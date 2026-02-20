@@ -1,0 +1,16 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": ".NET Launch (SmartCopy.App)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/SmartCopy.App/bin/Debug/net10.0/SmartCopy.App.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/SmartCopy.App",
+            "console": "internalConsole",
+            "stopAtEntry": false
+        }
+    ]
+}

@@ -1,19 +1,16 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="100"
              x:Class="SmartCopy.UI.Views.FilterChainView"
              x:DataType="vm:FilterChainViewModel">
-    <StackPanel Orientation="Vertical">
-        <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,5">
-            <TextBlock Text="FILTERS" FontWeight="Bold" VerticalAlignment="Center" />
-            <Button Content="+ Add ▾" />
-            <Button Content="Save ▾" />
-            <Button Content="Load ▾" />
-        </StackPanel>
-        <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="4" Padding="5">
+    <Border Background="#252526" BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="6" Padding="10">
+        <StackPanel Orientation="Vertical">
+            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
+                <TextBlock Text="FILTERS" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="#4facfe" />
+                <Button Content="+ Add ▾" CornerRadius="4" />
+                <Button Content="Save ▾" CornerRadius="4" />
+                <Button Content="Load ▾" CornerRadius="4" />
+            </StackPanel>
             <ItemsControl ItemsSource="{Binding Filters}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -22,20 +19,20 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Border BorderBrush="LightGray" BorderThickness="1" CornerRadius="4" Padding="5" Margin="0,0,5,5" Background="#2c2c2c">
+                        <Border BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,8,8" Background="#333333">
                             <StackPanel Orientation="Horizontal" Spacing="10">
-                                <TextBlock Text="≡" VerticalAlignment="Center" Cursor="Hand" />
+                                <TextBlock Text="≡" VerticalAlignment="Center" Cursor="Hand" Foreground="Gray" />
                                 <TextBlock Text="{Binding Description}" VerticalAlignment="Center" />
-                                <ComboBox SelectedIndex="0" Width="150">
+                                <ComboBox SelectedIndex="0" Width="150" CornerRadius="4">
                                     <ComboBoxItem Content="{Binding Mode}" />
                                 </ComboBox>
-                                <ToggleButton IsChecked="{Binding IsEnabled}" Content="●" Width="30" Height="30" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
-                                <Button Content="✕" Width="30" Height="30" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Background="Transparent" Foreground="Red" />
+                                <ToggleButton IsChecked="{Binding IsEnabled}" Content="●" Width="30" Height="28" CornerRadius="4" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
+                                <Button Content="✕" Width="30" Height="28" CornerRadius="4" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Background="Transparent" Foreground="#f44336" />
                             </StackPanel>
                         </Border>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
-        </Border>
-    </StackPanel>
+        </StackPanel>
+    </Border>
 </UserControl>
