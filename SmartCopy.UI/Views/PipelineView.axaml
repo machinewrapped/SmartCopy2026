@@ -1,0 +1,42 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="100"
+             x:Class="SmartCopy.UI.Views.PipelineView"
+             x:DataType="vm:PipelineViewModel">
+    <StackPanel Orientation="Vertical">
+        <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,5">
+            <TextBlock Text="PIPELINE" FontWeight="Bold" VerticalAlignment="Center" />
+            <Button Content="Copy ▾" />
+            <Button Content="Move ▾" />
+            <Button Content="Delete" />
+            <Button Content="Custom ▾" />
+            <Button Content="▶ Run" Background="Green" Foreground="White" />
+            <Button Content="👁 Preview" />
+        </StackPanel>
+        <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="4" Padding="5">
+            <ItemsControl ItemsSource="{Binding Steps}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <Border BorderBrush="LightGray" BorderThickness="1" CornerRadius="4" Padding="5" Margin="0,0,5,5" Background="#2c2c2c">
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <TextBlock Text="{Binding Description}" VerticalAlignment="Center" />
+                                    <Button Content="✕" Width="24" Height="24" Padding="0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Background="Transparent" Foreground="Red" />
+                                </StackPanel>
+                            </Border>
+                            <TextBlock Text="→" VerticalAlignment="Center" Margin="5" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </Border>
+    </StackPanel>
+</UserControl>

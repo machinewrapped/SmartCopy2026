@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="SmartCopy.App/SmartCopy.App.csproj" />
+  <Project Path="SmartCopy.Core/SmartCopy.Core.csproj" />
+  <Project Path="SmartCopy.Tests/SmartCopy.Tests.csproj" />
+  <Project Path="SmartCopy.UI/SmartCopy.UI.csproj" />
+</Solution>
