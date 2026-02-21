@@ -1,4 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using SmartCopy.UI.Services;
 
@@ -24,18 +26,25 @@ public partial class MainViewModel : ViewModelBase
         DirectoryTree = new DirectoryTreeViewModel(memoryProvider, MockMemoryFileSystemFactory.RootPath);
         FileList = new FileListViewModel(memoryProvider, MockMemoryFileSystemFactory.DefaultFileListPath);
 
-        DirectoryTree.PropertyChanged += (_, e) =>
+        DirectoryTree.PropertyChanged += async (_, e) =>
         {
             if (e.PropertyName == nameof(DirectoryTreeViewModel.SelectedNode))
             {
                 var selectedNode = DirectoryTree.SelectedNode;
                 if (selectedNode?.IsDirectory == true)
                 {
-                    _ = FileList.LoadFilesForDirectoryAsync(selectedNode.FullPath);
+                    try
+                    {
+                        await FileList.LoadFilesForDirectoryAsync(selectedNode.FullPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Failed to load files for directory: {ex}");
+                    }
                 }
             }
         };
-        _ = InitializeAsync();
+        InitializeInBackground();
 
         // Propagate the pipeline's first Copy/Move destination to the filter chain.
         // This is also where a directory tree rescan will be triggered in future phases.
@@ -45,6 +54,18 @@ public partial class MainViewModel : ViewModelBase
                 FilterChain.PipelineDestinationPath = Pipeline.FirstDestinationPath;
         };
         FilterChain.PipelineDestinationPath = Pipeline.FirstDestinationPath;
+    }
+
+    private async void InitializeInBackground()
+    {
+        try
+        {
+            await InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Initialization failed: {ex}");
+        }
     }
 
     private async Task InitializeAsync()

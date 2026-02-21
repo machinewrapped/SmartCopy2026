@@ -12,7 +12,8 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
 {
     private const string Root = "/";
     private readonly ConcurrentDictionary<string, MemoryEntry> _entries = new(StringComparer.OrdinalIgnoreCase);
-    private readonly object _mutationLock = new();
+    // SemaphoreSlim(1,1) provides async-compatible exclusive locking for all mutation operations.
+    private readonly SemaphoreSlim _mutationSemaphore = new(1, 1);
 
     public MemoryFileSystemProvider()
     {
@@ -32,6 +33,8 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         var normalizedPath = Normalize(path);
         EnsureDirectoryExists(normalizedPath);
 
+        // GetParentPath(kv.Key) == normalizedPath selects direct children.
+        // The extra inequality guard is only needed for root ("/"), where GetParentPath("/") == "/".
         var children = _entries
             .Where(kv => GetParentPath(kv.Key).Equals(normalizedPath, StringComparison.OrdinalIgnoreCase)
                          && !kv.Key.Equals(normalizedPath, StringComparison.OrdinalIgnoreCase))
@@ -78,8 +81,8 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
     public async Task WriteAsync(string path, Stream data, IProgress<long>? progress, CancellationToken ct)
     {
         var normalizedPath = Normalize(path);
-        EnsureParentDirectoryExists(normalizedPath);
 
+        // Read stream content before acquiring the mutation lock to avoid holding it during I/O.
         const int chunkSize = 256 * 1024;
         var buffer = new byte[chunkSize];
         await using var output = new MemoryStream();
@@ -99,17 +102,27 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
 
         var now = DateTime.UtcNow;
         var entry = MemoryEntry.CreateFile(output.ToArray(), now);
-        _entries[normalizedPath] = entry;
 
-        TouchParentModifiedTime(normalizedPath, now);
+        await _mutationSemaphore.WaitAsync(ct);
+        try
+        {
+            EnsureParentDirectoryExists(normalizedPath);
+            _entries[normalizedPath] = entry;
+            TouchParentModifiedTime(normalizedPath, now);
+        }
+        finally
+        {
+            _mutationSemaphore.Release();
+        }
     }
 
-    public Task DeleteAsync(string path, CancellationToken ct)
+    public async Task DeleteAsync(string path, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         var normalizedPath = Normalize(path);
 
-        lock (_mutationLock)
+        await _mutationSemaphore.WaitAsync(ct);
+        try
         {
             if (!_entries.ContainsKey(normalizedPath))
             {
@@ -118,17 +131,20 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
 
             RemovePathInternal(normalizedPath);
         }
-
-        return Task.CompletedTask;
+        finally
+        {
+            _mutationSemaphore.Release();
+        }
     }
 
-    public Task MoveAsync(string sourcePath, string destPath, CancellationToken ct)
+    public async Task MoveAsync(string sourcePath, string destPath, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         var normalizedSourcePath = Normalize(sourcePath);
         var normalizedDestinationPath = Normalize(destPath);
 
-        lock (_mutationLock)
+        await _mutationSemaphore.WaitAsync(ct);
+        try
         {
             if (!_entries.TryGetValue(normalizedSourcePath, out var sourceEntry))
             {
@@ -137,7 +153,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
 
             if (normalizedSourcePath.Equals(normalizedDestinationPath, StringComparison.OrdinalIgnoreCase))
             {
-                return Task.CompletedTask;
+                return;
             }
 
             if (sourceEntry.IsDirectory && IsDescendantOf(normalizedDestinationPath, normalizedSourcePath))
@@ -176,22 +192,32 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
                     _entries.TryRemove(oldKey, out _);
                 }
 
-                return Task.CompletedTask;
+                return;
             }
 
             _entries[normalizedDestinationPath] = sourceEntry;
             _entries.TryRemove(normalizedSourcePath, out _);
         }
-
-        return Task.CompletedTask;
+        finally
+        {
+            _mutationSemaphore.Release();
+        }
     }
 
-    public Task CreateDirectoryAsync(string path, CancellationToken ct)
+    public async Task CreateDirectoryAsync(string path, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         var normalizedPath = Normalize(path);
-        EnsureDirectoryExists(normalizedPath, createIfMissing: true);
-        return Task.CompletedTask;
+
+        await _mutationSemaphore.WaitAsync(ct);
+        try
+        {
+            EnsureDirectoryExists(normalizedPath, createIfMissing: true);
+        }
+        finally
+        {
+            _mutationSemaphore.Release();
+        }
     }
 
     public Task<bool> ExistsAsync(string path, CancellationToken ct)

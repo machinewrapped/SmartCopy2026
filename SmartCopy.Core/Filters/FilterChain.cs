@@ -18,13 +18,6 @@ public sealed class FilterChain
 
     public IReadOnlyList<IFilter> Filters => _filters;
 
-    public IEnumerable<FileSystemNode> Apply(
-        IEnumerable<FileSystemNode> nodes,
-        IFileSystemProvider? comparisonProvider = null)
-    {
-        return ApplyAsync(nodes, comparisonProvider).ConfigureAwait(false).GetAwaiter().GetResult();
-    }
-
     public async Task<IReadOnlyList<FileSystemNode>> ApplyAsync(
         IEnumerable<FileSystemNode> nodes,
         IFileSystemProvider? comparisonProvider = null,
@@ -42,13 +35,6 @@ public sealed class FilterChain
         }
 
         return result;
-    }
-
-    public void ApplyToTree(
-        IEnumerable<FileSystemNode> roots,
-        IFileSystemProvider? comparisonProvider = null)
-    {
-        ApplyToTreeAsync(roots, comparisonProvider).ConfigureAwait(false).GetAwaiter().GetResult();
     }
 
     public async Task ApplyToTreeAsync(

@@ -7,7 +7,7 @@ namespace SmartCopy.Tests.Filters;
 public sealed class FilterChainTests
 {
     [Fact]
-    public void Apply_WithIncludeAndExcludeFilters_ReturnsExpectedNodes()
+    public async Task Apply_WithIncludeAndExcludeFilters_ReturnsExpectedNodes()
     {
         var nodes = new[]
         {
@@ -22,14 +22,14 @@ public sealed class FilterChainTests
             new SizeRangeFilter(minBytes: 120, maxBytes: null, FilterMode.Exclude),
         ]);
 
-        var result = chain.Apply(nodes).ToList();
+        var result = (await chain.ApplyAsync(nodes)).ToList();
 
         Assert.Single(result);
         Assert.Equal("a.mp3", result[0].Name);
     }
 
     [Fact]
-    public void ApplyToTree_SetsFilterResultAndExcludedByFilter()
+    public async Task ApplyToTree_SetsFilterResultAndExcludedByFilter()
     {
         var root = new FileSystemNode
         {
@@ -42,7 +42,7 @@ public sealed class FilterChainTests
         root.Children.Add(child);
 
         var chain = new FilterChain([new ExtensionFilter(["mp3"], FilterMode.Include)]);
-        chain.ApplyToTree([root]);
+        await chain.ApplyToTreeAsync([root]);
 
         Assert.Equal(FilterResult.Excluded, child.FilterResult);
         Assert.Equal("Extension", child.ExcludedByFilter);
@@ -61,4 +61,3 @@ public sealed class FilterChainTests
         };
     }
 }
-

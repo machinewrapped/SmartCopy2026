@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -23,61 +22,69 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 
     public Task<IReadOnlyList<FileSystemNode>> GetChildrenAsync(string path, CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        var fullPath = Resolve(path);
-
-        if (!Directory.Exists(fullPath))
-        {
-            throw new DirectoryNotFoundException(fullPath);
-        }
-
-        var nodes = new List<FileSystemNode>();
-
-        foreach (var childDirectory in Directory.EnumerateDirectories(fullPath))
+        return Task.Run<IReadOnlyList<FileSystemNode>>(() =>
         {
             ct.ThrowIfCancellationRequested();
-            nodes.Add(CreateDirectoryNode(childDirectory, parent: null));
-        }
+            var fullPath = Resolve(path);
 
-        foreach (var childFile in Directory.EnumerateFiles(fullPath))
-        {
-            ct.ThrowIfCancellationRequested();
-            nodes.Add(CreateFileNode(childFile, parent: null));
-        }
+            if (!Directory.Exists(fullPath))
+            {
+                throw new DirectoryNotFoundException(fullPath);
+            }
 
-        return Task.FromResult<IReadOnlyList<FileSystemNode>>(nodes);
+            var nodes = new List<FileSystemNode>();
+
+            foreach (var childDirectory in Directory.EnumerateDirectories(fullPath))
+            {
+                ct.ThrowIfCancellationRequested();
+                nodes.Add(CreateDirectoryNode(childDirectory, parent: null));
+            }
+
+            foreach (var childFile in Directory.EnumerateFiles(fullPath))
+            {
+                ct.ThrowIfCancellationRequested();
+                nodes.Add(CreateFileNode(childFile, parent: null));
+            }
+
+            return nodes;
+        }, ct);
     }
 
     public Task<FileSystemNode> GetNodeAsync(string path, CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        var fullPath = Resolve(path);
-
-        if (Directory.Exists(fullPath))
+        return Task.Run(() =>
         {
-            return Task.FromResult(CreateDirectoryNode(fullPath, parent: null));
-        }
+            ct.ThrowIfCancellationRequested();
+            var fullPath = Resolve(path);
 
-        if (File.Exists(fullPath))
-        {
-            return Task.FromResult(CreateFileNode(fullPath, parent: null));
-        }
+            if (Directory.Exists(fullPath))
+            {
+                return CreateDirectoryNode(fullPath, parent: null);
+            }
 
-        throw new FileNotFoundException($"Path does not exist: {fullPath}", fullPath);
+            if (File.Exists(fullPath))
+            {
+                return CreateFileNode(fullPath, parent: null);
+            }
+
+            throw new FileNotFoundException($"Path does not exist: {fullPath}", fullPath);
+        }, ct);
     }
 
     public Task<Stream> OpenReadAsync(string path, CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        var fullPath = Resolve(path);
-
-        if (!File.Exists(fullPath))
+        return Task.Run<Stream>(() =>
         {
-            throw new FileNotFoundException($"File does not exist: {fullPath}", fullPath);
-        }
+            ct.ThrowIfCancellationRequested();
+            var fullPath = Resolve(path);
 
-        Stream stream = File.Open(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        return Task.FromResult(stream);
+            if (!File.Exists(fullPath))
+            {
+                throw new FileNotFoundException($"File does not exist: {fullPath}", fullPath);
+            }
+
+            return File.Open(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        }, ct);
     }
 
     public async Task WriteAsync(string path, Stream data, IProgress<long>? progress, CancellationToken ct)
@@ -109,74 +116,85 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 
     public Task DeleteAsync(string path, CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        var fullPath = Resolve(path);
-
-        if (File.Exists(fullPath))
+        return Task.Run(() =>
         {
-            File.Delete(fullPath);
-            return Task.CompletedTask;
-        }
+            ct.ThrowIfCancellationRequested();
+            var fullPath = Resolve(path);
 
-        if (Directory.Exists(fullPath))
-        {
-            Directory.Delete(fullPath, recursive: true);
-            return Task.CompletedTask;
-        }
+            if (File.Exists(fullPath))
+            {
+                File.Delete(fullPath);
+                return;
+            }
 
-        throw new FileNotFoundException($"Path does not exist: {fullPath}", fullPath);
+            if (Directory.Exists(fullPath))
+            {
+                Directory.Delete(fullPath, recursive: true);
+                return;
+            }
+
+            throw new FileNotFoundException($"Path does not exist: {fullPath}", fullPath);
+        }, ct);
     }
 
     public Task MoveAsync(string sourcePath, string destPath, CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        var fullSourcePath = Resolve(sourcePath);
-        var fullDestinationPath = Resolve(destPath);
-
-        var destinationParent = Path.GetDirectoryName(fullDestinationPath);
-        if (!string.IsNullOrEmpty(destinationParent))
+        return Task.Run(() =>
         {
-            Directory.CreateDirectory(destinationParent);
-        }
+            ct.ThrowIfCancellationRequested();
+            var fullSourcePath = Resolve(sourcePath);
+            var fullDestinationPath = Resolve(destPath);
 
-        if (File.Exists(fullSourcePath))
-        {
-            if (File.Exists(fullDestinationPath))
+            var destinationParent = Path.GetDirectoryName(fullDestinationPath);
+            if (!string.IsNullOrEmpty(destinationParent))
             {
-                File.Delete(fullDestinationPath);
+                Directory.CreateDirectory(destinationParent);
             }
 
-            File.Move(fullSourcePath, fullDestinationPath);
-            return Task.CompletedTask;
-        }
-
-        if (Directory.Exists(fullSourcePath))
-        {
-            if (Directory.Exists(fullDestinationPath))
+            if (File.Exists(fullSourcePath))
             {
-                Directory.Delete(fullDestinationPath, recursive: true);
+                if (File.Exists(fullDestinationPath))
+                {
+                    File.Delete(fullDestinationPath);
+                }
+
+                File.Move(fullSourcePath, fullDestinationPath);
+                return;
             }
 
-            Directory.Move(fullSourcePath, fullDestinationPath);
-            return Task.CompletedTask;
-        }
+            if (Directory.Exists(fullSourcePath))
+            {
+                if (Directory.Exists(fullDestinationPath))
+                {
+                    Directory.Delete(fullDestinationPath, recursive: true);
+                }
 
-        throw new FileNotFoundException($"Source path does not exist: {fullSourcePath}", fullSourcePath);
+                Directory.Move(fullSourcePath, fullDestinationPath);
+                return;
+            }
+
+            throw new FileNotFoundException($"Source path does not exist: {fullSourcePath}", fullSourcePath);
+        }, ct);
     }
 
     public Task CreateDirectoryAsync(string path, CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        var fullPath = Resolve(path);
-        Directory.CreateDirectory(fullPath);
-        return Task.CompletedTask;
+        return Task.Run(() =>
+        {
+            ct.ThrowIfCancellationRequested();
+            var fullPath = Resolve(path);
+            Directory.CreateDirectory(fullPath);
+        }, ct);
     }
 
     public Task<bool> ExistsAsync(string path, CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        var fullPath = Resolve(path);
-        return Task.FromResult(File.Exists(fullPath) || Directory.Exists(fullPath));
+        return Task.Run(() =>
+        {
+            ct.ThrowIfCancellationRequested();
+            var fullPath = Resolve(path);
+            return File.Exists(fullPath) || Directory.Exists(fullPath);
+        }, ct);
     }
 
     private string Resolve(string path)
@@ -228,4 +246,3 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         };
     }
 }
-
