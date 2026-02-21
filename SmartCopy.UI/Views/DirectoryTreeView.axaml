@@ -9,7 +9,10 @@
         <conv:CheckStateConverter x:Key="CheckStateConverter" />
     </UserControl.Resources>
 
-    <TreeView ItemsSource="{Binding RootNodes}" Background="Transparent" BorderThickness="0">
+    <TreeView ItemsSource="{Binding RootNodes}"
+              SelectedItem="{Binding SelectedNode, Mode=TwoWay}"
+              Background="Transparent"
+              BorderThickness="0">
         <TreeView.ItemTemplate>
             <TreeDataTemplate ItemsSource="{Binding Children}">
                 <StackPanel Orientation="Horizontal" Spacing="4">

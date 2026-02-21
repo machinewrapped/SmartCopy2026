@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- Avalonia telemetry writes to %LocalAppData%; disable in sandboxed/dev environments where that can be blocked. -->
+    <UsedAvaloniaProducts></UsedAvaloniaProducts>
+  </PropertyGroup>
+</Project>

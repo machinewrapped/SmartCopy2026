@@ -1,7 +1,7 @@
 # SmartCopy2026 — Design & Implementation Plan (Revised)
 
 **Prepared:** 2026-02-18
-**Revised:** 2026-02-21 (clarity/specification/actionability pass; execution plan and decision log updated)
+**Revised:** 2026-02-21 (status synchronized with implemented Phase 1 work on `mem-filesystem`)
 **Author:** Simon Booth
 **License:** MIT
 **Predecessor:** SmartCopy 2015 (GPL v3, .NET 4.8 WinForms, SourceForge)
@@ -950,9 +950,16 @@ and sync safely.*
 
 | Step | Status | Evidence | Next action |
 |---|---|---|---|
-| 1. Project scaffold + UI shell | In progress | 3-column shell exists; filter cards redesigned; window/column persistence implemented (§7) | Finish remaining shell checklist items (progress overlay, log panel, keyboard/accessibility) |
-| 2. Core models + memory provider foundation | Not started | Interfaces and architecture are defined (§4-§5), but provider/test harness implementations are incomplete | Implement memory-first provider layer and test doubles |
-| 3-10 | Not started | Design complete; no implementation exit criteria met yet | Execute in order |
+| 1. Project scaffold + UI shell | In progress | 3-column shell, seeded `/mem` source, tree->file-list sync, persisted window/column state, CI matrix in place | Finish log panel + keyboard/automation accessibility baseline |
+| 2. Core models + memory provider foundation | Complete (with minor test-fixture follow-up) | `FileSystemNode`, `IFileSystemProvider`, `ProviderCapabilities`, `MemoryFileSystemProvider`, and provider contract tests are implemented | Add shared memory-first fixture builders to reduce test duplication |
+| 3. Local provider + scanner integration | In progress | `LocalFileSystemProvider`, `DirectoryScanner`, `ScanOptions`, `ScanProgress` implemented; scanner tests verify progressive top-level streaming | Wire scanner streaming/cancellation into UI and add `TrashService` adapters |
+| 4. Node selection logic | In progress | Tri-state propagation and `IsSelected` behavior implemented in `FileSystemNode` and used by tree/list nodes | Add dedicated tri-state/perf tests and status-bar aggregate wiring |
+| 5. Filter chain | In progress | `IFilter`, `FilterChain`, and planned filter types are implemented with initial tests | Replace filter UI stubs with live chain execution and broaden test coverage |
+| 6. Transform pipeline | In progress | Core pipeline (`TransformPipeline`, `PipelineRunner`) and built-in steps (`Copy/Move/Delete/Flatten`) implemented with tests | Wire Preview/Run in UI, enforce delete-confirm preview policy, add journal/progress integration |
+| 7. Sync operations | Started (core skeleton) | `SyncWorkflow` has find-orphans and basic update/mirror builders | Implement full update/mirror semantics (`IfNewer`, orphan delete pass with confirmation) + UI entry points |
+| 8. Selection save/load | In progress | `SelectionSerializer` (`.txt`, `.m3u`, `.sc2sel`) and `SelectionManager` implemented with round-trip tests | Wire File menu flows and add unmatched-path reporting behavior |
+| 9. Settings persistence | In progress | `AppSettings` + `AppSettingsStore` implemented with corrupt-file fallback tests and cross-platform path resolution | Add schema migration path and startup/shutdown wiring for persisted defaults |
+| 10. Filesystem watcher | Started (core skeleton) | `DirectoryWatcher` exists with 300ms debounce + change batching | Add automated watcher tests and incremental rescan integration with selection preservation |
 
 ### Step 1 — Project Scaffold + UI Shell (finish)
 
@@ -960,16 +967,16 @@ Deliverables:
 - [x] Solution and projects exist: `SmartCopy.Core`, `SmartCopy.App`, `SmartCopy.UI`, `SmartCopy.Tests`
 - [x] DI bootstrapping in `AppServiceProvider.cs`
 - [x] UI shell layout and persisted window/column state (§7)
-- [ ] Operation progress overlay placeholder (no real operations yet)
+- [x] Operation progress overlay placeholder (no real operations yet)
 - [ ] Collapsible log panel with placeholder entries
 - [ ] Full keyboard baseline (`Tab`, arrows, `Space`, `Ctrl+A`, `Delete`/`Ctrl+D`, `F5`, `Escape`)
 - [ ] `AutomationProperties.Name` on all interactive controls
-- [ ] CI workflow runs build + tests on Windows and Linux
+- [x] CI workflow runs build + tests on Windows and Linux
 
 Acceptance criteria:
 - [ ] App launches and renders correctly on Windows and Linux
 - [ ] Shell checklist in §7 is fully checked
-- [ ] No hard dependency on real filesystem for shell startup
+- [x] No hard dependency on real filesystem for shell startup (current shell uses seeded `/mem/`)
 
 Verification:
 - [ ] `dotnet build SmartCopy.App/SmartCopy.App.csproj`
@@ -978,36 +985,36 @@ Verification:
 ### Step 2 — Core Models + MemoryFileSystemProvider (test-first foundation)
 
 Deliverables:
-- [ ] Implement `FileSystemNode` full model contract from §10
-- [ ] Implement `IFileSystemProvider` + `ProviderCapabilities`
-- [ ] Implement `MemoryFileSystemProvider` for fast hermetic tests
-- [ ] Create shared test fixtures/builders that default to `MemoryFileSystemProvider`
+- [x] Implement `FileSystemNode` full model contract from §10
+- [x] Implement `IFileSystemProvider` + `ProviderCapabilities`
+- [x] Implement `MemoryFileSystemProvider` for fast hermetic tests
+- [ ] Create shared test fixtures/builders that default to `MemoryFileSystemProvider` (tests currently instantiate providers directly)
 
 Acceptance criteria:
-- [ ] Memory provider supports same contract without disk I/O
-- [ ] Scanner/filter/pipeline core tests in this step run only against `MemoryFileSystemProvider`
-- [ ] No production code in this step requires touching real files
+- [x] Memory provider supports same contract without disk I/O
+- [x] Scanner/filter/pipeline core tests in this step run against `MemoryFileSystemProvider`
+- [x] No production code in this step requires touching real files for shell startup
 
 Verification:
-- [ ] Unit tests for `MemoryFileSystemProvider`
-- [ ] Contract tests for enumerate/read/write/move/delete/create/exists on in-memory trees
+- [x] Unit tests for `MemoryFileSystemProvider`
+- [x] Contract tests for enumerate/read/write/move/delete/create/exists on in-memory trees
 
 ### Step 3 — Local Filesystem Provider + Directory Scanner Integration
 
 Deliverables:
-- [ ] Implement `LocalFileSystemProvider`
+- [x] Implement `LocalFileSystemProvider`
 - [ ] Implement platform `TrashService` adapters with timeout/fallback behavior
-- [ ] `DirectoryScanner` with progressive `IAsyncEnumerable<FileSystemNode>`
-- [ ] `ScanOptions` (`IncludeHidden`, `FullPreScan`, `LazyExpand`, `MaxDepth`)
-- [ ] `ScanProgress` reporting
-- [ ] Wiring into `DirectoryTreeViewModel` (replace hardcoded tree data)
+- [x] `DirectoryScanner` with progressive `IAsyncEnumerable<FileSystemNode>`
+- [x] `ScanOptions` (`IncludeHidden`, `FullPreScan`, `LazyExpand`, `MaxDepth`)
+- [x] `ScanProgress` reporting
+- [ ] Wiring into `DirectoryTreeViewModel` via progressive scanner stream (tree now uses provider-backed data, but not scanner streaming yet)
 
 Acceptance criteria:
-- [ ] Local provider supports enumerate/read/write/move/delete/create/exists end-to-end
-- [ ] Top-level nodes appear before deep traversal completes
+- [x] Local provider supports enumerate/read/write/move/delete/create/exists end-to-end
+- [x] Top-level nodes appear before deep traversal completes (scanner behavior + tests)
 - [ ] Cancelled scans stop cleanly without UI freeze
 - [ ] Scan options are honored and test-covered
-- [ ] Provider capability flags are consumed by at least one scanner/pipeline decision path
+- [x] Provider capability flags are consumed by at least one scanner/pipeline decision path (`CanAtomicMove` in `MoveStep`)
 
 Verification:
 - [ ] Unit tests for `LocalFileSystemProvider` failure paths (access denied, missing files, non-seekable streams)
@@ -1017,13 +1024,13 @@ Verification:
 ### Step 4 — Node Selection Logic
 
 Deliverables:
-- [ ] Tri-state propagation algorithm from §6.2 in production view models
-- [ ] `IsSelected` wiring (`CheckState == Checked && FilterResult == Included`)
+- [x] Tri-state propagation algorithm from §6.2 in production nodes/view models
+- [x] `IsSelected` wiring (`CheckState == Checked && FilterResult == Included`)
 - [ ] Status bar live counts/size from §6.10
 
 Acceptance criteria:
-- [ ] Parent/child state transitions are deterministic and O(height) upward
-- [ ] No per-node `PropertyChanged` storm during bulk updates (batched updates)
+- [x] Parent/child state transitions are deterministic and O(height) upward
+- [x] No per-node `PropertyChanged` storm during bulk updates (batched updates)
 
 Verification:
 - [ ] Unit tests for checked/unchecked/indeterminate transitions
@@ -1032,30 +1039,30 @@ Verification:
 ### Step 5 — Filter Chain
 
 Deliverables:
-- [ ] `IFilter`, `FilterChain`, `FilterConfig`
-- [ ] `Wildcard`, `Extension`, `Mirror`, `DateRange`, `SizeRange`, `Attribute` filters
+- [x] `IFilter`, `FilterChain`, `FilterConfig`
+- [x] `Wildcard`, `Extension`, `Mirror`, `DateRange`, `SizeRange`, `Attribute` filters
 - [ ] UI wiring so filter results affect tree + file list consistently
 
 Acceptance criteria:
-- [ ] Include/exclude semantics match §5.2
-- [ ] Disabled filters have zero effect
+- [x] Include/exclude semantics match §5.2
+- [x] Disabled filters have zero effect
 - [ ] Mirror filter comparison source is derived from pipeline destination by default
 
 Verification:
-- [ ] Unit tests per filter type and chain ordering
+- [ ] Unit tests per filter type and chain ordering (currently basic chain coverage only)
 - [ ] Integration test: apply mixed include/exclude chain and verify expected output set
 
 ### Step 6 — Transform Pipeline (built-in steps)
 
 Deliverables:
-- [ ] `ITransformStep`, `TransformPipeline`, `TransformContext`, `PipelineRunner`
-- [ ] `CopyStep`, `MoveStep`, `DeleteStep`, `FlattenStep`
-- [ ] Preview generation (`OperationPlan`) and preview UI wiring
+- [x] `ITransformStep`, `TransformPipeline`, `TransformContext`, `PipelineRunner`
+- [x] `CopyStep`, `MoveStep`, `DeleteStep`, `FlattenStep`
+- [ ] Preview generation (`OperationPlan`) and preview UI wiring (core complete; UI wiring pending)
 - [ ] Progress overlay wired to real operation events
 - [ ] Operation journal written to `%APPDATA%/SmartCopy2026/logs/`
 
 Acceptance criteria:
-- [ ] Exactly one terminal step required and validated
+- [x] Exactly one terminal step required and validated
 - [ ] Delete pipelines always require explicit preview confirmation
 - [ ] Overwrite and delete modes are honored per context/config
 
@@ -1068,13 +1075,13 @@ Verification:
 Deliverables:
 - [ ] Update target workflow (`MirrorFilter` + `CopyStep` + `IfNewer`)
 - [ ] Mirror target workflow (second orphan-delete pass with mandatory preview)
-- [ ] Find-orphans report mode
+- [x] Find-orphans report mode
 - [ ] Menu/preset entry points
 
 Acceptance criteria:
 - [ ] Update mode never deletes files
 - [ ] Mirror mode deletes only items confirmed in preview
-- [ ] Find-orphans performs no write/delete actions
+- [x] Find-orphans performs no write/delete actions
 
 Verification:
 - [ ] Integration tests against repeatable fixtures for update/mirror/orphan scenarios
@@ -1082,27 +1089,27 @@ Verification:
 ### Step 8 — Selection Save/Load
 
 Deliverables:
-- [ ] `SelectionSerializer` for `.txt`, `.m3u`, `.sc2sel`
-- [ ] `SelectionManager` snapshot/restore for rescans
+- [x] `SelectionSerializer` for `.txt`, `.m3u`, `.sc2sel`
+- [x] `SelectionManager` snapshot/restore for rescans
 - [ ] File menu wiring (save/load/restore)
 
 Acceptance criteria:
-- [ ] Relative path portability works across machines
+- [x] Relative path portability works across machines
 - [ ] Missing/unmatched paths are reported and skipped without aborting load
 
 Verification:
-- [ ] Round-trip tests for all formats
+- [x] Round-trip tests for all formats
 - [ ] Regression tests for mixed path separators and case differences
 
 ### Step 9 — Settings Persistence
 
 Deliverables:
-- [ ] `AppSettings` load/save + schema version
-- [ ] Cross-platform settings paths (`%APPDATA%` / `~/.config`)
+- [x] `AppSettings` load/save + schema version
+- [x] Cross-platform settings paths (`%APPDATA%` / `~/.config`)
 - [ ] Persisted UI and workflow defaults (sort, scan options, recents)
 
 Acceptance criteria:
-- [ ] Missing/corrupt settings file falls back to defaults without crash
+- [x] Missing/corrupt settings file falls back to defaults without crash
 - [ ] Forward-compatible migration path exists for schema changes
 
 Verification:
@@ -1112,7 +1119,7 @@ Verification:
 ### Step 10 — Filesystem Watcher
 
 Deliverables:
-- [ ] `DirectoryWatcher` with 300ms debounce and event coalescing
+- [x] `DirectoryWatcher` with 300ms debounce and event coalescing
 - [ ] Incremental subtree rescan with selection preservation (§6.5)
 - [ ] Settings toggle for watcher enable/disable (disabled for MTP providers)
 

@@ -1,33 +1,133 @@
-using System;
 using System.Collections.ObjectModel;
+using System.Threading;
+using System.Threading.Tasks;
 using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.UI.ViewModels;
 
 public class DirectoryTreeViewModel : ViewModelBase
 {
+    private readonly IFileSystemProvider _provider;
+    private readonly string _rootPath;
+    private FileSystemNode? _selectedNode;
+
     public ObservableCollection<FileSystemNode> RootNodes { get; } = new();
-
-    public DirectoryTreeViewModel()
+    public FileSystemNode? SelectedNode
     {
-        // Stub data
-        var rock = new FileSystemNode { Name = "Rock", IsDirectory = true, RelativePath = "Rock", CheckState = CheckState.Indeterminate };
-        var classicRock = new FileSystemNode { Name = "Classic Rock", IsDirectory = true, RelativePath = "Rock/Classic Rock", CheckState = CheckState.Checked, Parent = rock };
-        var beatles = new FileSystemNode { Name = "Beatles", IsDirectory = true, RelativePath = "Rock/Classic Rock/Beatles", CheckState = CheckState.Checked, Parent = classicRock };
-        var rollingStones = new FileSystemNode { Name = "Rolling Stones", IsDirectory = true, RelativePath = "Rock/Classic Rock/Rolling Stones", CheckState = CheckState.Unchecked, Parent = classicRock };
-        
-        classicRock.Children.Add(beatles);
-        classicRock.Children.Add(rollingStones);
-        rock.Children.Add(classicRock);
-        
-        var metal = new FileSystemNode { Name = "Metal", IsDirectory = true, RelativePath = "Rock/Metal", CheckState = CheckState.Indeterminate, Parent = rock };
-        rock.Children.Add(metal);
-        
-        var jazz = new FileSystemNode { Name = "Jazz", IsDirectory = true, RelativePath = "Jazz", CheckState = CheckState.Checked };
-        var classical = new FileSystemNode { Name = "Classical", IsDirectory = true, RelativePath = "Classical", CheckState = CheckState.Unchecked };
+        get => _selectedNode;
+        set => SetProperty(ref _selectedNode, value);
+    }
 
-        RootNodes.Add(rock);
-        RootNodes.Add(jazz);
-        RootNodes.Add(classical);
+    public DirectoryTreeViewModel(IFileSystemProvider provider, string rootPath)
+    {
+        _provider = provider;
+        _rootPath = rootPath;
+    }
+
+    public async Task InitializeAsync(string? initialSelectionPath = null, CancellationToken ct = default)
+    {
+        RootNodes.Clear();
+
+        var root = await BuildNodeTreeAsync(_rootPath, ct);
+        root.CheckState = CheckState.Indeterminate;
+        RootNodes.Add(root);
+        SelectedNode = root;
+
+        if (!string.IsNullOrWhiteSpace(initialSelectionPath))
+        {
+            SelectByPath(initialSelectionPath);
+        }
+    }
+
+    public bool SelectByPath(string fullPath)
+    {
+        if (string.IsNullOrWhiteSpace(fullPath))
+        {
+            return false;
+        }
+
+        var match = FindByPath(fullPath);
+        if (match is null)
+        {
+            return false;
+        }
+
+        SelectedNode = match;
+        return true;
+    }
+
+    private async Task<FileSystemNode> BuildNodeTreeAsync(string path, CancellationToken ct)
+    {
+        var sourceRoot = await _provider.GetNodeAsync(path, ct);
+        var root = CloneNode(sourceRoot, parent: null);
+
+        var stack = new Stack<FileSystemNode>();
+        stack.Push(root);
+
+        while (stack.Count > 0)
+        {
+            ct.ThrowIfCancellationRequested();
+            var current = stack.Pop();
+            if (!current.IsDirectory)
+            {
+                continue;
+            }
+
+            var children = await _provider.GetChildrenAsync(current.FullPath, ct);
+            for (var i = children.Count - 1; i >= 0; i--)
+            {
+                var child = children[i];
+                if (!child.IsDirectory)
+                {
+                    continue;
+                }
+
+                var clonedChild = CloneNode(child, current);
+                current.Children.Add(clonedChild);
+                stack.Push(clonedChild);
+            }
+        }
+
+        return root;
+    }
+
+    private static FileSystemNode CloneNode(FileSystemNode sourceNode, FileSystemNode? parent)
+    {
+        return new FileSystemNode
+        {
+            Name = sourceNode.Name,
+            FullPath = sourceNode.FullPath,
+            RelativePath = sourceNode.RelativePath,
+            IsDirectory = sourceNode.IsDirectory,
+            Size = sourceNode.Size,
+            CreatedAt = sourceNode.CreatedAt,
+            ModifiedAt = sourceNode.ModifiedAt,
+            Attributes = sourceNode.Attributes,
+            Parent = parent,
+            CheckState = sourceNode.CheckState,
+            FilterResult = sourceNode.FilterResult,
+            ExcludedByFilter = sourceNode.ExcludedByFilter,
+            Notes = sourceNode.Notes,
+        };
+    }
+
+    private FileSystemNode? FindByPath(string fullPath)
+    {
+        var stack = new Stack<FileSystemNode>(RootNodes);
+        while (stack.Count > 0)
+        {
+            var node = stack.Pop();
+            if (string.Equals(node.FullPath, fullPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return node;
+            }
+
+            for (var i = node.Children.Count - 1; i >= 0; i--)
+            {
+                stack.Push(node.Children[i]);
+            }
+        }
+
+        return null;
     }
 }
