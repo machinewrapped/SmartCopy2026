@@ -1,4 +1,5 @@
-using System.Collections.ObjectModel;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using SmartCopy.Core.FileSystem;
@@ -11,7 +12,12 @@ public class FileListViewModel : ViewModelBase
     private string _directoryPath;
     private CancellationTokenSource? _loadCts;
 
-    public ObservableCollection<FileSystemNode> Files { get; } = new();
+    private IReadOnlyList<FileSystemNode> _files = [];
+    public IReadOnlyList<FileSystemNode> Files
+    {
+        get => _files;
+        private set => SetProperty(ref _files, value);
+    }
 
     public FileListViewModel(IFileSystemProvider provider, string directoryPath)
     {
@@ -19,59 +25,62 @@ public class FileListViewModel : ViewModelBase
         _directoryPath = directoryPath;
     }
 
-    public async Task LoadFilesForDirectoryAsync(string directoryPath)
+    public async Task LoadFilesForNodeAsync(FileSystemNode directoryNode)
     {
         _loadCts?.Cancel();
         _loadCts?.Dispose();
         _loadCts = new CancellationTokenSource();
         var ct = _loadCts.Token;
 
-        _directoryPath = directoryPath;
-        var children = await _provider.GetChildrenAsync(_directoryPath, ct);
-        var files = new List<FileSystemNode>();
-        foreach (var child in children)
+        _directoryPath = directoryNode.FullPath;
+        
+        if (directoryNode.Files.Count == 0)
         {
-            ct.ThrowIfCancellationRequested();
-            if (child.IsDirectory)
+            var children = await _provider.GetChildrenAsync(_directoryPath, ct);
+            var files = new List<FileSystemNode>();
+            
+            foreach (var child in children)
             {
-                continue;
+                ct.ThrowIfCancellationRequested();
+                if (child.IsDirectory)
+                {
+                    continue;
+                }
+
+                var checkState = directoryNode.CheckState == CheckState.Checked ? CheckState.Checked : CheckState.Unchecked;
+
+                var filterResult = child.Name.Equals("desktop.ini", StringComparison.OrdinalIgnoreCase)
+                    ? FilterResult.Excluded
+                    : FilterResult.Included;
+
+                files.Add(new FileSystemNode
+                {
+                    Name = child.Name,
+                    FullPath = child.FullPath,
+                    RelativePath = child.RelativePath,
+                    IsDirectory = false,
+                    Size = child.Size,
+                    CreatedAt = child.CreatedAt,
+                    ModifiedAt = child.ModifiedAt,
+                    Attributes = child.Attributes,
+                    CheckState = checkState,
+                    FilterResult = filterResult,
+                    ExcludedByFilter = filterResult == FilterResult.Excluded ? "Hidden" : null,
+                    Parent = directoryNode
+                });
             }
 
-            var checkState = child.Name switch
+            if (ct.IsCancellationRequested)
             {
-                "Something.flac" => CheckState.Unchecked,
-                _ => CheckState.Checked,
-            };
+                return;
+            }
 
-            var filterResult = child.Name.Equals("desktop.ini", StringComparison.OrdinalIgnoreCase)
-                ? FilterResult.Excluded
-                : FilterResult.Included;
-
-            files.Add(new FileSystemNode
+            foreach (var file in files)
             {
-                Name = child.Name,
-                FullPath = child.FullPath,
-                RelativePath = child.RelativePath,
-                IsDirectory = false,
-                Size = child.Size,
-                CreatedAt = child.CreatedAt,
-                ModifiedAt = child.ModifiedAt,
-                Attributes = child.Attributes,
-                CheckState = checkState,
-                FilterResult = filterResult,
-                ExcludedByFilter = filterResult == FilterResult.Excluded ? "Hidden" : null,
-            });
+                directoryNode.Files.Add(file);
+            }
         }
 
-        if (ct.IsCancellationRequested)
-        {
-            return;
-        }
-
-        Files.Clear();
-        foreach (var file in files)
-        {
-            Files.Add(file);
-        }
+        Files = directoryNode.Files.ToList();
     }
 }

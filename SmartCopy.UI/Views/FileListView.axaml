@@ -17,11 +17,11 @@
         <DataGrid.Columns>
             <DataGridTemplateColumn Width="Auto">
                 <DataGridTemplateColumn.Header>
-                    <CheckBox IsThreeState="True" Margin="8,0,0,0" />
+                    <CheckBox IsThreeState="False" Margin="8,0,0,0" />
                 </DataGridTemplateColumn.Header>
                 <DataGridTemplateColumn.CellTemplate>
                     <DataTemplate>
-                        <CheckBox IsChecked="{Binding CheckState, Converter={StaticResource CheckStateConverter}}" IsThreeState="True" Margin="8,0,0,0" />
+                        <CheckBox IsChecked="{Binding CheckState, Converter={StaticResource CheckStateConverter}}" IsThreeState="False" Margin="8,0,0,0" />
                     </DataTemplate>
                 </DataGridTemplateColumn.CellTemplate>
             </DataGridTemplateColumn>

@@ -35,7 +35,7 @@ public partial class MainViewModel : ViewModelBase
                 {
                     try
                     {
-                        await FileList.LoadFilesForDirectoryAsync(selectedNode.FullPath);
+                        await FileList.LoadFilesForNodeAsync(selectedNode);
                     }
                     catch (Exception ex)
                     {
@@ -71,6 +71,9 @@ public partial class MainViewModel : ViewModelBase
     private async Task InitializeAsync()
     {
         await DirectoryTree.InitializeAsync(MockMemoryFileSystemFactory.DefaultFileListPath);
-        await FileList.LoadFilesForDirectoryAsync(MockMemoryFileSystemFactory.DefaultFileListPath);
+        if (DirectoryTree.SelectedNode != null)
+        {
+            await FileList.LoadFilesForNodeAsync(DirectoryTree.SelectedNode);
+        }
     }
 }
