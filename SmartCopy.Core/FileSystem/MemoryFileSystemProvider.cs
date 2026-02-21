@@ -12,6 +12,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
 {
     private const string Root = "/";
     private readonly ConcurrentDictionary<string, MemoryEntry> _entries = new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _mutationLock = new();
 
     public MemoryFileSystemProvider()
     {
@@ -108,19 +109,14 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         ct.ThrowIfCancellationRequested();
         var normalizedPath = Normalize(path);
 
-        if (!_entries.ContainsKey(normalizedPath))
+        lock (_mutationLock)
         {
-            throw new FileNotFoundException($"Path does not exist: {normalizedPath}", normalizedPath);
-        }
+            if (!_entries.ContainsKey(normalizedPath))
+            {
+                throw new FileNotFoundException($"Path does not exist: {normalizedPath}", normalizedPath);
+            }
 
-        var toRemove = _entries.Keys
-            .Where(currentPath => currentPath.Equals(normalizedPath, StringComparison.OrdinalIgnoreCase)
-                                  || IsDescendantOf(currentPath, normalizedPath))
-            .ToList();
-
-        foreach (var key in toRemove)
-        {
-            _entries.TryRemove(key, out _);
+            RemovePathInternal(normalizedPath);
         }
 
         return Task.CompletedTask;
@@ -132,42 +128,61 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         var normalizedSourcePath = Normalize(sourcePath);
         var normalizedDestinationPath = Normalize(destPath);
 
-        if (!_entries.TryGetValue(normalizedSourcePath, out var sourceEntry))
+        lock (_mutationLock)
         {
-            throw new FileNotFoundException($"Source path does not exist: {normalizedSourcePath}", normalizedSourcePath);
-        }
-
-        EnsureParentDirectoryExists(normalizedDestinationPath);
-
-        if (sourceEntry.IsDirectory)
-        {
-            var keysToMove = _entries.Keys
-                .Where(currentPath => currentPath.Equals(normalizedSourcePath, StringComparison.OrdinalIgnoreCase)
-                                      || IsDescendantOf(currentPath, normalizedSourcePath))
-                .OrderBy(pathToMove => pathToMove.Length)
-                .ToList();
-
-            foreach (var oldKey in keysToMove)
+            if (!_entries.TryGetValue(normalizedSourcePath, out var sourceEntry))
             {
-                var relative = oldKey.Equals(normalizedSourcePath, StringComparison.OrdinalIgnoreCase)
-                    ? string.Empty
-                    : oldKey.Substring(normalizedSourcePath.Length).TrimStart('/');
-                var newKey = string.IsNullOrEmpty(relative)
-                    ? normalizedDestinationPath
-                    : Normalize(Combine(normalizedDestinationPath, relative));
-                _entries[newKey] = _entries[oldKey];
+                throw new FileNotFoundException($"Source path does not exist: {normalizedSourcePath}", normalizedSourcePath);
             }
 
-            foreach (var oldKey in keysToMove)
+            if (normalizedSourcePath.Equals(normalizedDestinationPath, StringComparison.OrdinalIgnoreCase))
             {
-                _entries.TryRemove(oldKey, out _);
+                return Task.CompletedTask;
             }
 
-            return Task.CompletedTask;
+            if (sourceEntry.IsDirectory && IsDescendantOf(normalizedDestinationPath, normalizedSourcePath))
+            {
+                throw new InvalidOperationException("Cannot move a directory into its own descendant.");
+            }
+
+            EnsureParentDirectoryExists(normalizedDestinationPath);
+
+            if (_entries.ContainsKey(normalizedDestinationPath))
+            {
+                RemovePathInternal(normalizedDestinationPath);
+            }
+
+            if (sourceEntry.IsDirectory)
+            {
+                var keysToMove = _entries.Keys
+                    .Where(currentPath => currentPath.Equals(normalizedSourcePath, StringComparison.OrdinalIgnoreCase)
+                                          || IsDescendantOf(currentPath, normalizedSourcePath))
+                    .OrderBy(pathToMove => pathToMove.Length)
+                    .ToList();
+
+                foreach (var oldKey in keysToMove)
+                {
+                    var relative = oldKey.Equals(normalizedSourcePath, StringComparison.OrdinalIgnoreCase)
+                        ? string.Empty
+                        : oldKey.Substring(normalizedSourcePath.Length).TrimStart('/');
+                    var newKey = string.IsNullOrEmpty(relative)
+                        ? normalizedDestinationPath
+                        : Normalize(Combine(normalizedDestinationPath, relative));
+                    _entries[newKey] = _entries[oldKey];
+                }
+
+                foreach (var oldKey in keysToMove)
+                {
+                    _entries.TryRemove(oldKey, out _);
+                }
+
+                return Task.CompletedTask;
+            }
+
+            _entries[normalizedDestinationPath] = sourceEntry;
+            _entries.TryRemove(normalizedSourcePath, out _);
         }
 
-        _entries[normalizedDestinationPath] = sourceEntry;
-        _entries.TryRemove(normalizedSourcePath, out _);
         return Task.CompletedTask;
     }
 
@@ -230,6 +245,19 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         }
 
         _entries[path] = MemoryEntry.CreateDirectory();
+    }
+
+    private void RemovePathInternal(string normalizedPath)
+    {
+        var toRemove = _entries.Keys
+            .Where(currentPath => currentPath.Equals(normalizedPath, StringComparison.OrdinalIgnoreCase)
+                                  || IsDescendantOf(currentPath, normalizedPath))
+            .ToList();
+
+        foreach (var key in toRemove)
+        {
+            _entries.TryRemove(key, out _);
+        }
     }
 
     private static bool IsDescendantOf(string path, string ancestorPath)
@@ -349,4 +377,3 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         }
     }
 }
-

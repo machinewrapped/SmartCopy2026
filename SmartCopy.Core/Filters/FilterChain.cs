@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Core.Filters;
@@ -20,22 +22,53 @@ public sealed class FilterChain
         IEnumerable<FileSystemNode> nodes,
         IFileSystemProvider? comparisonProvider = null)
     {
+        return ApplyAsync(nodes, comparisonProvider).ConfigureAwait(false).GetAwaiter().GetResult();
+    }
+
+    public async Task<IReadOnlyList<FileSystemNode>> ApplyAsync(
+        IEnumerable<FileSystemNode> nodes,
+        IFileSystemProvider? comparisonProvider = null,
+        CancellationToken ct = default)
+    {
+        var result = new List<FileSystemNode>();
         foreach (var node in nodes)
         {
-            if (EvaluateNode(node, comparisonProvider, out _, out _))
+            ct.ThrowIfCancellationRequested();
+            var evaluation = await EvaluateNodeAsync(node, comparisonProvider, ct);
+            if (evaluation.IsIncluded)
             {
-                yield return node;
+                result.Add(node);
             }
         }
+
+        return result;
     }
 
     public void ApplyToTree(
         IEnumerable<FileSystemNode> roots,
         IFileSystemProvider? comparisonProvider = null)
     {
-        foreach (var root in roots)
+        ApplyToTreeAsync(roots, comparisonProvider).ConfigureAwait(false).GetAwaiter().GetResult();
+    }
+
+    public async Task ApplyToTreeAsync(
+        IEnumerable<FileSystemNode> roots,
+        IFileSystemProvider? comparisonProvider = null,
+        CancellationToken ct = default)
+    {
+        var stack = new Stack<FileSystemNode>(roots);
+        while (stack.Count > 0)
         {
-            ApplyToTreeNode(root, comparisonProvider);
+            ct.ThrowIfCancellationRequested();
+            var node = stack.Pop();
+            var evaluation = await EvaluateNodeAsync(node, comparisonProvider, ct);
+            node.FilterResult = evaluation.IsIncluded ? FilterResult.Included : FilterResult.Excluded;
+            node.ExcludedByFilter = evaluation.IsIncluded ? null : evaluation.ExcludedByFilter;
+
+            for (var i = node.Children.Count - 1; i >= 0; i--)
+            {
+                stack.Push(node.Children[i]);
+            }
         }
     }
 
@@ -53,46 +86,40 @@ public sealed class FilterChain
         return new FilterChain(filters);
     }
 
-    private void ApplyToTreeNode(FileSystemNode node, IFileSystemProvider? comparisonProvider)
-    {
-        var included = EvaluateNode(node, comparisonProvider, out var excludedByFilter, out _);
-        node.FilterResult = included ? FilterResult.Included : FilterResult.Excluded;
-        node.ExcludedByFilter = included ? null : excludedByFilter;
-
-        foreach (var child in node.Children)
-        {
-            ApplyToTreeNode(child, comparisonProvider);
-        }
-    }
-
-    private bool EvaluateNode(
+    private async Task<NodeEvaluation> EvaluateNodeAsync(
         FileSystemNode node,
         IFileSystemProvider? comparisonProvider,
-        out string? excludedByFilter,
-        out IFilter? matchingFilter)
+        CancellationToken ct)
     {
-        excludedByFilter = null;
-        matchingFilter = null;
-
         foreach (var filter in _filters.Where(f => f.IsEnabled))
         {
-            var matches = filter.Matches(node, comparisonProvider);
+            ct.ThrowIfCancellationRequested();
+            var matches = await filter.MatchesAsync(node, comparisonProvider, ct);
             if (filter.Mode == FilterMode.Include && !matches)
             {
-                excludedByFilter = filter.Name;
-                matchingFilter = filter;
-                return false;
+                return new NodeEvaluation(
+                    IsIncluded: false,
+                    ExcludedByFilter: filter.Name,
+                    MatchingFilter: filter);
             }
 
             if (filter.Mode == FilterMode.Exclude && matches)
             {
-                excludedByFilter = filter.Name;
-                matchingFilter = filter;
-                return false;
+                return new NodeEvaluation(
+                    IsIncluded: false,
+                    ExcludedByFilter: filter.Name,
+                    MatchingFilter: filter);
             }
         }
 
-        return true;
+        return new NodeEvaluation(
+            IsIncluded: true,
+            ExcludedByFilter: null,
+            MatchingFilter: null);
     }
-}
 
+    private readonly record struct NodeEvaluation(
+        bool IsIncluded,
+        string? ExcludedByFilter,
+        IFilter? MatchingFilter);
+}

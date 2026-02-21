@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Threading;
+using System.Threading.Tasks;
 using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.UI.ViewModels;
@@ -7,6 +9,7 @@ public class FileListViewModel : ViewModelBase
 {
     private readonly IFileSystemProvider _provider;
     private string _directoryPath;
+    private CancellationTokenSource? _loadCts;
 
     public ObservableCollection<FileSystemNode> Files { get; } = new();
 
@@ -14,17 +17,21 @@ public class FileListViewModel : ViewModelBase
     {
         _provider = provider;
         _directoryPath = directoryPath;
-        LoadFilesForDirectory(_directoryPath);
     }
 
-    public void LoadFilesForDirectory(string directoryPath)
+    public async Task LoadFilesForDirectoryAsync(string directoryPath)
     {
-        _directoryPath = directoryPath;
-        Files.Clear();
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+        _loadCts = new CancellationTokenSource();
+        var ct = _loadCts.Token;
 
-        var children = _provider.GetChildrenAsync(_directoryPath, CancellationToken.None).GetAwaiter().GetResult();
+        _directoryPath = directoryPath;
+        var children = await _provider.GetChildrenAsync(_directoryPath, ct);
+        var files = new List<FileSystemNode>();
         foreach (var child in children)
         {
+            ct.ThrowIfCancellationRequested();
             if (child.IsDirectory)
             {
                 continue;
@@ -40,7 +47,7 @@ public class FileListViewModel : ViewModelBase
                 ? FilterResult.Excluded
                 : FilterResult.Included;
 
-            Files.Add(new FileSystemNode
+            files.Add(new FileSystemNode
             {
                 Name = child.Name,
                 FullPath = child.FullPath,
@@ -54,6 +61,17 @@ public class FileListViewModel : ViewModelBase
                 FilterResult = filterResult,
                 ExcludedByFilter = filterResult == FilterResult.Excluded ? "Hidden" : null,
             });
+        }
+
+        if (ct.IsCancellationRequested)
+        {
+            return;
+        }
+
+        Files.Clear();
+        foreach (var file in files)
+        {
+            Files.Add(file);
         }
     }
 }

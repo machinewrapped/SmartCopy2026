@@ -1,5 +1,7 @@
 using System;
 using System.Text.Json.Nodes;
+using System.Threading;
+using System.Threading.Tasks;
 using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Core.Filters.Filters;
@@ -32,20 +34,23 @@ public sealed class DateRangeFilter : FilterBase
     public override string Summary => $"{Field} between {Min:yyyy-MM-dd} and {Max:yyyy-MM-dd}";
     public override string Description => $"DateRange: {Field}";
 
-    public override bool Matches(FileSystemNode node, IFileSystemProvider? comparisonProvider)
+    public override ValueTask<bool> MatchesAsync(
+        FileSystemNode node,
+        IFileSystemProvider? comparisonProvider,
+        CancellationToken ct = default)
     {
         var value = Field == DateField.Created ? node.CreatedAt : node.ModifiedAt;
         if (Min.HasValue && value < Min.Value)
         {
-            return false;
+            return ValueTask.FromResult(false);
         }
 
         if (Max.HasValue && value > Max.Value)
         {
-            return false;
+            return ValueTask.FromResult(false);
         }
 
-        return true;
+        return ValueTask.FromResult(true);
     }
 
     protected override JsonObject BuildParameters()
@@ -68,4 +73,3 @@ public sealed class DateRangeFilter : FilterBase
         return obj;
     }
 }
-

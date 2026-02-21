@@ -1,4 +1,6 @@
 using System.Text.Json.Nodes;
+using System.Threading;
+using System.Threading.Tasks;
 using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Core.Filters.Filters;
@@ -18,24 +20,27 @@ public sealed class SizeRangeFilter : FilterBase
     public override string Summary => $"Size range: {MinBytes ?? 0} - {MaxBytes ?? long.MaxValue}";
     public override string Description => "SizeRange filter";
 
-    public override bool Matches(FileSystemNode node, IFileSystemProvider? comparisonProvider)
+    public override ValueTask<bool> MatchesAsync(
+        FileSystemNode node,
+        IFileSystemProvider? comparisonProvider,
+        CancellationToken ct = default)
     {
         if (node.IsDirectory)
         {
-            return false;
+            return ValueTask.FromResult(false);
         }
 
         if (MinBytes.HasValue && node.Size < MinBytes.Value)
         {
-            return false;
+            return ValueTask.FromResult(false);
         }
 
         if (MaxBytes.HasValue && node.Size > MaxBytes.Value)
         {
-            return false;
+            return ValueTask.FromResult(false);
         }
 
-        return true;
+        return ValueTask.FromResult(true);
     }
 
     protected override JsonObject BuildParameters()
@@ -54,4 +59,3 @@ public sealed class SizeRangeFilter : FilterBase
         return obj;
     }
 }
-

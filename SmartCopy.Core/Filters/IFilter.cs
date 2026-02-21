@@ -1,4 +1,6 @@
 using SmartCopy.Core.FileSystem;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace SmartCopy.Core.Filters;
 
@@ -10,6 +12,8 @@ public interface IFilter
     FilterConfig Config { get; }
     string Summary { get; }
     string Description { get; }
-    bool Matches(FileSystemNode node, IFileSystemProvider? comparisonProvider);
+    ValueTask<bool> MatchesAsync(
+        FileSystemNode node,
+        IFileSystemProvider? comparisonProvider,
+        CancellationToken ct = default);
 }
-

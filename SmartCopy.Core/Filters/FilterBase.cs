@@ -1,4 +1,6 @@
 using System.Text.Json.Nodes;
+using System.Threading;
+using System.Threading.Tasks;
 using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Core.Filters;
@@ -17,7 +19,10 @@ public abstract class FilterBase : IFilter
     public bool IsEnabled { get; set; }
     public abstract string Summary { get; }
     public abstract string Description { get; }
-    public abstract bool Matches(FileSystemNode node, IFileSystemProvider? comparisonProvider);
+    public abstract ValueTask<bool> MatchesAsync(
+        FileSystemNode node,
+        IFileSystemProvider? comparisonProvider,
+        CancellationToken ct = default);
 
     public virtual FilterConfig Config => new(
         FilterType: Name,
@@ -27,4 +32,3 @@ public abstract class FilterBase : IFilter
 
     protected virtual JsonObject BuildParameters() => [];
 }
-

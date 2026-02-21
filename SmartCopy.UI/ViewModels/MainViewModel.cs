@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using System.Threading.Tasks;
 using SmartCopy.UI.Services;
 
 namespace SmartCopy.UI.ViewModels;
@@ -30,11 +31,11 @@ public partial class MainViewModel : ViewModelBase
                 var selectedNode = DirectoryTree.SelectedNode;
                 if (selectedNode?.IsDirectory == true)
                 {
-                    FileList.LoadFilesForDirectory(selectedNode.FullPath);
+                    _ = FileList.LoadFilesForDirectoryAsync(selectedNode.FullPath);
                 }
             }
         };
-        DirectoryTree.SelectByPath(MockMemoryFileSystemFactory.DefaultFileListPath);
+        _ = InitializeAsync();
 
         // Propagate the pipeline's first Copy/Move destination to the filter chain.
         // This is also where a directory tree rescan will be triggered in future phases.
@@ -44,5 +45,11 @@ public partial class MainViewModel : ViewModelBase
                 FilterChain.PipelineDestinationPath = Pipeline.FirstDestinationPath;
         };
         FilterChain.PipelineDestinationPath = Pipeline.FirstDestinationPath;
+    }
+
+    private async Task InitializeAsync()
+    {
+        await DirectoryTree.InitializeAsync(MockMemoryFileSystemFactory.DefaultFileListPath);
+        await FileList.LoadFilesForDirectoryAsync(MockMemoryFileSystemFactory.DefaultFileListPath);
     }
 }

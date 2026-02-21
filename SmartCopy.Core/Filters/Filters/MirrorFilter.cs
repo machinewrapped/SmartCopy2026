@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using System.Text.Json.Nodes;
+using System.Threading;
+using System.Threading.Tasks;
 using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Core.Filters.Filters;
@@ -30,7 +32,10 @@ public sealed class MirrorFilter : FilterBase
     public override string Summary => "Skip files already mirrored";
     public override string Description => $"Mirror: {ComparisonPath} ({CompareMode})";
 
-    public override bool Matches(FileSystemNode node, IFileSystemProvider? comparisonProvider)
+    public override async ValueTask<bool> MatchesAsync(
+        FileSystemNode node,
+        IFileSystemProvider? comparisonProvider,
+        CancellationToken ct = default)
     {
         if (comparisonProvider is null)
         {
@@ -38,7 +43,7 @@ public sealed class MirrorFilter : FilterBase
         }
 
         var comparePath = PathHelper.CombineForProvider(ComparisonPath, node.RelativePath);
-        var exists = comparisonProvider.ExistsAsync(comparePath, default).GetAwaiter().GetResult();
+        var exists = await comparisonProvider.ExistsAsync(comparePath, ct);
         if (!exists)
         {
             return false;
@@ -49,7 +54,7 @@ public sealed class MirrorFilter : FilterBase
             return true;
         }
 
-        var targetNode = comparisonProvider.GetNodeAsync(comparePath, default).GetAwaiter().GetResult();
+        var targetNode = await comparisonProvider.GetNodeAsync(comparePath, ct);
         return string.Equals(targetNode.Name, node.Name, StringComparison.OrdinalIgnoreCase)
                && targetNode.Size == node.Size;
     }
@@ -61,4 +66,3 @@ public sealed class MirrorFilter : FilterBase
             ["compareMode"] = CompareMode.ToString(),
         };
 }
-

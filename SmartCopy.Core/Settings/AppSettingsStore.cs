@@ -28,7 +28,15 @@ public sealed class AppSettingsStore
             var settings = JsonSerializer.Deserialize<AppSettings>(json, _jsonOptions);
             return settings ?? new AppSettings();
         }
-        catch
+        catch (JsonException)
+        {
+            return new AppSettings();
+        }
+        catch (IOException)
+        {
+            return new AppSettings();
+        }
+        catch (UnauthorizedAccessException)
         {
             return new AppSettings();
         }
@@ -57,4 +65,3 @@ public sealed class AppSettingsStore
         return Path.Combine(home, ".config", "SmartCopy2026", "settings.json");
     }
 }
-

@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json.Nodes;
+using System.Threading;
+using System.Threading.Tasks;
 using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Core.Filters.Filters;
@@ -28,18 +30,20 @@ public sealed class ExtensionFilter : FilterBase
     public override string Summary => $"Extensions: {string.Join(", ", Extensions.Select(e => "." + e))}";
     public override string Description => $"Extension: {string.Join("; ", Extensions.Select(e => "*." + e))}";
 
-    public override bool Matches(FileSystemNode node, IFileSystemProvider? comparisonProvider)
+    public override ValueTask<bool> MatchesAsync(
+        FileSystemNode node,
+        IFileSystemProvider? comparisonProvider,
+        CancellationToken ct = default)
     {
         if (node.IsDirectory)
         {
-            return false;
+            return ValueTask.FromResult(false);
         }
 
         var extension = Path.GetExtension(node.Name).TrimStart('.').ToLowerInvariant();
-        return _extensions.Contains(extension);
+        return ValueTask.FromResult(_extensions.Contains(extension));
     }
 
     protected override JsonObject BuildParameters() =>
         new() { ["extensions"] = string.Join(';', Extensions) };
 }
-

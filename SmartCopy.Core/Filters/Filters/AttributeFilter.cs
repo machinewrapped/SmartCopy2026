@@ -1,5 +1,7 @@
 using System.IO;
 using System.Text.Json.Nodes;
+using System.Threading;
+using System.Threading.Tasks;
 using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Core.Filters.Filters;
@@ -17,12 +19,14 @@ public sealed class AttributeFilter : FilterBase
     public override string Summary => $"Attributes include: {RequiredAttributes}";
     public override string Description => $"Attributes: {RequiredAttributes}";
 
-    public override bool Matches(FileSystemNode node, IFileSystemProvider? comparisonProvider)
+    public override ValueTask<bool> MatchesAsync(
+        FileSystemNode node,
+        IFileSystemProvider? comparisonProvider,
+        CancellationToken ct = default)
     {
-        return (node.Attributes & RequiredAttributes) == RequiredAttributes;
+        return ValueTask.FromResult((node.Attributes & RequiredAttributes) == RequiredAttributes);
     }
 
     protected override JsonObject BuildParameters() =>
         new() { ["attributes"] = RequiredAttributes.ToString() };
 }
-

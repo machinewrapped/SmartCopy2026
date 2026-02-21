@@ -2,6 +2,8 @@ using System;
 using System.Linq;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
 using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Core.Filters.Filters;
@@ -25,14 +27,17 @@ public sealed class WildcardFilter : FilterBase
     public override string Summary => $"Name matches {Pattern}";
     public override string Description => $"Wildcard: {Pattern}";
 
-    public override bool Matches(FileSystemNode node, IFileSystemProvider? comparisonProvider)
+    public override ValueTask<bool> MatchesAsync(
+        FileSystemNode node,
+        IFileSystemProvider? comparisonProvider,
+        CancellationToken ct = default)
     {
         if (_patterns.Length == 0)
         {
-            return false;
+            return ValueTask.FromResult(false);
         }
 
-        return _patterns.Any(pattern => pattern.IsMatch(node.Name));
+        return ValueTask.FromResult(_patterns.Any(pattern => pattern.IsMatch(node.Name)));
     }
 
     protected override JsonObject BuildParameters() =>
@@ -49,4 +54,3 @@ public sealed class WildcardFilter : FilterBase
             .ToArray();
     }
 }
-

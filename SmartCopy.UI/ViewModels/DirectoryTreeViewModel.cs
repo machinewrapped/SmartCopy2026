@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Threading;
+using System.Threading.Tasks;
 using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.UI.ViewModels;
@@ -20,17 +22,21 @@ public class DirectoryTreeViewModel : ViewModelBase
     {
         _provider = provider;
         _rootPath = rootPath;
-        LoadTree();
     }
 
-    private void LoadTree()
+    public async Task InitializeAsync(string? initialSelectionPath = null, CancellationToken ct = default)
     {
         RootNodes.Clear();
 
-        var root = BuildNodeRecursive(_rootPath, parent: null);
+        var root = await BuildNodeTreeAsync(_rootPath, ct);
         root.CheckState = CheckState.Indeterminate;
         RootNodes.Add(root);
         SelectedNode = root;
+
+        if (!string.IsNullOrWhiteSpace(initialSelectionPath))
+        {
+            SelectByPath(initialSelectionPath);
+        }
     }
 
     public bool SelectByPath(string fullPath)
@@ -50,10 +56,44 @@ public class DirectoryTreeViewModel : ViewModelBase
         return true;
     }
 
-    private FileSystemNode BuildNodeRecursive(string path, FileSystemNode? parent)
+    private async Task<FileSystemNode> BuildNodeTreeAsync(string path, CancellationToken ct)
     {
-        var sourceNode = _provider.GetNodeAsync(path, CancellationToken.None).GetAwaiter().GetResult();
-        var node = new FileSystemNode
+        var sourceRoot = await _provider.GetNodeAsync(path, ct);
+        var root = CloneNode(sourceRoot, parent: null);
+
+        var stack = new Stack<FileSystemNode>();
+        stack.Push(root);
+
+        while (stack.Count > 0)
+        {
+            ct.ThrowIfCancellationRequested();
+            var current = stack.Pop();
+            if (!current.IsDirectory)
+            {
+                continue;
+            }
+
+            var children = await _provider.GetChildrenAsync(current.FullPath, ct);
+            for (var i = children.Count - 1; i >= 0; i--)
+            {
+                var child = children[i];
+                if (!child.IsDirectory)
+                {
+                    continue;
+                }
+
+                var clonedChild = CloneNode(child, current);
+                current.Children.Add(clonedChild);
+                stack.Push(clonedChild);
+            }
+        }
+
+        return root;
+    }
+
+    private static FileSystemNode CloneNode(FileSystemNode sourceNode, FileSystemNode? parent)
+    {
+        return new FileSystemNode
         {
             Name = sourceNode.Name,
             FullPath = sourceNode.FullPath,
@@ -69,24 +109,6 @@ public class DirectoryTreeViewModel : ViewModelBase
             ExcludedByFilter = sourceNode.ExcludedByFilter,
             Notes = sourceNode.Notes,
         };
-
-        if (!node.IsDirectory)
-        {
-            return node;
-        }
-
-        var children = _provider.GetChildrenAsync(path, CancellationToken.None).GetAwaiter().GetResult();
-        foreach (var child in children)
-        {
-            if (!child.IsDirectory)
-            {
-                continue;
-            }
-
-            node.Children.Add(BuildNodeRecursive(child.FullPath, node));
-        }
-
-        return node;
     }
 
     private FileSystemNode? FindByPath(string fullPath)
