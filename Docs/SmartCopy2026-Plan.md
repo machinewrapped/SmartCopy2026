@@ -1,7 +1,7 @@
 # SmartCopy2026 — Design & Implementation Plan (Revised)
 
 **Prepared:** 2026-02-18
-**Revised:** 2026-02-19 (incorporated Gemini review feedback)
+**Revised:** 2026-02-21 (UI shell progress: 3-column layout, filter card redesign, window/column persistence)
 **Author:** Simon Booth
 **License:** MIT
 **Predecessor:** SmartCopy 2015 (GPL v3, .NET 4.8 WinForms, SourceForge)
@@ -267,6 +267,18 @@ public interface IFilter
     FilterMode Mode { get; }        // Include | Exclude
     bool IsEnabled { get; set; }
     FilterConfig Config { get; }    // serialisable
+
+    /// <summary>
+    /// Human-readable one-liner for the filter card face.
+    /// Generated from the current config, e.g. "Only .mp3 and .flac files".
+    /// </summary>
+    string Summary { get; }
+
+    /// <summary>
+    /// Compact technical description shown as a subtitle on the card.
+    /// e.g. "Extension: *.mp3; *.flac"
+    /// </summary>
+    string Description { get; }
 
     /// <summary>
     /// Returns true if this filter matches the node.
@@ -786,38 +798,55 @@ experienced users.
 
 ### Main Window Layout
 
+The main content area uses a **3-column layout** — Filters | Folders | Files — all at the same
+height and separated by draggable `GridSplitter`s. This places the filter controls in direct
+visual proximity to the tree and file list they affect, making the data-flow left-to-right and
+immediately legible to new users.
+
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│  Source [/home/user/Music               ▾] [📁]                      │
-│  Target [/mnt/phone/Music               ▾] [📁] [📱 Phone (MTP)]     │
-│  ──────────────────────────────────────────────────────────────────  │
-│  ┌──────────────────────┐  ┌───────────────────────────────────────┐ │
-│  │ ▶ □  Rock            │  │ ☑  Name               Size  Modified  │ │
-│  │   ▼ ☑  Classic Rock  │  │ ☑  Come Together.flac 48MB 2024-03-01│ │
-│  │      ☑  Beatles      │  │ ☐  Something.flac     32MB 2024-03-01│ │
-│  │      ☐  Rolling St.  │  │ ☑  cover.jpg         420KB 2024-03-01│ │
-│  │   ▶ ▣  Metal         │  │                                       │ │
-│  │ ▶ ☑  Jazz            │  │                                       │ │
-│  │ ▶ ☐  Classical       │  │                                       │ │
-│  └──────────────────────┘  └───────────────────────────────────────┘ │
-│  ──────────────────────────────────────────────────────────────────  │
-│  FILTERS  [+ Add ▾]  [Save ▾]  [Load ▾]                              │
-│  ┌──────────────────────────────────────────────────────────────┐    │
-│  │ ≡  Extension: *.mp3;*.flac   [INCLUDE ▾]   [●]  [✕]        │    │
-│  │ ≡  Mirror: /target  name+size  [EXCLUDE matched ▾]  [●] [✕] │    │
-│  └──────────────────────────────────────────────────────────────┘    │
-│  ──────────────────────────────────────────────────────────────────  │
-│  PIPELINE  [Copy ▾]  [Move ▾]  [Delete]  [Custom ▾]  [▶ Run]  [👁 Preview] │
-│  ┌──────────────────────────────────────────────────────────────┐    │
-│  │  [⊞ Flatten]  →  [⚙ Convert: mp3 320k]  →  [→ Copy]  [✕]  │    │
-│  └──────────────────────────────────────────────────────────────┘    │
-│  ──────────────────────────────────────────────────────────────────  │
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  Source [/home/user/Music                              ▾] [📁]               │
+│  Target [/mnt/phone/Music                              ▾] [📁] [📱 Phone (MTP)]│
+│  ────────────────────────────────────────────────────────────────────────    │
+│  ┌─────────────────┐ ║ ┌──────────────────┐ ║ ┌───────────────────────────┐ │
+│  │ FILTERS         │ ║ │ ▶ □  Rock        │ ║ │ ☑  Name         Modified  │ │
+│  │                 │ ║ │ ▶ ☑  Jazz        │ ║ │ ☑  Come Together.flac … │ │
+│  │ ☑ Only .mp3 /   │ ║ │ ▶ ☐  Classical   │ ║ │ ☐  Something.flac      … │ │
+│  │   .flac files   │ ║ │                  │ ║ │ ☑  cover.jpg           … │ │
+│  │   Ext:*.mp3;…   │ ║ │                  │ ║ │ ☑  desktop.ini         … │ │
+│  │                 │ ║ │                  │ ║ │                           │ │
+│  │ ☑ Skip files    │ ║ │                  │ ║ │                           │ │
+│  │   already on    │ ║ │                  │ ║ │                           │ │
+│  │   target        │ ║ │                  │ ║ │                           │ │
+│  │   Mirror:/tgt…  │ ║ │                  │ ║ │                           │ │
+│  │                 │ ║ │                  │ ║ │                           │ │
+│  │ + Add filter    │ ║ │                  │ ║ │                           │ │
+│  │─────────────────│ ║ │                  │ ║ │                           │ │
+│  │ [Save ▾][Load ▾]│ ║ │                  │ ║ │                           │ │
+│  └─────────────────┘ ║ └──────────────────┘ ║ └───────────────────────────┘ │
+│  ────────────────────────────────────────────────────────────────────────    │
+│  PIPELINE  [Copy ▾]  [Move ▾]  [Delete]  [Custom ▾]  [▶ Run]  [👁 Preview]  │
+│  [⊞ Flatten]  →  [⚙ Convert: mp3 320k]  →  [→ Copy]                        │
+│  ────────────────────────────────────────────────────────────────────────    │
 │  142 files (2.3 GB) selected   17 filtered out  │  ████████░░ 78%  0:34 left │
-│  Abbey Road/01 Come Together.flac                                     │
-└──────────────────────────────────────────────────────────────────────┘
+│  Abbey Road/01 Come Together.flac                                            │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-`≡` = drag handle for reordering  `[●]` = enable/disable toggle
+`║` = draggable GridSplitter between columns
+
+**Filter card anatomy** (each filter in the Filters column):
+```
+┌──────────────────────────────────────────────────┐
+│ ☑  Only .mp3 and .flac files        ≡  ✎  ✕    │
+│    Extension: *.mp3; *.flac                       │
+└──────────────────────────────────────────────────┘
+```
+- **Checkbox** (left) — enable/disable the filter in-place
+- **Summary** (bold) — human-readable one-liner generated from filter config
+- **Description** (dimmed subtitle) — raw technical spec for power users
+- **Drag handle** `≡`, **edit pencil** `✎`, **remove** `✕` (right-aligned)
+- The mode dropdown (INCLUDE/EXCLUDE) and detailed config live in the edit dialog, not the card face
 
 ### UI Improvements Over Predecessor
 
@@ -825,12 +854,17 @@ experienced users.
 2. **Proper tri-state tree checkboxes** — `▣` for indeterminate
 3. **Filter chain is visual** — each filter is a card; drag to reorder; toggle without removing
 4. **Pipeline is visual** — steps shown as an arrow chain; presets as buttons
-5. **Split pane is resizable** — drag the divider between tree and file list
-6. **Status bar** — selected count + size, filtered count, current operation
-7. **Preview** — shows exactly what will happen before running
-8. **Device picker** — MTP devices appear in the target path dropdown alongside local paths
-9. **Log panel** — collapsible panel at the bottom showing timestamped operation log
-10. **Keyboard-first** — every action reachable via keyboard; focus indicators on all controls
+5. **Three-column layout** — Filters | Folders | Files in a single resizable row; all three columns
+   have draggable splitters; column widths are persisted across sessions
+6. **Filter cards are human-friendly** — each card shows a readable summary ("Only .mp3 and .flac
+   files") above a dimmed technical subtitle; enable/disable via checkbox; edit via pencil icon
+7. **Status bar** — selected count + size, filtered count, current operation
+8. **Preview** — shows exactly what will happen before running
+9. **Device picker** — MTP devices appear in the target path dropdown alongside local paths
+10. **Log panel** — collapsible panel at the bottom showing timestamped operation log
+11. **Keyboard-first** — every action reachable via keyboard; focus indicators on all controls
+12. **Window state persistence** — size, position, maximised state, and all column widths saved to
+    `%LOCALAPPDATA%/SmartCopy2026/window.json`; off-screen position safety check on restore
 
 ### Keyboard Navigation (Phase 1 baseline)
 
@@ -854,16 +888,19 @@ The shell must be built first with placeholder/hardcoded data before any busines
 This validates the layout and UX before architecture decisions are locked in.
 
 Shell checklist:
-- [ ] Main window with correct proportions, resizable split pane
-- [ ] Source/target fields with browse button (no real browsing yet — just editable text)
-- [ ] TreeView with 2–3 levels of hardcoded nodes, tri-state checkbox behaviour fully working
-- [ ] FileListView with 5–6 hardcoded rows, all columns, column resizing, click-to-sort
-- [ ] Filter chain area: two placeholder `FilterCard` controls, drag-to-reorder working
-- [ ] Pipeline area: two placeholder `PipelineStepCard` controls with arrow connectors
-- [ ] Status bar: placeholder text updating on checkbox interactions
+- [x] Main window with correct proportions, resizable split panes (3-column: Filters/Folders/Files)
+- [x] Source/target fields with browse button and Phone (MTP) button (no real browsing yet)
+- [x] TreeView with 2–3 levels of hardcoded nodes, tri-state checkbox behaviour fully working
+- [x] FileListView with hardcoded rows, all columns (Name/Size/Modified), column resizing, click-to-sort
+- [x] Filter chain area: two placeholder filter cards with human-readable summary + technical subtitle,
+      enable/disable checkbox, edit (pencil) button, remove button, inline "+ Add filter" ghost card,
+      Save/Load buttons pinned to bottom of column
+- [x] Pipeline area: placeholder pipeline steps with arrow connectors, Copy/Move/Delete/Custom/Run/Preview buttons
+- [x] Status bar: placeholder text (file count, size, filtered count, progress bar, time remaining, current file)
+- [x] Window size, position, maximised state, and all three column widths persisted to
+      `%LOCALAPPDATA%/SmartCopy2026/window.json`; restored on next open with off-screen safety guard
 - [ ] Operation progress overlay: progress bars, pause/cancel buttons, status labels — no real operation
 - [ ] Log panel: collapsible, scrollable, a few placeholder log entries
-- [ ] Menu skeleton: File, Edit, Filters, Pipeline, Tools, Help (items present, no handlers)
 - [ ] Full keyboard navigation: Tab order, arrow keys in tree/list, Space to toggle, focus indicators
 - [ ] Automation properties on all interactive controls (screen-reader baseline)
 
@@ -1094,7 +1131,6 @@ public class AppSettings
     public string DefaultOverwriteMode { get; set; } = "IfNewer";
     public string DefaultDeleteMode { get; set; } = "Trash";
     public int LogRetentionDays { get; set; } = 30;
-    public WindowState WindowState { get; set; } = new();
     public ColumnSettings FileListColumns { get; set; } = new();
     public List<string> RecentSources { get; set; } = [];
     public List<string> RecentTargets { get; set; } = [];
@@ -1103,6 +1139,32 @@ public class AppSettings
     public List<string> RecentPipelines { get; set; } = [];
 }
 ```
+
+Window geometry is stored in a **separate** file (`%LOCALAPPDATA%/SmartCopy2026/window.json`)
+rather than `settings.json`. This isolates fast-changing UI state from slower application
+settings and avoids a read-modify-write race on startup:
+
+```csharp
+// Written/read by MainWindow.axaml.cs — not part of AppSettings
+private sealed class WindowSettings
+{
+    public double  Width           { get; set; } = 1400;
+    public double  Height          { get; set; } = 860;
+    public double? X               { get; set; }   // null = use CenterScreen
+    public double? Y               { get; set; }
+    public bool    IsMaximized     { get; set; }
+    public double? ColWidthFilters { get; set; }   // pixels; null = use star-ratio default
+    public double? ColWidthFolders { get; set; }
+    public double? ColWidthFiles   { get; set; }
+}
+```
+
+**Safety rules applied on restore:**
+- Width/height clamped to minimum 800×600
+- Per-column minimums: Filters ≥ 150 px, Folders ≥ 150 px, Files ≥ 300 px
+- Position only restored if the top-left corner + 100 px inset lands on a connected screen
+  (prevents "lost window" after monitor configuration changes)
+- All I/O wrapped in try/catch — corrupt file silently falls back to defaults
 
 ---
 
