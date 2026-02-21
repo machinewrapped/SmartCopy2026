@@ -31,12 +31,9 @@ public partial class MainWindow : Window
 
     private static readonly JsonSerializerOptions s_jsonOptions = new() { WriteIndented = true };
 
-    private readonly Grid _contentGrid;
-
     public MainWindow()
     {
         InitializeComponent();
-        _contentGrid = this.FindControl<Grid>("ContentGrid")!;
     }
 
     // ── Restore ────────────────────────────────────────────────────────────────
@@ -79,7 +76,7 @@ public partial class MainWindow : Window
 
             // Restore column widths as absolute pixel values, clamped to each
             // column's minimum so a corrupt file can't produce unusable columns.
-            var cols = _contentGrid.ColumnDefinitions;
+            var cols = ContentGrid.ColumnDefinitions;
             if (s.ColWidthFilters.HasValue)
                 cols[ColIdxFilters].Width = new GridLength(
                     Math.Max(s.ColWidthFilters.Value, MinColFilters), GridUnitType.Pixel);
@@ -136,7 +133,7 @@ public partial class MainWindow : Window
             var isMaximized = WindowState == WindowState.Maximized;
 
             // Read the actual rendered pixel widths of the three content columns.
-            var cols = _contentGrid.ColumnDefinitions;
+            var cols = ContentGrid.ColumnDefinitions;
 
             var s = new WindowSettings
             {

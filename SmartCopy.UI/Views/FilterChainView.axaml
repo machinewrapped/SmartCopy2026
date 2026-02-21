@@ -17,7 +17,7 @@
             </Grid>
 
             <!-- Filter cards + inline Add button, scrollable -->
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ScrollViewer x:Name="FiltersScrollViewer" VerticalScrollBarVisibility="Auto">
                 <StackPanel Orientation="Vertical">
 
                     <!-- Existing filter cards -->
@@ -61,6 +61,8 @@
                                                     Foreground="#a0a0a0"
                                                     FontSize="13" />
                                             <Button Content="✕"
+                                                    Command="{Binding $parent[UserControl].((vm:FilterChainViewModel)DataContext).RemoveFilterCommand}"
+                                                    CommandParameter="{Binding}"
                                                     Width="26" Height="26" CornerRadius="4"
                                                     Padding="0"
                                                     HorizontalContentAlignment="Center"
@@ -76,12 +78,14 @@
                     </ItemsControl>
 
                     <!-- Inline Add button — styled as a ghost card -->
-                    <Border BorderBrush="#3e3e42" BorderThickness="1"
+                    <Button BorderBrush="#3e3e42" BorderThickness="1"
                             CornerRadius="4" Padding="8,7" Background="Transparent"
-                            Cursor="Hand" Opacity="0.55">
+                            Cursor="Hand" Opacity="0.55"
+                            HorizontalAlignment="Stretch"
+                            Command="{Binding AddFilterCommand}">
                         <TextBlock Text="+ Add filter" Foreground="#4facfe"
                                    FontStyle="Italic" HorizontalAlignment="Center" />
-                    </Border>
+                    </Button>
 
                 </StackPanel>
             </ScrollViewer>

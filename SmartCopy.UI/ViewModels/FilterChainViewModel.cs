@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 
 namespace SmartCopy.UI.ViewModels;
 
@@ -46,5 +47,26 @@ public partial class FilterChainViewModel : ViewModelBase
             Mode        = "EXCLUDE",
             IsEnabled   = true,
         });
+    }
+
+    [RelayCommand]
+    private void AddFilter()
+    {
+        Filters.Add(new FilterViewModel
+        {
+            Summary = "New Simulated Filter",
+            Description = "Placeholder filter to test the UI flow.",
+            Mode = "INCLUDE",
+            IsEnabled = true,
+        });
+    }
+
+    [RelayCommand]
+    private void RemoveFilter(FilterViewModel filter)
+    {
+        if (filter != null)
+        {
+            Filters.Remove(filter);
+        }
     }
 }

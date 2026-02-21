@@ -4,36 +4,201 @@
              x:Class="SmartCopy.UI.Views.PipelineView"
              x:DataType="vm:PipelineViewModel">
     <Border Background="#252526" BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="6" Padding="10">
-        <StackPanel Orientation="Vertical">
-            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
-                <TextBlock Text="PIPELINE" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="#4facfe" />
-                <Button Content="Copy ▾" CornerRadius="4" />
-                <Button Content="Move ▾" CornerRadius="4" />
-                <Button Content="Delete" CornerRadius="4" />
-                <Button Content="Custom ▾" CornerRadius="4" />
-                <Button Content="▶ Run" Background="#4caf50" Foreground="White" FontWeight="Bold" CornerRadius="4" />
-                <Button Content="👁 Preview" CornerRadius="4" />
+        <DockPanel>
+
+            <!-- RIGHT: Run + Preview stacked vertically -->
+            <StackPanel DockPanel.Dock="Right"
+                        Orientation="Vertical"
+                        Spacing="6"
+                        Width="95"
+                        Margin="10,0,0,0"
+                        VerticalAlignment="Center">
+                <Button Content="▶  Run"
+                        Command="{Binding RunPipelineCommand}"
+                        Background="#4caf50" Foreground="White" FontWeight="Bold"
+                        CornerRadius="4"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center" />
+                <Button Content="👁  Preview"
+                        Command="{Binding PreviewPipelineCommand}"
+                        CornerRadius="4"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center" />
             </StackPanel>
-            <ItemsControl ItemsSource="{Binding Steps}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel Orientation="Horizontal" />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <StackPanel Orientation="Horizontal" Spacing="5">
-                            <Border BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,5,5" Background="#333333">
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <TextBlock Text="{Binding Description}" VerticalAlignment="Center" />
-                                    <Button Content="✕" Width="24" Height="24" CornerRadius="4" Padding="0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Background="Transparent" Foreground="#f44336" />
+
+            <!-- TOP: "PIPELINE" label + "Load Preset ▾" button -->
+            <StackPanel DockPanel.Dock="Top"
+                        Orientation="Horizontal"
+                        Spacing="10"
+                        Margin="0,0,0,8">
+                <TextBlock Text="PIPELINE"
+                           FontWeight="SemiBold"
+                           Foreground="#4facfe"
+                           VerticalAlignment="Center" />
+
+                <Button Content="Load Preset ▾" CornerRadius="4">
+                    <Button.Flyout>
+                        <MenuFlyout Placement="BottomEdgeAlignedLeft">
+
+                            <MenuItem Header="Standard">
+                                <MenuItem Header="Copy pipeline"
+                                          Command="{Binding LoadPresetCommand}"
+                                          CommandParameter="Copy" />
+                                <MenuItem Header="Move pipeline"
+                                          Command="{Binding LoadPresetCommand}"
+                                          CommandParameter="Move" />
+                                <MenuItem Header="Delete pipeline"
+                                          Command="{Binding LoadPresetCommand}"
+                                          CommandParameter="Delete" />
+                            </MenuItem>
+
+                            <Separator />
+
+                            <MenuItem Header="My Pipelines"
+                                      ItemsSource="{Binding SavedPipelineNames}">
+                                <MenuItem.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <MenuItem Header="{Binding}"
+                                                  Command="{Binding $parent[UserControl].((vm:PipelineViewModel)DataContext).LoadPresetCommand}"
+                                                  CommandParameter="{Binding}" />
+                                    </DataTemplate>
+                                </MenuItem.ItemTemplate>
+                            </MenuItem>
+
+                            <Separator />
+
+                            <MenuItem Header="Save current pipeline..."
+                                      Command="{Binding SavePipelineCommand}" />
+
+                        </MenuFlyout>
+                    </Button.Flyout>
+                </Button>
+            </StackPanel>
+
+            <!-- CENTRE: Horizontal scrollable step chain -->
+            <ScrollViewer x:Name="StepsScrollViewer"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Disabled">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="0">
+
+                    <!-- Step cards -->
+                    <ItemsControl ItemsSource="{Binding Steps}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PipelineStepViewModel">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+                                    <!-- Step card -->
+                                    <Border BorderBrush="#3e3e42" BorderThickness="1"
+                                            CornerRadius="4" Padding="10,6"
+                                            Background="#333333"
+                                            MinWidth="90">
+                                        <Grid RowDefinitions="Auto, Auto">
+
+                                            <!-- Title row: icon + label + ✕ -->
+                                            <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto">
+                                                <TextBlock Grid.Column="0"
+                                                           Text="{Binding Icon}"
+                                                           FontSize="13"
+                                                           VerticalAlignment="Center"
+                                                           Margin="0,0,6,0" />
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding Label}"
+                                                           FontWeight="Medium"
+                                                           VerticalAlignment="Center" />
+                                                <Button Grid.Column="2"
+                                                        Content="✕"
+                                                        Command="{Binding $parent[UserControl].((vm:PipelineViewModel)DataContext).RemoveStepCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        Width="20" Height="20"
+                                                        CornerRadius="3"
+                                                        Padding="0"
+                                                        HorizontalContentAlignment="Center"
+                                                        VerticalContentAlignment="Center"
+                                                        Background="Transparent"
+                                                        Foreground="#f44336"
+                                                        FontSize="10"
+                                                        VerticalAlignment="Top"
+                                                        Margin="8,0,0,0" />
+                                            </Grid>
+
+                                            <!-- Details sub-text -->
+                                            <TextBlock Grid.Row="1"
+                                                       Text="{Binding Details}"
+                                                       FontSize="10"
+                                                       Opacity="0.55"
+                                                       TextWrapping="NoWrap"
+                                                       Margin="0,3,0,0" />
+
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Connector arrow -->
+                                    <TextBlock Text="→"
+                                               VerticalAlignment="Center"
+                                               Margin="6,0"
+                                               Foreground="Gray"
+                                               FontWeight="Bold"
+                                               FontSize="14" />
+
                                 </StackPanel>
-                            </Border>
-                            <TextBlock Text="→" VerticalAlignment="Center" Margin="5" Foreground="Gray" FontWeight="Bold" />
-                        </StackPanel>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Ghost "+" add button with step-type picker flyout -->
+                    <Button BorderBrush="#3e3e42" BorderThickness="1"
+                            CornerRadius="4" Padding="10,6"
+                            Background="Transparent"
+                            Cursor="Hand" Opacity="0.55"
+                            VerticalAlignment="Center">
+                        <Button.Flyout>
+                            <MenuFlyout Placement="BottomEdgeAlignedLeft">
+
+                                <MenuItem Header="Path steps">
+                                    <MenuItem Header="Flatten"
+                                              Command="{Binding AddStepCommand}"
+                                              CommandParameter="{x:Static vm:StepKind.Flatten}" />
+                                    <MenuItem Header="Rebase"
+                                              Command="{Binding AddStepCommand}"
+                                              CommandParameter="{x:Static vm:StepKind.Rebase}" />
+                                    <MenuItem Header="Rename"
+                                              Command="{Binding AddStepCommand}"
+                                              CommandParameter="{x:Static vm:StepKind.Rename}" />
+                                </MenuItem>
+
+                                <MenuItem Header="Content steps">
+                                    <MenuItem Header="Convert"
+                                              Command="{Binding AddStepCommand}"
+                                              CommandParameter="{x:Static vm:StepKind.Convert}" />
+                                </MenuItem>
+
+                                <MenuItem Header="Terminal steps">
+                                    <MenuItem Header="Copy"
+                                              Command="{Binding AddStepCommand}"
+                                              CommandParameter="{x:Static vm:StepKind.Copy}" />
+                                    <MenuItem Header="Move"
+                                              Command="{Binding AddStepCommand}"
+                                              CommandParameter="{x:Static vm:StepKind.Move}" />
+                                    <MenuItem Header="Delete"
+                                              Command="{Binding AddStepCommand}"
+                                              CommandParameter="{x:Static vm:StepKind.Delete}" />
+                                </MenuItem>
+
+                            </MenuFlyout>
+                        </Button.Flyout>
+                        <TextBlock Text="+ Add step"
+                                   Foreground="#4facfe"
+                                   FontStyle="Italic" />
+                    </Button>
+
+                </StackPanel>
+            </ScrollViewer>
+
+        </DockPanel>
     </Border>
 </UserControl>
