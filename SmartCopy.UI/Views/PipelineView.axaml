@@ -97,7 +97,7 @@
                                             CornerRadius="4" Padding="10,6"
                                             Background="#333333"
                                             MinWidth="90">
-                                        <Grid RowDefinitions="Auto, Auto">
+                                        <Grid RowDefinitions="Auto, Auto, Auto">
 
                                             <!-- Title row: icon + label + ✕ -->
                                             <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto">
@@ -126,13 +126,36 @@
                                                         Margin="8,0,0,0" />
                                             </Grid>
 
-                                            <!-- Details sub-text -->
+                                            <!-- Details sub-text (non-destination steps) -->
                                             <TextBlock Grid.Row="1"
                                                        Text="{Binding Details}"
                                                        FontSize="10"
                                                        Opacity="0.55"
                                                        TextWrapping="NoWrap"
+                                                       IsVisible="{Binding !HasDestination}"
                                                        Margin="0,3,0,0" />
+
+                                            <!-- Destination path row (Copy / Move steps only) -->
+                                            <Grid Grid.Row="2"
+                                                  ColumnDefinitions="*, Auto"
+                                                  IsVisible="{Binding HasDestination}"
+                                                  Margin="0,4,0,0">
+                                                <TextBox Grid.Column="0"
+                                                         Text="{Binding DestinationPath}"
+                                                         Watermark="Destination path..."
+                                                         FontSize="11"
+                                                         Background="#2a2a2a"
+                                                         CornerRadius="3"
+                                                         Padding="4,2"
+                                                         MinWidth="160" />
+                                                <Button Grid.Column="1"
+                                                        Content="📁"
+                                                        FontSize="11"
+                                                        Padding="4,2"
+                                                        Margin="4,0,0,0"
+                                                        CornerRadius="3"
+                                                        ToolTip.Tip="Browse for destination" />
+                                            </Grid>
 
                                         </Grid>
                                     </Border>

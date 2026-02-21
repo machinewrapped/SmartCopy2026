@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -19,6 +21,14 @@ public partial class PipelineStepViewModel : ViewModelBase
 
     [ObservableProperty]
     private string _details = string.Empty;
+
+    [ObservableProperty]
+    private string _destinationPath = string.Empty;
+
+    // True for steps that require a destination path (Copy, Move).
+    public bool HasDestination => Kind is StepKind.Copy or StepKind.Move;
+
+    partial void OnKindChanged(StepKind value) => OnPropertyChanged(nameof(HasDestination));
 }
 
 public partial class PipelineViewModel : ViewModelBase
@@ -26,11 +36,44 @@ public partial class PipelineViewModel : ViewModelBase
     public ObservableCollection<PipelineStepViewModel> Steps { get; } = new();
     public ObservableCollection<string> SavedPipelineNames { get; } = new();
 
+    // The destination path of the first Copy or Move step in the pipeline.
+    // Empty if no such step exists. MainViewModel propagates this to FilterChainViewModel.
+    public string FirstDestinationPath
+    {
+        get
+        {
+            var step = Steps.FirstOrDefault(s => s.Kind is StepKind.Copy or StepKind.Move);
+            return step?.DestinationPath ?? string.Empty;
+        }
+    }
+
     public PipelineViewModel()
     {
+        Steps.CollectionChanged += OnStepsCollectionChanged;
+
         Steps.Add(new PipelineStepViewModel { Kind = StepKind.Flatten, Label = "Flatten", Icon = "⊞", Details = "Strip directory structure" });
         Steps.Add(new PipelineStepViewModel { Kind = StepKind.Convert, Label = "Convert", Icon = "⚙", Details = "mp3 320k" });
-        Steps.Add(new PipelineStepViewModel { Kind = StepKind.Copy,    Label = "Copy",    Icon = "→", Details = "Copy to target" });
+        Steps.Add(new PipelineStepViewModel { Kind = StepKind.Copy,    Label = "Copy To", Icon = "→", DestinationPath = "/mnt/phone/Music" });
+    }
+
+    private void OnStepsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.NewItems != null)
+            foreach (PipelineStepViewModel step in e.NewItems)
+                step.PropertyChanged += OnStepPropertyChanged;
+
+        if (e.OldItems != null)
+            foreach (PipelineStepViewModel step in e.OldItems)
+                step.PropertyChanged -= OnStepPropertyChanged;
+
+        OnPropertyChanged(nameof(FirstDestinationPath));
+    }
+
+    private void OnStepPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(PipelineStepViewModel.DestinationPath)
+                           or nameof(PipelineStepViewModel.Kind))
+            OnPropertyChanged(nameof(FirstDestinationPath));
     }
 
     [RelayCommand]
@@ -42,8 +85,8 @@ public partial class PipelineViewModel : ViewModelBase
             StepKind.Rebase  => new PipelineStepViewModel { Kind = kind, Label = "Rebase",  Icon = "⤢", Details = "Change root path" },
             StepKind.Rename  => new PipelineStepViewModel { Kind = kind, Label = "Rename",  Icon = "✏", Details = "Rename pattern" },
             StepKind.Convert => new PipelineStepViewModel { Kind = kind, Label = "Convert", Icon = "⚙", Details = "Configure format" },
-            StepKind.Copy    => new PipelineStepViewModel { Kind = kind, Label = "Copy",    Icon = "→", Details = "Copy to target" },
-            StepKind.Move    => new PipelineStepViewModel { Kind = kind, Label = "Move",    Icon = "⇒", Details = "Move to target" },
+            StepKind.Copy    => new PipelineStepViewModel { Kind = kind, Label = "Copy To", Icon = "→" },
+            StepKind.Move    => new PipelineStepViewModel { Kind = kind, Label = "Move To", Icon = "⇒" },
             StepKind.Delete  => new PipelineStepViewModel { Kind = kind, Label = "Delete",  Icon = "🗑", Details = "Send to trash" },
             _                => new PipelineStepViewModel { Kind = kind, Label = "Custom",  Icon = "?", Details = "Configure step" },
         };
@@ -86,12 +129,12 @@ public partial class PipelineViewModel : ViewModelBase
 
     private static List<PipelineStepViewModel> BuildCopyPreset() =>
     [
-        new() { Kind = StepKind.Copy,   Label = "Copy",   Icon = "→", Details = "Copy to target" },
+        new() { Kind = StepKind.Copy, Label = "Copy To", Icon = "→" },
     ];
 
     private static List<PipelineStepViewModel> BuildMovePreset() =>
     [
-        new() { Kind = StepKind.Move,   Label = "Move",   Icon = "⇒", Details = "Move to target" },
+        new() { Kind = StepKind.Move, Label = "Move To", Icon = "⇒" },
     ];
 
     private static List<PipelineStepViewModel> BuildDeletePreset() =>

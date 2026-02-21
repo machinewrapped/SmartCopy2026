@@ -31,6 +31,13 @@ public partial class FilterChainViewModel : ViewModelBase
 {
     public ObservableCollection<FilterViewModel> Filters { get; } = new();
 
+    // Pushed by MainViewModel whenever Pipeline.FirstDestinationPath changes.
+    [ObservableProperty]
+    private string _pipelineDestinationPath = string.Empty;
+
+    // Reference to the Mirror filter stub so its description can be updated reactively.
+    private FilterViewModel? _mirrorFilter;
+
     public FilterChainViewModel()
     {
         Filters.Add(new FilterViewModel
@@ -40,13 +47,25 @@ public partial class FilterChainViewModel : ViewModelBase
             Mode        = "INCLUDE",
             IsEnabled   = true,
         });
-        Filters.Add(new FilterViewModel
+
+        _mirrorFilter = new FilterViewModel
         {
-            Summary     = "Skip files already on target",
-            Description = "Mirror: /target  match by name + size",
-            Mode        = "EXCLUDE",
-            IsEnabled   = true,
-        });
+            Summary   = "Skip files already on target",
+            Mode      = "EXCLUDE",
+            IsEnabled = true,
+        };
+        UpdateMirrorDescription();
+        Filters.Add(_mirrorFilter);
+    }
+
+    partial void OnPipelineDestinationPathChanged(string value) => UpdateMirrorDescription();
+
+    private void UpdateMirrorDescription()
+    {
+        if (_mirrorFilter is null) return;
+        _mirrorFilter.Description = string.IsNullOrEmpty(PipelineDestinationPath)
+            ? "Mirror: (no destination in pipeline)  match by name + size"
+            : $"Mirror: {PipelineDestinationPath}  match by name + size";
     }
 
     [RelayCommand]
@@ -54,10 +73,10 @@ public partial class FilterChainViewModel : ViewModelBase
     {
         Filters.Add(new FilterViewModel
         {
-            Summary = "New Simulated Filter",
+            Summary     = "New Simulated Filter",
             Description = "Placeholder filter to test the UI flow.",
-            Mode = "INCLUDE",
-            IsEnabled = true,
+            Mode        = "INCLUDE",
+            IsEnabled   = true,
         });
     }
 
@@ -65,8 +84,6 @@ public partial class FilterChainViewModel : ViewModelBase
     private void RemoveFilter(FilterViewModel filter)
     {
         if (filter != null)
-        {
             Filters.Remove(filter);
-        }
     }
 }

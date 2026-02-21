@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace SmartCopy.UI.ViewModels;
@@ -7,9 +6,6 @@ public partial class MainViewModel : ViewModelBase
 {
     [ObservableProperty]
     private string _sourcePath = string.Empty;
-
-    [ObservableProperty]
-    private string _targetPath = string.Empty;
 
     public DirectoryTreeViewModel DirectoryTree { get; } = new();
     public FileListViewModel FileList { get; } = new();
@@ -21,6 +17,14 @@ public partial class MainViewModel : ViewModelBase
     public MainViewModel()
     {
         SourcePath = "/home/user/Music";
-        TargetPath = "/mnt/phone/Music";
+
+        // Propagate the pipeline's first Copy/Move destination to the filter chain.
+        // This is also where a directory tree rescan will be triggered in future phases.
+        Pipeline.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(PipelineViewModel.FirstDestinationPath))
+                FilterChain.PipelineDestinationPath = Pipeline.FirstDestinationPath;
+        };
+        FilterChain.PipelineDestinationPath = Pipeline.FirstDestinationPath;
     }
 }
