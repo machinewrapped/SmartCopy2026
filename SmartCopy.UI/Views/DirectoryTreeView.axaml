@@ -13,6 +13,11 @@
               SelectedItem="{Binding SelectedNode, Mode=TwoWay}"
               Background="Transparent"
               BorderThickness="0">
+        <TreeView.Styles>
+            <Style Selector="TreeViewItem">
+                <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+            </Style>
+        </TreeView.Styles>
         <TreeView.ItemTemplate>
             <TreeDataTemplate ItemsSource="{Binding Children}">
                 <StackPanel Orientation="Horizontal" Spacing="4">

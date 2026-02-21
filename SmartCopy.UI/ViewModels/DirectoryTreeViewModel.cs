@@ -29,7 +29,7 @@ public class DirectoryTreeViewModel : ViewModelBase
         RootNodes.Clear();
 
         var root = await BuildNodeTreeAsync(_rootPath, ct);
-        root.CheckState = CheckState.Indeterminate;
+        root.IsExpanded = true;
         RootNodes.Add(root);
         SelectedNode = root;
 
@@ -74,9 +74,8 @@ public class DirectoryTreeViewModel : ViewModelBase
             }
 
             var children = await _provider.GetChildrenAsync(current.FullPath, ct);
-            for (var i = children.Count - 1; i >= 0; i--)
+            foreach (var child in children)
             {
-                var child = children[i];
                 if (!child.IsDirectory)
                 {
                     continue;
@@ -108,6 +107,7 @@ public class DirectoryTreeViewModel : ViewModelBase
             FilterResult = sourceNode.FilterResult,
             ExcludedByFilter = sourceNode.ExcludedByFilter,
             Notes = sourceNode.Notes,
+            IsExpanded = sourceNode.IsExpanded,
         };
     }
 
