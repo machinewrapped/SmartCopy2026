@@ -31,11 +31,12 @@ public partial class MainWindow : Window
 
     private static readonly JsonSerializerOptions s_jsonOptions = new() { WriteIndented = true };
 
-    private Grid _contentGrid => this.FindControl<Grid>("ContentGrid")!;
+    private readonly Grid _contentGrid;
 
     public MainWindow()
     {
         InitializeComponent();
+        _contentGrid = this.FindControl<Grid>("ContentGrid")!;
     }
 
     // ── Restore ────────────────────────────────────────────────────────────────
