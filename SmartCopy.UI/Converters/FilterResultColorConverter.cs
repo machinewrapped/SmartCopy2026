@@ -17,7 +17,7 @@ public class FilterResultColorConverter : IValueConverter
                 return new SolidColorBrush(Colors.SlateBlue);
             }
         }
-        return new SolidColorBrush(Colors.Transparent);
+        return Avalonia.AvaloniaProperty.UnsetValue;
     }
 
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
