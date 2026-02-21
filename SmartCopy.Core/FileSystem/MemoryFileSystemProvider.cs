@@ -74,7 +74,10 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
             throw new InvalidOperationException($"Cannot open directory for read: {normalizedPath}");
         }
 
-        Stream stream = new MemoryStream(entry.Content.ToArray(), writable: false);
+        Stream stream = entry.Content != null 
+            ? new MemoryStream(entry.Content.ToArray(), writable: false)
+            : new MemoryStream(Array.Empty<byte>(), writable: false);
+            
         return Task.FromResult(stream);
     }
 
@@ -242,6 +245,15 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         TouchParentModifiedTime(normalizedPath, now);
     }
 
+    public void SeedSimulatedFile(string path, long size)
+    {
+        var normalizedPath = Normalize(path);
+        EnsureParentDirectoryExists(normalizedPath);
+        var now = DateTime.UtcNow;
+        _entries[normalizedPath] = MemoryEntry.CreateSimulatedFile(size, now);
+        TouchParentModifiedTime(normalizedPath, now);
+    }
+
     private void EnsureParentDirectoryExists(string path)
     {
         var parentPath = GetParentPath(path);
@@ -357,7 +369,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
             FullPath = path,
             RelativePath = path.Equals(Root, StringComparison.OrdinalIgnoreCase) ? string.Empty : path.TrimStart('/'),
             IsDirectory = entry.IsDirectory,
-            Size = entry.IsDirectory ? 0 : entry.Content.Length,
+            Size = entry.IsDirectory ? 0 : entry.Size,
             CreatedAt = entry.CreatedAt,
             ModifiedAt = entry.ModifiedAt,
             Attributes = entry.Attributes,
@@ -376,7 +388,8 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
 
     private readonly record struct MemoryEntry(
         bool IsDirectory,
-        byte[] Content,
+        byte[]? Content,
+        long Size,
         DateTime CreatedAt,
         DateTime ModifiedAt,
         FileAttributes Attributes)
@@ -387,6 +400,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
             return new MemoryEntry(
                 IsDirectory: true,
                 Content: Array.Empty<byte>(),
+                Size: 0,
                 CreatedAt: now,
                 ModifiedAt: now,
                 Attributes: FileAttributes.Directory);
@@ -397,6 +411,18 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
             return new MemoryEntry(
                 IsDirectory: false,
                 Content: content,
+                Size: content.Length,
+                CreatedAt: timestamp,
+                ModifiedAt: timestamp,
+                Attributes: FileAttributes.Normal);
+        }
+
+        public static MemoryEntry CreateSimulatedFile(long size, DateTime timestamp)
+        {
+            return new MemoryEntry(
+                IsDirectory: false,
+                Content: null,
+                Size: size,
                 CreatedAt: timestamp,
                 ModifiedAt: timestamp,
                 Attributes: FileAttributes.Normal);
