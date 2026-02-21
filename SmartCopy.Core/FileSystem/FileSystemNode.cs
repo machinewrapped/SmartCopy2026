@@ -45,6 +45,15 @@ public class FileSystemNode : INotifyPropertyChanged
             if (_checkState != effectiveValue)
             {
                 SetCheckStateWithPropagation(effectiveValue);
+
+                if (effectiveValue == CheckState.Checked)
+                {
+                    IsExpanded = true;
+                }
+                else if (effectiveValue == CheckState.Unchecked)
+                {
+                    IsExpanded = false;
+                }
             }
         }
     }
