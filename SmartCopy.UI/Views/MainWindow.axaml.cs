@@ -85,9 +85,6 @@ public partial class MainWindow : Window
                 cols[ColIdxFolders].Width = new GridLength(
                     Math.Max(s.ColWidthFolders.Value, MinColFolders), GridUnitType.Pixel);
 
-            if (s.ColWidthFiles.HasValue)
-                cols[ColIdxFiles].Width = new GridLength(
-                    Math.Max(s.ColWidthFiles.Value, MinColFiles), GridUnitType.Pixel);
         }
         catch
         {
@@ -146,7 +143,6 @@ public partial class MainWindow : Window
                 IsMaximized     = isMaximized,
                 ColWidthFilters = cols[ColIdxFilters].ActualWidth,
                 ColWidthFolders = cols[ColIdxFolders].ActualWidth,
-                ColWidthFiles   = cols[ColIdxFiles].ActualWidth,
             };
 
             Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
@@ -169,6 +165,5 @@ public partial class MainWindow : Window
         public bool    IsMaximized     { get; set; }
         public double? ColWidthFilters { get; set; }
         public double? ColWidthFolders { get; set; }
-        public double? ColWidthFiles   { get; set; }
     }
 }
