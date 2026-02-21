@@ -95,6 +95,7 @@ public class FileSystemNode : INotifyPropertyChanged
 
     public FileSystemNode? Parent { get; init; }
     public ObservableCollection<FileSystemNode> Children { get; } = new();
+    public ObservableCollection<FileSystemNode> Files { get; } = new();
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -129,7 +130,7 @@ public class FileSystemNode : INotifyPropertyChanged
         OnPropertyChanged(nameof(IsSelected));
 
         // Downward propagation
-        if (newState != CheckState.Indeterminate && Children.Count > 0)
+        if (newState != CheckState.Indeterminate && (Children.Count > 0 || Files.Count > 0))
         {
             using (BeginBatchUpdate())
             {
@@ -150,17 +151,27 @@ public class FileSystemNode : INotifyPropertyChanged
                 child._checkState = newState;
                 child.OnPropertyChanged(nameof(CheckState));
                 child.OnPropertyChanged(nameof(IsSelected));
-                if (child.Children.Count > 0)
+                if (child.Children.Count > 0 || child.Files.Count > 0)
                 {
                     child.PropagateDownward(newState);
                 }
+            }
+        }
+
+        foreach (var file in Files)
+        {
+            if (file._checkState != newState)
+            {
+                file._checkState = newState;
+                file.OnPropertyChanged(nameof(CheckState));
+                file.OnPropertyChanged(nameof(IsSelected));
             }
         }
     }
 
     private void RecalculateCheckState()
     {
-        if (Children.Count == 0) return;
+        if (Children.Count == 0 && Files.Count == 0) return;
 
         bool hasChecked = false;
         bool hasUnchecked = false;
@@ -170,6 +181,13 @@ public class FileSystemNode : INotifyPropertyChanged
         {
             if (child.CheckState == CheckState.Checked) hasChecked = true;
             else if (child.CheckState == CheckState.Unchecked) hasUnchecked = true;
+            else hasIndeterminate = true;
+        }
+
+        foreach (var file in Files)
+        {
+            if (file.CheckState == CheckState.Checked) hasChecked = true;
+            else if (file.CheckState == CheckState.Unchecked) hasUnchecked = true;
             else hasIndeterminate = true;
         }
 
