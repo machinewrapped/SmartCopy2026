@@ -13,6 +13,8 @@ namespace SmartCopy.Core.Pipeline;
 public sealed class PipelineRunner
 {
     private readonly TransformPipeline _pipeline;
+    // Tracks that PreviewAsync was called before ExecuteAsync on delete pipelines.
+    private bool _previewCompleted;
 
     public PipelineRunner(TransformPipeline pipeline)
     {
@@ -38,6 +40,14 @@ public sealed class PipelineRunner
             foreach (var step in _pipeline.Steps)
             {
                 var preview = step.Preview(context);
+
+                // Propagate the transformed path so downstream steps (e.g. CopyStep after
+                // FlattenStep) preview against the correct path, matching what execution produces.
+                if (step.IsPathStep && !string.IsNullOrWhiteSpace(preview.DestinationPath))
+                {
+                    context.CurrentPath = preview.DestinationPath;
+                }
+
                 if (!string.IsNullOrWhiteSpace(preview.DestinationPath))
                 {
                     var warning = await GetWarningAsync(preview.DestinationPath, targetProvider, ct);
@@ -57,6 +67,7 @@ public sealed class PipelineRunner
             }
         }
 
+        _previewCompleted = true;
         return new OperationPlan
         {
             Actions = actions,
@@ -74,6 +85,12 @@ public sealed class PipelineRunner
         IProgress<OperationProgress>? progress = null,
         CancellationToken ct = default)
     {
+        if (_pipeline.HasDeleteStep && !_previewCompleted)
+        {
+            throw new InvalidOperationException(
+                "Pipelines containing a DeleteStep must be previewed before execution.");
+        }
+
         var selected = selectedNodes.ToList();
         var results = new List<TransformResult>();
         var stopwatch = Stopwatch.StartNew();
@@ -168,4 +185,3 @@ public sealed class PipelineRunner
         return TimeSpan.FromSeconds(seconds);
     }
 }
-

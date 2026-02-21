@@ -47,6 +47,17 @@ public sealed class MoveStep : ITransformStep
                              ?? throw new InvalidOperationException("TargetProvider must be set for MoveStep.");
         var destination = StepPathHelper.BuildDestinationPath(DestinationPath, context.CurrentPath);
 
+        var destinationExists = await targetProvider.ExistsAsync(destination, ct);
+        if (destinationExists && context.OverwriteMode == OverwriteMode.Skip)
+        {
+            return new TransformResult(
+                Success: true,
+                StepType: StepType,
+                DestinationPath: destination,
+                OutputBytes: 0,
+                Message: "Skipped existing destination.");
+        }
+
         if (ReferenceEquals(targetProvider, context.SourceProvider) && targetProvider.Capabilities.CanAtomicMove)
         {
             await context.SourceProvider.MoveAsync(context.SourceNode.FullPath, destination, ct);
