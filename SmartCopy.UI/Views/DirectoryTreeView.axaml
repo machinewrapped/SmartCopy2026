@@ -21,8 +21,8 @@
         <TreeView.ItemTemplate>
             <TreeDataTemplate ItemsSource="{Binding Children}">
                 <StackPanel Orientation="Horizontal" Spacing="4">
-                    <CheckBox IsChecked="{Binding CheckState, Converter={StaticResource CheckStateConverter}}" 
-                              IsThreeState="True" />
+                    <CheckBox IsChecked="{Binding CheckState, Converter={StaticResource CheckStateConverter}}"
+                              IsThreeState="False" />
                     <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
                 </StackPanel>
             </TreeDataTemplate>

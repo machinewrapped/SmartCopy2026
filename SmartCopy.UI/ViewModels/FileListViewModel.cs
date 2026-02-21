@@ -1,4 +1,5 @@
-using System.Collections.ObjectModel;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using SmartCopy.Core.FileSystem;
@@ -11,7 +12,12 @@ public class FileListViewModel : ViewModelBase
     private string _directoryPath;
     private CancellationTokenSource? _loadCts;
 
-    public ObservableCollection<FileSystemNode> Files { get; } = new();
+    private IReadOnlyList<FileSystemNode> _files = [];
+    public IReadOnlyList<FileSystemNode> Files
+    {
+        get => _files;
+        private set => SetProperty(ref _files, value);
+    }
 
     public FileListViewModel(IFileSystemProvider provider, string directoryPath)
     {
@@ -75,10 +81,6 @@ public class FileListViewModel : ViewModelBase
             }
         }
 
-        Files.Clear();
-        foreach (var file in directoryNode.Files)
-        {
-            Files.Add(file);
-        }
+        Files = directoryNode.Files.ToList();
     }
 }

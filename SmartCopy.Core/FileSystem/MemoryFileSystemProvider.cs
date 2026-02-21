@@ -74,8 +74,8 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
             throw new InvalidOperationException($"Cannot open directory for read: {normalizedPath}");
         }
 
-        Stream stream = entry.Content != null 
-            ? new MemoryStream(entry.Content.ToArray(), writable: false)
+        Stream stream = entry.Content != null
+            ? new MemoryStream(entry.Content, writable: false)
             : new MemoryStream(Array.Empty<byte>(), writable: false);
             
         return Task.FromResult(stream);

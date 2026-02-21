@@ -27,30 +27,15 @@ public class FileSystemNode : INotifyPropertyChanged
         get => _checkState;
         set
         {
-            CheckState effectiveValue = value;
-            
-            // Intercept UI clicks to enforce Unchecked/Indeterminate -> Checked -> Unchecked
-            // Avalonia IsThreeState=True cycles: Unchecked -> Checked -> Indeterminate -> Unchecked
-            // If we are currently Checked and UI tries to set Indeterminate, override to Unchecked.
-            if (_checkState == CheckState.Checked && value == CheckState.Indeterminate)
+            if (_checkState != value)
             {
-                effectiveValue = CheckState.Unchecked;
-            }
-            // If we are currently Indeterminate and UI tries to set Unchecked, override to Checked.
-            else if (_checkState == CheckState.Indeterminate && value == CheckState.Unchecked)
-            {
-                effectiveValue = CheckState.Checked;
-            }
+                SetCheckStateWithPropagation(value);
 
-            if (_checkState != effectiveValue)
-            {
-                SetCheckStateWithPropagation(effectiveValue);
-
-                if (effectiveValue == CheckState.Checked)
+                if (value == CheckState.Checked)
                 {
                     IsExpanded = true;
                 }
-                else if (effectiveValue == CheckState.Unchecked)
+                else if (value == CheckState.Unchecked)
                 {
                     IsExpanded = false;
                 }
