@@ -4,16 +4,16 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
         xmlns:views="clr-namespace:SmartCopy.UI.Views"
-        mc:Ignorable="d" d:DesignWidth="1050" d:DesignHeight="800"
+        mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="860"
         x:Class="SmartCopy.UI.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="SmartCopy 2026"
         WindowStartupLocation="CenterScreen"
-        Width="1050" Height="800"
+        Width="1400" Height="860"
         Background="#1e1e1e"
         Foreground="#e0e0e0">
 
-    <Grid RowDefinitions="Auto, Auto, *, Auto, Auto, Auto">
+    <Grid RowDefinitions="Auto, Auto, *, Auto, Auto">
         <!-- Menu Bar -->
         <Border Grid.Row="0" Background="#2d2d30" BorderBrush="#3e3e42" BorderThickness="0,0,0,1">
             <Menu>
@@ -36,7 +36,7 @@
                     <ComboBoxItem Content="{Binding SourcePath}" IsSelected="True" />
                 </ComboBox>
                 <Button Grid.Row="0" Grid.Column="2" Content="📁 Browse" Margin="0,0,5,5" CornerRadius="4"/>
-                
+
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="Target" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold"/>
                 <ComboBox Grid.Row="1" Grid.Column="1" Margin="0,5,5,0" HorizontalAlignment="Stretch" CornerRadius="4">
                     <ComboBoxItem Content="{Binding TargetPath}" IsSelected="True" />
@@ -46,27 +46,31 @@
             </Grid>
         </Border>
 
-        <!-- Split View: Tree + List -->
-        <Grid Grid.Row="2" ColumnDefinitions="3*, Auto, 7*" Margin="10,5">
-            <Border Grid.Column="0" Background="#252526" BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="6" Padding="5">
+        <!-- Filters | Folders | Files (3-column main content area) -->
+        <Grid x:Name="ContentGrid" Grid.Row="2" ColumnDefinitions="1.3*, Auto, 2*, Auto, 5*" Margin="10,5">
+            <!-- Filters column -->
+            <views:FilterChainView Grid.Column="0" DataContext="{Binding FilterChain}" />
+
+            <GridSplitter Grid.Column="1" Width="5" Background="Transparent" ResizeDirection="Columns" Margin="4,0" />
+
+            <!-- Folders (directory tree) column -->
+            <Border Grid.Column="2" Background="#252526" BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="6" Padding="5">
                 <views:DirectoryTreeView DataContext="{Binding DirectoryTree}" />
             </Border>
-            
-            <GridSplitter Grid.Column="1" Width="5" Background="Transparent" ResizeDirection="Columns" Margin="4,0" />
-            
-            <Border Grid.Column="2" Background="#252526" BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="6" Padding="5">
+
+            <GridSplitter Grid.Column="3" Width="5" Background="Transparent" ResizeDirection="Columns" Margin="4,0" />
+
+            <!-- Files (file list) column -->
+            <Border Grid.Column="4" Background="#252526" BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="6" Padding="5">
                 <views:FileListView DataContext="{Binding FileList}" />
             </Border>
         </Grid>
 
-        <!-- Filters Area -->
-        <views:FilterChainView Grid.Row="3" DataContext="{Binding FilterChain}" Margin="10,5" />
-
         <!-- Pipeline Area -->
-        <views:PipelineView Grid.Row="4" DataContext="{Binding Pipeline}" Margin="10,5,10,10" />
+        <views:PipelineView Grid.Row="3" DataContext="{Binding Pipeline}" Margin="10,5,10,10" />
 
         <!-- Status & Progress -->
-        <Border Grid.Row="5" Background="#007acc" BorderBrush="#3e3e42" BorderThickness="0,1,0,0" Padding="12,6">
+        <Border Grid.Row="4" Background="#007acc" BorderBrush="#3e3e42" BorderThickness="0,1,0,0" Padding="12,6">
             <views:OperationProgressView DataContext="{Binding OperationProgress}" Foreground="White" />
         </Border>
     </Grid>

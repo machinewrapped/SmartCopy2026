@@ -4,35 +4,87 @@
              x:Class="SmartCopy.UI.Views.FilterChainView"
              x:DataType="vm:FilterChainViewModel">
     <Border Background="#252526" BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="6" Padding="10">
-        <StackPanel Orientation="Vertical">
-            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
-                <TextBlock Text="FILTERS" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="#4facfe" />
-                <Button Content="+ Add ▾" CornerRadius="4" />
-                <Button Content="Save ▾" CornerRadius="4" />
-                <Button Content="Load ▾" CornerRadius="4" />
-            </StackPanel>
-            <ItemsControl ItemsSource="{Binding Filters}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel Orientation="Horizontal" />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,8,8" Background="#333333">
-                            <StackPanel Orientation="Horizontal" Spacing="10">
-                                <TextBlock Text="≡" VerticalAlignment="Center" Cursor="Hand" Foreground="Gray" />
-                                <TextBlock Text="{Binding Description}" VerticalAlignment="Center" />
-                                <ComboBox SelectedIndex="0" Width="150" CornerRadius="4">
-                                    <ComboBoxItem Content="{Binding Mode}" />
-                                </ComboBox>
-                                <ToggleButton IsChecked="{Binding IsEnabled}" Content="●" Width="30" Height="28" CornerRadius="4" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
-                                <Button Content="✕" Width="30" Height="28" CornerRadius="4" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Background="Transparent" Foreground="#f44336" />
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </StackPanel>
+        <DockPanel>
+            <!-- Header pinned to the top -->
+            <TextBlock DockPanel.Dock="Top"
+                       Text="FILTERS" FontWeight="SemiBold" Foreground="#4facfe"
+                       Margin="0,0,0,8" />
+
+            <!-- Save / Load pinned to the bottom -->
+            <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*, 4, *" Margin="0,8,0,0">
+                <Button Grid.Column="0" Content="Save ▾" CornerRadius="4" HorizontalAlignment="Stretch" />
+                <Button Grid.Column="2" Content="Load ▾" CornerRadius="4" HorizontalAlignment="Stretch" />
+            </Grid>
+
+            <!-- Filter cards + inline Add button, scrollable -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Orientation="Vertical">
+
+                    <!-- Existing filter cards -->
+                    <ItemsControl ItemsSource="{Binding Filters}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:FilterViewModel">
+                                <Border BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="4"
+                                        Margin="0,0,0,6" Background="#333333">
+                                    <Grid ColumnDefinitions="Auto, *, Auto" Margin="8,7">
+
+                                        <!-- Left: enabled checkbox -->
+                                        <CheckBox Grid.Column="0"
+                                                  IsChecked="{Binding IsEnabled}"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,8,0" />
+
+                                        <!-- Centre: summary + technical description -->
+                                        <StackPanel Grid.Column="1" Orientation="Vertical" Spacing="2"
+                                                    VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Summary}"
+                                                       FontWeight="Medium"
+                                                       TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding Description}"
+                                                       FontSize="11" Opacity="0.55"
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+
+                                        <!-- Right: drag handle · edit · delete -->
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal"
+                                                    Spacing="2" VerticalAlignment="Center"
+                                                    Margin="8,0,0,0">
+                                            <TextBlock Text="≡" Foreground="Gray"
+                                                       VerticalAlignment="Center"
+                                                       Cursor="Hand" Margin="0,0,4,0" />
+                                            <Button Content="✎"
+                                                    Width="26" Height="26" CornerRadius="4"
+                                                    Padding="0"
+                                                    HorizontalContentAlignment="Center"
+                                                    VerticalContentAlignment="Center"
+                                                    Background="Transparent"
+                                                    Foreground="#a0a0a0"
+                                                    FontSize="13" />
+                                            <Button Content="✕"
+                                                    Width="26" Height="26" CornerRadius="4"
+                                                    Padding="0"
+                                                    HorizontalContentAlignment="Center"
+                                                    VerticalContentAlignment="Center"
+                                                    Background="Transparent"
+                                                    Foreground="#f44736" />
+                                        </StackPanel>
+
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Inline Add button — styled as a ghost card -->
+                    <Border BorderBrush="#3e3e42" BorderThickness="1"
+                            CornerRadius="4" Padding="8,7" Background="Transparent"
+                            Cursor="Hand" Opacity="0.55">
+                        <TextBlock Text="+ Add filter" Foreground="#4facfe"
+                                   FontStyle="Italic" HorizontalAlignment="Center" />
+                    </Border>
+
+                </StackPanel>
+            </ScrollViewer>
+        </DockPanel>
     </Border>
 </UserControl>
