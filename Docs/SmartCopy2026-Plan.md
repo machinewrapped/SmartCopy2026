@@ -1,7 +1,7 @@
 # SmartCopy2026 — Design & Implementation Plan (Revised)
 
 **Prepared:** 2026-02-18
-**Revised:** 2026-02-21 (UI shell progress: 3-column layout, filter card redesign, window/column persistence)
+**Revised:** 2026-02-21 (clarity/specification/actionability pass; execution plan and decision log updated)
 **Author:** Simon Booth
 **License:** MIT
 **Predecessor:** SmartCopy 2015 (GPL v3, .NET 4.8 WinForms, SourceForge)
@@ -85,7 +85,7 @@ Before redesigning, preserve these patterns:
 
 - **WPF** — Windows-only; forfeits cross-platform goal
 - **MAUI** — Mobile-first; poor for traditional tree/list desktop UIs
-- **Electron** — 150MB+ runtime; 200MB+ RAM for a file utility is embarrassing; Node.js I/O adds unnecessary overhead
+- **Electron** — large runtime/RAM overhead for a desktop file utility; Node.js I/O adds unnecessary complexity
 - **Tauri/Rust** — Rust expertise required; web UI is poor for complex tree views; MTP via unsafe FFI
 - **Kotlin + Compose Multiplatform** — JVM distribution overhead; no developer familiarity; MTP requires JNI
 
@@ -871,7 +871,7 @@ immediately legible to new users.
 
 ### UI Improvements Over Predecessor
 
-1. **Source and target accept drag-and-drop** from Explorer/Finder
+1. **Source and destination fields accept drag-and-drop** from Explorer/Finder
 2. **Proper tri-state tree checkboxes** — `▣` for indeterminate
 3. **Filter chain is visual** — each filter is a card; drag to reorder; toggle without removing
 4. **Pipeline is visual** — steps shown as an arrow chain; presets as buttons
@@ -936,138 +936,234 @@ Shell checklist:
 
 ## 8. Phase 1 — Core Workflows
 
-*Goal: a cross-platform file manager that nails the core workflows — browse, select, filter,
-copy, sync — with a clean architecture that makes everything else easy to add.*
+*Goal: ship a reliable cross-platform v1 that can scan, select, filter, preview, copy/move/delete,
+and sync safely.*
 
-Work in this order. Each step should leave the app in a buildable, runnable state.
+### Phase 1 execution rules
 
-### Step 1 — Project Scaffold + UI Shell
+1. Finish steps in order unless an explicit dependency exception is documented in the PR.
+2. Each step must end in a buildable state and include tests for the new behavior.
+3. "Done" means deliverables shipped, acceptance criteria met, and verification commands pass.
+4. Any UX/safety requirement marked "mandatory" in this plan blocks step completion.
 
-- [ ] Create solution: `SmartCopy.Core`, `SmartCopy.App`, `SmartCopy.UI`, `SmartCopy.Tests`
-- [ ] `SmartCopy.Core` targets `net10.0`; `SmartCopy.App` targets Avalonia with `net10.0`
-- [ ] Wire up DI in `AppServiceProvider.cs`
-- [ ] **Build the complete UI shell** (see §7 UI Shell Scope above, including keyboard nav)
-- [ ] All ViewModels are stubs with hardcoded/fake data — no real filesystem calls yet
-- [ ] App launches, layout looks right, resizing works, checkboxes propagate, drag-to-reorder works
-- [ ] CI pipeline: build + test on push (GitHub Actions, Windows + Linux runners)
+### Phase 1 status snapshot (as of 2026-02-21)
 
-### Step 2 — Core Models + Local Filesystem Provider
+| Step | Status | Evidence | Next action |
+|---|---|---|---|
+| 1. Project scaffold + UI shell | In progress | 3-column shell exists; filter cards redesigned; window/column persistence implemented (§7) | Finish remaining shell checklist items (progress overlay, log panel, keyboard/accessibility) |
+| 2. Core models + memory provider foundation | Not started | Interfaces and architecture are defined (§4-§5), but provider/test harness implementations are incomplete | Implement memory-first provider layer and test doubles |
+| 3-10 | Not started | Design complete; no implementation exit criteria met yet | Execute in order |
 
-- [ ] `FileSystemNode` with all properties and observable `Children`
-- [ ] `IFileSystemProvider` interface (including `ProviderCapabilities`)
-- [ ] `LocalFileSystemProvider` implementation
-- [ ] **`MemoryFileSystemProvider`** — in-memory implementation of `IFileSystemProvider` for use
-      in all unit and integration tests; avoids slow disk I/O and manual temp-directory cleanup;
-      enables millisecond-fast tests for scanning, filtering, and pipeline logic
-- [ ] `TrashService` with platform-specific implementations and 500ms timeout
-- [ ] Unit tests: `LocalFileSystemProvider` against a temp directory fixture
+### Step 1 — Project Scaffold + UI Shell (finish)
 
-### Step 3 — Directory Scanner
+Deliverables:
+- [x] Solution and projects exist: `SmartCopy.Core`, `SmartCopy.App`, `SmartCopy.UI`, `SmartCopy.Tests`
+- [x] DI bootstrapping in `AppServiceProvider.cs`
+- [x] UI shell layout and persisted window/column state (§7)
+- [ ] Operation progress overlay placeholder (no real operations yet)
+- [ ] Collapsible log panel with placeholder entries
+- [ ] Full keyboard baseline (`Tab`, arrows, `Space`, `Ctrl+A`, `Delete`/`Ctrl+D`, `F5`, `Escape`)
+- [ ] `AutomationProperties.Name` on all interactive controls
+- [ ] CI workflow runs build + tests on Windows and Linux
 
-- [ ] `DirectoryScanner` with `IAsyncEnumerable<FileSystemNode>` yield
-- [ ] Progressive scan: top-level folders first, stream children in background
-- [ ] `ScanOptions`: `IncludeHidden`, `FullPreScan`, `LazyExpand`, `MaxDepth`
-- [ ] Scan progress reporting via `IProgress<ScanProgress>`
-- [ ] Wire into `DirectoryTreeViewModel`: replace hardcoded nodes with real scan
-- [ ] Unit tests: scan a temp directory structure, verify node counts and depths
+Acceptance criteria:
+- [ ] App launches and renders correctly on Windows and Linux
+- [ ] Shell checklist in §7 is fully checked
+- [ ] No hard dependency on real filesystem for shell startup
+
+Verification:
+- [ ] `dotnet build SmartCopy.App/SmartCopy.App.csproj`
+- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj`
+
+### Step 2 — Core Models + MemoryFileSystemProvider (test-first foundation)
+
+Deliverables:
+- [ ] Implement `FileSystemNode` full model contract from §10
+- [ ] Implement `IFileSystemProvider` + `ProviderCapabilities`
+- [ ] Implement `MemoryFileSystemProvider` for fast hermetic tests
+- [ ] Create shared test fixtures/builders that default to `MemoryFileSystemProvider`
+
+Acceptance criteria:
+- [ ] Memory provider supports same contract without disk I/O
+- [ ] Scanner/filter/pipeline core tests in this step run only against `MemoryFileSystemProvider`
+- [ ] No production code in this step requires touching real files
+
+Verification:
+- [ ] Unit tests for `MemoryFileSystemProvider`
+- [ ] Contract tests for enumerate/read/write/move/delete/create/exists on in-memory trees
+
+### Step 3 — Local Filesystem Provider + Directory Scanner Integration
+
+Deliverables:
+- [ ] Implement `LocalFileSystemProvider`
+- [ ] Implement platform `TrashService` adapters with timeout/fallback behavior
+- [ ] `DirectoryScanner` with progressive `IAsyncEnumerable<FileSystemNode>`
+- [ ] `ScanOptions` (`IncludeHidden`, `FullPreScan`, `LazyExpand`, `MaxDepth`)
+- [ ] `ScanProgress` reporting
+- [ ] Wiring into `DirectoryTreeViewModel` (replace hardcoded tree data)
+
+Acceptance criteria:
+- [ ] Local provider supports enumerate/read/write/move/delete/create/exists end-to-end
+- [ ] Top-level nodes appear before deep traversal completes
+- [ ] Cancelled scans stop cleanly without UI freeze
+- [ ] Scan options are honored and test-covered
+- [ ] Provider capability flags are consumed by at least one scanner/pipeline decision path
+
+Verification:
+- [ ] Unit tests for `LocalFileSystemProvider` failure paths (access denied, missing files, non-seekable streams)
+- [ ] Unit tests for scanner node counts/depth/hidden-file handling/cancellation (memory provider + local provider)
+- [ ] UI smoke test: initial tree render under large directory (>10k entries)
 
 ### Step 4 — Node Selection Logic
 
-- [ ] Tri-state checkbox propagation (downward set + upward recalculate) — see §6.2
-- [ ] `IsSelected` computed property on `FileSystemNode`
-- [ ] Status bar live-updating selected count and size — see §6.10
-- [ ] Unit tests: propagation rules for checked/unchecked/indeterminate
+Deliverables:
+- [ ] Tri-state propagation algorithm from §6.2 in production view models
+- [ ] `IsSelected` wiring (`CheckState == Checked && FilterResult == Included`)
+- [ ] Status bar live counts/size from §6.10
+
+Acceptance criteria:
+- [ ] Parent/child state transitions are deterministic and O(height) upward
+- [ ] No per-node `PropertyChanged` storm during bulk updates (batched updates)
+
+Verification:
+- [ ] Unit tests for checked/unchecked/indeterminate transitions
+- [ ] Performance test for toggling large subtrees (target: no UI hitch > 100ms on reference machine)
 
 ### Step 5 — Filter Chain
 
+Deliverables:
 - [ ] `IFilter`, `FilterChain`, `FilterConfig`
-- [ ] All filter types: `WildcardFilter`, `ExtensionFilter`, `MirrorFilter`, `DateRangeFilter`,
-  `SizeRangeFilter`, `AttributeFilter`
-- [ ] Wire `FilterChain` into tree + file list view: excluded nodes hidden or coloured
-- [ ] `FilterChainViewModel` wired to real `FilterChain`
-- [ ] Unit tests for each filter type and filter chain composition
+- [ ] `Wildcard`, `Extension`, `Mirror`, `DateRange`, `SizeRange`, `Attribute` filters
+- [ ] UI wiring so filter results affect tree + file list consistently
 
-### Step 6 — Transform Pipeline (Built-in Steps)
+Acceptance criteria:
+- [ ] Include/exclude semantics match §5.2
+- [ ] Disabled filters have zero effect
+- [ ] Mirror filter comparison source is derived from pipeline destination by default
 
+Verification:
+- [ ] Unit tests per filter type and chain ordering
+- [ ] Integration test: apply mixed include/exclude chain and verify expected output set
+
+### Step 6 — Transform Pipeline (built-in steps)
+
+Deliverables:
 - [ ] `ITransformStep`, `TransformPipeline`, `TransformContext`, `PipelineRunner`
-- [ ] `CopyStep` with 256KB chunk streaming + `OperationProgress` reporting
-- [ ] `MoveStep` with whole-directory-first strategy — see §6.8
-- [ ] `DeleteStep` with trash-by-default + ReadOnly handling — see §6.11
-- [ ] `FlattenStep` with conflict detection — see §6.9
-- [ ] `PreviewOperation`: dry-run producing `OperationPlan`
-- [ ] Mandatory preview for delete pipelines — see §5.4
-- [ ] Wire progress overlay to real `PipelineRunner` — replace placeholder
-- [ ] Wire Preview button to real `PreviewViewModel`
-- [ ] Operation journal: log completed actions via Serilog rolling-file sink to `%APPDATA%/SmartCopy2026/logs/` — see §6.11
-- [ ] Unit tests: copy, move, delete, flatten against temp directories
-- [ ] Integration test: end-to-end copy workflow (scan → select → filter → copy → verify)
+- [ ] `CopyStep`, `MoveStep`, `DeleteStep`, `FlattenStep`
+- [ ] Preview generation (`OperationPlan`) and preview UI wiring
+- [ ] Progress overlay wired to real operation events
+- [ ] Operation journal written to `%APPDATA%/SmartCopy2026/logs/`
+
+Acceptance criteria:
+- [ ] Exactly one terminal step required and validated
+- [ ] Delete pipelines always require explicit preview confirmation
+- [ ] Overwrite and delete modes are honored per context/config
+
+Verification:
+- [ ] Unit tests for copy/move/delete/flatten behavior and conflict handling
+- [ ] Integration test: scan -> select -> filter -> preview -> execute -> verify outputs
 
 ### Step 7 — Sync Operations
 
-- [ ] Update target (MirrorFilter + CopyStep + IfNewer overwrite mode) — see §6.7
-- [ ] Mirror target (Update + delete orphans in second pass) with mandatory preview for deletes
-- [ ] Find orphans (report only, no copy)
-- [ ] Expose via Pipeline presets and/or dedicated menu items
-- [ ] Integration test: sync a pre-built fixture, verify correct files copied/deleted
+Deliverables:
+- [ ] Update target workflow (`MirrorFilter` + `CopyStep` + `IfNewer`)
+- [ ] Mirror target workflow (second orphan-delete pass with mandatory preview)
+- [ ] Find-orphans report mode
+- [ ] Menu/preset entry points
+
+Acceptance criteria:
+- [ ] Update mode never deletes files
+- [ ] Mirror mode deletes only items confirmed in preview
+- [ ] Find-orphans performs no write/delete actions
+
+Verification:
+- [ ] Integration tests against repeatable fixtures for update/mirror/orphan scenarios
 
 ### Step 8 — Selection Save/Load
 
-- [ ] `SelectionSerializer`: write and read `.txt`, `.m3u`, `.sc2sel` — see §6.6
-- [ ] `SelectionManager`: in-memory snapshot for rescan preservation — see §6.5
-- [ ] Wire to File menu: Save Selection, Load Selection, Restore Selection
-- [ ] Unit tests: round-trip all three formats; verify unmatched paths are skipped gracefully
+Deliverables:
+- [ ] `SelectionSerializer` for `.txt`, `.m3u`, `.sc2sel`
+- [ ] `SelectionManager` snapshot/restore for rescans
+- [ ] File menu wiring (save/load/restore)
+
+Acceptance criteria:
+- [ ] Relative path portability works across machines
+- [ ] Missing/unmatched paths are reported and skipped without aborting load
+
+Verification:
+- [ ] Round-trip tests for all formats
+- [ ] Regression tests for mixed path separators and case differences
 
 ### Step 9 — Settings Persistence
 
-- [ ] `AppSettings` class with all properties
-- [ ] Load on startup, save on clean exit
-- [ ] Settings file: `%APPDATA%/SmartCopy2026/settings.json` on Windows,
-  `~/.config/SmartCopy2026/settings.json` on Linux/macOS
-- [ ] Window size/position, column widths, sort column/order, recent paths, scan options
+Deliverables:
+- [ ] `AppSettings` load/save + schema version
+- [ ] Cross-platform settings paths (`%APPDATA%` / `~/.config`)
+- [ ] Persisted UI and workflow defaults (sort, scan options, recents)
+
+Acceptance criteria:
+- [ ] Missing/corrupt settings file falls back to defaults without crash
+- [ ] Forward-compatible migration path exists for schema changes
+
+Verification:
+- [ ] Unit tests for serialization/migration/error fallback
+- [ ] Manual smoke test across restart on Windows + Linux
 
 ### Step 10 — Filesystem Watcher
 
+Deliverables:
 - [ ] `DirectoryWatcher` with 300ms debounce and event coalescing
-- [ ] Incremental rescan of affected subtree with selection preservation — see §6.5
-- [ ] Enable/disable via Settings (watcher disabled on MTP sources — not applicable)
+- [ ] Incremental subtree rescan with selection preservation (§6.5)
+- [ ] Settings toggle for watcher enable/disable (disabled for MTP providers)
+
+Acceptance criteria:
+- [ ] File bursts do not trigger rescan storms
+- [ ] Existing selections survive watcher-triggered updates
+
+Verification:
+- [ ] Tests for debounce/coalescing semantics
+- [ ] End-to-end UI test: create/delete/rename events update only impacted subtree
 
 ---
 
 ## 9. Remaining Phases
 
-### Phase 2 — Modern Features
+### Phase 2 — Modern Features (post-v1 hardening)
 
+Scope:
 - [ ] Filter chain save/load (`.sc2filter`) + preset library UI
 - [ ] Pipeline save/load (`.sc2pipe`) + preset library UI
-- [ ] MTP provider (`MtpFileSystemProvider`) — Windows only, via MediaDevices NuGet package
-- [ ] Device detection: enumerate WPD devices; show in source Browse dropdown and in the
-      destination picker flyout on Copy/Move pipeline step cards (replacing the plain 📁 Browse
-      button with a "Local folder... / Phone (MTP)..." split option)
-- [ ] Lazy-expand scan mode
-- [ ] `DuplicateFilter` + `PathDepthFilter`
-- [ ] Drag-and-drop for source/target paths
-- [ ] Bookmarks/favourites for source/target paths
+- [ ] Windows MTP provider (`MtpFileSystemProvider`) + WPD device picker integration
+- [ ] `DuplicateFilter` and `PathDepthFilter`
+- [ ] Drag-and-drop and bookmarks/favorites for source field and pipeline destination fields
+
+Exit criteria:
+- [ ] MTP copy round-trip validated on at least two physical devices
+- [ ] Filter/pipeline preset import/export is stable and versioned
 
 ### Phase 3 — Advanced Pipeline Steps
 
-- [ ] `RenameStep` with pattern tokens: `{name}`, `{ext}`, `{date}`, `{artist}`, `{album}`,
-  `{track:00}`, `{title}` — token values from filename heuristics or embedded metadata
-- [ ] `RebaseStep` (add/remove leading directory levels)
-- [ ] `ConvertStep` + `IConversionPlugin` interface + `PluginLoader`
-- [ ] Plugin settings UI per plugin (settings panel injected into `PipelineStepCard`)
-- [ ] FFmpeg plugin (separate download): flac/wav/aiff → mp3/ogg/aac/opus
-- [ ] Transcode-to-MTP pipeline (convert on the fly, stream to device)
-- [ ] Conversion preview: estimated output size (based on bitrate × duration if available)
+Scope:
+- [ ] `RenameStep` token engine (`{name}`, `{ext}`, `{date}`, `{artist}`, `{album}`, `{track:00}`, `{title}`)
+- [ ] `RebaseStep`
+- [ ] `ConvertStep` + plugin loader + per-plugin settings UI
+- [ ] FFmpeg reference plugin and conversion-size preview
+
+Exit criteria:
+- [ ] Plugin isolation and loading failures handled without app crash
+- [ ] At least one conversion plugin ships with tests and docs
 
 ### Phase 4 — Polish and Extensibility
 
-- [ ] Session files (`.sc2session`): source path, target path, filter chain, pipeline,
-  selection snapshot — full round-trip restore
-- [ ] Dark/light theme toggle (Avalonia theming)
-- [ ] Localisation-ready string resources (i18n infrastructure; English-only initially)
-- [ ] Automatic update check (GitHub Releases API)
-- [ ] "Merge multiple sources to one target" — multiple source roots, single target tree
-- [ ] Plugin SDK documentation for community-authored conversion plugins
+Scope:
+- [ ] Session files (`.sc2session`) with full restore
+- [ ] Theming, localization infrastructure, update checks
+- [ ] Multi-source merge workflow
+- [ ] Public plugin SDK documentation
+
+Exit criteria:
+- [ ] Release candidate passes cross-platform smoke checklist
+- [ ] Plugin SDK docs are sufficient for a third party to build a basic plugin
 
 ---
 
@@ -1150,16 +1246,13 @@ The destination path is part of the individual step's config, not a top-level pi
 property. This allows a single pipeline to contain multiple Copy/Move steps writing to
 different locations.
 
-```csharp
-```
-
 ### AppSettings (JSON — `settings.json`)
 
 ```csharp
 public class AppSettings
 {
+    public int SchemaVersion { get; set; } = 1;
     public string? LastSourcePath { get; set; }
-    public string? LastTargetPath { get; set; }
     public bool IncludeHidden { get; set; } = false;
     public bool ShowFilteredFiles { get; set; } = false;
     public bool AutoSelectOnSelectionRestore { get; set; } = true;
@@ -1174,8 +1267,8 @@ public class AppSettings
     public int LogRetentionDays { get; set; } = 30;
     public ColumnSettings FileListColumns { get; set; } = new();
     public List<string> RecentSources { get; set; } = [];
-    // RecentTargets: used to populate recent-path suggestions in the destination picker on
-    // Copy/Move pipeline step cards. Not a global target field.
+    // No global target path exists; Copy/Move steps own destinationPath.
+    // RecentTargets is only for destination suggestions in step cards.
     public List<string> RecentTargets { get; set; } = [];
     public List<string> FavouritePaths { get; set; } = [];
     public List<string> RecentFilterChains { get; set; } = [];
@@ -1213,20 +1306,18 @@ private sealed class WindowSettings
 
 ## 11. Open Questions
 
-1. **Packaging and distribution** — self-contained single-file publish works for all platforms.
-   Consider: Windows `winget` manifest, macOS `.dmg` wrapping the binary, Linux `.AppImage`.
-   No installer strictly required for v1.
+Track these as explicit decision records. If no decision is made by the target date, use the
+default and continue.
 
-2. **Plugin trust model** — options for third-party plugins:
-   - Prompt user on first load ("This plugin is from an unknown source. Allow?")
-   - Code-signing requirement (complex to enforce; blocks community plugins)
-   - Hash-pinning in a manifest (requires a central registry)
-   Recommend: prompt on first load for v1; revisit if a plugin ecosystem develops.
+| Topic | Default for v1 | Owner | Target date | Status |
+|---|---|---|---|---|
+| Packaging/distribution | Ship self-contained binaries first; add `winget` manifest next | Maintainer | 2026-03-15 | Open |
+| Plugin trust model | Prompt on first load; remember user choice per plugin hash | Maintainer | 2026-03-20 | Open |
+| Session snapshot size | Keep uncompressed; add optional `GZipStream` when file > 4 MB | Maintainer | 2026-04-01 | Open |
+| Trash on network drives | Detect unsupported trash and require explicit permanent-delete confirmation | Maintainer | 2026-03-01 | Resolved |
 
-3. **Session files and selection snapshot size** — `.sc2session` includes a full selection
-   snapshot. For very large trees this could be several MB. Accepted as a reasonable trade-off
-   for reliable crash recovery. Compress with `GZipStream` if size becomes a practical concern.
-
-4. **Trash on network drives** — some network paths don't support a trash/recycle bin. The
-   `TrashService` should detect this and fall back to a confirmation dialog for permanent delete.
-   Resolved: yes, detect and warn (see §6.11).
+Decision notes:
+1. Packaging: installer is optional for v1; prioritize reliable portable binaries.
+2. Plugin trust: code-signing and central registry are deferred until plugin ecosystem justifies complexity.
+3. Snapshot size: optimize only when measured data shows real UX/storage pain.
+4. Network trash behavior is defined in §6.11 and should be implemented as a hard safety rule.
