@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dotnet build:*)"
+      "Bash(dotnet build:*)",
+      "mcp__plugin_github_github__pull_request_read",
+      "Bash(dotnet test:*)"
     ]
   }
 }
