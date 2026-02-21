@@ -1,10 +1,10 @@
-﻿namespace SmartCopy.Tests;
+namespace SmartCopy.Tests;
 
-public class UnitTest1
+public sealed class UnitTest1
 {
     [Fact]
-    public void Test1()
+    public void Placeholder_Sanity()
     {
-
+        Assert.True(true);
     }
 }
