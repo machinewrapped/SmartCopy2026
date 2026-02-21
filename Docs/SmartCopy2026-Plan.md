@@ -313,7 +313,7 @@ filters are skipped entirely (their nodes are treated as if the filter does not 
 |---|---|---|
 | `WildcardFilter` | `Pattern` (`;`-separated) | Matches on filename only; `*` and `?` wildcards |
 | `ExtensionFilter` | `Extensions` list | Case-insensitive; normalised without leading dot |
-| `MirrorFilter` | `ComparisonPath`, `CompareMode`, `ExcludeMode` | See §6.3 for full algorithm |
+| `MirrorFilter` | `ComparisonPath`, `CompareMode`, `ExcludeMode` | See §6.3 for full algorithm. `ComparisonPath` is typically auto-derived from the first Copy/Move step in the current pipeline rather than being set independently. |
 | `DateRangeFilter` | `Field` (Created/Modified), `Min`, `Max` | Either bound can be null (open range) |
 | `SizeRangeFilter` | `MinBytes`, `MaxBytes` | Either bound can be null |
 | `DuplicateFilter` | `Scope` (WithinSource/VsTarget) | Excludes all but first occurrence |
@@ -359,6 +359,12 @@ public class TransformContext
 
 `PipelineRunner` iterates selected nodes, creates a fresh `TransformContext` for each, passes it
 through each step in sequence, and reports `OperationProgress` after each file completes.
+
+**Destination ownership:** `TargetProvider` in `TransformContext` is populated by `CopyStep` and
+`MoveStep` from their own `Config.DestinationPath` (resolved to an `IFileSystemProvider` at
+pipeline execution time). It is not set from a global target path — there is no global target.
+Each terminal step carries its own destination, which means a single pipeline could in principle
+contain multiple Copy/Move steps writing to different locations.
 
 **Example pipelines:**
 
@@ -597,6 +603,16 @@ Implementation notes:
 - For `ExtensionAgnostic`: key = `Path.ChangeExtension(relativePath, "").ToLowerInvariant()`
 - Rebuild the lookup when the comparison path changes (not on every `Matches()` call)
 
+**ComparisonPath auto-deduction:** In the UI, `MirrorFilter` cards display the destination
+path deduced from the pipeline rather than requiring the user to configure it separately.
+`MainViewModel` observes `PipelineViewModel.FirstDestinationPath` and pushes it to
+`FilterChainViewModel.PipelineDestinationPath`, which updates the Mirror filter card's
+description reactively. At execution time, `FilterChain.Apply()` receives the
+`comparisonProvider` resolved from the first Copy/Move step's destination — so filter
+evaluation always uses the correct target without requiring the user to set the path in two
+places. If no Copy/Move step exists in the pipeline, the filter displays "(no destination in
+pipeline)" and the comparison is skipped.
+
 ### 6.4 Wildcard Pattern Matching
 
 Pattern string uses `;` as separator for multiple patterns. Each pattern is applied to the
@@ -689,6 +705,11 @@ The predecessor had four sync modes, each expressible as a filter + pipeline com
 **Safety:** Mirror target's delete pass always shows a mandatory preview (see §5.4). The preview
 clearly labels which files will be deleted and from where. The user must confirm before any
 deletions execute.
+
+**Destination resolution:** In the filter + pipeline combinations above, "target" means the
+`DestinationPath` of the `CopyStep` or `MoveStep` in the pipeline. There is no separate global
+target path field — the pipeline step is the authoritative source of the destination. The
+`MirrorFilter`'s comparison path is auto-derived from that same step (see §6.3).
 
 Overwrite strategy when a file exists at the destination (applies to copy and sync operations):
 - `Skip` — never overwrite; skip if destination file exists
@@ -806,7 +827,6 @@ immediately legible to new users.
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │  Source [/home/user/Music                              ▾] [📁]               │
-│  Target [/mnt/phone/Music                              ▾] [📁] [📱 Phone (MTP)]│
 │  ────────────────────────────────────────────────────────────────────────    │
 │  ┌─────────────────┐ ║ ┌──────────────────┐ ║ ┌───────────────────────────┐ │
 │  │ FILTERS         │ ║ │ ▶ □  Rock        │ ║ │ ☑  Name         Modified  │ │
@@ -818,15 +838,16 @@ immediately legible to new users.
 │  │ ☑ Skip files    │ ║ │                  │ ║ │                           │ │
 │  │   already on    │ ║ │                  │ ║ │                           │ │
 │  │   target        │ ║ │                  │ ║ │                           │ │
-│  │   Mirror:/tgt…  │ ║ │                  │ ║ │                           │ │
-│  │                 │ ║ │                  │ ║ │                           │ │
+│  │   Mirror: from  │ ║ │                  │ ║ │                           │ │
+│  │   pipeline ▾    │ ║ │                  │ ║ │                           │ │
 │  │ + Add filter    │ ║ │                  │ ║ │                           │ │
 │  │─────────────────│ ║ │                  │ ║ │                           │ │
 │  │ [Save ▾][Load ▾]│ ║ │                  │ ║ │                           │ │
 │  └─────────────────┘ ║ └──────────────────┘ ║ └───────────────────────────┘ │
-│  ────────────────────────────────────────────────────────────────────────    │
-│  PIPELINE  [Copy ▾]  [Move ▾]  [Delete]  [Custom ▾]  [▶ Run]  [👁 Preview]  │
-│  [⊞ Flatten]  →  [⚙ Convert: mp3 320k]  →  [→ Copy]                        │
+│  ──────────────────────────────────────────────────────────── [▶ Run      ] │
+│  PIPELINE  [Load Preset ▾]                                     [👁 Preview  ] │
+│  [⊞ Flatten] → [⚙ Convert  ] → [→ Copy To                  ] →  + Add step │
+│              →  [mp3 320k  ]    [/mnt/phone/Music         📁]               │
 │  ────────────────────────────────────────────────────────────────────────    │
 │  142 files (2.3 GB) selected   17 filtered out  │  ████████░░ 78%  0:34 left │
 │  Abbey Road/01 Come Together.flac                                            │
@@ -860,7 +881,9 @@ immediately legible to new users.
    files") above a dimmed technical subtitle; enable/disable via checkbox; edit via pencil icon
 7. **Status bar** — selected count + size, filtered count, current operation
 8. **Preview** — shows exactly what will happen before running
-9. **Device picker** — MTP devices appear in the target path dropdown alongside local paths
+9. **Device picker** — MTP devices appear in the destination path picker on Copy/Move pipeline
+   steps alongside local paths (the 📁 Browse button becomes a "Local folder... / Phone (MTP)..."
+   split flyout when MTP devices are available)
 10. **Log panel** — collapsible panel at the bottom showing timestamped operation log
 11. **Keyboard-first** — every action reachable via keyboard; focus indicators on all controls
 12. **Window state persistence** — size, position, maximised state, and all column widths saved to
@@ -869,7 +892,8 @@ immediately legible to new users.
 ### Keyboard Navigation (Phase 1 baseline)
 
 All critical actions must be keyboard-accessible from the initial shell:
-- **Tab** cycles between source/target fields, tree, file list, filter chain, pipeline, buttons
+- **Tab** cycles between the source field, tree, file list, filter chain, pipeline steps
+  (including inline destination fields on Copy/Move step cards), and action buttons
 - **Arrow keys** navigate the tree and file list
 - **Space** toggles checkbox on the focused tree node or file list row
 - **Enter** expands/collapses a tree node
@@ -889,13 +913,17 @@ This validates the layout and UX before architecture decisions are locked in.
 
 Shell checklist:
 - [x] Main window with correct proportions, resizable split panes (3-column: Filters/Folders/Files)
-- [x] Source/target fields with browse button and Phone (MTP) button (no real browsing yet)
+- [x] Source field with browse button (no real browsing yet); target path removed — destination
+      is owned by Copy/Move pipeline step cards
 - [x] TreeView with 2–3 levels of hardcoded nodes, tri-state checkbox behaviour fully working
 - [x] FileListView with hardcoded rows, all columns (Name/Size/Modified), column resizing, click-to-sort
 - [x] Filter chain area: two placeholder filter cards with human-readable summary + technical subtitle,
       enable/disable checkbox, edit (pencil) button, remove button, inline "+ Add filter" ghost card,
       Save/Load buttons pinned to bottom of column
-- [x] Pipeline area: placeholder pipeline steps with arrow connectors, Copy/Move/Delete/Custom/Run/Preview buttons
+- [x] Pipeline area: horizontal scrollable step chain with → connectors; Load Preset ▾ menu
+      (Standard: Copy/Move/Delete presets; My Pipelines; Save current pipeline); + Add step flyout
+      (Path / Content / Terminal step categories); Run and Preview buttons stacked on the right;
+      Copy/Move step cards show inline destination path TextBox + stub 📁 Browse button
 - [x] Status bar: placeholder text (file count, size, filtered count, progress bar, time remaining, current file)
 - [x] Window size, position, maximised state, and all three column widths persisted to
       `%LOCALAPPDATA%/SmartCopy2026/window.json`; restored on next open with off-screen safety guard
@@ -1012,7 +1040,9 @@ Work in this order. Each step should leave the app in a buildable, runnable stat
 - [ ] Filter chain save/load (`.sc2filter`) + preset library UI
 - [ ] Pipeline save/load (`.sc2pipe`) + preset library UI
 - [ ] MTP provider (`MtpFileSystemProvider`) — Windows only, via MediaDevices NuGet package
-- [ ] Device detection: enumerate WPD devices, show in source/target dropdown
+- [ ] Device detection: enumerate WPD devices; show in source Browse dropdown and in the
+      destination picker flyout on Copy/Move pipeline step cards (replacing the plain 📁 Browse
+      button with a "Local folder... / Phone (MTP)..." split option)
 - [ ] Lazy-expand scan mode
 - [ ] `DuplicateFilter` + `PathDepthFilter`
 - [ ] Drag-and-drop for source/target paths
@@ -1112,6 +1142,17 @@ public record PipelineConfig(
 );
 ```
 
+**Copy/Move step parameters** (stored in `TransformStepConfig.Parameters`):
+```json
+{ "destinationPath": "/mnt/phone/Music", "overwriteMode": "IfNewer" }
+```
+The destination path is part of the individual step's config, not a top-level pipeline
+property. This allows a single pipeline to contain multiple Copy/Move steps writing to
+different locations.
+
+```csharp
+```
+
 ### AppSettings (JSON — `settings.json`)
 
 ```csharp
@@ -1133,6 +1174,8 @@ public class AppSettings
     public int LogRetentionDays { get; set; } = 30;
     public ColumnSettings FileListColumns { get; set; } = new();
     public List<string> RecentSources { get; set; } = [];
+    // RecentTargets: used to populate recent-path suggestions in the destination picker on
+    // Copy/Move pipeline step cards. Not a global target field.
     public List<string> RecentTargets { get; set; } = [];
     public List<string> FavouritePaths { get; set; } = [];
     public List<string> RecentFilterChains { get; set; } = [];
