@@ -2,6 +2,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using SmartCopy.Core.FileSystem;
+using SmartCopy.Tests.TestInfrastructure;
 
 namespace SmartCopy.Tests.FileSystem;
 
@@ -10,8 +11,7 @@ public sealed class MemoryFileSystemProviderTests
     [Fact]
     public async Task WriteReadAndEnumerate_WorksEndToEnd()
     {
-        var provider = new MemoryFileSystemProvider();
-        provider.SeedDirectory("/music");
+        var provider = MemoryFileSystemFixtures.Create(fixture => fixture.WithDirectory("/music"));
 
         await using var content = new MemoryStream(Encoding.UTF8.GetBytes("hello world"));
         await provider.WriteAsync("/music/track.txt", content, progress: null, CancellationToken.None);
@@ -37,11 +37,11 @@ public sealed class MemoryFileSystemProviderTests
     [Fact]
     public async Task MoveAndDelete_WorkForFilesAndDirectories()
     {
-        var provider = new MemoryFileSystemProvider();
-        provider.SeedDirectory("/source");
-        provider.SeedFile("/source/a.txt", "A"u8);
-        provider.SeedDirectory("/source/sub");
-        provider.SeedFile("/source/sub/b.txt", "B"u8);
+        var provider = MemoryFileSystemFixtures.Create(fixture => fixture
+            .WithDirectory("/source")
+            .WithFile("/source/a.txt", "A"u8)
+            .WithDirectory("/source/sub")
+            .WithFile("/source/sub/b.txt", "B"u8));
 
         await provider.MoveAsync("/source", "/dest", CancellationToken.None);
 
@@ -57,4 +57,3 @@ public sealed class MemoryFileSystemProviderTests
         Assert.Equal("a.txt", children.Single().Name);
     }
 }
-

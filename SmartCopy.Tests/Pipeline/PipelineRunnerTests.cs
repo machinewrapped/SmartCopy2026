@@ -4,6 +4,7 @@ using System.Text;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
+using SmartCopy.Tests.TestInfrastructure;
 
 namespace SmartCopy.Tests.Pipeline;
 
@@ -12,12 +13,11 @@ public sealed class PipelineRunnerTests
     [Fact]
     public async Task CopyPipeline_PreviewsAndExecutes()
     {
-        var sourceProvider = new MemoryFileSystemProvider();
-        var targetProvider = new MemoryFileSystemProvider();
-
-        sourceProvider.SeedDirectory("/source");
-        sourceProvider.SeedFile("/source/song.flac", Encoding.UTF8.GetBytes("audio"));
-        targetProvider.SeedDirectory("/target");
+        var (sourceProvider, targetProvider) = MemoryFileSystemFixtures.CreatePair(
+            source => source
+                .WithDirectory("/source")
+                .WithFile("/source/song.flac", Encoding.UTF8.GetBytes("audio")),
+            target => target.WithDirectory("/target"));
 
         var sourceNode = await sourceProvider.GetNodeAsync("/source/song.flac", CancellationToken.None);
         var pipeline = new TransformPipeline([new CopyStep("/target")]);
@@ -50,9 +50,9 @@ public sealed class PipelineRunnerTests
     [Fact]
     public async Task DeletePipeline_RequiresPreviewBeforeExecute()
     {
-        var provider = new MemoryFileSystemProvider();
-        provider.SeedDirectory("/source");
-        provider.SeedFile("/source/delete-me.txt", "x"u8);
+        var provider = MemoryFileSystemFixtures.Create(fixture => fixture
+            .WithDirectory("/source")
+            .WithFile("/source/delete-me.txt", "x"u8));
 
         var node = await provider.GetNodeAsync("/source/delete-me.txt", CancellationToken.None);
         var runner = new PipelineRunner(new TransformPipeline([new DeleteStep()]));
@@ -71,9 +71,9 @@ public sealed class PipelineRunnerTests
     [Fact]
     public async Task DeletePipeline_RemovesSourceFile_AfterPreview()
     {
-        var provider = new MemoryFileSystemProvider();
-        provider.SeedDirectory("/source");
-        provider.SeedFile("/source/delete-me.txt", "x"u8);
+        var provider = MemoryFileSystemFixtures.Create(fixture => fixture
+            .WithDirectory("/source")
+            .WithFile("/source/delete-me.txt", "x"u8));
 
         var node = await provider.GetNodeAsync("/source/delete-me.txt", CancellationToken.None);
         var runner = new PipelineRunner(new TransformPipeline([new DeleteStep()]));
@@ -101,14 +101,13 @@ public sealed class PipelineRunnerTests
     [Fact]
     public async Task FlattenThenCopy_FlattensPathAtDestination()
     {
-        var sourceProvider = new MemoryFileSystemProvider();
-        var targetProvider = new MemoryFileSystemProvider();
-
-        sourceProvider.SeedDirectory("/source");
-        sourceProvider.SeedDirectory("/source/deep");
-        sourceProvider.SeedDirectory("/source/deep/folder");
-        sourceProvider.SeedFile("/source/deep/folder/track.mp3", "x"u8);
-        targetProvider.SeedDirectory("/out");
+        var (sourceProvider, targetProvider) = MemoryFileSystemFixtures.CreatePair(
+            source => source
+                .WithDirectory("/source")
+                .WithDirectory("/source/deep")
+                .WithDirectory("/source/deep/folder")
+                .WithFile("/source/deep/folder/track.mp3", "x"u8),
+            target => target.WithDirectory("/out"));
 
         var node = await sourceProvider.GetNodeAsync("/source/deep/folder/track.mp3", CancellationToken.None);
         var runner = new PipelineRunner(new TransformPipeline(
@@ -132,12 +131,11 @@ public sealed class PipelineRunnerTests
     [Fact]
     public async Task FlattenThenCopy_PreviewReportsFlattened_DestinationPath()
     {
-        var sourceProvider = new MemoryFileSystemProvider();
-        var targetProvider = new MemoryFileSystemProvider();
-
-        sourceProvider.SeedDirectory("/source/deep/folder");
-        sourceProvider.SeedFile("/source/deep/folder/track.mp3", "x"u8);
-        targetProvider.SeedDirectory("/out");
+        var (sourceProvider, targetProvider) = MemoryFileSystemFixtures.CreatePair(
+            source => source
+                .WithDirectory("/source/deep/folder")
+                .WithFile("/source/deep/folder/track.mp3", "x"u8),
+            target => target.WithDirectory("/out"));
 
         var node = await sourceProvider.GetNodeAsync("/source/deep/folder/track.mp3", CancellationToken.None);
         var runner = new PipelineRunner(new TransformPipeline(
@@ -161,11 +159,11 @@ public sealed class PipelineRunnerTests
     [Fact]
     public async Task MoveStep_SkipsExistingDestination_WhenOverwriteModeIsSkip()
     {
-        var provider = new MemoryFileSystemProvider();
-        provider.SeedDirectory("/source");
-        provider.SeedDirectory("/dest");
-        provider.SeedFile("/source/song.mp3", "original"u8);
-        provider.SeedFile("/dest/source/song.mp3", "existing"u8);
+        var provider = MemoryFileSystemFixtures.Create(fixture => fixture
+            .WithDirectory("/source")
+            .WithDirectory("/dest")
+            .WithFile("/source/song.mp3", "original"u8)
+            .WithFile("/dest/source/song.mp3", "existing"u8));
 
         var node = await provider.GetNodeAsync("/source/song.mp3", CancellationToken.None);
         var runner = new PipelineRunner(new TransformPipeline([new MoveStep("/dest")]));

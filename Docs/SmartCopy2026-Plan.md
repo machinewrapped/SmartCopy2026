@@ -958,12 +958,12 @@ and sync safely.*
 
 | Workstream item | Status | Evidence | Next action |
 |---|---|---|---|
-| UX-1 (Step 1): Baseline shell | In progress | 3-column shell, seeded `/mem` source, tree->file-list sync, persisted window/column state, CI matrix in place | Close verification checklist and mark baseline shell complete |
-| UX-2 (Step 4): Node selection logic | In progress | Tri-state propagation and `IsSelected` behavior implemented in `FileSystemNode` and used by tree/list nodes | Add dedicated tri-state/perf tests |
+| UX-1 (Step 1): Baseline shell | Complete | 3-column shell, seeded `/mem` source, tree->file-list sync, persisted window/column state, CI matrix in place; verification checklist closed | Keep as baseline for UX-loop regression checks in later steps |
+| UX-2 (Step 3): Node selection logic | Complete | Tri-state propagation and `IsSelected` behavior implemented in `FileSystemNode` and covered by dedicated transition tests | Expand with scale/perf coverage alongside Step 10 observability work |
 | UX-3 (Step 5): Filter chain | In progress | `IFilter`, `FilterChain`, and planned filter types are implemented with initial tests | Replace filter UI stubs with live chain execution and broaden test coverage |
 | UX-4 (Step 6): Transform pipeline | In progress | Core pipeline (`TransformPipeline`, `PipelineRunner`) and built-in steps (`Copy/Move/Delete/Flatten`) implemented with tests | Wire Preview/Run in UI, enforce delete-confirm preview policy, add journal/progress integration |
 | UX-5 (Step 7): Sync operations | Started (core skeleton) | `SyncWorkflow` has find-orphans and basic update/mirror builders | Implement full update/mirror semantics (`IfNewer`, orphan delete pass with confirmation) + UI entry points |
-| Hardening-1 (Step 2): Memory provider foundation | In progress (functionally complete, validation follow-up) | `FileSystemNode`, `IFileSystemProvider`, `ProviderCapabilities`, `MemoryFileSystemProvider`, and provider contract tests are implemented | Add shared memory-first fixture builders to reduce test duplication and standardise fixture usage |
+| Hardening-1 (Step 2): Memory provider foundation | Complete | `FileSystemNode`, `IFileSystemProvider`, `ProviderCapabilities`, `MemoryFileSystemProvider`, provider contract tests, and shared memory-first fixture builders are implemented | Reuse the shared fixture builder pattern for all new core workflow tests |
 | Hardening-2 (Step 8): Selection save/load | In progress | `SelectionSerializer` (`.txt`, `.m3u`, `.sc2sel`) and `SelectionManager` implemented with round-trip tests | Wire File menu flows and add unmatched-path reporting behavior |
 | Hardening-3 (Step 9): Settings persistence | In progress | `AppSettings` + `AppSettingsStore` implemented with corrupt-file fallback tests and cross-platform path resolution | Add schema migration path and startup/shutdown wiring for persisted defaults |
 | Polish-1 (Step 10): Shell observability + status | Not started | Scope split out of overloaded Step 1/Step 4 | Implement after Step 7 end-to-end UX loop is proven |
@@ -992,7 +992,7 @@ Deliverables:
 - [x] Implement `FileSystemNode` full model contract from §10
 - [x] Implement `IFileSystemProvider` + `ProviderCapabilities`
 - [x] Implement `MemoryFileSystemProvider` for fast hermetic tests
-- [ ] Create shared test fixtures/builders that default to `MemoryFileSystemProvider` (tests currently instantiate providers directly)
+- [x] Create shared test fixtures/builders that default to `MemoryFileSystemProvider`
 
 Acceptance criteria:
 - [x] No hard dependency on real filesystem for shell startup
@@ -1014,7 +1014,7 @@ Acceptance criteria:
 - [x] No per-node `PropertyChanged` storm during bulk updates (batched updates)
 
 Verification:
-- [ ] Unit tests for checked/unchecked/indeterminate transitions
+- [x] Unit tests for checked/unchecked/indeterminate transitions
 
 ### Step 4 — Filter Chain (UX Loop Track)
 
