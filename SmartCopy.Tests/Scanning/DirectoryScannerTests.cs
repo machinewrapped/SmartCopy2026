@@ -1,5 +1,6 @@
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Scanning;
+using SmartCopy.Tests.TestInfrastructure;
 
 namespace SmartCopy.Tests.Scanning;
 
@@ -8,12 +9,12 @@ public sealed class DirectoryScannerTests
     [Fact]
     public async Task ScanAsync_StreamsTopLevelThenChildren()
     {
-        var provider = new MemoryFileSystemProvider();
-        provider.SeedDirectory("/root");
-        provider.SeedDirectory("/root/rock");
-        provider.SeedDirectory("/root/rock/beatles");
-        provider.SeedFile("/root/rock/beatles/song.mp3", "x"u8);
-        provider.SeedDirectory("/root/jazz");
+        var provider = MemoryFileSystemFixtures.Create(fixture => fixture
+            .WithDirectory("/root")
+            .WithDirectory("/root/rock")
+            .WithDirectory("/root/rock/beatles")
+            .WithFile("/root/rock/beatles/song.mp3", "x"u8)
+            .WithDirectory("/root/jazz"));
 
         var scanner = new DirectoryScanner();
         var results = new List<FileSystemNode>();
@@ -44,11 +45,11 @@ public sealed class DirectoryScannerTests
     [Fact]
     public async Task ScanAsync_RespectsMaxDepth()
     {
-        var provider = new MemoryFileSystemProvider();
-        provider.SeedDirectory("/root");
-        provider.SeedDirectory("/root/a");
-        provider.SeedDirectory("/root/a/b");
-        provider.SeedFile("/root/a/b/file.txt", "x"u8);
+        var provider = MemoryFileSystemFixtures.Create(fixture => fixture
+            .WithDirectory("/root")
+            .WithDirectory("/root/a")
+            .WithDirectory("/root/a/b")
+            .WithFile("/root/a/b/file.txt", "x"u8));
 
         var scanner = new DirectoryScanner();
         var results = new List<FileSystemNode>();
