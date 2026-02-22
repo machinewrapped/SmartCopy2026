@@ -1,6 +1,4 @@
 using System;
-using System.IO;
-using System.Linq;
 using SmartCopy.Core.Filters.Filters;
 
 namespace SmartCopy.Core.Filters;

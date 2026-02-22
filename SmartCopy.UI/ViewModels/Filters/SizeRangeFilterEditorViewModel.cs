@@ -66,18 +66,24 @@ public partial class SizeRangeFilterEditorViewModel : FilterEditorViewModelBase
 
     private static (double? min, double? max, SizeUnit unit) BackCalculate(long? minBytes, long? maxBytes)
     {
-        // Use the largest unit that produces a whole number >= 1 for at least one bound
         var referenceBytes = maxBytes ?? minBytes ?? 0L;
-
-        var unit = referenceBytes >= 1024L * 1024 * 1024 * 1024 ? SizeUnit.TB
-            : referenceBytes >= 1024L * 1024 * 1024 ? SizeUnit.GB
-            : referenceBytes >= 1024L * 1024 ? SizeUnit.MB
-            : referenceBytes >= 1024L ? SizeUnit.KB
-            : SizeUnit.Bytes;
+        var unit = BestUnitForBytes(referenceBytes);
 
         var multiplier = (double)UnitMultiplier(unit);
         double? min = minBytes.HasValue ? Math.Round(minBytes.Value / multiplier, 2) : null;
         double? max = maxBytes.HasValue ? Math.Round(maxBytes.Value / multiplier, 2) : null;
         return (min, max, unit);
+    }
+
+    /// <summary>
+    /// Returns the largest unit that keeps the value at or above 1.
+    /// </summary>
+    private static SizeUnit BestUnitForBytes(long bytes)
+    {
+        if (bytes >= UnitMultiplier(SizeUnit.TB)) return SizeUnit.TB;
+        if (bytes >= UnitMultiplier(SizeUnit.GB)) return SizeUnit.GB;
+        if (bytes >= UnitMultiplier(SizeUnit.MB)) return SizeUnit.MB;
+        if (bytes >= UnitMultiplier(SizeUnit.KB)) return SizeUnit.KB;
+        return SizeUnit.Bytes;
     }
 }

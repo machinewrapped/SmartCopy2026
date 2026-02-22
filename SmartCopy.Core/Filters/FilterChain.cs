@@ -9,6 +9,7 @@ namespace SmartCopy.Core.Filters;
 
 public sealed class FilterChain
 {
+    private const string AllChildrenExcluded = "All children excluded";
     private readonly List<IFilter> _filters = [];
 
     public FilterChain(IEnumerable<IFilter> filters)
@@ -72,25 +73,7 @@ public sealed class FilterChain
 
         for (var i = postOrderList.Count - 1; i >= 0; i--)
         {
-            var node = postOrderList[i];
-            if (node.IsDirectory && (node.Children.Count > 0 || node.Files.Count > 0))
-            {
-                if (node.FilterResult == FilterResult.Included || node.ExcludedByFilter == "All children excluded")
-                {
-                    bool hasIncluded = node.Children.Any(c => c.FilterResult == FilterResult.Included) ||
-                                       node.Files.Any(f => f.FilterResult == FilterResult.Included);
-                    if (!hasIncluded)
-                    {
-                        node.FilterResult = FilterResult.Excluded;
-                        node.ExcludedByFilter = "All children excluded";
-                    }
-                    else
-                    {
-                        node.FilterResult = FilterResult.Included;
-                        node.ExcludedByFilter = null;
-                    }
-                }
-            }
+            UpdateDirectoryExclusion(postOrderList[i]);
         }
 
         foreach (var root in roots)
@@ -104,26 +87,36 @@ public sealed class FilterChain
     {
         while (node != null)
         {
-            if (node.IsDirectory && (node.Children.Count > 0 || node.Files.Count > 0))
-            {
-                if (node.FilterResult == FilterResult.Included || node.ExcludedByFilter == "All children excluded")
-                {
-                    bool hasIncluded = node.Children.Any(c => c.FilterResult == FilterResult.Included) ||
-                                       node.Files.Any(f => f.FilterResult == FilterResult.Included);
-
-                    if (!hasIncluded)
-                    {
-                        node.FilterResult = FilterResult.Excluded;
-                        node.ExcludedByFilter = "All children excluded";
-                    }
-                    else
-                    {
-                        node.FilterResult = FilterResult.Included;
-                        node.ExcludedByFilter = null;
-                    }
-                }
-            }
+            UpdateDirectoryExclusion(node);
             node = node.Parent;
+        }
+    }
+
+    /// <summary>
+    /// If <paramref name="node"/> is a non-empty directory that was not explicitly excluded
+    /// by a filter, sets its <see cref="FileSystemNode.FilterResult"/> based on whether
+    /// any child or file is still included.
+    /// </summary>
+    private static void UpdateDirectoryExclusion(FileSystemNode node)
+    {
+        if (!node.IsDirectory || (node.Children.Count == 0 && node.Files.Count == 0))
+            return;
+
+        if (node.FilterResult != FilterResult.Included && node.ExcludedByFilter != AllChildrenExcluded)
+            return;
+
+        bool hasIncluded = node.Children.Any(c => c.FilterResult == FilterResult.Included) ||
+                           node.Files.Any(f => f.FilterResult == FilterResult.Included);
+
+        if (hasIncluded)
+        {
+            node.FilterResult = FilterResult.Included;
+            node.ExcludedByFilter = null;
+        }
+        else
+        {
+            node.FilterResult = FilterResult.Excluded;
+            node.ExcludedByFilter = AllChildrenExcluded;
         }
     }
 

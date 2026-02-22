@@ -8,17 +8,20 @@ namespace SmartCopy.UI.ViewModels.Filters;
 public partial class AttributeFilterEditorViewModel : FilterEditorViewModelBase
 {
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsValid))]
     private bool _hidden;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsValid))]
     private bool _readOnly;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsValid))]
     private bool _system;
 
-    partial void OnHiddenChanged(bool value) { OnPropertyChanged(nameof(IsValid)); AutoUpdateName(); }
-    partial void OnReadOnlyChanged(bool value) { OnPropertyChanged(nameof(IsValid)); AutoUpdateName(); }
-    partial void OnSystemChanged(bool value) { OnPropertyChanged(nameof(IsValid)); AutoUpdateName(); }
+    partial void OnHiddenChanged(bool value) => AutoUpdateName();
+    partial void OnReadOnlyChanged(bool value) => AutoUpdateName();
+    partial void OnSystemChanged(bool value) => AutoUpdateName();
 
     public override bool IsValid => Hidden || ReadOnly || System;
 

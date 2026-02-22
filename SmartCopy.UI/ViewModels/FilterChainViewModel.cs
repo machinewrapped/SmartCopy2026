@@ -28,14 +28,7 @@ public partial class FilterViewModel(IFilter filter) : ViewModelBase
         {
             if (!string.IsNullOrWhiteSpace(_backingFilter.CustomName))
                 return _backingFilter.CustomName;
-            var modeStr = _backingFilter.Mode switch
-            {
-                FilterMode.Only => "Only",
-                FilterMode.Add => "Add",
-                FilterMode.Exclude => "Exclude",
-                _ => _backingFilter.Mode.ToString(),
-            };
-            return $"{modeStr} {_backingFilter.TypeDisplayName}";
+            return $"{_backingFilter.Mode} {_backingFilter.TypeDisplayName}";
         }
     }
 

@@ -1,4 +1,3 @@
-using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SmartCopy.Core.Filters;
@@ -100,15 +99,7 @@ public partial class EditFilterDialogViewModel : ObservableObject
             }
         }
 
-        string newPrefix = newMode switch
-        {
-            FilterMode.Only => "Only",
-            FilterMode.Add => "Add",
-            FilterMode.Exclude => "Exclude",
-            _ => newMode.ToString()
-        };
-
-        FilterName = $"{newPrefix} {baseName}";
+        FilterName = $"{newMode} {baseName}";
     }
 
     partial void OnFilterNameChanged(string value)
@@ -152,12 +143,7 @@ public partial class EditFilterDialogViewModel : ObservableObject
         string pipelineDestinationPath = "")
     {
         var editor = FilterEditorViewModelFactory.Create(filterType);
-        if (editor is MirrorFilterEditorViewModel mirrorEditor)
-        {
-            mirrorEditor.SetSuggestedPath(pipelineDestinationPath);
-        }
-
-        return new EditFilterDialogViewModel(editor);
+        return CreateFromEditor(editor, pipelineDestinationPath);
     }
 
     /// <summary>Creates a pre-populated editor for editing an existing filter.</summary>
@@ -166,10 +152,15 @@ public partial class EditFilterDialogViewModel : ObservableObject
         string pipelineDestinationPath = "")
     {
         var editor = FilterEditorViewModelFactory.CreateFrom(existingFilter);
+        return CreateFromEditor(editor, pipelineDestinationPath);
+    }
+
+    private static EditFilterDialogViewModel CreateFromEditor(
+        FilterEditorViewModelBase editor,
+        string pipelineDestinationPath)
+    {
         if (editor is MirrorFilterEditorViewModel mirrorEditor)
-        {
             mirrorEditor.SetSuggestedPath(pipelineDestinationPath);
-        }
 
         return new EditFilterDialogViewModel(editor);
     }

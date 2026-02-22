@@ -55,11 +55,7 @@ public class FileListViewModel(IFileSystemProvider provider, string directoryPat
     /// </summary>
     public async Task ReapplyFiltersAsync(CancellationToken ct = default)
     {
-        if (_chain is not null && _files.Count > 0)
-        {
-            await _chain.ApplyToTreeAsync(_files, _comparisonProvider, ct);
-        }
-
+        await ApplyChainToFilesAsync(ct);
         RefreshVisibleFiles();
     }
 
@@ -110,13 +106,14 @@ public class FileListViewModel(IFileSystemProvider provider, string directoryPat
 
         _files = [.. directoryNode.Files];
 
-        // Apply current chain to the freshly loaded file set.
-        if (_chain is not null && _files.Count > 0)
-        {
-            await _chain.ApplyToTreeAsync(_files, _comparisonProvider, ct);
-        }
-
+        await ApplyChainToFilesAsync(ct);
         RefreshVisibleFiles();
+    }
+
+    private async Task ApplyChainToFilesAsync(CancellationToken ct = default)
+    {
+        if (_chain is not null && _files.Count > 0)
+            await _chain.ApplyToTreeAsync(_files, _comparisonProvider, ct);
     }
 
     private void RefreshVisibleFiles()
