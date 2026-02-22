@@ -974,7 +974,7 @@ Deliverables:
 - [x] CI workflow runs build + tests on Windows and Linux
 
 Acceptance criteria:
-- [ ] App launches and renders correctly on Windows and Linux
+- [ ] App launches and renders correctly on Windows
 - [ ] Shell checklist in §7 is fully checked
 - [x] No hard dependency on real filesystem for shell startup (current shell uses seeded `/mem/`)
 
@@ -1114,7 +1114,7 @@ Acceptance criteria:
 
 Verification:
 - [ ] Unit tests for serialization/migration/error fallback
-- [ ] Manual smoke test across restart on Windows + Linux
+- [ ] Manual smoke test across restart on Windows
 
 ### Step 10 — Filesystem Watcher
 
