@@ -34,7 +34,7 @@ public sealed class EditFilterDialogViewModelTests
     [Fact]
     public void ForEdit_PrePopulatesExtensions()
     {
-        var existingFilter = new ExtensionFilter(["mp3", "flac"], FilterMode.Include);
+        var existingFilter = new ExtensionFilter(["mp3", "flac"], FilterMode.Only);
 
         var vm = EditFilterDialogViewModel.ForEdit(existingFilter);
         var editor = (ExtensionFilterEditorViewModel)vm.Editor;
@@ -58,6 +58,17 @@ public sealed class EditFilterDialogViewModelTests
 
         Assert.NotNull(vm.ResultFilter);
         Assert.IsType<ExtensionFilter>(vm.ResultFilter);
+    }
+
+    [Fact]
+    public void ModeIsAdd_SetToTrue_ChangesModeOnEditor()
+    {
+        var vm = EditFilterDialogViewModel.ForNew("Extension");
+
+        vm.ModeIsAdd = true;
+
+        Assert.Equal(FilterMode.Add, vm.Mode);
+        Assert.Equal(FilterMode.Add, vm.Editor.Mode);
     }
 
     [Fact]

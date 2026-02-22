@@ -54,7 +54,7 @@ public partial class FilterChainView : UserControl
 
     // ---- Add-filter popup ----
 
-    private void OnPresetPickedClosePopup(FilterPreset _) => AddFilterPopup.IsOpen = false;
+    private void OnPresetPickedClosePopup(FilterPreset _) => Dispatcher.UIThread.Post(() => AddFilterPopup.IsOpen = false);
 
     private void OnAddFilterButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
@@ -67,7 +67,7 @@ public partial class FilterChainView : UserControl
 
     private void OnNewFilterDialogRequested(object? sender, string filterType)
     {
-        AddFilterPopup.IsOpen = false;
+        Dispatcher.UIThread.Post(() => AddFilterPopup.IsOpen = false);
         _ = OpenNewFilterDialogAsync(filterType);
     }
 
@@ -79,8 +79,7 @@ public partial class FilterChainView : UserControl
     private async Task OpenNewFilterDialogAsync(string filterType)
     {
         if (_currentViewModel is null) return;
-        var parentWindow = this.VisualRoot as Window;
-        if (parentWindow is null) return;
+        if (this.VisualRoot is not Window parentWindow) return;
 
         var vm = EditFilterDialogViewModel.ForNew(
             filterType,
@@ -101,8 +100,7 @@ public partial class FilterChainView : UserControl
     private async Task OpenEditFilterDialogAsync(FilterViewModel filterVm)
     {
         if (_currentViewModel is null) return;
-        var parentWindow = this.VisualRoot as Window;
-        if (parentWindow is null) return;
+        if (this.VisualRoot is not Window parentWindow) return;
 
         var vm = EditFilterDialogViewModel.ForEdit(
             filterVm.BackingFilter,

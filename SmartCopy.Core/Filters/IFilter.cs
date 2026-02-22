@@ -12,6 +12,7 @@ public interface IFilter
     bool IsEnabled { get; set; }
     string? CustomName { get; set; }
     FilterConfig Config { get; }
+    bool AppliesToDirectories { get; }
     string Summary { get; }
     string Description { get; }
 

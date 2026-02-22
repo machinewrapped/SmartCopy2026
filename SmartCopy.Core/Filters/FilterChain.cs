@@ -81,31 +81,50 @@ public sealed class FilterChain
         IFileSystemProvider? comparisonProvider,
         CancellationToken ct)
     {
+        bool inSet = true;
+        string? excludedBy = null;
+        IFilter? excludingFilter = null;
+
         foreach (var filter in _filters.Where(f => f.IsEnabled))
         {
+            if (node.IsDirectory && !filter.AppliesToDirectories)
+                continue;
+
             ct.ThrowIfCancellationRequested();
             var matches = await filter.MatchesAsync(node, comparisonProvider, ct);
-            if (filter.Mode == FilterMode.Include && !matches)
-            {
-                return new NodeEvaluation(
-                    IsIncluded: false,
-                    ExcludedByFilter: filter.Name,
-                    MatchingFilter: filter);
-            }
 
-            if (filter.Mode == FilterMode.Exclude && matches)
+            switch (filter.Mode)
             {
-                return new NodeEvaluation(
-                    IsIncluded: false,
-                    ExcludedByFilter: filter.Name,
-                    MatchingFilter: filter);
+                case FilterMode.Only:
+                    if (inSet && !matches)
+                    {
+                        inSet = false;
+                        excludedBy = filter.Name;
+                        excludingFilter = filter;
+                    }
+                    break;
+
+                case FilterMode.Add:
+                    if (matches)
+                    {
+                        inSet = true;
+                        excludedBy = null;
+                        excludingFilter = null;
+                    }
+                    break;
+
+                case FilterMode.Exclude:
+                    if (matches)
+                    {
+                        inSet = false;
+                        excludedBy = filter.Name;
+                        excludingFilter = filter;
+                    }
+                    break;
             }
         }
 
-        return new NodeEvaluation(
-            IsIncluded: true,
-            ExcludedByFilter: null,
-            MatchingFilter: null);
+        return new NodeEvaluation(inSet, excludedBy, excludingFilter);
     }
 
     private readonly record struct NodeEvaluation(

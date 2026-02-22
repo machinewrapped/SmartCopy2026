@@ -5,37 +5,43 @@
              x:Class="SmartCopy.UI.Views.FileListView"
              x:DataType="vm:FileListViewModel">
 
-    <UserControl.Resources>
-        <conv:CheckStateConverter x:Key="CheckStateConverter" />
-        <conv:FileSizeConverter x:Key="FileSizeConverter" />
-        <conv:FilterResultColorConverter x:Key="FilterResultColorConverter" />
-    </UserControl.Resources>
+   <UserControl.Resources>
+       <conv:CheckStateConverter x:Key="CheckStateConverter" />
+       <conv:FileSizeConverter x:Key="FileSizeConverter" />
+       <conv:FilterResultExcludedConverter x:Key="FilterResultExcludedConverter" />
+   </UserControl.Resources>
 
-    <DataGrid ItemsSource="{Binding VisibleFiles}" AutoGenerateColumns="False"
-              CanUserReorderColumns="True" CanUserResizeColumns="True" CanUserSortColumns="True" 
-              GridLinesVisibility="Horizontal" BorderThickness="0" Background="Transparent">
-        <DataGrid.Columns>
-            <DataGridTemplateColumn Width="Auto">
-                <DataGridTemplateColumn.Header>
-                    <CheckBox IsThreeState="False" Margin="8,0,0,0" />
-                </DataGridTemplateColumn.Header>
-                <DataGridTemplateColumn.CellTemplate>
-                    <DataTemplate>
-                        <CheckBox IsChecked="{Binding CheckState, Converter={StaticResource CheckStateConverter}}" IsThreeState="False" Margin="8,0,0,0" />
-                    </DataTemplate>
-                </DataGridTemplateColumn.CellTemplate>
-            </DataGridTemplateColumn>
-            <DataGridTemplateColumn Header="Name" Width="*" IsReadOnly="True" SortMemberPath="Name">
-                <DataGridTemplateColumn.CellTemplate>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding Name}"
-                                   Foreground="{Binding FilterResult, Converter={StaticResource FilterResultColorConverter}}"
-                                   VerticalAlignment="Center" Padding="4,0" />
-                    </DataTemplate>
-                </DataGridTemplateColumn.CellTemplate>
-            </DataGridTemplateColumn>
-            <DataGridTextColumn Header="Size" IsReadOnly="True" Binding="{Binding Size, Converter={StaticResource FileSizeConverter}, Mode=OneWay}" Width="100" />
-            <DataGridTextColumn Header="Modified" IsReadOnly="True" Binding="{Binding ModifiedAt, StringFormat=\{0:yyyy-MM-dd\}, Mode=OneWay}" Width="120" />
-        </DataGrid.Columns>
-    </DataGrid>
+   <UserControl.Styles>
+       <Style Selector="TextBlock.excluded-file">
+           <Setter Property="Foreground" Value="SlateBlue" />
+       </Style>
+   </UserControl.Styles>
+
+   <DataGrid ItemsSource="{Binding VisibleFiles}" AutoGenerateColumns="False"
+             CanUserReorderColumns="True" CanUserResizeColumns="True" CanUserSortColumns="True"
+             GridLinesVisibility="Horizontal" BorderThickness="0" Background="Transparent">
+       <DataGrid.Columns>
+           <DataGridTemplateColumn Width="Auto">
+               <DataGridTemplateColumn.Header>
+                   <CheckBox IsThreeState="False" Margin="8,0,0,0" />
+               </DataGridTemplateColumn.Header>
+               <DataGridTemplateColumn.CellTemplate>
+                   <DataTemplate>
+                       <CheckBox IsChecked="{Binding CheckState, Converter={StaticResource CheckStateConverter}}" IsThreeState="False" Margin="8,0,0,0" />
+                   </DataTemplate>
+               </DataGridTemplateColumn.CellTemplate>
+           </DataGridTemplateColumn>
+           <DataGridTemplateColumn Header="Name" Width="*" IsReadOnly="True" SortMemberPath="Name">
+               <DataGridTemplateColumn.CellTemplate>
+                   <DataTemplate>
+                       <TextBlock Text="{Binding Name}"
+                                  Classes.excluded-file="{Binding FilterResult, Converter={StaticResource FilterResultExcludedConverter}}"
+                                  VerticalAlignment="Center" Padding="4,0" />
+                   </DataTemplate>
+               </DataGridTemplateColumn.CellTemplate>
+           </DataGridTemplateColumn>
+           <DataGridTextColumn Header="Size" IsReadOnly="True" Binding="{Binding Size, Converter={StaticResource FileSizeConverter}, Mode=OneWay}" Width="100" />
+           <DataGridTextColumn Header="Modified" IsReadOnly="True" Binding="{Binding ModifiedAt, StringFormat=\{0:yyyy-MM-dd\}, Mode=OneWay}" Width="120" />
+       </DataGrid.Columns>
+   </DataGrid>
 </UserControl>

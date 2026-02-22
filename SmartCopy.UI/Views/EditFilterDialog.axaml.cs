@@ -29,6 +29,6 @@ public partial class EditFilterDialog : Window
         };
     }
 
-    private void OnOk() => Close(true);
-    private void OnCancel() => Close(false);
+    private void OnOk() => Avalonia.Threading.Dispatcher.UIThread.Post(() => Close(true));
+    private void OnCancel() => Avalonia.Threading.Dispatcher.UIThread.Post(() => Close(false));
 }

@@ -10,7 +10,7 @@ namespace SmartCopy.UI.ViewModels.Filters;
 public abstract partial class FilterEditorViewModelBase : ObservableObject
 {
     [ObservableProperty]
-    private FilterMode _mode = FilterMode.Include;
+    private FilterMode _mode = FilterMode.Only;
 
     [ObservableProperty]
     private string _filterName = string.Empty;

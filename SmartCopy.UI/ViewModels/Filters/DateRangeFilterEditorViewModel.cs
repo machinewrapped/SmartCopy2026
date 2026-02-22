@@ -55,7 +55,7 @@ public partial class DateRangeFilterEditorViewModel : FilterEditorViewModelBase
 
     public override string GenerateName()
     {
-        var prefix = Mode == FilterMode.Include ? "Include" : "Exclude";
+        var prefix = Mode.ToString();
         var from = MinDate.HasValue ? MinDate.Value.ToString("yyyy-MM-dd") : "any";
         var to = MaxDate.HasValue ? MaxDate.Value.ToString("yyyy-MM-dd") : "any";
         return $"{prefix} {Field} {from} – {to}";

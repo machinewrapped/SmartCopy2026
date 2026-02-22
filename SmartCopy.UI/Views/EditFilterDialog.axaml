@@ -13,16 +13,23 @@
         Background="#1e1e1e">
     <StackPanel Spacing="12" Margin="20">
 
-        <!-- Include / Exclude toggle -->
+        <!-- Only / Add / Exclude toggle -->
         <StackPanel Orientation="Horizontal" Spacing="6">
-            <RadioButton Content="INCLUDE"
-                         IsChecked="{Binding ModeIsInclude}"
+            <RadioButton Content="ONLY"
+                         IsChecked="{Binding ModeIsOnly}"
                          GroupName="FilterMode"
-                         FontWeight="SemiBold" />
+                         FontWeight="SemiBold"
+                         ToolTip.Tip="Keep only matching files (intersect)" />
+            <RadioButton Content="ADD"
+                         IsChecked="{Binding ModeIsAdd}"
+                         GroupName="FilterMode"
+                         FontWeight="SemiBold"
+                         ToolTip.Tip="Also include matching files (union)" />
             <RadioButton Content="EXCLUDE"
                          IsChecked="{Binding ModeIsExclude}"
                          GroupName="FilterMode"
-                         FontWeight="SemiBold" />
+                         FontWeight="SemiBold"
+                         ToolTip.Tip="Remove matching files (subtract)" />
         </StackPanel>
 
         <!-- Filter name field -->

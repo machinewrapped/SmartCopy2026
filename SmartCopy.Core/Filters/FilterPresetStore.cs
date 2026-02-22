@@ -122,13 +122,13 @@ public sealed class FilterPresetStore
 
     private static readonly IReadOnlyList<FilterPreset> BuiltInExtensionPresets =
     [
-        MakeBuiltIn("Include Audio files",  "Extension", FilterMode.Include,
+        MakeBuiltIn("Only Audio files",  "Extension", FilterMode.Only,
             new JsonObject { ["extensions"] = "mp3;flac;aac;ogg;wav;m4a" }),
-        MakeBuiltIn("Include Images",       "Extension", FilterMode.Include,
+        MakeBuiltIn("Only Images",       "Extension", FilterMode.Only,
             new JsonObject { ["extensions"] = "jpg;jpeg;png;gif;webp;bmp;tiff;svg" }),
-        MakeBuiltIn("Include Documents",    "Extension", FilterMode.Include,
+        MakeBuiltIn("Only Documents",    "Extension", FilterMode.Only,
             new JsonObject { ["extensions"] = "pdf;docx;xlsx;pptx;txt;odt" }),
-        MakeBuiltIn("Include Log files",    "Extension", FilterMode.Include,
+        MakeBuiltIn("Only Log files",    "Extension", FilterMode.Only,
             new JsonObject { ["extensions"] = "log;txt" }),
     ];
 

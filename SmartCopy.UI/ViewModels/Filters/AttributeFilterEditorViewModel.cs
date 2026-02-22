@@ -49,7 +49,7 @@ public partial class AttributeFilterEditorViewModel : FilterEditorViewModelBase
 
     public override string GenerateName()
     {
-        var prefix = Mode == FilterMode.Include ? "Include" : "Exclude";
+        var prefix = Mode.ToString();
         var attrs = BuildAttributes() & ~FileAttributes.Normal;
         return attrs == 0 ? prefix : $"{prefix} {attrs}";
     }

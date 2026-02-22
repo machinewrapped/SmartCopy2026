@@ -69,7 +69,7 @@ public partial class ExtensionFilterEditorViewModel : FilterEditorViewModelBase
 
     public override string GenerateName()
     {
-        var prefix = Mode == FilterMode.Include ? "Include" : "Exclude";
+        var prefix = Mode.ToString();
         if (Extensions.Count == 0)
         {
             return prefix;

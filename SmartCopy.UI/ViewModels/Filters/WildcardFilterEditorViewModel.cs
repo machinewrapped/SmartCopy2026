@@ -29,7 +29,7 @@ public partial class WildcardFilterEditorViewModel : FilterEditorViewModelBase
 
     public override string GenerateName()
     {
-        var prefix = Mode == FilterMode.Include ? "Include" : "Exclude";
+        var prefix = Mode.ToString();
         return string.IsNullOrWhiteSpace(Pattern) ? prefix : $"{prefix} {Pattern}";
     }
 }

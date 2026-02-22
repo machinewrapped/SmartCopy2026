@@ -19,6 +19,7 @@ public abstract class FilterBase : IFilter
     public FilterMode Mode { get; }
     public bool IsEnabled { get; set; }
     public string? CustomName { get; set; }
+    public virtual bool AppliesToDirectories => false;
     public abstract string Summary { get; }
     public abstract string Description { get; }
     public abstract ValueTask<bool> MatchesAsync(

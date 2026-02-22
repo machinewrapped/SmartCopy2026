@@ -17,14 +17,21 @@ public partial class EditFilterDialogViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsValid))]
-    [NotifyPropertyChangedFor(nameof(ModeIsInclude))]
+    [NotifyPropertyChangedFor(nameof(ModeIsOnly))]
+    [NotifyPropertyChangedFor(nameof(ModeIsAdd))]
     [NotifyPropertyChangedFor(nameof(ModeIsExclude))]
-    private FilterMode _mode = FilterMode.Include;
+    private FilterMode _mode = FilterMode.Only;
 
-    public bool ModeIsInclude
+    public bool ModeIsOnly
     {
-        get => Mode == FilterMode.Include;
-        set { if (value) Mode = FilterMode.Include; }
+        get => Mode == FilterMode.Only;
+        set { if (value) Mode = FilterMode.Only; }
+    }
+
+    public bool ModeIsAdd
+    {
+        get => Mode == FilterMode.Add;
+        set { if (value) Mode = FilterMode.Add; }
     }
 
     public bool ModeIsExclude
@@ -46,7 +53,6 @@ public partial class EditFilterDialogViewModel : ObservableObject
     {
         Editor = editor;
 
-        // Keep mode and name in sync with the editor's observables
         editor.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(FilterEditorViewModelBase.FilterName))
@@ -54,7 +60,10 @@ public partial class EditFilterDialogViewModel : ObservableObject
             if (e.PropertyName == nameof(FilterEditorViewModelBase.Mode))
                 Mode = editor.Mode;
             if (e.PropertyName == nameof(FilterEditorViewModelBase.IsValid))
+            {
                 OnPropertyChanged(nameof(IsValid));
+                OkCommand.NotifyCanExecuteChanged();
+            }
         };
 
         // Push initial values

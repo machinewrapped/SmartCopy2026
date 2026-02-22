@@ -61,7 +61,7 @@ public partial class MirrorFilterEditorViewModel : FilterEditorViewModelBase
 
     public override string GenerateName()
     {
-        var prefix = Mode == FilterMode.Include ? "Include" : "Exclude";
+        var prefix = Mode.ToString();
         return string.IsNullOrEmpty(ComparisonPath)
             ? $"{prefix} mirrored files"
             : $"{prefix} already in {ComparisonPath}";

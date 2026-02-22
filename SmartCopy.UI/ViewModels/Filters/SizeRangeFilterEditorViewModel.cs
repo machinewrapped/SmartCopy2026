@@ -55,7 +55,7 @@ public partial class SizeRangeFilterEditorViewModel : FilterEditorViewModelBase
 
     public override string GenerateName()
     {
-        var prefix = Mode == FilterMode.Include ? "Include" : "Exclude";
+        var prefix = Mode.ToString();
         var from = MinValue.HasValue ? $"{MinValue} {Unit}" : "any";
         var to = MaxValue.HasValue ? $"{MaxValue} {Unit}" : "any";
         return $"{prefix} size {from} – {to}";

@@ -21,7 +21,7 @@
                                     HorizontalContentAlignment="Left"
                                     Padding="8,6"
                                     CornerRadius="4"
-                                    Command="{Binding $parent[UserControl].((vm:AddFilterViewModel)DataContext).SelectFilterTypeCommand}"
+                                    Command="{Binding $parent[UserControl].((vm:AddFilterViewModel)DataContext).SelectFilterTypeCommand, FallbackValue={x:Null}}"
                                     CommandParameter="{Binding}">
                                 <StackPanel Orientation="Vertical" Spacing="1">
                                     <TextBlock Text="{Binding DisplayName}" FontWeight="Medium" />
@@ -47,7 +47,7 @@
                             CornerRadius="4"
                             FontSize="14" />
                     <TextBlock Grid.Column="1"
-                               Text="{Binding SelectedType.DisplayName}"
+                               Text="{Binding SelectedType.DisplayName, FallbackValue=''}"
                                FontWeight="SemiBold"
                                VerticalAlignment="Center"
                                Margin="4,0,0,0" />
@@ -79,7 +79,7 @@
                                         HorizontalContentAlignment="Left"
                                         Padding="8,5"
                                         CornerRadius="4"
-                                        Command="{Binding $parent[UserControl].((vm:AddFilterViewModel)DataContext).PickPresetCommand}"
+                                        Command="{Binding $parent[UserControl].((vm:AddFilterViewModel)DataContext).PickPresetCommand, FallbackValue={x:Null}}"
                                         CommandParameter="{Binding}">
                                     <TextBlock Text="{Binding DisplayName}" />
                                 </Button>
@@ -99,7 +99,7 @@
                                         HorizontalContentAlignment="Left"
                                         Padding="8,5"
                                         CornerRadius="4"
-                                        Command="{Binding $parent[UserControl].((vm:AddFilterViewModel)DataContext).PickPresetCommand}"
+                                        Command="{Binding $parent[UserControl].((vm:AddFilterViewModel)DataContext).PickPresetCommand, FallbackValue={x:Null}}"
                                         CommandParameter="{Binding}">
                                     <TextBlock Text="{Binding DisplayName}" />
                                 </Button>

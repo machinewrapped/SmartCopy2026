@@ -28,6 +28,7 @@ public sealed class MirrorFilter : FilterBase
 
     public string ComparisonPath { get; }
     public MirrorCompareMode CompareMode { get; }
+    public override bool AppliesToDirectories => true;
 
     public override string Summary => "Skip files already mirrored";
     public override string Description => $"Mirror: {ComparisonPath} ({CompareMode})";

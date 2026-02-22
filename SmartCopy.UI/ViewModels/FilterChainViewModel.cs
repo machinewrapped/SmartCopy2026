@@ -33,7 +33,13 @@ public partial class FilterViewModel : ViewModelBase
         {
             if (!string.IsNullOrWhiteSpace(_backingFilter.CustomName))
                 return _backingFilter.CustomName;
-            var modeStr = _backingFilter.Mode == FilterMode.Include ? "Include" : "Exclude";
+            var modeStr = _backingFilter.Mode switch
+            {
+                FilterMode.Only => "Only",
+                FilterMode.Add => "Add",
+                FilterMode.Exclude => "Exclude",
+                _ => _backingFilter.Mode.ToString(),
+            };
             return $"{modeStr} {_backingFilter.TypeDisplayName}";
         }
     }

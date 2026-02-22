@@ -91,7 +91,7 @@ public sealed class FilterEditorViewModelTests
     [Fact]
     public void LoadFrom_Extension_ThenBuildFilter_RoundTrip()
     {
-        var original = new ExtensionFilter(["mp3", "flac"], FilterMode.Include);
+        var original = new ExtensionFilter(["mp3", "flac"], FilterMode.Only);
 
         var editor = (ExtensionFilterEditorViewModel)FilterEditorViewModelFactory.CreateFrom(original);
         var rebuilt = (ExtensionFilter)editor.BuildFilter();
