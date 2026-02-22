@@ -1,7 +1,7 @@
 # SmartCopy2026 — Design & Implementation Plan (Revised)
 
 **Prepared:** 2026-02-18
-**Revised:** 2026-02-21 (status synchronized with implemented Phase 1 work on `mem-filesystem`)
+**Revised:** 2026-02-22 (Phase 1 is now strictly memory-first UX/architecture; local filesystem integration moved to standalone Phase 2)
 **Author:** Simon Booth
 **License:** MIT
 **Predecessor:** SmartCopy 2015 (GPL v3, .NET 4.8 WinForms, SourceForge)
@@ -939,50 +939,55 @@ Shell checklist:
 *Goal: ship a reliable cross-platform v1 that can scan, select, filter, preview, copy/move/delete,
 and sync safely.*
 
-### Phase 1 execution rules
+### Phase 1 sequencing principle (revised 2026-02-22)
 
-1. Finish steps in order unless an explicit dependency exception is documented in the PR.
-2. Each step must end in a buildable state and include tests for the new behavior.
-3. "Done" means deliverables shipped, acceptance criteria met, and verification commands pass.
-4. Any UX/safety requirement marked "mandatory" in this plan blocks step completion.
+1. Prove and refine UX using `MemoryFileSystemProvider` first; seeded `/mem` remains the default integration source until the end-to-end flow is demoable.
+2. Treat the UX loop as the primary critical path: scan/seed -> select -> filter -> preview -> run -> verify.
+3. `LocalFileSystemProvider` remains in-repo during Phase 1 as a design reference for `IFileSystemProvider` flexibility, but is not exercised as a delivery gate in this phase.
+4. All real local-filesystem integration tasks (scanner wiring, trash adapters, watcher-driven rescans) are deferred to standalone Phase 2.
+5. "Done" means deliverables shipped, acceptance criteria met, verification commands pass, and UX-loop tests run on memory fixtures first.
+6. Any UX/safety requirement marked "mandatory" in this plan blocks step completion.
 
-### Phase 1 status snapshot (as of 2026-02-21)
+### Phase 1 delivery order (UX-first, memory-backed)
 
-| Step | Status | Evidence | Next action |
+1. UX loop track (blocking for feature-complete v1 demo): **Step 1 -> Step 4 -> Step 5 -> Step 6 -> Step 7**
+2. Validation-first hardening track (prioritised while behaviour is still fresh): **Step 2 and Step 4 test closure, then Step 8 -> Step 9**
+3. UX polish track (after end-to-end flow is proven): **Step 10 -> Step 11**
+
+### Phase 1 status snapshot (as of 2026-02-22)
+
+| Workstream item | Status | Evidence | Next action |
 |---|---|---|---|
-| 1. Project scaffold + UI shell | In progress | 3-column shell, seeded `/mem` source, tree->file-list sync, persisted window/column state, CI matrix in place | Finish log panel + keyboard/automation accessibility baseline |
-| 2. Core models + memory provider foundation | Complete (with minor test-fixture follow-up) | `FileSystemNode`, `IFileSystemProvider`, `ProviderCapabilities`, `MemoryFileSystemProvider`, and provider contract tests are implemented | Add shared memory-first fixture builders to reduce test duplication |
-| 3. Local provider + scanner integration | In progress | `LocalFileSystemProvider`, `DirectoryScanner`, `ScanOptions`, `ScanProgress` implemented; scanner tests verify progressive top-level streaming | Wire scanner streaming/cancellation into UI and add `TrashService` adapters |
-| 4. Node selection logic | In progress | Tri-state propagation and `IsSelected` behavior implemented in `FileSystemNode` and used by tree/list nodes | Add dedicated tri-state/perf tests and status-bar aggregate wiring |
-| 5. Filter chain | In progress | `IFilter`, `FilterChain`, and planned filter types are implemented with initial tests | Replace filter UI stubs with live chain execution and broaden test coverage |
-| 6. Transform pipeline | In progress | Core pipeline (`TransformPipeline`, `PipelineRunner`) and built-in steps (`Copy/Move/Delete/Flatten`) implemented with tests | Wire Preview/Run in UI, enforce delete-confirm preview policy, add journal/progress integration |
-| 7. Sync operations | Started (core skeleton) | `SyncWorkflow` has find-orphans and basic update/mirror builders | Implement full update/mirror semantics (`IfNewer`, orphan delete pass with confirmation) + UI entry points |
-| 8. Selection save/load | In progress | `SelectionSerializer` (`.txt`, `.m3u`, `.sc2sel`) and `SelectionManager` implemented with round-trip tests | Wire File menu flows and add unmatched-path reporting behavior |
-| 9. Settings persistence | In progress | `AppSettings` + `AppSettingsStore` implemented with corrupt-file fallback tests and cross-platform path resolution | Add schema migration path and startup/shutdown wiring for persisted defaults |
-| 10. Filesystem watcher | Started (core skeleton) | `DirectoryWatcher` exists with 300ms debounce + change batching | Add automated watcher tests and incremental rescan integration with selection preservation |
+| UX-1 (Step 1): Baseline shell | In progress | 3-column shell, seeded `/mem` source, tree->file-list sync, persisted window/column state, CI matrix in place | Close verification checklist and mark baseline shell complete |
+| UX-2 (Step 4): Node selection logic | In progress | Tri-state propagation and `IsSelected` behavior implemented in `FileSystemNode` and used by tree/list nodes | Add dedicated tri-state/perf tests |
+| UX-3 (Step 5): Filter chain | In progress | `IFilter`, `FilterChain`, and planned filter types are implemented with initial tests | Replace filter UI stubs with live chain execution and broaden test coverage |
+| UX-4 (Step 6): Transform pipeline | In progress | Core pipeline (`TransformPipeline`, `PipelineRunner`) and built-in steps (`Copy/Move/Delete/Flatten`) implemented with tests | Wire Preview/Run in UI, enforce delete-confirm preview policy, add journal/progress integration |
+| UX-5 (Step 7): Sync operations | Started (core skeleton) | `SyncWorkflow` has find-orphans and basic update/mirror builders | Implement full update/mirror semantics (`IfNewer`, orphan delete pass with confirmation) + UI entry points |
+| Hardening-1 (Step 2): Memory provider foundation | In progress (functionally complete, validation follow-up) | `FileSystemNode`, `IFileSystemProvider`, `ProviderCapabilities`, `MemoryFileSystemProvider`, and provider contract tests are implemented | Add shared memory-first fixture builders to reduce test duplication and standardise fixture usage |
+| Hardening-2 (Step 8): Selection save/load | In progress | `SelectionSerializer` (`.txt`, `.m3u`, `.sc2sel`) and `SelectionManager` implemented with round-trip tests | Wire File menu flows and add unmatched-path reporting behavior |
+| Hardening-3 (Step 9): Settings persistence | In progress | `AppSettings` + `AppSettingsStore` implemented with corrupt-file fallback tests and cross-platform path resolution | Add schema migration path and startup/shutdown wiring for persisted defaults |
+| Polish-1 (Step 10): Shell observability + status | Not started | Scope split out of overloaded Step 1/Step 4 | Implement after Step 7 end-to-end UX loop is proven |
+| Polish-2 (Step 11): Keyboard + accessibility baseline | Not started | Scope split out of overloaded Step 1 | Implement after Step 10 |
 
-### Step 1 — Project Scaffold + UI Shell (finish)
+### Step 1 — Project Scaffold + Baseline UI Shell (UX Loop Track)
 
 Deliverables:
 - [x] Solution and projects exist: `SmartCopy.Core`, `SmartCopy.App`, `SmartCopy.UI`, `SmartCopy.Tests`
 - [x] DI bootstrapping in `AppServiceProvider.cs`
 - [x] UI shell layout and persisted window/column state (§7)
 - [x] Operation progress overlay placeholder (no real operations yet)
-- [ ] Collapsible log panel with placeholder entries
-- [ ] Full keyboard baseline (`Tab`, arrows, `Space`, `Ctrl+A`, `Delete`/`Ctrl+D`, `F5`, `Escape`)
-- [ ] `AutomationProperties.Name` on all interactive controls
 - [x] CI workflow runs build + tests on Windows and Linux
 
 Acceptance criteria:
 - [ ] App launches and renders correctly on Windows
-- [ ] Shell checklist in §7 is fully checked
+- [ ] Baseline shell checklist in §7 is fully checked (excluding Step 10/Step 11 polish items)
 - [x] No hard dependency on real filesystem for shell startup (current shell uses seeded `/mem/`)
 
 Verification:
 - [ ] `dotnet build SmartCopy.App/SmartCopy.App.csproj`
 - [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj`
 
-### Step 2 — Core Models + MemoryFileSystemProvider (test-first foundation)
+### Step 2 — Core Models + MemoryFileSystemProvider (Memory-Backed Hardening Track, test-first foundation)
 
 Deliverables:
 - [x] Implement `FileSystemNode` full model contract from §10
@@ -999,34 +1004,11 @@ Verification:
 - [x] Unit tests for `MemoryFileSystemProvider`
 - [x] Contract tests for enumerate/read/write/move/delete/create/exists on in-memory trees
 
-### Step 3 — Local Filesystem Provider + Directory Scanner Integration
-
-Deliverables:
-- [x] Implement `LocalFileSystemProvider`
-- [ ] Implement platform `TrashService` adapters with timeout/fallback behavior
-- [x] `DirectoryScanner` with progressive `IAsyncEnumerable<FileSystemNode>`
-- [x] `ScanOptions` (`IncludeHidden`, `FullPreScan`, `LazyExpand`, `MaxDepth`)
-- [x] `ScanProgress` reporting
-- [ ] Wiring into `DirectoryTreeViewModel` via progressive scanner stream (tree now uses provider-backed data, but not scanner streaming yet)
-
-Acceptance criteria:
-- [x] Local provider supports enumerate/read/write/move/delete/create/exists end-to-end
-- [x] Top-level nodes appear before deep traversal completes (scanner behavior + tests)
-- [ ] Cancelled scans stop cleanly without UI freeze
-- [ ] Scan options are honored and test-covered
-- [x] Provider capability flags are consumed by at least one scanner/pipeline decision path (`CanAtomicMove` in `MoveStep`)
-
-Verification:
-- [ ] Unit tests for `LocalFileSystemProvider` failure paths (access denied, missing files, non-seekable streams)
-- [ ] Unit tests for scanner node counts/depth/hidden-file handling/cancellation (memory provider + local provider)
-- [ ] UI smoke test: initial tree render under large directory (>10k entries)
-
-### Step 4 — Node Selection Logic
+### Step 3 — Node Selection Logic (UX Loop Track, validation-priority)
 
 Deliverables:
 - [x] Tri-state propagation algorithm from §6.2 in production nodes/view models
 - [x] `IsSelected` wiring (`CheckState == Checked && FilterResult == Included`)
-- [ ] Status bar live counts/size from §6.10
 
 Acceptance criteria:
 - [x] Parent/child state transitions are deterministic and O(height) upward
@@ -1036,7 +1018,7 @@ Verification:
 - [ ] Unit tests for checked/unchecked/indeterminate transitions
 - [ ] Performance test for toggling large subtrees (target: no UI hitch > 100ms on reference machine)
 
-### Step 5 — Filter Chain
+### Step 4 — Filter Chain (UX Loop Track)
 
 Deliverables:
 - [x] `IFilter`, `FilterChain`, `FilterConfig`
@@ -1052,7 +1034,7 @@ Verification:
 - [ ] Unit tests per filter type and chain ordering (currently basic chain coverage only)
 - [ ] Integration test: apply mixed include/exclude chain and verify expected output set
 
-### Step 6 — Transform Pipeline (built-in steps)
+### Step 5 — Transform Pipeline (UX Loop Track, built-in steps)
 
 Deliverables:
 - [x] `ITransformStep`, `TransformPipeline`, `TransformContext`, `PipelineRunner`
@@ -1070,7 +1052,7 @@ Verification:
 - [ ] Unit tests for copy/move/delete/flatten behavior and conflict handling
 - [ ] Integration test: scan -> select -> filter -> preview -> execute -> verify outputs
 
-### Step 7 — Sync Operations
+### Step 6 — Sync Operations (UX Loop Track)
 
 Deliverables:
 - [ ] Update target workflow (`MirrorFilter` + `CopyStep` + `IfNewer`)
@@ -1086,7 +1068,7 @@ Acceptance criteria:
 Verification:
 - [ ] Integration tests against repeatable fixtures for update/mirror/orphan scenarios
 
-### Step 8 — Selection Save/Load
+### Step 7 — Selection Save/Load (Memory-Backed Hardening Track)
 
 Deliverables:
 - [x] `SelectionSerializer` for `.txt`, `.m3u`, `.sc2sel`
@@ -1101,7 +1083,7 @@ Verification:
 - [x] Round-trip tests for all formats
 - [ ] Regression tests for mixed path separators and case differences
 
-### Step 9 — Settings Persistence
+### Step 8 — Settings Persistence (Memory-Backed Hardening Track)
 
 Deliverables:
 - [x] `AppSettings` load/save + schema version
@@ -1116,26 +1098,63 @@ Verification:
 - [ ] Unit tests for serialization/migration/error fallback
 - [ ] Manual smoke test across restart on Windows
 
-### Step 10 — Filesystem Watcher
+### Step 9 — Shell Observability and Status Feedback (UX Polish Track)
 
 Deliverables:
-- [x] `DirectoryWatcher` with 300ms debounce and event coalescing
-- [ ] Incremental subtree rescan with selection preservation (§6.5)
-- [ ] Settings toggle for watcher enable/disable (disabled for MTP providers)
+- [ ] Collapsible log panel with placeholder entries in the shell layout
+- [ ] Status bar live counts/size from §6.10
+- [ ] Cross-check status-bar values against selected/filter states under `/mem` fixtures
 
 Acceptance criteria:
-- [ ] File bursts do not trigger rescan storms
-- [ ] Existing selections survive watcher-triggered updates
+- [ ] Users can see deterministic selected/file-size/count feedback while changing selection and filters
+- [ ] Log panel does not interfere with core tree/list/filter/pipeline interactions
 
 Verification:
-- [ ] Tests for debounce/coalescing semantics
-- [ ] End-to-end UI test: create/delete/rename events update only impacted subtree
+- [ ] UI smoke test: selection/filter changes update status-bar counts correctly
+- [ ] UI smoke test: log panel expand/collapse persists and restores correctly
+
+### Step 10 — Keyboard Navigation and Accessibility Baseline (UX Polish Track)
+
+Deliverables:
+- [ ] Full keyboard baseline (`Tab`, arrows, `Space`, `Ctrl+A`, `Delete`/`Ctrl+D`, `F5`, `Escape`)
+- [ ] `AutomationProperties.Name` on all interactive controls
+- [ ] Focus-visibility pass for tree, list, filter cards, and pipeline step cards
+
+Acceptance criteria:
+- [ ] Core memory-backed workflow is operable without mouse input
+- [ ] Screen-reader baseline metadata is present on primary interactive controls
+
+Verification:
+- [ ] Keyboard-only smoke test for scan/selection/filter/pipeline-preview path
+- [ ] Accessibility checklist pass for automation-name coverage on required controls
 
 ---
 
 ## 9. Remaining Phases
 
-### Phase 2 — Modern Features (post-v1 hardening)
+### Phase 2 — Real Filesystem Integration (standalone)
+
+Goal:
+- Exercise `LocalFileSystemProvider` in real usage after memory-backed UX/architecture is proven.
+- Validate that `IFileSystemProvider` abstractions hold under real disk behavior without forcing
+  early UX compromises.
+
+Scope:
+- [ ] Local provider/scanner integration in `DirectoryTreeViewModel` via progressive streams
+- [ ] Platform `TrashService` adapters with timeout/fallback behavior
+- [ ] Real-disk cancellation and scan-options validation coverage
+- [ ] Incremental subtree rescan with selection preservation (§6.5)
+- [ ] Watcher enable/disable settings, including provider capability gating
+- [ ] Debounce/coalescing and subtree-only update tests
+- [ ] Add provider parity checks so memory and local providers are exercised against the same
+      contract/integration scenarios where feasible
+
+Exit criteria:
+- [ ] End-to-end flow runs in UI against real local paths: scan -> select -> filter -> preview -> execute
+- [ ] Local-provider failure-path tests and watcher tests are stable in CI
+- [ ] No Phase 1 UX behavior regresses when switching source from `/mem` to a real directory
+
+### Phase 3 — Modern Features (post-local-integration hardening)
 
 Scope:
 - [ ] Filter chain save/load (`.sc2filter`) + preset library UI
@@ -1148,7 +1167,7 @@ Exit criteria:
 - [ ] MTP copy round-trip validated on at least two physical devices
 - [ ] Filter/pipeline preset import/export is stable and versioned
 
-### Phase 3 — Advanced Pipeline Steps
+### Phase 4 — Advanced Pipeline Steps
 
 Scope:
 - [ ] `RenameStep` token engine (`{name}`, `{ext}`, `{date}`, `{artist}`, `{album}`, `{track:00}`, `{title}`)
@@ -1160,7 +1179,7 @@ Exit criteria:
 - [ ] Plugin isolation and loading failures handled without app crash
 - [ ] At least one conversion plugin ships with tests and docs
 
-### Phase 4 — Polish and Extensibility
+### Phase 5 — Polish and Extensibility
 
 Scope:
 - [ ] Session files (`.sc2session`) with full restore
