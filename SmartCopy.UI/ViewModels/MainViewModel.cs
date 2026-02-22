@@ -32,6 +32,14 @@ public partial class MainViewModel : ViewModelBase
 
         FilterChain = new FilterChainViewModel(presetStore, settings);
         DirectoryTree = new DirectoryTreeViewModel(_memoryProvider, MockMemoryFileSystemFactory.RootPath);
+        DirectoryTree.ShowFilteredNodesInTree = settings.ShowFilteredNodesInTree;
+
+        FilterChain.VisibilityToggled += (_, isVisible) =>
+        {
+            DirectoryTree.ShowFilteredNodesInTree = isVisible;
+            settings.ShowFilteredNodesInTree = isVisible;
+        };
+
         FileList = new FileListViewModel(_memoryProvider, MockMemoryFileSystemFactory.DefaultFileListPath);
 
         // Propagate the pipeline's first Copy/Move destination to the filter chain.

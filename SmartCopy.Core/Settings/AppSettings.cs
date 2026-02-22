@@ -8,6 +8,7 @@ public sealed class AppSettings
     public string? LastSourcePath { get; set; }
     public bool IncludeHidden { get; set; }
     public bool ShowFilteredFiles { get; set; }
+    public bool ShowFilteredNodesInTree { get; set; } = true;
     public bool AutoSelectOnSelectionRestore { get; set; } = true;
     public bool AllowOverwrite { get; set; }
     public bool AllowDeleteReadOnly { get; set; }

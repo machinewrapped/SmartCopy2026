@@ -122,11 +122,25 @@ public partial class FilterChainViewModel : ViewModelBase
     /// <summary>Raised when the user clicks Load ▾; code-behind handles the file picker.</summary>
     public event EventHandler? LoadChainRequested;
 
+    public event EventHandler<bool>? VisibilityToggled;
+
+    private bool _showExcludedNodesInTree = true;
+    public bool ShowExcludedNodesInTree
+    {
+        get => _showExcludedNodesInTree;
+        set
+        {
+            if (SetProperty(ref _showExcludedNodesInTree, value))
+                VisibilityToggled?.Invoke(this, value);
+        }
+    }
+
     public FilterChainViewModel() : this(new FilterPresetStore(), new AppSettings()) { }
 
     public FilterChainViewModel(FilterPresetStore presetStore, AppSettings settings)
     {
         PresetStore = presetStore;
+        _showExcludedNodesInTree = settings.ShowFilteredNodesInTree;
         AddFilter = new AddFilterViewModel(presetStore, settings);
         AddFilter.PresetPicked += OnPresetPicked;
         AddFilter.NewFilterRequested += typeKey => NewFilterDialogRequested?.Invoke(this, typeKey);

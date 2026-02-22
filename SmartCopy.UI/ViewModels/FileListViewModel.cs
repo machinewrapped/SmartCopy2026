@@ -62,7 +62,9 @@ public class FileListViewModel : ViewModelBase
     public async Task ReapplyFiltersAsync(CancellationToken ct = default)
     {
         if (_chain is not null && _files.Count > 0)
+        {
             await _chain.ApplyToTreeAsync(_files, _comparisonProvider, ct);
+        }
 
         RefreshVisibleFiles();
     }
@@ -115,8 +117,10 @@ public class FileListViewModel : ViewModelBase
         _files = directoryNode.Files.ToList();
 
         // Apply current chain to the freshly loaded file set.
-        if (_chain is not null)
+        if (_chain is not null && _files.Count > 0)
+        {
             await _chain.ApplyToTreeAsync(_files, _comparisonProvider, ct);
+        }
 
         RefreshVisibleFiles();
     }

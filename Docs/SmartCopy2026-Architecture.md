@@ -426,6 +426,9 @@ Each `FileSystemNode` carries two independent pieces of application state:
 - `Included` — passes all enabled filters (or no filters are active)
 - `Excluded` — caught by at least one active filter; carries the name of the first excluding filter
 
+A parent directory dynamically becomes `Excluded` if all its loaded children and files are `Excluded`.
+The UI models an `IsFilterIncluded` property (true if `Included`) which drives checkbox enabled state and visibility.
+
 A file is **selected** (i.e. will be included in the next operation) if and only if:
 ```
 IsSelected = CheckState == Checked && FilterResult == Included
@@ -440,8 +443,8 @@ IsSelected = CheckState == Checked && FilterResult == Included
 | Excluded by filter | Accent (e.g. slate blue) | Only shown when ShowFilteredFiles = true |
 | Hidden file | Secondary accent (e.g. brown) | Only shown when IncludeHidden = true |
 
-Filtered files are hidden from the tree/list by default. When `ShowFilteredFiles = true`, they
-appear with a distinct colour and are non-selectable (user cannot check a filtered file).
+Filtered files are hidden from the file list by default, controlled by `ShowFilteredFiles = true`.
+Filtered nodes in the tree are similarly controlled by `ShowFilteredNodesInTree = true`. When visible, they appear with a distinct opacity/colour and are non-selectable (checkboxes are disabled).
 
 ### 6.2 Tri-State Checkbox Propagation
 

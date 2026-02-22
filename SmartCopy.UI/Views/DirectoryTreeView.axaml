@@ -8,6 +8,7 @@
     <UserControl.Resources>
         <conv:CheckStateConverter x:Key="CheckStateConverter" />
         <conv:FilterResultOpacityConverter x:Key="FilterResultOpacityConverter" />
+        <conv:NodeVisibilityConverter x:Key="NodeVisibilityConverter" />
     </UserControl.Resources>
 
     <TreeView ItemsSource="{Binding RootNodes}"
@@ -17,6 +18,14 @@
         <TreeView.Styles>
             <Style Selector="TreeViewItem">
                 <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                <Setter Property="IsVisible">
+                    <Setter.Value>
+                        <MultiBinding Converter="{StaticResource NodeVisibilityConverter}">
+                            <Binding Path="IsFilterIncluded" />
+                            <Binding Path="DataContext.ShowFilteredNodesInTree" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                        </MultiBinding>
+                    </Setter.Value>
+                </Setter>
             </Style>
         </TreeView.Styles>
         <TreeView.ItemTemplate>
@@ -24,6 +33,7 @@
                 <StackPanel Orientation="Horizontal" Spacing="4"
                             Opacity="{Binding FilterResult, Converter={StaticResource FilterResultOpacityConverter}}">
                     <CheckBox IsChecked="{Binding CheckState, Converter={StaticResource CheckStateConverter}}"
+                              IsEnabled="{Binding IsFilterIncluded}"
                               IsThreeState="False" />
                     <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
                 </StackPanel>

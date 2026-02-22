@@ -19,6 +19,13 @@ public class DirectoryTreeViewModel : ViewModelBase
         set => SetProperty(ref _selectedNode, value);
     }
 
+    private bool _showFilteredNodesInTree = true;
+    public bool ShowFilteredNodesInTree
+    {
+        get => _showFilteredNodesInTree;
+        set => SetProperty(ref _showFilteredNodesInTree, value);
+    }
+
     public DirectoryTreeViewModel(IFileSystemProvider provider, string rootPath)
     {
         _provider = provider;
@@ -89,14 +96,16 @@ public class DirectoryTreeViewModel : ViewModelBase
             var children = await _provider.GetChildrenAsync(current.FullPath, ct);
             foreach (var child in children)
             {
-                if (!child.IsDirectory)
-                {
-                    continue;
-                }
-
                 var clonedChild = CloneNode(child, current);
-                current.Children.Add(clonedChild);
-                stack.Push(clonedChild);
+                if (child.IsDirectory)
+                {
+                    current.Children.Add(clonedChild);
+                    stack.Push(clonedChild);
+                }
+                else
+                {
+                    current.Files.Add(clonedChild);
+                }
             }
         }
 

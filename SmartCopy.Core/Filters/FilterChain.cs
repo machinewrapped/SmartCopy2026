@@ -43,10 +43,14 @@ public sealed class FilterChain
         CancellationToken ct = default)
     {
         var stack = new Stack<FileSystemNode>(roots);
+        var postOrderList = new List<FileSystemNode>();
+
         while (stack.Count > 0)
         {
             ct.ThrowIfCancellationRequested();
             var node = stack.Pop();
+            postOrderList.Add(node);
+
             var evaluation = await EvaluateNodeAsync(node, comparisonProvider, ct);
             node.FilterResult = evaluation.IsIncluded ? FilterResult.Included : FilterResult.Excluded;
             node.ExcludedByFilter = evaluation.IsIncluded ? null : evaluation.ExcludedByFilter;
@@ -55,6 +59,71 @@ public sealed class FilterChain
             {
                 stack.Push(node.Children[i]);
             }
+
+            // Also evaluate all files in the current directory so that
+            // parent exclusion recalculation can see their correct state.
+            foreach (var file in node.Files)
+            {
+                var fileEval = await EvaluateNodeAsync(file, comparisonProvider, ct);
+                file.FilterResult = fileEval.IsIncluded ? FilterResult.Included : FilterResult.Excluded;
+                file.ExcludedByFilter = fileEval.IsIncluded ? null : fileEval.ExcludedByFilter;
+            }
+        }
+
+        for (var i = postOrderList.Count - 1; i >= 0; i--)
+        {
+            var node = postOrderList[i];
+            if (node.IsDirectory && (node.Children.Count > 0 || node.Files.Count > 0))
+            {
+                if (node.FilterResult == FilterResult.Included || node.ExcludedByFilter == "All children excluded")
+                {
+                    bool hasIncluded = node.Children.Any(c => c.FilterResult == FilterResult.Included) ||
+                                       node.Files.Any(f => f.FilterResult == FilterResult.Included);
+                    if (!hasIncluded)
+                    {
+                        node.FilterResult = FilterResult.Excluded;
+                        node.ExcludedByFilter = "All children excluded";
+                    }
+                    else
+                    {
+                        node.FilterResult = FilterResult.Included;
+                        node.ExcludedByFilter = null;
+                    }
+                }
+            }
+        }
+
+        foreach (var root in roots)
+        {
+            if (root.Parent != null)
+                RecalculateParentExclusion(root.Parent);
+        }
+    }
+
+    public void RecalculateParentExclusion(FileSystemNode? node)
+    {
+        while (node != null)
+        {
+            if (node.IsDirectory && (node.Children.Count > 0 || node.Files.Count > 0))
+            {
+                if (node.FilterResult == FilterResult.Included || node.ExcludedByFilter == "All children excluded")
+                {
+                    bool hasIncluded = node.Children.Any(c => c.FilterResult == FilterResult.Included) ||
+                                       node.Files.Any(f => f.FilterResult == FilterResult.Included);
+
+                    if (!hasIncluded)
+                    {
+                        node.FilterResult = FilterResult.Excluded;
+                        node.ExcludedByFilter = "All children excluded";
+                    }
+                    else
+                    {
+                        node.FilterResult = FilterResult.Included;
+                        node.ExcludedByFilter = null;
+                    }
+                }
+            }
+            node = node.Parent;
         }
     }
 

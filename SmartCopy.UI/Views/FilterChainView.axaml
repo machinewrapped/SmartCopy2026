@@ -7,9 +7,13 @@
     <Border Background="#252526" BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="6" Padding="10">
         <DockPanel>
             <!-- Header pinned to the top -->
-            <TextBlock DockPanel.Dock="Top"
-                       Text="FILTERS" FontWeight="SemiBold" Foreground="#4facfe"
-                       Margin="0,0,0,8" />
+            <Grid DockPanel.Dock="Top" ColumnDefinitions="*, Auto" Margin="0,0,0,8">
+                <TextBlock Grid.Column="0" Text="FILTERS" FontWeight="SemiBold" Foreground="#4facfe" VerticalAlignment="Center" />
+                <ToggleButton Grid.Column="1" Content="👁"
+                              ToolTip.Tip="Toggle visibility of excluded nodes in the tree"
+                              IsChecked="{Binding ShowExcludedNodesInTree}"
+                              Padding="4" CornerRadius="4" Background="Transparent" />
+            </Grid>
 
             <!-- Save / Load pinned to the bottom -->
             <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*, 4, *" Margin="0,8,0,0">

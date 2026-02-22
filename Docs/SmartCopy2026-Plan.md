@@ -333,6 +333,9 @@ Tests (`SmartCopy.Tests/Filters/FilterLiveWiringTests.cs`) against `MemoryFileSy
 #### Acceptance criteria
 - [x] `Only`/`Add`/`Exclude` semantics match Architecture `Section 5.2`
 - [x] Disabled filters have zero effect on `FilterResult`
+- [x] Parent node is excluded if all its children and files are excluded
+- [x] Excluded nodes have their checkboxes disabled in the tree and file list
+- [x] Tree view has a toggle to hide or show excluded nodes
 - [x] Mirror filter comparison path suggestion derives from pipeline destination
 - [x] Add-filter flyout shows type list → preset list drill-down
 - [x] "★ Only Audio files" built-in preset adds a filter and updates tree/file list

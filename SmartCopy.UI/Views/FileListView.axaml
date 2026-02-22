@@ -27,7 +27,9 @@
                </DataGridTemplateColumn.Header>
                <DataGridTemplateColumn.CellTemplate>
                    <DataTemplate>
-                       <CheckBox IsChecked="{Binding CheckState, Converter={StaticResource CheckStateConverter}}" IsThreeState="False" Margin="8,0,0,0" />
+                       <CheckBox IsChecked="{Binding CheckState, Converter={StaticResource CheckStateConverter}}"
+                                 IsEnabled="{Binding IsFilterIncluded}"
+                                 IsThreeState="False" Margin="8,0,0,0" />
                    </DataTemplate>
                </DataGridTemplateColumn.CellTemplate>
            </DataGridTemplateColumn>

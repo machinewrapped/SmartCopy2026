@@ -54,6 +54,7 @@ public class FileSystemNode : INotifyPropertyChanged
                 _filterResult = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IsSelected));
+                OnPropertyChanged(nameof(IsFilterIncluded));
             }
         }
     }
@@ -101,6 +102,7 @@ public class FileSystemNode : INotifyPropertyChanged
     }
 
     public bool IsSelected => CheckState == CheckState.Checked && FilterResult == FilterResult.Included;
+    public bool IsFilterIncluded => FilterResult == FilterResult.Included;
 
     public FileSystemNode? Parent { get; init; }
     public ObservableCollection<FileSystemNode> Children { get; } = new();
