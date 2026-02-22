@@ -12,6 +12,7 @@ public partial class DateRangeFilterEditorViewModel : FilterEditorViewModelBase
     [NotifyPropertyChangedFor(nameof(FieldIsModified))]
     private DateField _field = DateField.Modified;
 
+
     public bool FieldIsCreated
     {
         get => Field == DateField.Created;
@@ -25,9 +26,11 @@ public partial class DateRangeFilterEditorViewModel : FilterEditorViewModelBase
     }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsValid))]
     private DateTimeOffset? _minDate;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsValid))]
     private DateTimeOffset? _maxDate;
 
     partial void OnFieldChanged(DateField value) => AutoUpdateName();

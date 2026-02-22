@@ -7,6 +7,7 @@ namespace SmartCopy.UI.ViewModels.Filters;
 public partial class WildcardFilterEditorViewModel : FilterEditorViewModelBase
 {
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsValid))]
     private string _pattern = string.Empty;
 
     partial void OnPatternChanged(string value) => AutoUpdateName();

@@ -10,12 +10,15 @@ public enum SizeUnit { Bytes, KB, MB, GB, TB }
 public partial class SizeRangeFilterEditorViewModel : FilterEditorViewModelBase
 {
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsValid))]
     private double? _minValue;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsValid))]
     private double? _maxValue;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsValid))]
     private SizeUnit _unit = SizeUnit.MB;
 
     partial void OnMinValueChanged(double? value) => AutoUpdateName();

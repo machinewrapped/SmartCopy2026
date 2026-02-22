@@ -7,9 +7,11 @@ namespace SmartCopy.UI.ViewModels.Filters;
 public partial class MirrorFilterEditorViewModel : FilterEditorViewModelBase
 {
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsValid))]
     private string _comparisonPath = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsValid))]
     [NotifyPropertyChangedFor(nameof(CompareModeIsNameOnly))]
     [NotifyPropertyChangedFor(nameof(CompareModeIsNameAndSize))]
     private MirrorCompareMode _compareMode = MirrorCompareMode.NameAndSize;

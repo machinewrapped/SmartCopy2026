@@ -67,13 +67,48 @@ public partial class EditFilterDialogViewModel : ObservableObject
         };
 
         // Push initial values
-        Mode = editor.Mode;
         FilterName = editor.FilterName;
+        Mode = editor.Mode;
+
+        // Ensure the prefix is correctly applied on initialization
+        UpdateFilterNameForMode(Mode);
+
+        // Ensure OK button evaluates its initial state
+        OnPropertyChanged(nameof(IsValid));
+        OkCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnModeChanged(FilterMode value)
     {
         Editor.Mode = value;
+        UpdateFilterNameForMode(value);
+    }
+
+    private void UpdateFilterNameForMode(FilterMode newMode)
+    {
+        if (string.IsNullOrWhiteSpace(FilterName)) return;
+
+        var prefixes = new[] { "Only ", "Add ", "Exclude " };
+        string baseName = FilterName;
+
+        foreach (var prefix in prefixes)
+        {
+            if (baseName.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase))
+            {
+                baseName = baseName.Substring(prefix.Length).TrimStart();
+                break;
+            }
+        }
+
+        string newPrefix = newMode switch
+        {
+            FilterMode.Only => "Only",
+            FilterMode.Add => "Add",
+            FilterMode.Exclude => "Exclude",
+            _ => newMode.ToString()
+        };
+
+        FilterName = $"{newPrefix} {baseName}";
     }
 
     partial void OnFilterNameChanged(string value)

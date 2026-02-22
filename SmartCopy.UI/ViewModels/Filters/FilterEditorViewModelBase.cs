@@ -22,8 +22,13 @@ public abstract partial class FilterEditorViewModelBase : ObservableObject
 
     partial void OnFilterNameChanged(string value)
     {
-        _userHasEditedName = !string.IsNullOrEmpty(value);
+        if (!_isAutoUpdatingName && !string.IsNullOrEmpty(value))
+        {
+            _userHasEditedName = true;
+        }
     }
+
+    private bool _isAutoUpdatingName;
 
     /// <summary>
     /// Produces a validated filter instance from the current editor state.
@@ -54,7 +59,15 @@ public abstract partial class FilterEditorViewModelBase : ObservableObject
     {
         if (!_userHasEditedName)
         {
-            FilterName = GenerateName();
+            _isAutoUpdatingName = true;
+            try
+            {
+                FilterName = GenerateName();
+            }
+            finally
+            {
+                _isAutoUpdatingName = false;
+            }
         }
     }
 }
