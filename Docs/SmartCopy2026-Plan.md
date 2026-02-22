@@ -264,8 +264,11 @@ the pipeline. `LocalFileSystemProvider` needs no retry logic.
 public interface IFilter
 {
     string Name { get; }
-    FilterMode Mode { get; }        // Include | Exclude
+    string TypeDisplayName { get; }
+    FilterMode Mode { get; }        // Only | Add | Exclude
     bool IsEnabled { get; set; }
+    string? CustomName { get; set; }
+    bool AppliesToDirectories { get; }
     FilterConfig Config { get; }    // serialisable
 
     /// <summary>
@@ -282,30 +285,41 @@ public interface IFilter
 
     /// <summary>
     /// Returns true if this filter matches the node.
-    /// For Exclude filters: matched nodes are hidden.
-    /// For Include filters: only matched nodes are shown.
     /// comparisonProvider is non-null when filter needs to check a second location (MirrorFilter).
     /// </summary>
-    bool Matches(FileSystemNode node, IFileSystemProvider? comparisonProvider);
+    ValueTask<bool> MatchesAsync(
+        FileSystemNode node,
+        IFileSystemProvider? comparisonProvider,
+        CancellationToken ct = default);
 }
 
-public class FilterChain
+public sealed class FilterChain
 {
     public IReadOnlyList<IFilter> Filters { get; }
 
-    // Applies all enabled filters in order. A node survives if it passes all Include
-    // filters and is not caught by any Exclude filter.
-    public IEnumerable<FileSystemNode> Apply(
+    public Task<IReadOnlyList<FileSystemNode>> ApplyAsync(
         IEnumerable<FileSystemNode> nodes,
-        IFileSystemProvider? comparisonProvider = null);
+        IFileSystemProvider? comparisonProvider = null,
+        CancellationToken ct = default);
 
-    public FilterChainConfig ToConfig();
+    public Task ApplyToTreeAsync(
+        IEnumerable<FileSystemNode> roots,
+        IFileSystemProvider? comparisonProvider = null,
+        CancellationToken ct = default);
+
+    public FilterChainConfig ToConfig(string name = "Default", string? description = null);
     public static FilterChain FromConfig(FilterChainConfig config);
 }
 ```
 
-Filter evaluation order matters. Later filters in the chain narrow the result further. Disabled
-filters are skipped entirely (their nodes are treated as if the filter does not exist).
+Runtime semantics are now set-based and order-sensitive:
+- Start state is `inSet = true` for each node
+- `Only`: intersection step; if a currently-included node does not match, it is excluded
+- `Add`: union step; any matching node is re-included, even if excluded earlier
+- `Exclude`: subtraction step; any matching node is excluded
+
+Disabled filters are skipped entirely. Filters that do not apply to directories are skipped for
+directory nodes (`AppliesToDirectories`).
 
 **Filter types:**
 
@@ -313,11 +327,9 @@ filters are skipped entirely (their nodes are treated as if the filter does not 
 |---|---|---|
 | `WildcardFilter` | `Pattern` (`;`-separated) | Matches on filename only; `*` and `?` wildcards |
 | `ExtensionFilter` | `Extensions` list | Case-insensitive; normalised without leading dot |
-| `MirrorFilter` | `ComparisonPath`, `CompareMode`, `ExcludeMode` | See §6.3 for full algorithm. `ComparisonPath` is typically auto-derived from the first Copy/Move step in the current pipeline rather than being set independently. |
+| `MirrorFilter` | `ComparisonPath`, `CompareMode` | See §6.3 for full algorithm. `ComparisonPath` is suggested from the first Copy/Move destination path in the current pipeline. |
 | `DateRangeFilter` | `Field` (Created/Modified), `Min`, `Max` | Either bound can be null (open range) |
 | `SizeRangeFilter` | `MinBytes`, `MaxBytes` | Either bound can be null |
-| `DuplicateFilter` | `Scope` (WithinSource/VsTarget) | Excludes all but first occurrence |
-| `PathDepthFilter` | `MinDepth`, `MaxDepth` | Depth 0 = root; either bound nullable |
 | `AttributeFilter` | `Attributes` flags | Hidden, ReadOnly, System |
 
 Saved as `.sc2filter` (JSON). See §10 for `FilterChainConfig` schema.
@@ -582,36 +594,27 @@ is preserved. If a filter is removed, previously-filtered nodes reappear with th
 
 ### 6.3 Mirror Filter
 
-Determines whether a file in the source has a counterpart in a comparison location (typically the
-target). The filter has two orthogonal parameters:
+Determines whether a source node has a counterpart at `ComparisonPath + RelativePath` in a
+comparison provider (typically the target side).
 
-**CompareMode** — what constitutes a "match":
-- `NameOnly` — same filename (case-insensitive) at the same relative path
-- `NameAndSize` — same filename AND same byte count
-- `ExtensionAgnostic` — same filename stem (no extension), any extension, same relative path
-  (useful when source is .flac and target has been converted to .mp3)
+Current parameters:
+- `CompareMode = NameOnly` — counterpart exists at same relative path
+- `CompareMode = NameAndSize` — counterpart exists and size matches (name comparison remains case-insensitive)
 
-**ExcludeMode** — which files to exclude from the view:
-- `ExcludeMatched` (most common) — hide files that exist in the comparison location.
-  Use case: "show me only files not yet copied to the target"
-- `ExcludeUnmatched` — hide files that do NOT exist in the comparison location.
-  Use case: "show me only files that are already mirrored"
+The include/exclude behavior is governed by the chain-level `FilterMode` (`Only`, `Add`,
+`Exclude`), not by a separate mirror-specific exclusion mode.
 
-Implementation notes:
-- Build a lookup set from the comparison provider at filter application time (not per-file)
-- For `NameOnly`/`NameAndSize`: key = `relativePath.ToLowerInvariant()`
-- For `ExtensionAgnostic`: key = `Path.ChangeExtension(relativePath, "").ToLowerInvariant()`
-- Rebuild the lookup when the comparison path changes (not on every `Matches()` call)
+Implementation notes (current code path):
+- If `comparisonProvider` is null, mirror matching returns `false`
+- `comparePath` is built with `PathHelper.CombineForProvider(ComparisonPath, node.RelativePath)`
+- If counterpart does not exist, returns `false`
+- Directories are treated as matched when counterpart exists
+- For `NameAndSize`, file match additionally checks target node `Size`
 
-**ComparisonPath auto-deduction:** In the UI, `MirrorFilter` cards display the destination
-path deduced from the pipeline rather than requiring the user to configure it separately.
-`MainViewModel` observes `PipelineViewModel.FirstDestinationPath` and pushes it to
-`FilterChainViewModel.PipelineDestinationPath`, which updates the Mirror filter card's
-description reactively. At execution time, `FilterChain.Apply()` receives the
-`comparisonProvider` resolved from the first Copy/Move step's destination — so filter
-evaluation always uses the correct target without requiring the user to set the path in two
-places. If no Copy/Move step exists in the pipeline, the filter displays "(no destination in
-pipeline)" and the comparison is skipped.
+**ComparisonPath suggestion from pipeline:** `MainViewModel` pushes
+`PipelineViewModel.FirstDestinationPath` into `FilterChainViewModel.PipelineDestinationPath`.
+When opening `EditFilterDialog` for a mirror filter, the editor is pre-populated with that
+suggested path. In Phase 1 memory-backed runs, startup seeds this to `/mem/target`.
 
 ### 6.4 Wildcard Pattern Matching
 
@@ -867,7 +870,7 @@ immediately legible to new users.
 - **Summary** (bold) — human-readable one-liner generated from filter config
 - **Description** (dimmed subtitle) — raw technical spec for power users
 - **Drag handle** `≡`, **edit pencil** `✎`, **remove** `✕` (right-aligned)
-- The mode dropdown (INCLUDE/EXCLUDE) and detailed config live in the edit dialog, not the card face
+- The mode selector (`ONLY` / `ADD` / `EXCLUDE`) and detailed config live in the edit dialog, not the card face
 
 ### Filter UX Flow
 
@@ -922,16 +925,16 @@ The dialog dispatches to a type-specific editor view via `ContentControl` + `Dat
 ┌─────────────────────────────────────────┐
 │  Edit Filter                            │
 ├─────────────────────────────────────────┤
-│  [INCLUDE ●]  [EXCLUDE ○]               │  ← prominent toggle
+│  [ONLY ●] [ADD ○] [EXCLUDE ○]           │  ← mode radio group
 ├─────────────────────────────────────────┤
-│  Name:  [Include .mp3, .flac      ]     │  ← auto-generated, user-overridable
+│  Name: [Only .mp3 and .flac       ]     │  ← auto-generated, user-overridable
 ├─────────────────────────────────────────┤
 │  ┌── type-specific form ──────────────┐ │
-│  │ Extension: [.mp3 ×][.flac ×][+]   │ │  chip list + text input
+│  │ Extension: [.mp3 ×][.flac ×] +Add  │ │  chips + input
 │  │ Wildcard:  [*.tmp;*.bak          ]│ │  single text box
 │  │ Date Range: ○Created ●Modified    │ │  radio + two CalendarDatePickers
-│  │ Size Range: [1.5][MB▾] to [──][GB▾]│ │  NumericUpDown + unit ComboBox
-│  │ Mirror:     [/mem/target     ][…] │ │  path field (Browse stub, Phase 1)
+│  │ Size Range: Min[1.5] Max[──] [MB▾] │ │  shared unit selector
+│  │ Mirror:     [/mem/target     ][…] │ │  browse button disabled in Phase 1
 │  │             ○Name  ●Name+Size     │ │
 │  │ Attribute:  ☐Hidden ☐RO ☐System  │ │
 │  └────────────────────────────────── ┘ │
@@ -942,15 +945,15 @@ The dialog dispatches to a type-specific editor view via `ContentControl` + `Dat
 └─────────────────────────────────────────┘
 ```
 
-"Save as preset" persists the filter config to `FilterPresetStore` (distinct from the full
-filter-chain Save/Load buttons, which persist an entire `FilterChainConfig` to a `.json` file).
+"Save as preset" sets a flag on the dialog VM; after a successful dialog close,
+`FilterChainView.axaml.cs` persists the preset via `FilterPresetStore`.
 
 #### Filter Results in Tree / File List
 
-- **`FilterResult.Excluded` + `ShowFilteredFiles=true`**: node visible, opacity 0.4, SlateBlue
-  colour, non-checkable
-- **`FilterResult.Excluded` + `ShowFilteredFiles=false`**: file-list nodes hidden; directory nodes
-  remain visible (grayed) so the tree stays navigable
+- **`FilterResult.Excluded` + `ShowFilteredFiles=true`**: files remain visible; tree rows are dimmed
+  (`Opacity = 0.4`) and excluded file names are styled (`SlateBlue`)
+- **`FilterResult.Excluded` + `ShowFilteredFiles=false`**: excluded files are removed from
+  `VisibleFiles`; tree remains navigable with excluded directories still shown dimmed
 - All filter changes propagate within ~100 ms via a debounced `CancellationTokenSource`
 - Drag handle `≡` on filter cards reorders the chain (Avalonia `DragDrop`); order affects
   chain evaluation sequence
@@ -1046,7 +1049,7 @@ and sync safely.*
 |---|---|---|---|
 | UX-1 (Step 1): Baseline shell | Complete | 3-column shell, seeded `/mem` source, tree->file-list sync, persisted window/column state, CI matrix in place; verification checklist closed | Keep as baseline for UX-loop regression checks in later steps |
 | UX-2 (Step 3): Node selection logic | Complete | Tri-state propagation and `IsSelected` behavior implemented in `FileSystemNode` and covered by dedicated transition tests | Expand with scale/perf coverage alongside Step 10 observability work |
-| UX-3 (Step 5): Filter chain | In progress | `IFilter`, `FilterChain`, and planned filter types are implemented with initial tests | Replace filter UI stubs with live chain execution and broaden test coverage |
+| UX-3 (Step 4): Filter chain | Mostly complete | Live filter UX is wired end-to-end (presets, add/edit dialog, drag reorder, tree/file-list reapply), and dedicated filter test suites are in place | Finish chain Save/Load file-picker integration and close the remaining manual verification item |
 | UX-4 (Step 6): Transform pipeline | In progress | Core pipeline (`TransformPipeline`, `PipelineRunner`) and built-in steps (`Copy/Move/Delete/Flatten`) implemented with tests | Wire Preview/Run in UI, enforce delete-confirm preview policy, add journal/progress integration |
 | UX-5 (Step 7): Sync operations | Started (core skeleton) | `SyncWorkflow` has find-orphans and basic update/mirror builders | Implement full update/mirror semantics (`IfNewer`, orphan delete pass with confirmation) + UI entry points |
 | Hardening-1 (Step 2): Memory provider foundation | Complete | `FileSystemNode`, `IFileSystemProvider`, `ProviderCapabilities`, `MemoryFileSystemProvider`, provider contract tests, and shared memory-first fixture builders are implemented | Reuse the shared fixture builder pattern for all new core workflow tests |
@@ -1104,10 +1107,15 @@ Verification:
 
 ### Step 4 — Filter Chain (UX Loop Track)
 
+Status update (2026-02-22): sub-steps 4a-4f are implemented in current code and covered by
+automated tests. Remaining follow-up is UI completion for chain Save/Load flow (file picker +
+JSON round-trip wiring in the shell).
+
 #### Already complete
 - [x] `IFilter`, `FilterChain`, `FilterConfig`, `FilterChainConfig`
 - [x] `Wildcard`, `Extension`, `Mirror`, `DateRange`, `SizeRange`, `Attribute` filters
 - [x] Basic `FilterChain` unit tests
+- [x] Filter mode model evolved to `Only | Add | Exclude` with ordered set-based evaluation
 
 #### Sub-step 4a — `FilterPresetStore` + `FilterFactory` (Core)
 
@@ -1121,11 +1129,11 @@ Modify:
 - `SmartCopy.Core/Settings/AppSettings.cs` — add `Dictionary<string, List<string>> FilterTypeMruPresetIds`
 
 Built-in presets (hardcoded, never written to disk):
-- Extension / "Audio files": `mp3;flac;aac;ogg;wav;m4a`, Include
-- Extension / "Images": `jpg;jpeg;png;gif;webp;bmp;tiff;svg`, Include
-- Extension / "Documents": `pdf;docx;xlsx;pptx;txt;odt`, Include
-- Extension / "Log files": `log;txt`, Include
-- Wildcard / "Temp files": `*.tmp;*.bak;~*;Thumbs.db`, Exclude
+- Extension / "Only Audio files": `mp3;flac;aac;ogg;wav;m4a`, Only
+- Extension / "Only Images": `jpg;jpeg;png;gif;webp;bmp;tiff;svg`, Only
+- Extension / "Only Documents": `pdf;docx;xlsx;pptx;txt;odt`, Only
+- Extension / "Only Log files": `log;txt`, Only
+- Wildcard / "Exclude Temp files": `*.tmp;*.bak;~*;Thumbs.db`, Exclude
 
 Tests (`SmartCopy.Tests/Filters/FilterPresetStoreTests.cs`): built-ins present when no user file; save/delete/overwrite round-trips; built-ins precede user presets; `FilterFactory` round-trips all 6 filter types.
 
@@ -1153,22 +1161,22 @@ Tests (`SmartCopy.Tests/Filters/AddFilterViewModelTests.cs`): level navigation; 
 #### Sub-step 4d — `EditFilterDialog` (modal Window)
 
 New files:
-- `SmartCopy.UI/ViewModels/EditFilterDialogViewModel.cs` — factory methods `ForNew(filterType, pipelineDest, presets)` and `ForEdit(existingFilter, …)`; `OkAsync()` builds filter, saves preset if flagged
-- `SmartCopy.UI/Views/EditFilterDialog.axaml` + `.cs` — modal `Window`; Include/Exclude toggle → name field → `ContentControl` + `DataTemplate` dispatch → "Save as preset" → Cancel/OK
+- `SmartCopy.UI/ViewModels/EditFilterDialogViewModel.cs` — factory methods `ForNew(filterType, pipelineDestinationPath = "")` and `ForEdit(existingFilter, pipelineDestinationPath = "")`; `Ok()` builds `ResultFilter`; `SaveAsPreset` flag is exposed for caller handling
+- `SmartCopy.UI/Views/EditFilterDialog.axaml` + `.cs` — modal `Window`; Only/Add/Exclude toggle → name field → `ContentControl` + `DataTemplate` dispatch → "Save as preset" → Cancel/OK
 - `SmartCopy.UI/Views/FilterEditors/` — 6 `UserControl` files (one per type): Extension chips, Wildcard text box, DateRange date pickers, SizeRange numeric inputs, Mirror path + compare mode, Attribute checkboxes
 
-Dialog launch in `FilterChainView.axaml.cs` code-behind: `NewFilterDialogRequested` → `ForNew` → `ShowDialog`; edit pencil → `ForEdit` → `ShowDialog`.
+Dialog launch + preset persistence in `FilterChainView.axaml.cs`: `NewFilterDialogRequested` → `ForNew` → `ShowDialog`; edit pencil → `ForEdit` → `ShowDialog`; if OK + SaveAsPreset, save through `FilterPresetStore` before adding/replacing the card.
 
-Tests (`SmartCopy.Tests/Filters/EditFilterDialogViewModelTests.cs`): `ForNew` empty; `ForEdit` pre-populated; preset saved when flagged; `IsValid` gates OK.
+Tests (`SmartCopy.Tests/Filters/EditFilterDialogViewModelTests.cs`): `ForNew` type dispatch; `ForEdit` pre-population; mode toggles (`Only/Add/Exclude`) update editor state; `IsValid` gates OK; mirror path suggestion is applied.
 
 #### Sub-step 4e — `FilterViewModel` real `IFilter` wiring + `BuildLiveChain()`
 
 Modify `SmartCopy.UI/ViewModels/FilterChainViewModel.cs` (significant rewrite):
 - `FilterViewModel` wraps a live `IFilter`; `IsEnabled` toggle fires `ChainChanged`; `ReplaceFilter(IFilter)` swaps instance
-- `FilterChainViewModel` gains: `FilterPresetStore`/`AppSettings` constructor params; `AddFilterViewModel AddFilter`; `FilterChain BuildLiveChain()`; `public event EventHandler? ChainChanged`; `AddFilterFromResult`, `ReplaceFilter`, `MoveFilter(int, int)`; `NewFilterDialogRequested` event; `SaveChainAsync`/`LoadChainAsync` commands
+- `FilterChainViewModel` gains: `FilterPresetStore`/`AppSettings` constructor params; `AddFilterViewModel AddFilter`; `FilterChain BuildLiveChain()`; `public event EventHandler? ChainChanged`; `AddFilterFromResult`, `ReplaceFilter`, `MoveFilter(int, int)`; `NewFilterDialogRequested` event; `SaveChain`/`LoadChain` commands that raise `SaveChainRequested`/`LoadChainRequested`
 - `FilterChainView.axaml.cs` wires Avalonia `DragDrop` on the `ItemsControl`; drop handler calls `MoveFilter`
 
-Modify `MainViewModel`: construct `AppSettingsStore` + `FilterPresetStore`; load settings; pass to `FilterChainViewModel`; set `PipelineDestinationPath = "/mem/target"` during `InitializeAsync`.
+Modify `MainViewModel`: construct `AppSettings` + `FilterPresetStore`; pass to `FilterChainViewModel`; keep `PipelineDestinationPath` synchronized with pipeline destination and seed it to `/mem/target` during `InitializeAsync`.
 
 Tests (`SmartCopy.Tests/Filters/FilterChainViewModelTests.cs`): `BuildLiveChain`; add/remove fire `ChainChanged`; `IsEnabled` toggle fires `ChainChanged`; `ReplaceFilter` updates VM.
 
@@ -1186,29 +1194,31 @@ New: `SmartCopy.UI/Converters/FilterResultOpacityConverter.cs` — `Excluded →
 
 Modify `DirectoryTreeView.axaml`: add `Opacity` style binding via `FilterResultOpacityConverter`. Wire `FileListView.axaml` `DataGrid.ItemsSource` to `VisibleFiles`.
 
-Tests (`SmartCopy.Tests/Filters/FilterLiveWiringTests.cs`) against `MemoryFileSystemProvider`: extension filter excludes non-matching files; include+exclude chain; `ShowFilteredFiles` toggle; disable filter resets excluded nodes; `ReapplyFiltersAsync` updates loaded file nodes; MirrorFilter against `/mem/target`.
+Tests (`SmartCopy.Tests/Filters/FilterLiveWiringTests.cs`) against `MemoryFileSystemProvider`: extension filter excludes non-matching files; `Only`+`Exclude` chain behavior; `ShowFilteredFiles` toggle; disabled filter resets excluded nodes; `ReapplyFiltersAsync` updates existing loaded file nodes.
 
 #### Acceptance criteria
-- [ ] Include/exclude semantics match §5.2
-- [ ] Disabled filters have zero effect on `FilterResult`
-- [ ] Mirror filter comparison path auto-derives from pipeline destination
-- [ ] Add-filter flyout shows type list → preset list drill-down
-- [ ] "★ Audio files" built-in preset adds filter and updates tree/file list immediately
-- [ ] "＋ New..." opens `EditFilterDialog`; OK adds filter and updates tree/file list
-- [ ] Edit pencil re-opens dialog pre-populated; Save as preset appears in next add-filter flow
-- [ ] Filter card checkbox toggle re-evaluates chain without reopening dialog
-- [ ] `VisibleFiles` respects `ShowFilteredFiles` toggle
-- [ ] Drag handle `≡` reorders filter cards; chain re-evaluated after reorder
-- [ ] MirrorFilter evaluated against `/mem/target` (Phase 1 in-memory validation)
+- [x] `Only`/`Add`/`Exclude` semantics match §5.2
+- [x] Disabled filters have zero effect on `FilterResult`
+- [x] Mirror filter comparison path suggestion derives from pipeline destination
+- [x] Add-filter flyout shows type list → preset list drill-down
+- [x] "★ Only Audio files" built-in preset adds a filter and updates tree/file list
+- [x] "＋ New..." opens `EditFilterDialog`; OK adds filter and updates tree/file list
+- [x] Edit pencil re-opens dialog pre-populated; save-as-preset path is wired
+- [x] Filter card checkbox toggle re-evaluates chain without reopening dialog
+- [x] `VisibleFiles` respects `ShowFilteredFiles` toggle
+- [x] Drag handle `≡` reorders filter cards; chain re-evaluated after reorder
+- [x] MirrorFilter is evaluated with comparison provider wiring in memory-backed Phase 1 flow
+- [ ] Save/Load chain completes full UI round-trip (file picker + JSON persistence wiring)
 
 #### Verification
-- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "FilterPresetStore"` (≥5 tests)
-- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "FilterEditorViewModel"` (≥6 tests)
-- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "AddFilterViewModel"` (≥5 tests)
-- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "EditFilterDialogViewModel"` (≥6 tests)
-- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "FilterChainViewModel"` (≥6 tests)
-- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "FilterLiveWiring"` (≥6 tests)
-- [ ] Manual: launch app, add "★ Audio files" preset, verify tree grays non-.mp3/.flac directories
+- [x] Automated filter suites are currently passing in the user environment (Codex cannot execute tests in this environment)
+- [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "FilterPresetStore"` (≥5 tests)
+- [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "FilterEditorViewModel"` (≥6 tests)
+- [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "AddFilterViewModel"` (≥5 tests)
+- [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "EditFilterDialogViewModel"` (≥6 tests)
+- [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "FilterChainViewModel"` (≥6 tests)
+- [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "FilterLiveWiring"` (≥6 tests)
+- [ ] Manual: launch app, add "★ Only Audio files" preset, verify tree/file-list filtering behavior
 - [ ] Manual: create new Extension filter via dialog, save as preset, reload app, verify preset persists
 - [ ] Manual: "Save ▾" writes `.json`; "Load ▾" restores chain from file
 
@@ -1411,14 +1421,15 @@ public enum DeleteMode    { Trash, Permanent }
 ### FilterChainConfig (persistence)
 
 ```csharp
-public record FilterConfig(
+public sealed record FilterConfig(
     string FilterType,         // "Wildcard" | "Mirror" | "DateRange" | etc.
     bool IsEnabled,
-    string Mode,               // "Include" | "Exclude"
-    JsonObject Parameters      // type-specific; see individual filter for keys
+    string Mode,               // "Only" | "Add" | "Exclude" (legacy "Include" is accepted on read)
+    JsonObject Parameters,     // type-specific; see individual filter for keys
+    string? CustomName = null
 );
 
-public record FilterChainConfig(
+public sealed record FilterChainConfig(
     string Name,
     string? Description,
     List<FilterConfig> Filters
