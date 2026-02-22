@@ -7,6 +7,7 @@
     
     <UserControl.Resources>
         <conv:CheckStateConverter x:Key="CheckStateConverter" />
+        <conv:FilterResultOpacityConverter x:Key="FilterResultOpacityConverter" />
     </UserControl.Resources>
 
     <TreeView ItemsSource="{Binding RootNodes}"
@@ -20,7 +21,8 @@
         </TreeView.Styles>
         <TreeView.ItemTemplate>
             <TreeDataTemplate ItemsSource="{Binding Children}">
-                <StackPanel Orientation="Horizontal" Spacing="4">
+                <StackPanel Orientation="Horizontal" Spacing="4"
+                            Opacity="{Binding FilterResult, Converter={StaticResource FilterResultOpacityConverter}}">
                     <CheckBox IsChecked="{Binding CheckState, Converter={StaticResource CheckStateConverter}}"
                               IsThreeState="False" />
                     <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />

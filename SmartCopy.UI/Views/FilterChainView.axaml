@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
+             xmlns:views="clr-namespace:SmartCopy.UI.Views"
              x:Class="SmartCopy.UI.Views.FilterChainView"
              x:DataType="vm:FilterChainViewModel">
     <Border Background="#252526" BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="6" Padding="10">
@@ -12,8 +13,10 @@
 
             <!-- Save / Load pinned to the bottom -->
             <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*, 4, *" Margin="0,8,0,0">
-                <Button Grid.Column="0" Content="Save ▾" CornerRadius="4" HorizontalAlignment="Stretch" />
-                <Button Grid.Column="2" Content="Load ▾" CornerRadius="4" HorizontalAlignment="Stretch" />
+                <Button Grid.Column="0" Content="Save ▾" CornerRadius="4" HorizontalAlignment="Stretch"
+                        Command="{Binding SaveChainCommand}" />
+                <Button Grid.Column="2" Content="Load ▾" CornerRadius="4" HorizontalAlignment="Stretch"
+                        Command="{Binding LoadChainCommand}" />
             </Grid>
 
             <!-- Filter cards + inline Add button, scrollable -->
@@ -21,11 +24,12 @@
                 <StackPanel Orientation="Vertical">
 
                     <!-- Existing filter cards -->
-                    <ItemsControl ItemsSource="{Binding Filters}">
+                    <ItemsControl x:Name="FiltersItemsControl" ItemsSource="{Binding Filters}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:FilterViewModel">
                                 <Border BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="4"
-                                        Margin="0,0,0,6" Background="#333333">
+                                        Margin="0,0,0,6" Background="#333333"
+                                        Tag="{Binding}">
                                     <Grid ColumnDefinitions="Auto, *, Auto" Margin="8,7">
 
                                         <!-- Left: enabled checkbox -->
@@ -49,7 +53,9 @@
                                         <StackPanel Grid.Column="2" Orientation="Horizontal"
                                                     Spacing="2" VerticalAlignment="Center"
                                                     Margin="8,0,0,0">
-                                            <TextBlock Text="≡" Foreground="Gray"
+                                            <!-- Drag handle: PointerPressed handler set in code-behind -->
+                                            <TextBlock x:Name="DragHandle"
+                                                       Text="≡" Foreground="Gray"
                                                        VerticalAlignment="Center"
                                                        Cursor="Hand" Margin="0,0,4,0" />
                                             <Button Content="✎"
@@ -59,7 +65,9 @@
                                                     VerticalContentAlignment="Center"
                                                     Background="Transparent"
                                                     Foreground="#a0a0a0"
-                                                    FontSize="13" />
+                                                    FontSize="13"
+                                                    Command="{Binding $parent[UserControl].((vm:FilterChainViewModel)DataContext).RequestEditFilterCommand}"
+                                                    CommandParameter="{Binding}" />
                                             <Button Content="✕"
                                                     Command="{Binding $parent[UserControl].((vm:FilterChainViewModel)DataContext).RemoveFilterCommand}"
                                                     CommandParameter="{Binding}"
@@ -77,15 +85,26 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <!-- Inline Add button — styled as a ghost card -->
-                    <Button BorderBrush="#3e3e42" BorderThickness="1"
-                            CornerRadius="4" Padding="8,7" Background="Transparent"
-                            Cursor="Hand" Opacity="0.55"
-                            HorizontalAlignment="Stretch"
-                            Command="{Binding AddFilterCommand}">
-                        <TextBlock Text="+ Add filter" Foreground="#4facfe"
-                                   FontStyle="Italic" HorizontalAlignment="Center" />
-                    </Button>
+                    <!-- Inline Add button — opens the flyout popup -->
+                    <Panel>
+                        <Button x:Name="AddFilterButton"
+                                BorderBrush="#3e3e42" BorderThickness="1"
+                                CornerRadius="4" Padding="8,7" Background="Transparent"
+                                Cursor="Hand" Opacity="0.55"
+                                HorizontalAlignment="Stretch"
+                                Click="OnAddFilterButtonClick">
+                            <TextBlock Text="+ Add filter" Foreground="#4facfe"
+                                       FontStyle="Italic" HorizontalAlignment="Center" />
+                        </Button>
+
+                        <!-- Add-filter flyout popup -->
+                        <Popup x:Name="AddFilterPopup"
+                               Placement="Bottom"
+                               PlacementTarget="{Binding ElementName=AddFilterButton}">
+                            <views:AddFilterFlyout x:Name="AddFilterFlyoutControl"
+                                                   DataContext="{Binding AddFilter}" />
+                        </Popup>
+                    </Panel>
 
                 </StackPanel>
             </ScrollViewer>

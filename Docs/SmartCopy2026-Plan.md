@@ -869,6 +869,92 @@ immediately legible to new users.
 - **Drag handle** `≡`, **edit pencil** `✎`, **remove** `✕` (right-aligned)
 - The mode dropdown (INCLUDE/EXCLUDE) and detailed config live in the edit dialog, not the card face
 
+### Filter UX Flow
+
+#### Add Filter — Two-Level Drill-Down
+
+Clicking "+ Add filter" opens a **`Popup`** anchored below the button (light-dismiss on
+click-outside). The flyout uses two panels swapped by a boolean flag — no secondary window.
+
+**Level 1 — Filter type selection:**
+```
+┌────────────────────────────────┐
+│  Add Filter                    │
+├────────────────────────────────┤
+│  Extension    Filter by ext.   │
+│  Wildcard     Name pattern     │
+│  Date Range   Created/Modified │
+│  Size Range   Min/Max bytes    │
+│  Mirror       Skip on target   │
+│  Attribute    Hidden/ReadOnly  │
+└────────────────────────────────┘
+```
+
+**Level 2 — Preset picker for chosen type:**
+```
+┌────────────────────────────────┐
+│  ← Extension                   │
+├────────────────────────────────┤
+│  ＋ New...                     │
+├────────────────────────────────┤
+│  Recently used                 │
+│    My music (*.mp3;*.flac)     │
+├────────────────────────────────┤
+│  ★ Audio files                 │
+│  ★ Images                      │
+│  ★ Documents                   │
+│  ★ Log files                   │
+│    My custom preset            │
+└────────────────────────────────┘
+```
+
+- **"＋ New..."** — closes flyout, opens `EditFilterDialog` with empty form for selected type
+- **Preset row** — closes flyout, adds card immediately, triggers tree/file list update
+- **"←"** — returns to Level 1; "★" = built-in (read-only); plain rows = user-saved presets
+- "Recently used" shows the last 5 presets of this type from `AppSettings.FilterTypeMruPresetIds`
+
+#### EditFilterDialog
+
+A **modal `Window`** (`ShowDialog<bool?>`) opened via "＋ New..." or the edit pencil on any card.
+The dialog dispatches to a type-specific editor view via `ContentControl` + `DataTemplate`.
+
+```
+┌─────────────────────────────────────────┐
+│  Edit Filter                            │
+├─────────────────────────────────────────┤
+│  [INCLUDE ●]  [EXCLUDE ○]               │  ← prominent toggle
+├─────────────────────────────────────────┤
+│  Name:  [Include .mp3, .flac      ]     │  ← auto-generated, user-overridable
+├─────────────────────────────────────────┤
+│  ┌── type-specific form ──────────────┐ │
+│  │ Extension: [.mp3 ×][.flac ×][+]   │ │  chip list + text input
+│  │ Wildcard:  [*.tmp;*.bak          ]│ │  single text box
+│  │ Date Range: ○Created ●Modified    │ │  radio + two CalendarDatePickers
+│  │ Size Range: [1.5][MB▾] to [──][GB▾]│ │  NumericUpDown + unit ComboBox
+│  │ Mirror:     [/mem/target     ][…] │ │  path field (Browse stub, Phase 1)
+│  │             ○Name  ●Name+Size     │ │
+│  │ Attribute:  ☐Hidden ☐RO ☐System  │ │
+│  └────────────────────────────────── ┘ │
+├─────────────────────────────────────────┤
+│  ☐ Save as preset                       │
+├─────────────────────────────────────────┤
+│            [Cancel]      [OK ✓]         │  ← OK disabled when !IsValid
+└─────────────────────────────────────────┘
+```
+
+"Save as preset" persists the filter config to `FilterPresetStore` (distinct from the full
+filter-chain Save/Load buttons, which persist an entire `FilterChainConfig` to a `.json` file).
+
+#### Filter Results in Tree / File List
+
+- **`FilterResult.Excluded` + `ShowFilteredFiles=true`**: node visible, opacity 0.4, SlateBlue
+  colour, non-checkable
+- **`FilterResult.Excluded` + `ShowFilteredFiles=false`**: file-list nodes hidden; directory nodes
+  remain visible (grayed) so the tree stays navigable
+- All filter changes propagate within ~100 ms via a debounced `CancellationTokenSource`
+- Drag handle `≡` on filter cards reorders the chain (Avalonia `DragDrop`); order affects
+  chain evaluation sequence
+
 ### UI Improvements Over Predecessor
 
 1. **Source and destination fields accept drag-and-drop** from Explorer/Finder
@@ -950,9 +1036,9 @@ and sync safely.*
 
 ### Phase 1 delivery order (UX-first, memory-backed)
 
-1. UX loop track (blocking for feature-complete v1 demo): **Step 1 -> Step 4 -> Step 5 -> Step 6 -> Step 7**
-2. Validation-first hardening track (prioritised while behaviour is still fresh): **Step 2 and Step 4 test closure, then Step 8 -> Step 9**
-3. UX polish track (after end-to-end flow is proven): **Step 10 -> Step 11**
+1. UX loop track (blocking for feature-complete v1 demo)
+2. Validation-first hardening track (prioritised while behaviour is still fresh)
+3. UX polish track (after end-to-end flow is proven)
 
 ### Phase 1 status snapshot (as of 2026-02-22)
 
@@ -1018,19 +1104,113 @@ Verification:
 
 ### Step 4 — Filter Chain (UX Loop Track)
 
-Deliverables:
-- [x] `IFilter`, `FilterChain`, `FilterConfig`
+#### Already complete
+- [x] `IFilter`, `FilterChain`, `FilterConfig`, `FilterChainConfig`
 - [x] `Wildcard`, `Extension`, `Mirror`, `DateRange`, `SizeRange`, `Attribute` filters
-- [ ] UI wiring so filter results affect tree + file list consistently
+- [x] Basic `FilterChain` unit tests
 
-Acceptance criteria:
+#### Sub-step 4a — `FilterPresetStore` + `FilterFactory` (Core)
+
+New files:
+- `SmartCopy.Core/Filters/FilterPreset.cs` — `{ Id, Name, IsBuiltIn, FilterConfig }`
+- `SmartCopy.Core/Filters/FilterPresetCollection.cs` — JSON root `{ SchemaVersion, Dictionary<string, List<FilterPreset>> UserPresets }`
+- `SmartCopy.Core/Filters/FilterPresetStore.cs` — async CRUD: `GetPresetsForTypeAsync`, `SaveUserPresetAsync`, `DeleteUserPresetAsync`; built-ins always prepended; persists to `%APPDATA%/SmartCopy2026/filter-presets.json`
+- `SmartCopy.Core/Filters/FilterFactory.cs` — static `FromConfig(FilterConfig) → IFilter`; switch on `FilterType` string
+
+Modify:
+- `SmartCopy.Core/Settings/AppSettings.cs` — add `Dictionary<string, List<string>> FilterTypeMruPresetIds`
+
+Built-in presets (hardcoded, never written to disk):
+- Extension / "Audio files": `mp3;flac;aac;ogg;wav;m4a`, Include
+- Extension / "Images": `jpg;jpeg;png;gif;webp;bmp;tiff;svg`, Include
+- Extension / "Documents": `pdf;docx;xlsx;pptx;txt;odt`, Include
+- Extension / "Log files": `log;txt`, Include
+- Wildcard / "Temp files": `*.tmp;*.bak;~*;Thumbs.db`, Exclude
+
+Tests (`SmartCopy.Tests/Filters/FilterPresetStoreTests.cs`): built-ins present when no user file; save/delete/overwrite round-trips; built-ins precede user presets; `FilterFactory` round-trips all 6 filter types.
+
+#### Sub-step 4b — `FilterEditorViewModel` hierarchy (UI ↔ Core bridge)
+
+New folder: `SmartCopy.UI/ViewModels/Filters/`
+
+New files:
+- `FilterEditorViewModelBase.cs` — abstract; `FilterMode Mode`, `string FilterName`, `bool SaveAsPreset`; `abstract IFilter BuildFilter()`, `abstract bool IsValid`, `abstract void LoadFrom(IFilter)`, `virtual string GenerateName()`
+- One concrete subclass per filter type: `ExtensionFilterEditorViewModel`, `WildcardFilterEditorViewModel`, `DateRangeFilterEditorViewModel`, `SizeRangeFilterEditorViewModel`, `MirrorFilterEditorViewModel`, `AttributeFilterEditorViewModel`
+- `SizeUnit` enum: Bytes/KB/MB/GB/TB (in the size range editor)
+
+Tests (`SmartCopy.Tests/Filters/FilterEditorViewModelTests.cs`): extension normalisation and deduplication; size unit conversion; `LoadFrom → BuildFilter` round-trips for all 6 types.
+
+#### Sub-step 4c — Add-Filter flyout (two-level drill-down)
+
+New files:
+- `SmartCopy.UI/ViewModels/AddFilterViewModel.cs` — level-1: 6 `FilterTypeItem` entries; level-2: loads presets + MRU; events `PresetPicked(FilterPreset)`, `NewFilterRequested(string filterType)`; updates MRU on pick (prepend, cap at 5, deduplicate)
+- `SmartCopy.UI/Views/AddFilterFlyout.axaml` + `.cs` — `UserControl` hosted in a `Popup` (`PlacementMode=Bottom`); two panels swapped via `IsLevel2Visible`
+
+Modify: `SmartCopy.UI/Views/FilterChainView.axaml` + `.cs` — replace `AddFilter` button with `Popup`; code-behind routes events to `FilterChainViewModel`.
+
+Tests (`SmartCopy.Tests/Filters/AddFilterViewModelTests.cs`): level navigation; MRU population; GoBack; MRU update on pick.
+
+#### Sub-step 4d — `EditFilterDialog` (modal Window)
+
+New files:
+- `SmartCopy.UI/ViewModels/EditFilterDialogViewModel.cs` — factory methods `ForNew(filterType, pipelineDest, presets)` and `ForEdit(existingFilter, …)`; `OkAsync()` builds filter, saves preset if flagged
+- `SmartCopy.UI/Views/EditFilterDialog.axaml` + `.cs` — modal `Window`; Include/Exclude toggle → name field → `ContentControl` + `DataTemplate` dispatch → "Save as preset" → Cancel/OK
+- `SmartCopy.UI/Views/FilterEditors/` — 6 `UserControl` files (one per type): Extension chips, Wildcard text box, DateRange date pickers, SizeRange numeric inputs, Mirror path + compare mode, Attribute checkboxes
+
+Dialog launch in `FilterChainView.axaml.cs` code-behind: `NewFilterDialogRequested` → `ForNew` → `ShowDialog`; edit pencil → `ForEdit` → `ShowDialog`.
+
+Tests (`SmartCopy.Tests/Filters/EditFilterDialogViewModelTests.cs`): `ForNew` empty; `ForEdit` pre-populated; preset saved when flagged; `IsValid` gates OK.
+
+#### Sub-step 4e — `FilterViewModel` real `IFilter` wiring + `BuildLiveChain()`
+
+Modify `SmartCopy.UI/ViewModels/FilterChainViewModel.cs` (significant rewrite):
+- `FilterViewModel` wraps a live `IFilter`; `IsEnabled` toggle fires `ChainChanged`; `ReplaceFilter(IFilter)` swaps instance
+- `FilterChainViewModel` gains: `FilterPresetStore`/`AppSettings` constructor params; `AddFilterViewModel AddFilter`; `FilterChain BuildLiveChain()`; `public event EventHandler? ChainChanged`; `AddFilterFromResult`, `ReplaceFilter`, `MoveFilter(int, int)`; `NewFilterDialogRequested` event; `SaveChainAsync`/`LoadChainAsync` commands
+- `FilterChainView.axaml.cs` wires Avalonia `DragDrop` on the `ItemsControl`; drop handler calls `MoveFilter`
+
+Modify `MainViewModel`: construct `AppSettingsStore` + `FilterPresetStore`; load settings; pass to `FilterChainViewModel`; set `PipelineDestinationPath = "/mem/target"` during `InitializeAsync`.
+
+Tests (`SmartCopy.Tests/Filters/FilterChainViewModelTests.cs`): `BuildLiveChain`; add/remove fire `ChainChanged`; `IsEnabled` toggle fires `ChainChanged`; `ReplaceFilter` updates VM.
+
+#### Sub-step 4f — Live wiring: filter application to tree + file list
+
+Modify `MainViewModel`: subscribe `FilterChain.ChainChanged` → `ApplyFiltersAsync()` (CancellationTokenSource debounce; passes same `MemoryFileSystemProvider` as `comparisonProvider`).
+
+Modify `MockMemoryFileSystemFactory`: add `/mem/target` subtree with representative files.
+
+Modify `DirectoryTreeViewModel`: add `ApplyFiltersAsync(FilterChain, IFileSystemProvider?, CancellationToken)` delegating to `chain.ApplyToTreeAsync(RootNodes, …)`.
+
+Modify `FileListViewModel`: remove stub `FilterResult` logic; add `UpdateChain`, `ReapplyFiltersAsync`; expose `VisibleFiles` (respects `ShowFilteredFiles`).
+
+New: `SmartCopy.UI/Converters/FilterResultOpacityConverter.cs` — `Excluded → 0.4`, `Included → 1.0`.
+
+Modify `DirectoryTreeView.axaml`: add `Opacity` style binding via `FilterResultOpacityConverter`. Wire `FileListView.axaml` `DataGrid.ItemsSource` to `VisibleFiles`.
+
+Tests (`SmartCopy.Tests/Filters/FilterLiveWiringTests.cs`) against `MemoryFileSystemProvider`: extension filter excludes non-matching files; include+exclude chain; `ShowFilteredFiles` toggle; disable filter resets excluded nodes; `ReapplyFiltersAsync` updates loaded file nodes; MirrorFilter against `/mem/target`.
+
+#### Acceptance criteria
 - [ ] Include/exclude semantics match §5.2
-- [ ] Disabled filters have zero effect
-- [ ] Mirror filter comparison source is derived from pipeline destination by default
+- [ ] Disabled filters have zero effect on `FilterResult`
+- [ ] Mirror filter comparison path auto-derives from pipeline destination
+- [ ] Add-filter flyout shows type list → preset list drill-down
+- [ ] "★ Audio files" built-in preset adds filter and updates tree/file list immediately
+- [ ] "＋ New..." opens `EditFilterDialog`; OK adds filter and updates tree/file list
+- [ ] Edit pencil re-opens dialog pre-populated; Save as preset appears in next add-filter flow
+- [ ] Filter card checkbox toggle re-evaluates chain without reopening dialog
+- [ ] `VisibleFiles` respects `ShowFilteredFiles` toggle
+- [ ] Drag handle `≡` reorders filter cards; chain re-evaluated after reorder
+- [ ] MirrorFilter evaluated against `/mem/target` (Phase 1 in-memory validation)
 
-Verification:
-- [ ] Unit tests per filter type and chain ordering (currently basic chain coverage only)
-- [ ] Integration test: apply mixed include/exclude chain and verify expected output set
+#### Verification
+- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "FilterPresetStore"` (≥5 tests)
+- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "FilterEditorViewModel"` (≥6 tests)
+- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "AddFilterViewModel"` (≥5 tests)
+- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "EditFilterDialogViewModel"` (≥6 tests)
+- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "FilterChainViewModel"` (≥6 tests)
+- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "FilterLiveWiring"` (≥6 tests)
+- [ ] Manual: launch app, add "★ Audio files" preset, verify tree grays non-.mp3/.flac directories
+- [ ] Manual: create new Extension filter via dialog, save as preset, reload app, verify preset persists
+- [ ] Manual: "Save ▾" writes `.json`; "Load ▾" restores chain from file
 
 ### Step 5 — Transform Pipeline (UX Loop Track, built-in steps)
 

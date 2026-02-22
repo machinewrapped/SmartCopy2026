@@ -31,6 +31,7 @@ public sealed class DateRangeFilter : FilterBase
     public DateTime? Min { get; }
     public DateTime? Max { get; }
 
+    public override string TypeDisplayName => "Date Range";
     public override string Summary => $"{Field} between {Min:yyyy-MM-dd} and {Max:yyyy-MM-dd}";
     public override string Description => $"DateRange: {Field}";
 

@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.Filters;
 
 namespace SmartCopy.UI.ViewModels;
 
@@ -12,17 +13,58 @@ public class FileListViewModel : ViewModelBase
     private string _directoryPath;
     private CancellationTokenSource? _loadCts;
 
+    private FilterChain? _chain;
+    private IFileSystemProvider? _comparisonProvider;
+
+    // The full unfiltered set of file nodes for the current directory.
     private IReadOnlyList<FileSystemNode> _files = [];
-    public IReadOnlyList<FileSystemNode> Files
+
+    // The subset (or whole set) exposed to the DataGrid, respecting ShowFilteredFiles.
+    private IReadOnlyList<FileSystemNode> _visibleFiles = [];
+    public IReadOnlyList<FileSystemNode> VisibleFiles
     {
-        get => _files;
-        private set => SetProperty(ref _files, value);
+        get => _visibleFiles;
+        private set => SetProperty(ref _visibleFiles, value);
+    }
+
+    private bool _showFilteredFiles = true;
+    /// <summary>
+    /// When <c>true</c>, excluded files are still visible (dimmed).
+    /// When <c>false</c>, excluded files are hidden from the list.
+    /// </summary>
+    public bool ShowFilteredFiles
+    {
+        get => _showFilteredFiles;
+        set
+        {
+            if (SetProperty(ref _showFilteredFiles, value))
+                RefreshVisibleFiles();
+        }
     }
 
     public FileListViewModel(IFileSystemProvider provider, string directoryPath)
     {
         _provider = provider;
         _directoryPath = directoryPath;
+    }
+
+    /// <summary>Stores the active filter chain for use in subsequent load and reapply calls.</summary>
+    public void UpdateChain(FilterChain? chain, IFileSystemProvider? comparisonProvider)
+    {
+        _chain = chain;
+        _comparisonProvider = comparisonProvider;
+    }
+
+    /// <summary>
+    /// Re-applies the current filter chain to the already-loaded file nodes
+    /// and refreshes <see cref="VisibleFiles"/>.
+    /// </summary>
+    public async Task ReapplyFiltersAsync(CancellationToken ct = default)
+    {
+        if (_chain is not null && _files.Count > 0)
+            await _chain.ApplyToTreeAsync(_files, _comparisonProvider, ct);
+
+        RefreshVisibleFiles();
     }
 
     public async Task LoadFilesForNodeAsync(FileSystemNode directoryNode)
@@ -33,25 +75,20 @@ public class FileListViewModel : ViewModelBase
         var ct = _loadCts.Token;
 
         _directoryPath = directoryNode.FullPath;
-        
+
         if (directoryNode.Files.Count == 0)
         {
             var children = await _provider.GetChildrenAsync(_directoryPath, ct);
             var files = new List<FileSystemNode>();
-            
+
             foreach (var child in children)
             {
                 ct.ThrowIfCancellationRequested();
-                if (child.IsDirectory)
-                {
-                    continue;
-                }
+                if (child.IsDirectory) continue;
 
-                var checkState = directoryNode.CheckState == CheckState.Checked ? CheckState.Checked : CheckState.Unchecked;
-
-                var filterResult = child.Name.Equals("desktop.ini", StringComparison.OrdinalIgnoreCase)
-                    ? FilterResult.Excluded
-                    : FilterResult.Included;
+                var checkState = directoryNode.CheckState == CheckState.Checked
+                    ? CheckState.Checked
+                    : CheckState.Unchecked;
 
                 files.Add(new FileSystemNode
                 {
@@ -64,23 +101,32 @@ public class FileListViewModel : ViewModelBase
                     ModifiedAt = child.ModifiedAt,
                     Attributes = child.Attributes,
                     CheckState = checkState,
-                    FilterResult = filterResult,
-                    ExcludedByFilter = filterResult == FilterResult.Excluded ? "Hidden" : null,
-                    Parent = directoryNode
+                    FilterResult = FilterResult.Included,
+                    Parent = directoryNode,
                 });
             }
 
-            if (ct.IsCancellationRequested)
-            {
-                return;
-            }
+            if (ct.IsCancellationRequested) return;
 
             foreach (var file in files)
-            {
                 directoryNode.Files.Add(file);
-            }
         }
 
-        Files = directoryNode.Files.ToList();
+        _files = directoryNode.Files.ToList();
+
+        // Apply current chain to the freshly loaded file set.
+        if (_chain is not null)
+            await _chain.ApplyToTreeAsync(_files, _comparisonProvider, ct);
+
+        RefreshVisibleFiles();
+    }
+
+    private void RefreshVisibleFiles()
+    {
+        VisibleFiles = _showFilteredFiles
+            ? _files
+            : (IReadOnlyList<FileSystemNode>)_files
+                .Where(f => f.FilterResult == FilterResult.Included)
+                .ToList();
     }
 }

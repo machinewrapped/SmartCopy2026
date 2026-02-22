@@ -1,0 +1,31 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels.Filters"
+             x:Class="SmartCopy.UI.Views.FilterEditors.DateRangeFilterEditorView"
+             x:DataType="vm:DateRangeFilterEditorViewModel">
+    <StackPanel Spacing="10">
+
+        <!-- Date field radio buttons -->
+        <StackPanel Orientation="Horizontal" Spacing="16">
+            <RadioButton Content="Created"
+                         IsChecked="{Binding FieldIsCreated}"
+                         GroupName="DateField" />
+            <RadioButton Content="Modified"
+                         IsChecked="{Binding FieldIsModified}"
+                         GroupName="DateField" />
+        </StackPanel>
+
+        <!-- Date range pickers -->
+        <Grid ColumnDefinitions="Auto, *, Auto, *" ColumnSpacing="8">
+            <TextBlock Grid.Column="0" Text="From" VerticalAlignment="Center" />
+            <CalendarDatePicker Grid.Column="1"
+                                SelectedDate="{Binding MinDate}"
+                                Watermark="any" />
+            <TextBlock Grid.Column="2" Text="To" VerticalAlignment="Center" />
+            <CalendarDatePicker Grid.Column="3"
+                                SelectedDate="{Binding MaxDate}"
+                                Watermark="any" />
+        </Grid>
+
+    </StackPanel>
+</UserControl>

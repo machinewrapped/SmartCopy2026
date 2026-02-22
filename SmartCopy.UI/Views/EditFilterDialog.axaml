@@ -1,0 +1,75 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
+        xmlns:vmFilters="clr-namespace:SmartCopy.UI.ViewModels.Filters"
+        xmlns:viewEditors="clr-namespace:SmartCopy.UI.Views.FilterEditors"
+        x:Class="SmartCopy.UI.Views.EditFilterDialog"
+        x:DataType="vm:EditFilterDialogViewModel"
+        Title="Edit Filter"
+        Width="440"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#1e1e1e">
+    <StackPanel Spacing="12" Margin="20">
+
+        <!-- Include / Exclude toggle -->
+        <StackPanel Orientation="Horizontal" Spacing="6">
+            <RadioButton Content="INCLUDE"
+                         IsChecked="{Binding ModeIsInclude}"
+                         GroupName="FilterMode"
+                         FontWeight="SemiBold" />
+            <RadioButton Content="EXCLUDE"
+                         IsChecked="{Binding ModeIsExclude}"
+                         GroupName="FilterMode"
+                         FontWeight="SemiBold" />
+        </StackPanel>
+
+        <!-- Filter name field -->
+        <StackPanel Spacing="4">
+            <TextBlock Text="Name" FontSize="12" Opacity="0.7" />
+            <TextBox Text="{Binding FilterName}" Watermark="Auto-generated from parameters" />
+        </StackPanel>
+
+        <!-- Type-specific editor (dispatched by DataTemplate) -->
+        <Border BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="4" Padding="10">
+            <ContentControl Content="{Binding Editor}">
+                <ContentControl.DataTemplates>
+                    <DataTemplate DataType="vmFilters:ExtensionFilterEditorViewModel">
+                        <viewEditors:ExtensionFilterEditorView />
+                    </DataTemplate>
+                    <DataTemplate DataType="vmFilters:WildcardFilterEditorViewModel">
+                        <viewEditors:WildcardFilterEditorView />
+                    </DataTemplate>
+                    <DataTemplate DataType="vmFilters:DateRangeFilterEditorViewModel">
+                        <viewEditors:DateRangeFilterEditorView />
+                    </DataTemplate>
+                    <DataTemplate DataType="vmFilters:SizeRangeFilterEditorViewModel">
+                        <viewEditors:SizeRangeFilterEditorView />
+                    </DataTemplate>
+                    <DataTemplate DataType="vmFilters:MirrorFilterEditorViewModel">
+                        <viewEditors:MirrorFilterEditorView />
+                    </DataTemplate>
+                    <DataTemplate DataType="vmFilters:AttributeFilterEditorViewModel">
+                        <viewEditors:AttributeFilterEditorView />
+                    </DataTemplate>
+                </ContentControl.DataTemplates>
+            </ContentControl>
+        </Border>
+
+        <!-- Save as preset -->
+        <CheckBox Content="Save as preset" IsChecked="{Binding SaveAsPreset}" />
+
+        <!-- OK / Cancel buttons -->
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button Content="Cancel"
+                    Command="{Binding CancelCommand}"
+                    Width="80" />
+            <Button Content="OK"
+                    Command="{Binding OkCommand}"
+                    Width="80"
+                    IsDefault="True" />
+        </StackPanel>
+
+    </StackPanel>
+</Window>

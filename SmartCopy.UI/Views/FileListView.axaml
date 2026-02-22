@@ -11,7 +11,7 @@
         <conv:FilterResultColorConverter x:Key="FilterResultColorConverter" />
     </UserControl.Resources>
 
-    <DataGrid ItemsSource="{Binding Files}" AutoGenerateColumns="False"
+    <DataGrid ItemsSource="{Binding VisibleFiles}" AutoGenerateColumns="False"
               CanUserReorderColumns="True" CanUserResizeColumns="True" CanUserSortColumns="True" 
               GridLinesVisibility="Horizontal" BorderThickness="0" Background="Transparent">
         <DataGrid.Columns>
@@ -25,7 +25,15 @@
                     </DataTemplate>
                 </DataGridTemplateColumn.CellTemplate>
             </DataGridTemplateColumn>
-            <DataGridTextColumn Header="Name" IsReadOnly="True" Binding="{Binding Name, Mode=OneWay}" Width="*" Foreground="{Binding FilterResult, Converter={StaticResource FilterResultColorConverter}}" />
+            <DataGridTemplateColumn Header="Name" Width="*" IsReadOnly="True" SortMemberPath="Name">
+                <DataGridTemplateColumn.CellTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Name}"
+                                   Foreground="{Binding FilterResult, Converter={StaticResource FilterResultColorConverter}}"
+                                   VerticalAlignment="Center" Padding="4,0" />
+                    </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
             <DataGridTextColumn Header="Size" IsReadOnly="True" Binding="{Binding Size, Converter={StaticResource FileSizeConverter}, Mode=OneWay}" Width="100" />
             <DataGridTextColumn Header="Modified" IsReadOnly="True" Binding="{Binding ModifiedAt, StringFormat=\{0:yyyy-MM-dd\}, Mode=OneWay}" Width="120" />
         </DataGrid.Columns>

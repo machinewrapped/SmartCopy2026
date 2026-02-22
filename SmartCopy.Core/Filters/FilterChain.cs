@@ -72,6 +72,10 @@ public sealed class FilterChain
         return new FilterChain(filters);
     }
 
+    /// <summary>Convenience overload that uses <see cref="FilterFactory.FromConfig"/>.</summary>
+    public static FilterChain FromConfig(FilterChainConfig config)
+        => FromConfig(config, FilterFactory.FromConfig);
+
     private async Task<NodeEvaluation> EvaluateNodeAsync(
         FileSystemNode node,
         IFileSystemProvider? comparisonProvider,

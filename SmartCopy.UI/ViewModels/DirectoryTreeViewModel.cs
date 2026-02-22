@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Threading;
 using System.Threading.Tasks;
 using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.Filters;
 
 namespace SmartCopy.UI.ViewModels;
 
@@ -22,6 +23,18 @@ public class DirectoryTreeViewModel : ViewModelBase
     {
         _provider = provider;
         _rootPath = rootPath;
+    }
+
+    /// <summary>
+    /// Applies <paramref name="chain"/> to every node in the tree, setting
+    /// <see cref="FileSystemNode.FilterResult"/> and <see cref="FileSystemNode.ExcludedByFilter"/>.
+    /// </summary>
+    public async Task ApplyFiltersAsync(
+        FilterChain chain,
+        IFileSystemProvider? comparisonProvider,
+        CancellationToken ct = default)
+    {
+        await chain.ApplyToTreeAsync(RootNodes, comparisonProvider, ct);
     }
 
     public async Task InitializeAsync(string? initialSelectionPath = null, CancellationToken ct = default)
