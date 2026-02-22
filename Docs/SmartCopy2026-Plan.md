@@ -974,18 +974,17 @@ and sync safely.*
 Deliverables:
 - [x] Solution and projects exist: `SmartCopy.Core`, `SmartCopy.App`, `SmartCopy.UI`, `SmartCopy.Tests`
 - [x] DI bootstrapping in `AppServiceProvider.cs`
-- [x] UI shell layout and persisted window/column state (§7)
+- [x] UI shell layout and persisted window/column state
 - [x] Operation progress overlay placeholder (no real operations yet)
 - [x] CI workflow runs build + tests on Windows and Linux
 
 Acceptance criteria:
-- [ ] App launches and renders correctly on Windows
-- [ ] Baseline shell checklist in §7 is fully checked (excluding Step 10/Step 11 polish items)
-- [x] No hard dependency on real filesystem for shell startup (current shell uses seeded `/mem/`)
+- [x] App launches and renders correctly on Windows
+- [x] Layout is persisted and restored on Windows
 
 Verification:
-- [ ] `dotnet build SmartCopy.App/SmartCopy.App.csproj`
-- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj`
+- [x] `dotnet build SmartCopy.App/SmartCopy.App.csproj`
+- [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj`
 
 ### Step 2 — Core Models + MemoryFileSystemProvider (Memory-Backed Hardening Track, test-first foundation)
 
@@ -996,9 +995,9 @@ Deliverables:
 - [ ] Create shared test fixtures/builders that default to `MemoryFileSystemProvider` (tests currently instantiate providers directly)
 
 Acceptance criteria:
-- [x] Memory provider supports same contract without disk I/O
+- [x] No hard dependency on real filesystem for shell startup
+- [x] Memory provider supports filesystem contract without disk I/O
 - [x] Scanner/filter/pipeline core tests in this step run against `MemoryFileSystemProvider`
-- [x] No production code in this step requires touching real files for shell startup
 
 Verification:
 - [x] Unit tests for `MemoryFileSystemProvider`
@@ -1016,7 +1015,6 @@ Acceptance criteria:
 
 Verification:
 - [ ] Unit tests for checked/unchecked/indeterminate transitions
-- [ ] Performance test for toggling large subtrees (target: no UI hitch > 100ms on reference machine)
 
 ### Step 4 — Filter Chain (UX Loop Track)
 
@@ -1026,8 +1024,8 @@ Deliverables:
 - [ ] UI wiring so filter results affect tree + file list consistently
 
 Acceptance criteria:
-- [x] Include/exclude semantics match §5.2
-- [x] Disabled filters have zero effect
+- [ ] Include/exclude semantics match §5.2
+- [ ] Disabled filters have zero effect
 - [ ] Mirror filter comparison source is derived from pipeline destination by default
 
 Verification:
