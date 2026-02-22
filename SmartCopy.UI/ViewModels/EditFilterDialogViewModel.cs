@@ -95,7 +95,7 @@ public partial class EditFilterDialogViewModel : ObservableObject
         {
             if (baseName.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase))
             {
-                baseName = baseName.Substring(prefix.Length).TrimStart();
+                baseName = baseName[prefix.Length..].TrimStart();
                 break;
             }
         }
