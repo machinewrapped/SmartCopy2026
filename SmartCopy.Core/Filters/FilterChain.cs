@@ -100,7 +100,7 @@ public sealed class FilterChain
         }
     }
 
-    public void RecalculateParentExclusion(FileSystemNode? node)
+    public static void RecalculateParentExclusion(FileSystemNode? node)
     {
         while (node != null)
         {
@@ -132,7 +132,7 @@ public sealed class FilterChain
         return new FilterChainConfig(
             Name: name,
             Description: description,
-            Filters: _filters.Select(filter => filter.Config).ToList());
+            Filters: [.. _filters.Select(filter => filter.Config)]);
     }
 
     public static FilterChain FromConfig(FilterChainConfig config, Func<FilterConfig, IFilter> filterFactory)

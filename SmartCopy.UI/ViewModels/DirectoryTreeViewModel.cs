@@ -6,13 +6,14 @@ using SmartCopy.Core.Filters;
 
 namespace SmartCopy.UI.ViewModels;
 
-public class DirectoryTreeViewModel : ViewModelBase
+public class DirectoryTreeViewModel(IFileSystemProvider provider, string rootPath) : ViewModelBase
 {
-    private readonly IFileSystemProvider _provider;
-    private readonly string _rootPath;
+    private readonly IFileSystemProvider _provider = provider;
+    private readonly string _rootPath = rootPath;
     private FileSystemNode? _selectedNode;
 
-    public ObservableCollection<FileSystemNode> RootNodes { get; } = new();
+    public ObservableCollection<FileSystemNode> RootNodes { get; } = [];
+
     public FileSystemNode? SelectedNode
     {
         get => _selectedNode;
@@ -24,12 +25,6 @@ public class DirectoryTreeViewModel : ViewModelBase
     {
         get => _showFilteredNodesInTree;
         set => SetProperty(ref _showFilteredNodesInTree, value);
-    }
-
-    public DirectoryTreeViewModel(IFileSystemProvider provider, string rootPath)
-    {
-        _provider = provider;
-        _rootPath = rootPath;
     }
 
     /// <summary>

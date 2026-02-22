@@ -7,17 +7,17 @@ using SmartCopy.Core.Filters;
 
 namespace SmartCopy.UI.ViewModels;
 
-public class FileListViewModel : ViewModelBase
+public class FileListViewModel(IFileSystemProvider provider, string directoryPath) : ViewModelBase
 {
-    private readonly IFileSystemProvider _provider;
-    private string _directoryPath;
+    private readonly IFileSystemProvider _provider = provider;
+    private string _directoryPath = directoryPath;
     private CancellationTokenSource? _loadCts;
 
     private FilterChain? _chain;
     private IFileSystemProvider? _comparisonProvider;
 
     // The full unfiltered set of file nodes for the current directory.
-    private IReadOnlyList<FileSystemNode> _files = [];
+    private List<FileSystemNode> _files = [];
 
     // The subset (or whole set) exposed to the DataGrid, respecting ShowFilteredFiles.
     private IReadOnlyList<FileSystemNode> _visibleFiles = [];
@@ -40,12 +40,6 @@ public class FileListViewModel : ViewModelBase
             if (SetProperty(ref _showFilteredFiles, value))
                 RefreshVisibleFiles();
         }
-    }
-
-    public FileListViewModel(IFileSystemProvider provider, string directoryPath)
-    {
-        _provider = provider;
-        _directoryPath = directoryPath;
     }
 
     /// <summary>Stores the active filter chain for use in subsequent load and reapply calls.</summary>
@@ -114,7 +108,7 @@ public class FileListViewModel : ViewModelBase
                 directoryNode.Files.Add(file);
         }
 
-        _files = directoryNode.Files.ToList();
+        _files = [.. directoryNode.Files];
 
         // Apply current chain to the freshly loaded file set.
         if (_chain is not null && _files.Count > 0)
@@ -129,8 +123,6 @@ public class FileListViewModel : ViewModelBase
     {
         VisibleFiles = _showFilteredFiles
             ? _files
-            : (IReadOnlyList<FileSystemNode>)_files
-                .Where(f => f.FilterResult == FilterResult.Included)
-                .ToList();
+            : [.. _files.Where(f => f.FilterResult == FilterResult.Included)];
     }
 }

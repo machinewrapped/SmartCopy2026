@@ -12,14 +12,9 @@ namespace SmartCopy.UI.ViewModels;
 /// Wraps a live <see cref="IFilter"/> instance and exposes observable properties
 /// for binding to a filter card in <see cref="Views.FilterChainView"/>.
 /// </summary>
-public partial class FilterViewModel : ViewModelBase
+public partial class FilterViewModel(IFilter filter) : ViewModelBase
 {
-    private IFilter _backingFilter;
-
-    public FilterViewModel(IFilter filter)
-    {
-        _backingFilter = filter;
-    }
+    private IFilter _backingFilter = filter;
 
     /// <summary>The underlying filter instance.</summary>
     public IFilter BackingFilter => _backingFilter;
@@ -86,7 +81,7 @@ public partial class FilterViewModel : ViewModelBase
 
 public partial class FilterChainViewModel : ViewModelBase
 {
-    public ObservableCollection<FilterViewModel> Filters { get; } = new();
+    public ObservableCollection<FilterViewModel> Filters { get; } = [];
 
     /// <summary>
     /// Pushed by MainViewModel whenever the pipeline's first destination path changes.
@@ -151,7 +146,7 @@ public partial class FilterChainViewModel : ViewModelBase
     /// Called by <see cref="ViewModels.MainViewModel"/> whenever <see cref="ChainChanged"/> fires.
     /// </summary>
     public FilterChain BuildLiveChain()
-        => new FilterChain(Filters.Select(vm => vm.BackingFilter));
+        => new(Filters.Select(vm => vm.BackingFilter));
 
     /// <summary>Adds a new filter card from a freshly-built <see cref="IFilter"/>.</summary>
     public void AddFilterFromResult(IFilter filter)

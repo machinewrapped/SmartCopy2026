@@ -105,8 +105,8 @@ public class FileSystemNode : INotifyPropertyChanged
     public bool IsFilterIncluded => FilterResult == FilterResult.Included;
 
     public FileSystemNode? Parent { get; init; }
-    public ObservableCollection<FileSystemNode> Children { get; } = new();
-    public ObservableCollection<FileSystemNode> Files { get; } = new();
+    public ObservableCollection<FileSystemNode> Children { get; } = [];
+    public ObservableCollection<FileSystemNode> Files { get; } = [];
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -225,10 +225,8 @@ public class FileSystemNode : INotifyPropertyChanged
         }
     }
 
-    private class BatchUpdateScope : IDisposable
+    private class BatchUpdateScope(FileSystemNode node) : IDisposable
     {
-        private readonly FileSystemNode _node;
-        public BatchUpdateScope(FileSystemNode node) => _node = node;
-        public void Dispose() => _node.EndBatchUpdate();
+        public void Dispose() => node.EndBatchUpdate();
     }
 }

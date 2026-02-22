@@ -31,8 +31,10 @@ public partial class MainViewModel : ViewModelBase
         SourcePath = MockMemoryFileSystemFactory.RootPath + "/";
 
         FilterChain = new FilterChainViewModel(presetStore, settings);
-        DirectoryTree = new DirectoryTreeViewModel(_memoryProvider, MockMemoryFileSystemFactory.RootPath);
-        DirectoryTree.ShowFilteredNodesInTree = settings.ShowFilteredNodesInTree;
+        DirectoryTree = new DirectoryTreeViewModel(_memoryProvider, MockMemoryFileSystemFactory.RootPath)
+        {
+            ShowFilteredNodesInTree = settings.ShowFilteredNodesInTree
+        };
 
         FilterChain.VisibilityToggled += (_, isVisible) =>
         {
