@@ -13,7 +13,7 @@ public static class FilterFactory
     {
         var mode = config.Mode == "Include"
             ? FilterMode.Only  // backward compat: old "Include" → Only
-            : Enum.Parse<FilterMode>(config.Mode);
+            : Enum.TryParse<FilterMode>(config.Mode, out var m) ? m : FilterMode.Only;
         var filter = config.FilterType switch
         {
             "Extension"  => BuildExtension(config, mode),

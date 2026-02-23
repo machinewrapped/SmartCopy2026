@@ -53,8 +53,11 @@ public sealed class FilterChain
             postOrderList.Add(node);
 
             var evaluation = await EvaluateNodeAsync(node, comparisonProvider, ct);
-            node.FilterResult = evaluation.IsIncluded ? FilterResult.Included : FilterResult.Excluded;
-            node.ExcludedByFilter = evaluation.IsIncluded ? null : evaluation.ExcludedByFilter;
+            using (node.BeginBatchUpdate())
+            {
+                node.FilterResult = evaluation.IsIncluded ? FilterResult.Included : FilterResult.Excluded;
+                node.ExcludedByFilter = evaluation.IsIncluded ? null : evaluation.ExcludedByFilter;
+            }
 
             for (var i = node.Children.Count - 1; i >= 0; i--)
             {
@@ -66,8 +69,11 @@ public sealed class FilterChain
             foreach (var file in node.Files)
             {
                 var fileEval = await EvaluateNodeAsync(file, comparisonProvider, ct);
-                file.FilterResult = fileEval.IsIncluded ? FilterResult.Included : FilterResult.Excluded;
-                file.ExcludedByFilter = fileEval.IsIncluded ? null : fileEval.ExcludedByFilter;
+                using (file.BeginBatchUpdate())
+                {
+                    file.FilterResult = fileEval.IsIncluded ? FilterResult.Included : FilterResult.Excluded;
+                    file.ExcludedByFilter = fileEval.IsIncluded ? null : fileEval.ExcludedByFilter;
+                }
             }
         }
 
@@ -76,10 +82,9 @@ public sealed class FilterChain
             UpdateDirectoryExclusion(postOrderList[i]);
         }
 
-        foreach (var root in roots)
+        foreach (var parent in roots.Where(r => r.Parent != null).Select(r => r.Parent).Distinct())
         {
-            if (root.Parent != null)
-                RecalculateParentExclusion(root.Parent);
+            RecalculateParentExclusion(parent);
         }
     }
 
@@ -108,15 +113,18 @@ public sealed class FilterChain
         bool hasIncluded = node.Children.Any(c => c.FilterResult == FilterResult.Included) ||
                            node.Files.Any(f => f.FilterResult == FilterResult.Included);
 
-        if (hasIncluded)
+        using (node.BeginBatchUpdate())
         {
-            node.FilterResult = FilterResult.Included;
-            node.ExcludedByFilter = null;
-        }
-        else
-        {
-            node.FilterResult = FilterResult.Excluded;
-            node.ExcludedByFilter = AllChildrenExcluded;
+            if (hasIncluded)
+            {
+                node.FilterResult = FilterResult.Included;
+                node.ExcludedByFilter = null;
+            }
+            else
+            {
+                node.FilterResult = FilterResult.Excluded;
+                node.ExcludedByFilter = AllChildrenExcluded;
+            }
         }
     }
 
@@ -176,7 +184,7 @@ public sealed class FilterChain
                     break;
 
                 case FilterMode.Exclude:
-                    if (matches)
+                    if (inSet && matches)
                     {
                         inSet = false;
                         excludedBy = filter.Name;

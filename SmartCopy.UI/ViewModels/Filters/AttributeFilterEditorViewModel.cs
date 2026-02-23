@@ -27,7 +27,7 @@ public partial class AttributeFilterEditorViewModel : FilterEditorViewModelBase
 
     private FileAttributes BuildAttributes()
     {
-        var attrs = FileAttributes.Normal;
+        var attrs = (FileAttributes)0;
         if (Hidden) attrs |= FileAttributes.Hidden;
         if (ReadOnly) attrs |= FileAttributes.ReadOnly;
         if (System) attrs |= FileAttributes.System;
@@ -53,7 +53,7 @@ public partial class AttributeFilterEditorViewModel : FilterEditorViewModelBase
     public override string GenerateName()
     {
         var prefix = Mode.ToString();
-        var attrs = BuildAttributes() & ~FileAttributes.Normal;
+        var attrs = BuildAttributes();
         return attrs == 0 ? prefix : $"{prefix} {attrs}";
     }
 }
