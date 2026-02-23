@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.Text.Json.Nodes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SmartCopy.Core.Pipeline;
@@ -31,29 +32,32 @@ public enum StepCategory
 public partial class PipelineStepViewModel : ViewModelBase
 {
     private ITransformStep _step;
+    private string _customName = string.Empty;
     private string? _validationMessage;
     private bool _hasValidationError;
 
-    public PipelineStepViewModel(ITransformStep step)
+    public PipelineStepViewModel(ITransformStep step, string? customName = null)
     {
         _step = step;
+        _customName = PipelineStepDisplay.NormalizeCustomName(customName);
     }
 
     public ITransformStep Step => _step;
 
     public StepKind Kind => ToKind(_step.StepType);
 
-    public string Label => Kind switch
-    {
-        StepKind.Copy => "Copy To",
-        StepKind.Move => "Move To",
-        StepKind.Delete => "Delete",
-        StepKind.Flatten => "Flatten",
-        StepKind.Rename => "Rename",
-        StepKind.Rebase => "Rebase",
-        StepKind.Convert => "Convert",
-        _ => _step.StepType,
-    };
+    public string? CustomName => string.IsNullOrWhiteSpace(_customName) ? null : _customName;
+
+    public string AutoSummary => PipelineStepDisplay.GetSummary(_step);
+
+    public string Summary => string.IsNullOrWhiteSpace(_customName)
+        ? AutoSummary
+        : _customName;
+
+    public string Description => PipelineStepDisplay.GetDescription(_step);
+
+    // Keep old names for compatibility with tests and any remaining bindings.
+    public string Label => Summary;
 
     public string Icon => Kind switch
     {
@@ -67,23 +71,10 @@ public partial class PipelineStepViewModel : ViewModelBase
         _ => "?",
     };
 
-    public string Details => _step switch
-    {
-        CopyStep copyStep => string.IsNullOrWhiteSpace(copyStep.DestinationPath)
-            ? "Destination required"
-            : copyStep.DestinationPath,
-        MoveStep moveStep => string.IsNullOrWhiteSpace(moveStep.DestinationPath)
-            ? "Destination required"
-            : moveStep.DestinationPath,
-        DeleteStep deleteStep => deleteStep.Mode == DeleteMode.Permanent ? "⚠ Permanent" : "Trash",
-        FlattenStep flattenStep => $"Conflict: {flattenStep.ConflictStrategy}",
-        RenameStep renameStep => $"Pattern: {renameStep.Pattern}",
-        RebaseStep rebaseStep => $"Strip '{rebaseStep.StripPrefix}' Add '{rebaseStep.AddPrefix}'",
-        ConvertStep convertStep => string.IsNullOrWhiteSpace(convertStep.OutputExtension)
-            ? "Convert"
-            : $"Convert to .{convertStep.OutputExtension}",
-        _ => _step.StepType,
-    };
+    // Keep old names for compatibility with tests and any remaining bindings.
+    public string Details => Description;
+
+    public bool HasDescription => !string.IsNullOrWhiteSpace(Description);
 
     public bool HasDestination => _step is CopyStep or MoveStep;
 
@@ -114,19 +105,26 @@ public partial class PipelineStepViewModel : ViewModelBase
             if (changed)
             {
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(AutoSummary));
+                OnPropertyChanged(nameof(Summary));
+                OnPropertyChanged(nameof(Label));
                 OnPropertyChanged(nameof(Details));
+                OnPropertyChanged(nameof(Description));
+                OnPropertyChanged(nameof(HasDescription));
+                OnPropertyChanged(nameof(ShowDeleteBadge));
+                OnPropertyChanged(nameof(DeleteBadge));
                 StepChanged?.Invoke(this, EventArgs.Empty);
             }
         }
     }
 
-    public bool ShowDeleteBadge => _step is DeleteStep;
+    public bool ShowDeleteBadge => _step is DeleteStep { Mode: DeleteMode.Permanent };
 
     public bool IsPermanentDelete => _step is DeleteStep { Mode: DeleteMode.Permanent };
 
     public string? DeleteBadge =>
         _step is DeleteStep deleteStep
-            ? deleteStep.Mode == DeleteMode.Permanent ? "⚠ Permanent" : "Trash"
+            ? deleteStep.Mode == DeleteMode.Permanent ? "⚠ Permanent delete" : null
             : null;
 
     public string? ValidationMessage
@@ -143,14 +141,20 @@ public partial class PipelineStepViewModel : ViewModelBase
 
     public event EventHandler? StepChanged;
 
-    public void ReplaceStep(ITransformStep newStep)
+    public void ReplaceStep(ITransformStep newStep, string? customName = null)
     {
         _step = newStep;
+        _customName = PipelineStepDisplay.NormalizeCustomName(customName);
         OnPropertyChanged(nameof(Step));
         OnPropertyChanged(nameof(Kind));
+        OnPropertyChanged(nameof(CustomName));
+        OnPropertyChanged(nameof(AutoSummary));
+        OnPropertyChanged(nameof(Summary));
         OnPropertyChanged(nameof(Label));
         OnPropertyChanged(nameof(Icon));
         OnPropertyChanged(nameof(Details));
+        OnPropertyChanged(nameof(Description));
+        OnPropertyChanged(nameof(HasDescription));
         OnPropertyChanged(nameof(HasDestination));
         OnPropertyChanged(nameof(DestinationPath));
         OnPropertyChanged(nameof(ShowDeleteBadge));
@@ -177,6 +181,7 @@ public partial class PipelineStepViewModel : ViewModelBase
 
 public partial class PipelineViewModel : ViewModelBase
 {
+    private const string CustomNameParameter = "customName";
     private readonly PipelinePresetStore _presetStore;
     private readonly PipelineValidator _validator;
     private readonly string? _presetDirectory;
@@ -233,16 +238,16 @@ public partial class PipelineViewModel : ViewModelBase
         return new TransformPipeline(Steps.Select(step => step.Step));
     }
 
-    public void AddStepFromResult(StepKind kind, ITransformStep step)
+    public void AddStepFromResult(StepKind kind, ITransformStep step, string? customName = null)
     {
         _ = kind;
-        Steps.Add(new PipelineStepViewModel(step));
+        Steps.Add(new PipelineStepViewModel(step, customName));
         Revalidate();
     }
 
-    public void ReplaceStep(PipelineStepViewModel existing, ITransformStep replacement)
+    public void ReplaceStep(PipelineStepViewModel existing, ITransformStep replacement, string? customName = null)
     {
-        existing.ReplaceStep(replacement);
+        existing.ReplaceStep(replacement, customName);
         Revalidate();
     }
 
@@ -251,7 +256,8 @@ public partial class PipelineViewModel : ViewModelBase
         Steps.Clear();
         foreach (var configStep in preset.Config.Steps)
         {
-            Steps.Add(new PipelineStepViewModel(PipelineStepFactory.FromConfig(configStep)));
+            var customName = GetOptionalParameter(configStep, CustomNameParameter);
+            Steps.Add(new PipelineStepViewModel(PipelineStepFactory.FromConfig(configStep), customName));
         }
 
         Revalidate();
@@ -436,9 +442,31 @@ public partial class PipelineViewModel : ViewModelBase
         return new PipelineConfig(
             Name: name,
             Description: null,
-            Steps: Steps.Select(step => step.Step.Config).ToList(),
+            Steps: Steps.Select(BuildConfigWithUiMetadata).ToList(),
             OverwriteMode: OverwriteMode.IfNewer.ToString(),
             DeleteMode: DeleteMode.Trash.ToString());
+    }
+
+    private static TransformStepConfig BuildConfigWithUiMetadata(PipelineStepViewModel stepViewModel)
+    {
+        var baseConfig = stepViewModel.Step.Config;
+        var parameters = baseConfig.Parameters.DeepClone() as JsonObject ?? new JsonObject();
+        if (string.IsNullOrWhiteSpace(stepViewModel.CustomName))
+        {
+            parameters.Remove(CustomNameParameter);
+        }
+        else
+        {
+            parameters[CustomNameParameter] = stepViewModel.CustomName;
+        }
+
+        return new TransformStepConfig(baseConfig.StepType, parameters);
+    }
+
+    private static string? GetOptionalParameter(TransformStepConfig config, string name)
+    {
+        var value = config.Parameters[name]?.GetValue<string>()?.Trim();
+        return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 
     private static ITransformStep CreateDefaultStep(StepKind kind)

@@ -59,7 +59,7 @@ public partial class PipelineView : UserControl
         var result = await dialog.ShowDialog<bool?>(parentWindow);
         if (result == true && vm.ResultStep is not null)
         {
-            _currentViewModel.AddStepFromResult(kind, vm.ResultStep);
+            _currentViewModel.AddStepFromResult(kind, vm.ResultStep, vm.ResultCustomName);
         }
     }
 
@@ -75,7 +75,7 @@ public partial class PipelineView : UserControl
         var result = await dialog.ShowDialog<bool?>(parentWindow);
         if (result == true && vm.ResultStep is not null)
         {
-            _currentViewModel.ReplaceStep(step, vm.ResultStep);
+            _currentViewModel.ReplaceStep(step, vm.ResultStep, vm.ResultCustomName);
         }
     }
 

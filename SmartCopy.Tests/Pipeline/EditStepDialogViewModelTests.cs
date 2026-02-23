@@ -66,4 +66,31 @@ public sealed class EditStepDialogViewModelTests
         var result = Assert.IsType<FlattenStep>(vm.ResultStep);
         Assert.Equal(FlattenConflictStrategy.Overwrite, result.ConflictStrategy);
     }
+
+    [Fact]
+    public void StepName_UnchangedAutoValue_DoesNotCreateCustomOverride()
+    {
+        var vm = EditStepDialogViewModel.ForNew(StepKind.Copy);
+        var editor = (CopyStepEditorViewModel)vm.Editor;
+        editor.DestinationPath = "/mem/out";
+        var autoName = vm.StepName;
+
+        vm.OkCommand.Execute(null);
+
+        Assert.Equal(autoName, vm.StepName);
+        Assert.Null(vm.ResultCustomName);
+    }
+
+    [Fact]
+    public void StepName_CustomValue_IsReturnedAsOverride()
+    {
+        var vm = EditStepDialogViewModel.ForNew(StepKind.Copy);
+        var editor = (CopyStepEditorViewModel)vm.Editor;
+        editor.DestinationPath = "/mem/out";
+        vm.StepName = "Backup Music";
+
+        vm.OkCommand.Execute(null);
+
+        Assert.Equal("Backup Music", vm.ResultCustomName);
+    }
 }

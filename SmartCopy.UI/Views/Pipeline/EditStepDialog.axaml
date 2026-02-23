@@ -13,6 +13,12 @@
     <StackPanel Spacing="12" Margin="20">
         <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="#4facfe" />
 
+        <StackPanel Spacing="4">
+            <TextBlock Text="Name" FontSize="12" Opacity="0.7" />
+            <TextBox Text="{Binding StepName}"
+                     Watermark="Auto-generated from parameters" />
+        </StackPanel>
+
         <Border BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="4" Padding="10">
             <ContentControl Content="{Binding Editor}">
                 <ContentControl.DataTemplates>

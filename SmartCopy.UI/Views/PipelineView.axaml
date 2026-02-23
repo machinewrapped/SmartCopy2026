@@ -91,8 +91,8 @@
                                     <Border BorderBrush="#3e3e42" BorderThickness="1"
                                             CornerRadius="4" Padding="10,6"
                                             Background="#333333"
-                                            MinWidth="90">
-                                        <Grid RowDefinitions="Auto, Auto, Auto, Auto">
+                                            MinWidth="140">
+                                        <Grid RowDefinitions="Auto, Auto, Auto">
                                             <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto, Auto">
                                                 <TextBlock Grid.Column="0"
                                                            Text="{Binding Icon}"
@@ -100,8 +100,9 @@
                                                            VerticalAlignment="Center"
                                                            Margin="0,0,6,0" />
                                                 <TextBlock Grid.Column="1"
-                                                           Text="{Binding Label}"
+                                                           Text="{Binding Summary}"
                                                            FontWeight="Medium"
+                                                           TextWrapping="Wrap"
                                                            VerticalAlignment="Center" />
                                                 <Button Grid.Column="2"
                                                         Content="✎"
@@ -133,51 +134,29 @@
                                             </Grid>
 
                                             <TextBlock Grid.Row="1"
-                                                       Text="{Binding Details}"
+                                                       IsVisible="{Binding HasDescription}"
+                                                       Text="{Binding Description}"
                                                        FontSize="10"
                                                        Opacity="0.55"
                                                        TextWrapping="Wrap"
                                                        Margin="0,3,0,0" />
 
-                                            <Grid Grid.Row="2"
-                                                  ColumnDefinitions="*, Auto"
-                                                  IsVisible="{Binding HasDestination}"
-                                                  Margin="0,4,0,0">
-                                                <TextBox Grid.Column="0"
-                                                         Text="{Binding DestinationPath}"
-                                                         Watermark="Destination path..."
-                                                         FontSize="11"
-                                                         Background="#2a2a2a"
-                                                         CornerRadius="3"
-                                                         Padding="4,2"
-                                                         MinWidth="160" />
-                                                <Button Grid.Column="1"
-                                                        Content="📁"
-                                                        FontSize="11"
-                                                        Padding="4,2"
-                                                        Margin="4,0,0,0"
+                                            <StackPanel Grid.Row="2" Spacing="4" Margin="0,4,0,0">
+                                                <Border IsVisible="{Binding ShowDeleteBadge}"
+                                                        Background="#3b3b3b"
                                                         CornerRadius="3"
-                                                        ToolTip.Tip="Browse for destination" />
-                                            </Grid>
+                                                        Padding="4,2">
+                                                    <TextBlock Text="{Binding DeleteBadge}"
+                                                               Foreground="#f0ad4e"
+                                                               FontSize="10" />
+                                                </Border>
 
-                                            <Border Grid.Row="3"
-                                                    IsVisible="{Binding ShowDeleteBadge}"
-                                                    Background="#3b3b3b"
-                                                    CornerRadius="3"
-                                                    Margin="0,4,0,0"
-                                                    Padding="4,2">
-                                                <TextBlock Text="{Binding DeleteBadge}"
+                                                <TextBlock IsVisible="{Binding HasValidationError}"
+                                                           Text="{Binding ValidationMessage}"
                                                            Foreground="#f0ad4e"
-                                                           FontSize="10" />
-                                            </Border>
-
-                                            <TextBlock Grid.Row="3"
-                                                       IsVisible="{Binding HasValidationError}"
-                                                       Text="{Binding ValidationMessage}"
-                                                       Foreground="#f0ad4e"
-                                                       FontSize="10"
-                                                       Margin="0,4,0,0"
-                                                       TextWrapping="Wrap" />
+                                                           FontSize="10"
+                                                           TextWrapping="Wrap" />
+                                            </StackPanel>
                                         </Grid>
                                     </Border>
 

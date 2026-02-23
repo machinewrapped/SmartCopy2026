@@ -291,6 +291,8 @@ Phase 1 implementation notes:
   construction and blocked by validation (`Step.MissingDestination`).
 - `DeleteStep` carries per-step `Mode` (`Trash`/`Permanent`) in config.
 - `FlattenStep` carries `ConflictStrategy` in config (`AutoRenameCounter` baseline default).
+- Pipeline UI metadata may add optional step-level `customName` inside `TransformStepConfig.Parameters`
+  for preset round-tripping. Core step factories ignore unknown parameter keys.
 - `TransformResult` includes `SourcePath` so operation journal entries can include both source and
   destination values.
 - Standard presets are loaded from `PipelinePresetStore`:
@@ -944,29 +946,31 @@ The dialog dispatches to a type-specific editor view via `ContentControl` + `Dat
 
 #### Pipeline Step Card Anatomy
 
-Each step in the pipeline strip is a card connected by `→` arrows. Two representative shapes:
+Each step in the pipeline strip is a card connected by `→` arrows. Cards follow the same
+summary/subtitle pattern as filter cards:
 
 ```
 ┌──────────────────────────────────────────────────┐
-│ ⊞ Flatten                              ✎  ✕    │
-│   Strip directory structure                      │
+│ → Copy to Mirror                        ✎  ✕    │
+│   Destination: /mem/Mirror                      │
 └──────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────┐
-│ → Copy To                              ✎  ✕    │
-│   [/mnt/phone/Music              📁]            │
+│ 🗑 Delete permanently                   ✎  ✕    │
+│   This cannot be undone.                        │
+│   ⚠ Permanent delete                           │
 └──────────────────────────────────────────────────┘
 ```
 
-- **Icon + name** (top-left) — step type icon and human-readable name
-- **Summary or inline input** — path steps show a one-line description; executable steps (Copy/Move)
-  show an inline destination `TextBox` with `📁` browse button directly on the card face
+- **Icon + summary** (top-left) — icon plus human-readable summary; auto-generated from step parameters
+  unless user overrides it in `EditStepDialog`
+- **Technical subtitle** — compact detail line (for example destination path, pattern, strategy)
 - **Edit pencil** `✎` — opens `EditStepDialog` for full configuration (overwrite mode,
   conflict strategy, rename pattern, etc.)
 - **Remove** `✕` — removes the step; pipeline revalidates after each removal
 
-`DeleteStep` cards show a `🗑` icon and a badge: `Trash` (default) or `⚠ Permanent` when
-`DeleteMode.Permanent` is active. The badge is styled in amber to draw attention.
+`DeleteStep` cards are intentionally quiet for `Trash` mode (single-line summary, no extra badge).
+When `DeleteMode.Permanent` is active, the card shows an amber warning badge.
 
 #### Add Step — Two-Level Drill-Down
 
@@ -1025,11 +1029,8 @@ click-outside). Two panels swapped by an `IsLevel2Visible` flag — no secondary
 └────────────────────────────────┘
 ```
 
-Clicking a step type:
-- **Flatten** and **Delete** — added immediately with default configuration; no dialog opened.
-  `DeleteStep` shows the safety badge on the card face immediately.
-- **Copy To**, **Move To**, **Rebase**, **Rename**, **Convert** — `EditStepDialog` opens to
-  capture required configuration before the step is added.
+Clicking a step type opens `EditStepDialog` to capture configuration before the step is added.
+This includes optional custom step naming in the same interaction.
 - `←` returns to Level 1.
 
 **Execution eligibility rule:** A pipeline may contain zero or more executable steps.
@@ -1048,12 +1049,15 @@ saved and loaded via the `[Load Preset ▾]` button, not per-step presets.
 #### EditStepDialog
 
 A **modal `Window`** (`ShowDialog<bool?>`) opened by `✎` on any step card, or automatically
-when adding a step type that requires configuration. Dispatches to a type-specific editor via
+when adding a step type. Dispatches to a type-specific editor via
 `ContentControl` + `DataTemplate`.
 
 ```
 ┌─────────────────────────────────────────┐
 │  Edit Step: Copy To                     │
+├─────────────────────────────────────────┤
+│  Name: [Copy to Mirror              ]   │
+│       (auto-generated, overridable)     │
 ├─────────────────────────────────────────┤
 │  ┌── type-specific form ──────────────┐ │
 │  │                                    │ │
@@ -1103,6 +1107,7 @@ OK is disabled when:
 
 `EditStepDialog` does not have a "Save as preset" flag (unlike `EditFilterDialog`). Full
 pipeline saving is handled by the `[Load Preset ▾]` → "✎ Save current pipeline..." path.
+If the entered step name matches the auto-generated name, no custom-name override is persisted.
 
 #### Load Preset ▾ / Save Pipeline
 
@@ -1221,6 +1226,8 @@ run button is disabled until an executable step is added.
 - `ForEdit(PipelineStepViewModel existing)` — pre-populates form from existing step config
 - `ITransformStep BuildStep()` — produces the Core step instance on OK
 - `bool IsValid` — gates the OK button per type-specific rules above
+- `StepName` — auto-generated from editor parameters, with user override support
+- `ResultCustomName` — nullable override persisted only when different from auto-generated name
 
 **`PipelineValidation` (Core + UI contract):**
 - `PipelineValidator.Validate(IReadOnlyList<ITransformStep>) -> PipelineValidationResult`
@@ -1253,6 +1260,7 @@ run button is disabled until an executable step is added.
 2. **Proper tri-state tree checkboxes** — `▣` for indeterminate
 3. **Filter chain is visual** — each filter is a card; drag to reorder; toggle without removing
 4. **Pipeline is visual** — steps shown as an arrow chain; presets as buttons
+   and cards use human-readable summary + technical subtitle formatting
 5. **Three-column layout** — Filters | Folders | Files in a single resizable row; all three columns
    have draggable splitters; column widths are persisted across sessions
 6. **Filter cards are human-friendly** — each card shows a readable summary ("Only .mp3 and .flac
@@ -1271,7 +1279,7 @@ run button is disabled until an executable step is added.
 
 All critical actions must be keyboard-accessible from the initial shell:
 - **Tab** cycles between the source field, tree, file list, filter chain, pipeline steps
-  (including inline destination fields on Copy/Move step cards), and action buttons
+  and action buttons
 - **Arrow keys** navigate the tree and file list
 - **Space** toggles checkbox on the focused tree node or file list row
 - **Enter** expands/collapses a tree node
@@ -1301,7 +1309,7 @@ Shell checklist:
 - [x] Pipeline area: horizontal scrollable step chain with → connectors; Load Preset ▾ menu
       (Standard: Copy/Move/Delete presets; My Pipelines; Save current pipeline); + Add step flyout
       (Path / Content / Executable step categories); Run and Preview buttons stacked on the right;
-      Copy/Move step cards show inline destination path TextBox + stub 📁 Browse button
+      step cards show summary + technical subtitle and edit/remove actions
 - [x] Status bar: placeholder text (file count, size, filtered count, progress bar, time remaining, current file)
 - [x] Window size, position, maximised state, and all three column widths persisted to
       `%LOCALAPPDATA%/SmartCopy2026/window.json`; restored on next open with off-screen safety guard
@@ -1393,6 +1401,7 @@ property. This allows a single pipeline to contain multiple Copy/Move steps writ
 different locations.
 
 Additional step parameter keys used in Phase 1:
+- `UI metadata`: `{ "customName": "My user-facing step label" }` (optional; persisted by UI only)
 - `Delete`: `{ "deleteMode": "Trash" | "Permanent" }`
 - `Flatten`: `{ "conflictStrategy": "AutoRenameCounter" | "AutoRenameSourcePath" | "Skip" | "Overwrite" }`
 - `Rename`: `{ "pattern": "{name}_..." }`

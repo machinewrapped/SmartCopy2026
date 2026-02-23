@@ -1,3 +1,5 @@
+using System.Text.Json.Nodes;
+using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.UI.ViewModels;
 
@@ -79,5 +81,48 @@ public sealed class PipelineViewModelTests
         Assert.False(string.IsNullOrWhiteSpace(vm.BlockingValidationMessage));
         Assert.True(vm.Steps[0].HasValidationError);
         Assert.False(string.IsNullOrWhiteSpace(vm.Steps[0].ValidationMessage));
+    }
+
+    [Fact]
+    public void AddStep_CustomName_OverridesAutoSummary()
+    {
+        var vm = new PipelineViewModel();
+
+        vm.AddStepFromResult(StepKind.Copy, new CopyStep("/mem/out"), "Music Mirror");
+
+        Assert.Equal("Music Mirror", vm.Steps[0].Summary);
+        Assert.Equal("Music Mirror", vm.Steps[0].CustomName);
+    }
+
+    [Fact]
+    public void LoadPreset_ReadsCustomNameMetadata()
+    {
+        var vm = new PipelineViewModel();
+        var preset = new PipelinePreset
+        {
+            Name = "Named step",
+            IsBuiltIn = false,
+            Config = new PipelineConfig(
+                Name: "Named step",
+                Description: null,
+                Steps:
+                [
+                    new TransformStepConfig(
+                        "Copy",
+                        new JsonObject
+                        {
+                            ["destinationPath"] = "/mem/out",
+                            ["customName"] = "Audio Backup",
+                        }),
+                ],
+                OverwriteMode: OverwriteMode.IfNewer.ToString(),
+                DeleteMode: DeleteMode.Trash.ToString()),
+        };
+
+        vm.LoadPreset(preset);
+
+        Assert.Single(vm.Steps);
+        Assert.Equal("Audio Backup", vm.Steps[0].Summary);
+        Assert.Equal("Audio Backup", vm.Steps[0].CustomName);
     }
 }
