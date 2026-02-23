@@ -20,22 +20,41 @@
                 <MenuItem Header="_File">
                     <MenuItem Header="_Quit" />
                 </MenuItem>
-                <MenuItem Header="_Edit" />
+                <MenuItem Header="_Settings" />
                 <MenuItem Header="F_ilters" />
                 <MenuItem Header="_Pipeline" />
-                <MenuItem Header="_Tools" />
                 <MenuItem Header="_Help" />
             </Menu>
         </Border>
 
         <!-- Source Field -->
         <Border Grid.Row="1" Background="#252526" BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="6" Margin="10,10,10,5" Padding="10">
-            <Grid ColumnDefinitions="Auto, *, Auto">
+            <Grid ColumnDefinitions="Auto, *, Auto, Auto">
                 <TextBlock Grid.Column="0" Text="Source" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold"/>
-                <ComboBox Grid.Column="1" Margin="0,0,5,0" HorizontalAlignment="Stretch" CornerRadius="4">
-                    <ComboBoxItem Content="{Binding SourcePath}" IsSelected="True" />
+                <ComboBox Grid.Column="1"
+                          IsEditable="True"
+                          ItemsSource="{Binding SourceBookmarks}"
+                          SelectedItem="{Binding SelectedSourceBookmark, Mode=TwoWay}"
+                          Text="{Binding SourcePath, Mode=TwoWay}"
+                          Margin="0,0,5,0"
+                          HorizontalAlignment="Stretch"
+                          CornerRadius="4">
+                    <ComboBox.KeyBindings>
+                        <KeyBinding Gesture="Enter" Command="{Binding ApplySourcePathCommand}"/>
+                        <KeyBinding Gesture="Escape" Command="{Binding RevertSourcePathCommand}"/>
+                    </ComboBox.KeyBindings>
                 </ComboBox>
-                <Button Grid.Column="2" Content="📁 Browse" CornerRadius="4"/>
+                <Button Grid.Column="2"
+                        Content="★"
+                        Command="{Binding BookmarkCurrentPathCommand}"
+                        ToolTip.Tip="Bookmark this path"
+                        CornerRadius="4"
+                        Margin="0,0,5,0"/>
+                <Button Grid.Column="3"
+                        Content="📁 Browse"
+                        IsEnabled="False"
+                        CornerRadius="4"
+                        ToolTip.Tip="Browse (Phase 2)"/>
             </Grid>
         </Border>
 

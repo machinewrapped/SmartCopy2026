@@ -34,8 +34,8 @@ internal static class MockMemoryFileSystemFactory
                 var lastSlash = path.LastIndexOf('/');
                 if (lastSlash > 0)
                 {
-                    var dir = path.Substring(0, lastSlash);
-                    var parts = dir.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+                    var dir = path[..lastSlash];
+                    var parts = dir.Split('/', StringSplitOptions.RemoveEmptyEntries);
                     var currentDir = "";
                     foreach (var part in parts)
                     {
@@ -48,7 +48,7 @@ internal static class MockMemoryFileSystemFactory
                 }
 
                 int dotIndex = line.LastIndexOf('.');
-                var ext = dotIndex >= 0 ? line.Substring(dotIndex + 1).ToLowerInvariant() : "";
+                var ext = dotIndex >= 0 ? line[(dotIndex + 1)..].ToLowerInvariant() : "";
                 
                 long fakeSize = ext switch
                 {
