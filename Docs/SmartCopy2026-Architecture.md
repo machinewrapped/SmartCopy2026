@@ -153,6 +153,11 @@ public interface IFileSystemProvider
     Task MoveAsync(string sourcePath, string destPath, CancellationToken ct);
     Task CreateDirectoryAsync(string path, CancellationToken ct);
     Task<bool> ExistsAsync(string path, CancellationToken ct);
+
+    // Combines a base path with a relative fragment using this provider's own path conventions.
+    // Needed because MemoryFileSystemProvider uses virtual Unix-style paths while
+    // LocalFileSystemProvider uses OS-native paths; callers must not use OS Path.* APIs directly.
+    string CombinePath(string basePath, string relativePath);
 }
 
 public record ProviderCapabilities(
@@ -555,7 +560,7 @@ The include/exclude behavior is governed by the chain-level `FilterMode` (`Only`
 
 Implementation notes (current code path):
 - If `comparisonProvider` is null, mirror matching returns `false`
-- `comparePath` is built with `PathHelper.CombineForProvider(ComparisonPath, node.RelativePath)`
+- `comparePath` is built with `comparisonProvider.CombinePath(ComparisonPath, node.RelativePath)` — uses the provider's own path conventions to avoid OS `Path.GetFullPath` mangling virtual paths on Windows
 - If counterpart does not exist, returns `false`
 - Directories are treated as matched when counterpart exists
 - For `NameAndSize`, file match additionally checks target node `Size`

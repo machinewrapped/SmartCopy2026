@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
@@ -43,7 +42,7 @@ public sealed class MirrorFilter : FilterBase
             return false;
         }
 
-        var comparePath = PathHelper.CombineForProvider(ComparisonPath, node.RelativePath);
+        var comparePath = comparisonProvider.CombinePath(ComparisonPath, node.RelativePath);
         var exists = await comparisonProvider.ExistsAsync(comparePath, ct);
         if (!exists)
         {

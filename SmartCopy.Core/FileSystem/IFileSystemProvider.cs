@@ -19,5 +19,10 @@ public interface IFileSystemProvider
     Task MoveAsync(string sourcePath, string destPath, CancellationToken ct);
     Task CreateDirectoryAsync(string path, CancellationToken ct);
     Task<bool> ExistsAsync(string path, CancellationToken ct);
+
+    /// <summary>
+    /// Combines a base path with a relative path fragment using this provider's path conventions.
+    /// </summary>
+    string CombinePath(string basePath, string relativePath);
 }
 

@@ -230,6 +230,13 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         return Task.FromResult(_entries.ContainsKey(normalizedPath));
     }
 
+    public string CombinePath(string basePath, string relativePath)
+    {
+        if (string.IsNullOrEmpty(relativePath))
+            return Normalize(basePath);
+        return Normalize(basePath.TrimEnd('/') + "/" + relativePath.Replace('\\', '/'));
+    }
+
     public void SeedDirectory(string path)
     {
         var normalizedPath = Normalize(path);

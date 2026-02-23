@@ -197,6 +197,9 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         }, ct);
     }
 
+    public string CombinePath(string basePath, string relativePath)
+        => PathHelper.CombineForProvider(basePath, relativePath);
+
     private string Resolve(string path)
     {
         if (string.IsNullOrWhiteSpace(path))
