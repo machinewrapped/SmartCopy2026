@@ -27,20 +27,20 @@ public partial class DateRangeFilterEditorViewModel : FilterEditorViewModelBase
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsValid))]
-    private DateTimeOffset? _minDate;
+    private DateTime? _minDate;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsValid))]
-    private DateTimeOffset? _maxDate;
+    private DateTime? _maxDate;
 
     partial void OnFieldChanged(DateField value) => AutoUpdateName();
-    partial void OnMinDateChanged(DateTimeOffset? value) => AutoUpdateName();
-    partial void OnMaxDateChanged(DateTimeOffset? value) => AutoUpdateName();
+    partial void OnMinDateChanged(DateTime? value) => AutoUpdateName();
+    partial void OnMaxDateChanged(DateTime? value) => AutoUpdateName();
 
     public override bool IsValid => MinDate.HasValue || MaxDate.HasValue;
 
     public override IFilter BuildFilter()
-        => new DateRangeFilter(Field, MinDate?.DateTime, MaxDate?.DateTime, Mode);
+        => new DateRangeFilter(Field, MinDate, MaxDate, Mode);
 
     public override void LoadFrom(IFilter filter)
     {
@@ -51,8 +51,8 @@ public partial class DateRangeFilterEditorViewModel : FilterEditorViewModelBase
 
         Mode = dr.Mode;
         Field = dr.Field;
-        MinDate = dr.Min.HasValue ? new DateTimeOffset(dr.Min.Value) : null;
-        MaxDate = dr.Max.HasValue ? new DateTimeOffset(dr.Max.Value) : null;
+        MinDate = dr.Min;
+        MaxDate = dr.Max;
         FilterName = dr.CustomName ?? string.Empty;
     }
 
