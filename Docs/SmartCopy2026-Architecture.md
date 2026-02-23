@@ -851,6 +851,287 @@ The dialog dispatches to a type-specific editor view via `ContentControl` + `Dat
 - Drag handle `≡` on filter cards reorders the chain (Avalonia `DragDrop`); order affects
   chain evaluation sequence
 
+### Pipeline UX Flow
+
+#### Pipeline Step Card Anatomy
+
+Each step in the pipeline strip is a card connected by `→` arrows. Two representative shapes:
+
+```
+┌──────────────────────────────────────────────────┐
+│ ⊞ Flatten                              ✎  ✕    │
+│   Strip directory structure                      │
+└──────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────┐
+│ → Copy To                              ✎  ✕    │
+│   [/mnt/phone/Music              📁]            │
+└──────────────────────────────────────────────────┘
+```
+
+- **Icon + name** (top-left) — step type icon and human-readable name
+- **Summary or inline input** — path steps show a one-line description; terminal steps (Copy/Move)
+  show an inline destination `TextBox` with `📁` browse button directly on the card face
+- **Edit pencil** `✎` — opens `EditStepDialog` for full configuration (overwrite mode,
+  conflict strategy, rename pattern, etc.)
+- **Remove** `✕` — removes the step; pipeline revalidates after each removal
+
+`DeleteStep` cards show a `🗑` icon and a badge: `Trash` (default) or `⚠ Permanent` when
+`DeleteMode.Permanent` is active. The badge is styled in amber to draw attention.
+
+#### Add Step — Two-Level Drill-Down
+
+Clicking `+ Add step` opens a **`Popup`** anchored below the button (light-dismiss on
+click-outside). Two panels swapped by an `IsLevel2Visible` flag — no secondary window.
+
+**Level 1 — Category selection:**
+```
+┌────────────────────────────────┐
+│  Add Step                      │
+├────────────────────────────────┤
+│  Path steps                    │
+│    Modify the output path      │
+├────────────────────────────────┤
+│  Content steps                 │
+│    Transform file contents     │
+├────────────────────────────────┤
+│  Terminal steps                │
+│    Write or delete the file    │
+└────────────────────────────────┘
+```
+
+**Level 2 — Path steps:**
+```
+┌────────────────────────────────┐
+│  ← Path steps                  │
+├────────────────────────────────┤
+│  Flatten   Strip directory     │
+│            structure           │
+│  Rebase    Add / remove path   │
+│            levels              │
+│  Rename    Token-based name    │
+│            pattern             │
+└────────────────────────────────┘
+```
+
+**Level 2 — Content steps:**
+```
+┌────────────────────────────────┐
+│  ← Content steps               │
+├────────────────────────────────┤
+│  Convert   Change file format  │
+│            (requires plugin)   │
+└────────────────────────────────┘
+```
+
+**Level 2 — Terminal steps:**
+```
+┌────────────────────────────────┐
+│  ← Terminal steps              │
+├────────────────────────────────┤
+│  Copy To   Copy to destination │
+│  Move To   Move to destination │
+│  Delete    Remove source file  │
+│            ⚠ requires preview  │
+└────────────────────────────────┘
+```
+
+Clicking a step type:
+- **Flatten** and **Delete** — added immediately with default configuration; no dialog opened.
+  `DeleteStep` shows the safety badge on the card face immediately.
+- **Copy To**, **Move To**, **Rebase**, **Rename**, **Convert** — `EditStepDialog` opens to
+  capture required configuration before the step is added.
+- `←` returns to Level 1.
+
+**One terminal step rule:** A pipeline may only contain one terminal step. If a terminal step
+already exists when the user picks a new one, a tooltip-notification confirms the replacement
+before the old step is removed.
+
+The Add Step flyout has no preset layer (unlike Add Filter). Full pipeline configurations are
+saved and loaded via the `[Load Preset ▾]` button, not per-step presets.
+
+#### EditStepDialog
+
+A **modal `Window`** (`ShowDialog<bool?>`) opened by `✎` on any step card, or automatically
+when adding a step type that requires configuration. Dispatches to a type-specific editor via
+`ContentControl` + `DataTemplate`.
+
+```
+┌─────────────────────────────────────────┐
+│  Edit Step: Copy To                     │
+├─────────────────────────────────────────┤
+│  ┌── type-specific form ──────────────┐ │
+│  │                                    │ │
+│  │  [Copy To / Move To]               │ │
+│  │  Destination:                      │ │
+│  │  [/mnt/phone/Music          ][…]   │ │
+│  │                                    │ │
+│  │  Overwrite:                        │ │
+│  │  ○ Skip  ● If Newer  ○ Always      │ │
+│  │                                    │ │
+│  │  [Flatten]                         │ │
+│  │  Conflict strategy:                │ │
+│  │  ● Auto-rename  (song (2).mp3)     │ │
+│  │  ○ Prefix source path              │ │
+│  │  ○ Skip conflicting files          │ │
+│  │  ○ Overwrite silently              │ │
+│  │                                    │ │
+│  │  [Rename]                          │ │
+│  │  Pattern: [{name}              ]   │ │
+│  │  Tokens:  {name} {ext} {date}      │ │
+│  │           {artist} {album}         │ │
+│  │           {track:00} {title}       │ │
+│  │  Preview: [artist - title.mp3   ]  │ │
+│  │                                    │ │
+│  │  [Delete]                          │ │
+│  │  ● Send to Recycle Bin (safe)      │ │
+│  │  ○ Delete permanently  ⚠          │ │
+│  │                                    │ │
+│  │  [Rebase]                          │ │
+│  │  Strip prefix: [Music/          ]  │ │
+│  │  Add prefix:   [Archive/        ]  │ │
+│  │                                    │ │
+│  │  [Convert]  (Phase 4)              │ │
+│  │  Output format: [mp3 ▾]            │ │
+│  │  Quality:       [320k ▾]           │ │
+│  │                                    │ │
+│  └────────────────────────────────── ┘ │
+├─────────────────────────────────────────┤
+│            [Cancel]      [OK ✓]         │
+└─────────────────────────────────────────┘
+```
+
+OK is disabled when:
+- **Copy To / Move To**: destination path is empty
+- **Rename**: pattern string is empty
+- **Rebase**: neither strip-prefix nor add-prefix has a value
+
+`EditStepDialog` does not have a "Save as preset" flag (unlike `EditFilterDialog`). Full
+pipeline saving is handled by the `[Load Preset ▾]` → "✎ Save current pipeline..." path.
+
+#### Load Preset ▾ / Save Pipeline
+
+The `[Load Preset ▾]` button opens a menu:
+
+```
+┌──────────────────────────────────────┐
+│  Standard                            │
+│    Copy only                         │
+│    Move only                         │
+│    Delete to Trash                   │
+│    Flatten → Copy                    │
+├──────────────────────────────────────┤
+│  My Pipelines                        │
+│    Music to phone                    │
+│    Archive old files                 │
+├──────────────────────────────────────┤
+│  ✎ Save current pipeline...         │
+└──────────────────────────────────────┘
+```
+
+**Standard** presets (hardcoded, read-only):
+
+| Name | Steps |
+|---|---|
+| Copy only | `[CopyStep]` |
+| Move only | `[MoveStep]` |
+| Delete to Trash | `[DeleteStep(Trash)]` |
+| Flatten → Copy | `[FlattenStep → CopyStep]` |
+
+**My Pipelines** — user-saved `.sc2pipe` files from `%APPDATA%/SmartCopy2026/pipelines/`.
+
+**Save current pipeline** — prompts for a name (inline text input in the menu or a small
+dialog), then writes a `.sc2pipe` file. If a file with that name already exists, confirms
+overwrite.
+
+Loading a preset replaces the entire current pipeline. A tooltip-notification at the bottom of
+the pipeline strip confirms the name of the loaded preset.
+
+#### Preview Dialog
+
+`PreviewPipeline` opens the **Preview Dialog** (a modal `Window`, not a side panel), populated
+from `OperationPlan` produced by `PipelineRunner.PreviewAsync()`.
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  Preview — 142 files · 2.3 GB                            │
+├──────────────────────────────────────────────────────────┤
+│  ✓ 138 ready    ⚠ 3 destination exists    ✕ 1 conflict  │
+├──────────────────────────────────────────────────────────┤
+│  ⚠ Destination Exists (3)                               │
+│  ┌────────────────────────────┬─────────────┬─────────┐  │
+│  │ Source                     │ Destination │    Size │  │
+│  ├────────────────────────────┼─────────────┼─────────┤  │
+│  │ Abbey Road/Come Together   │ same·newer  │  45 MB  │  │
+│  │ Abbey Road/Something       │ same·same   │  38 MB  │  │
+│  │ Jazz/Kind of Blue          │ same·older  │  92 MB  │  │
+│  └────────────────────────────┴─────────────┴─────────┘  │
+│                                                          │
+│  ✕ Name Conflict (1)                                     │
+│  ┌────────────────────────────┬─────────────┬─────────┐  │
+│  │ Rock/track01.flac          │ track01(2)  │  28 MB  │  │
+│  └────────────────────────────┴─────────────┴─────────┘  │
+│                                                          │
+│  ✓ Ready (138 files)                      [show/hide ▾]  │
+├──────────────────────────────────────────────────────────┤
+│                       [Cancel]    [▶ Run (142 files)]    │
+└──────────────────────────────────────────────────────────┘
+```
+
+**Delete operation preview (mandatory):**
+
+When the pipeline contains a `DeleteStep`, preview is mandatory — there is no direct "Run"
+path. The `[▶ Run]` button in the main window is replaced by `[👁 Preview & Run]` and
+executes `PreviewAsync` first, requiring explicit confirmation in the dialog before proceeding.
+The dialog header and layout change to emphasize the destructive nature:
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  ⚠ Delete Preview — confirmation required                │
+├──────────────────────────────────────────────────────────┤
+│  Files will be sent to the Recycle Bin.                  │
+│  (To delete permanently, edit the Delete step.)          │
+├──────────────────────────────────────────────────────────┤
+│  47 files to delete · 1.2 GB                             │
+│  ┌──────────────────────────────────────────────────────┐ │
+│  │ Abbey Road/01 Come Together.flac               45 MB │ │
+│  │ Abbey Road/02 Something.flac                   38 MB │ │
+│  │ ...                                                  │ │
+│  └──────────────────────────────────────────────────────┘ │
+├──────────────────────────────────────────────────────────┤
+│                   [Cancel]   [🗑 Delete 47 files to Bin] │
+└──────────────────────────────────────────────────────────┘
+```
+
+For `DeleteMode.Permanent`, the header and confirm button intensify:
+```
+│  ⚠ Permanent delete — files CANNOT be recovered.        │
+...
+│                   [Cancel]   [⚠ Permanently Delete 47]  │
+```
+
+#### Pipeline-Specific ViewModels
+
+**`AddStepViewModel`** — mirrors `AddFilterViewModel` pattern:
+- `IsLevel2Visible` bool; `SelectedCategory` (`Path | Content | Terminal`)
+- `StepTypeItems` for Level 2 (name, description, `StepKind` enum value)
+- `StepTypeSelected(StepKind)` event — raised when user picks a type; caller decides
+  whether to add immediately or open `EditStepDialog`
+
+**`EditStepDialogViewModel`** — factory methods:
+- `ForNew(StepKind kind)` — empty form for the chosen step type
+- `ForEdit(PipelineStepViewModel existing)` — pre-populates form from existing step config
+- `ITransformStep BuildStep()` — produces the Core step instance on OK
+- `bool IsValid` — gates the OK button per type-specific rules above
+
+**`PipelinePresetStore`** — async CRUD over `.sc2pipe` files in the user data directory:
+- `GetStandardPresetsAsync()` — returns hardcoded read-only list
+- `GetUserPresetsAsync()` — reads `pipelines/` folder
+- `SaveUserPresetAsync(string name, PipelineConfig config)`
+- `DeleteUserPresetAsync(string name)`
+
+---
+
 ### UI Improvements Over Predecessor
 
 1. **Source and destination fields accept drag-and-drop** from Explorer/Finder
