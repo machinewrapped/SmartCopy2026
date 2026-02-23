@@ -116,7 +116,7 @@ public partial class MainViewModel : ViewModelBase
 
     private async Task InitializeAsync()
     {
-        // Phase 1: hardcode /mem/target as the mirror-filter comparison path.
+        // Phase 1: hardcode /mem/Mirror as the mirror-filter comparison path.
         FilterChain.PipelineDestinationPath = MockMemoryFileSystemFactory.TargetPath;
 
         // Pre-wire the chain before the initial tree load so the first file list load

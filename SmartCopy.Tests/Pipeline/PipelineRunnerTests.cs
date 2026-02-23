@@ -17,10 +17,10 @@ public sealed class PipelineRunnerTests
             source => source
                 .WithDirectory("/source")
                 .WithFile("/source/song.flac", Encoding.UTF8.GetBytes("audio")),
-            target => target.WithDirectory("/target"));
+            target => target.WithDirectory("/Mirror"));
 
         var sourceNode = await sourceProvider.GetNodeAsync("/source/song.flac", CancellationToken.None);
-        var pipeline = new TransformPipeline([new CopyStep("/target")]);
+        var pipeline = new TransformPipeline([new CopyStep("/Mirror")]);
         var runner = new PipelineRunner(pipeline);
 
         var plan = await runner.PreviewAsync(
@@ -32,7 +32,7 @@ public sealed class PipelineRunnerTests
             CancellationToken.None);
 
         Assert.Single(plan.Actions);
-        Assert.Contains("/target", plan.Actions[0].DestinationPath);
+        Assert.Contains("/Mirror", plan.Actions[0].DestinationPath);
 
         var results = await runner.ExecuteAsync(
             [sourceNode],
@@ -44,7 +44,7 @@ public sealed class PipelineRunnerTests
             CancellationToken.None);
 
         Assert.Contains(results, r => r.StepType == "Copy" && r.Success);
-        Assert.True(await targetProvider.ExistsAsync("/target/source/song.flac", CancellationToken.None));
+        Assert.True(await targetProvider.ExistsAsync("/Mirror/source/song.flac", CancellationToken.None));
     }
 
     [Fact]

@@ -192,7 +192,7 @@ public sealed class FilterChainTests
     public async Task ApplyToTree_MirrorFilter_ExcludesDirectoryWithNullProvider()
     {
         var dir = CreateDirectory("Music");
-        var chain = new FilterChain([new MirrorFilter("/target", MirrorCompareMode.NameOnly, FilterMode.Only)]);
+        var chain = new FilterChain([new MirrorFilter("/Mirror", MirrorCompareMode.NameOnly, FilterMode.Only)]);
         await chain.ApplyToTreeAsync([dir]); // null comparisonProvider → MirrorFilter returns false
 
         Assert.Equal(FilterResult.Excluded, dir.FilterResult);

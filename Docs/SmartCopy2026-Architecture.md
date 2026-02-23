@@ -507,7 +507,7 @@ Implementation notes (current code path):
 **ComparisonPath suggestion from pipeline:** `MainViewModel` pushes
 `PipelineViewModel.FirstDestinationPath` into `FilterChainViewModel.PipelineDestinationPath`.
 When opening `EditFilterDialog` for a mirror filter, the editor is pre-populated with that
-suggested path. In Phase 1 memory-backed runs, startup seeds this to `/mem/target`.
+suggested path.
 
 ### 6.4 Wildcard Pattern Matching
 
@@ -827,7 +827,7 @@ The dialog dispatches to a type-specific editor view via `ContentControl` + `Dat
 │  │ Wildcard:  [*.tmp;*.bak          ]│ │  single text box
 │  │ Date Range: ○Created ●Modified    │ │  radio + two CalendarDatePickers
 │  │ Size Range: Min[1.5] Max[──] [MB▾] │ │  shared unit selector
-│  │ Mirror:     [/mem/target     ][…] │ │  browse button disabled in Phase 1
+│  │ Mirror:     [/mem/Mirror     ][…] │ │  browse button disabled in Phase 1
 │  │             ○Name  ●Name+Size     │ │
 │  │ Attribute:  ☐Hidden ☐RO ☐System  │ │
 │  └────────────────────────────────── ┘ │
@@ -937,7 +937,7 @@ public class FileSystemNode : INotifyPropertyChanged
     public CheckState CheckState { get; set; }       // Checked | Unchecked | Indeterminate
     public FilterResult FilterResult { get; set; }   // Included | Excluded
     public string? ExcludedByFilter { get; set; }    // filter name if Excluded
-    public string? Notes { get; set; }               // e.g. "Mirrored at /target/foo"
+    public string? Notes { get; set; }               // e.g. "Mirrored at /Mirror/foo"
 
     // Computed
     public bool IsSelected => CheckState == CheckState.Checked

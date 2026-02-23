@@ -9,7 +9,8 @@ namespace SmartCopy.UI.Services;
 internal static class MockMemoryFileSystemFactory
 {
     public const string RootPath = "/mem";
-    public const string TargetPath = "/mem/target";
+    public const string SourcePath = "/mem/Music";
+    public const string TargetPath = "/mem/Mirror";
     public const string DefaultFileListPath = "/mem/Music/Alternative/Pixies/1988 Surfer Rosa [SACD Remaster]";
 
     public static MemoryFileSystemProvider CreateSeeded()
@@ -61,13 +62,6 @@ internal static class MockMemoryFileSystemFactory
                 provider.SeedSimulatedFile(path, fakeSize);
             }
         }
-
-        // Seed /mem/target with representative files for Phase 1 MirrorFilter validation.
-        provider.SeedDirectory(TargetPath);
-        provider.SeedDirectory(TargetPath + "/Music");
-        provider.SeedSimulatedFile(TargetPath + "/Music/already-mirrored.flac", 25_000_000);
-        provider.SeedSimulatedFile(TargetPath + "/Music/cover.jpg", 500_000);
-        provider.SeedSimulatedFile(TargetPath + "/Music/notes.txt", 10_000);
 
         return provider;
     }

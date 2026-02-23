@@ -310,15 +310,13 @@ Modify `SmartCopy.UI/ViewModels/FilterChainViewModel.cs` (significant rewrite):
 - `FilterChainViewModel` gains: `FilterPresetStore`/`AppSettings` constructor params; `AddFilterViewModel AddFilter`; `FilterChain BuildLiveChain()`; `public event EventHandler? ChainChanged`; `AddFilterFromResult`, `ReplaceFilter`, `MoveFilter(int, int)`; `NewFilterDialogRequested` event; `SaveChain`/`LoadChain` commands that raise `SaveChainRequested`/`LoadChainRequested`
 - `FilterChainView.axaml.cs` wires Avalonia `DragDrop` on the `ItemsControl`; drop handler calls `MoveFilter`
 
-Modify `MainViewModel`: construct `AppSettings` + `FilterPresetStore`; pass to `FilterChainViewModel`; keep `PipelineDestinationPath` synchronized with pipeline destination and seed it to `/mem/target` during `InitializeAsync`.
+Modify `MainViewModel`: construct `AppSettings` + `FilterPresetStore`; pass to `FilterChainViewModel`; keep `PipelineDestinationPath` synchronized with pipeline destination.
 
 Tests (`SmartCopy.Tests/Filters/FilterChainViewModelTests.cs`): `BuildLiveChain`; add/remove fire `ChainChanged`; `IsEnabled` toggle fires `ChainChanged`; `ReplaceFilter` updates VM.
 
 #### Sub-step 4f — Live wiring: filter application to tree + file list
 
 Modify `MainViewModel`: subscribe `FilterChain.ChainChanged` → `ApplyFiltersAsync()` (CancellationTokenSource debounce; passes same `MemoryFileSystemProvider` as `comparisonProvider`).
-
-Modify `MockMemoryFileSystemFactory`: add `/mem/target` subtree with representative files.
 
 Modify `DirectoryTreeViewModel`: add `ApplyFiltersAsync(FilterChain, IFileSystemProvider?, CancellationToken)` delegating to `chain.ApplyToTreeAsync(RootNodes, …)`.
 
