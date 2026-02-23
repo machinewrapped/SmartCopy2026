@@ -22,6 +22,7 @@ public partial class PipelineView : UserControl
                 _currentViewModel.Steps.CollectionChanged -= Steps_CollectionChanged;
                 _currentViewModel.EditStepRequested -= OnEditStepRequested;
                 _currentViewModel.AddStep.StepTypeSelected -= OnAddStepTypeSelected;
+                _currentViewModel.AddStep.CloseRequested -= OnCloseRequestedClosePopup;
             }
 
             _currentViewModel = DataContext as PipelineViewModel;
@@ -31,6 +32,7 @@ public partial class PipelineView : UserControl
                 _currentViewModel.Steps.CollectionChanged += Steps_CollectionChanged;
                 _currentViewModel.EditStepRequested += OnEditStepRequested;
                 _currentViewModel.AddStep.StepTypeSelected += OnAddStepTypeSelected;
+                _currentViewModel.AddStep.CloseRequested += OnCloseRequestedClosePopup;
             }
         };
     }
@@ -40,6 +42,8 @@ public partial class PipelineView : UserControl
         _currentViewModel?.AddStep.GoBackCommand.Execute(null);
         AddStepPopup.IsOpen = true;
     }
+
+    private void OnCloseRequestedClosePopup() => Dispatcher.UIThread.Post(() => AddStepPopup.IsOpen = false);
 
     private async void OnAddStepTypeSelected(StepKind kind)
     {

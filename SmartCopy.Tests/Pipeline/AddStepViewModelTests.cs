@@ -79,4 +79,20 @@ public sealed class AddStepViewModelTests
         Assert.Equal(StepKind.Copy, picks[0]);
         Assert.Equal(StepKind.Move, picks[1]);
     }
+
+    [Fact]
+    public void Close_RaisesCloseRequestedAndResetsState()
+    {
+        var vm = new AddStepViewModel();
+        var closed = false;
+        vm.CloseRequested += () => closed = true;
+        vm.NavigateToCategoryCommand.Execute(StepCategory.Content);
+
+        vm.CloseCommand.Execute(null);
+
+        Assert.True(closed);
+        Assert.False(vm.IsLevel2Visible);
+        Assert.Null(vm.SelectedCategory);
+        Assert.Empty(vm.StepTypeItems);
+    }
 }

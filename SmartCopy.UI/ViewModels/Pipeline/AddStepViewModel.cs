@@ -23,6 +23,8 @@ public partial class AddStepViewModel : ObservableObject
 
     public event Action<StepCategory>? CategoryNavigated;
 
+    public event Action? CloseRequested;
+
     [RelayCommand]
     private void NavigateToCategory(StepCategory category)
     {
@@ -45,6 +47,13 @@ public partial class AddStepViewModel : ObservableObject
         IsLevel2Visible = false;
         SelectedCategory = null;
         StepTypeItems = [];
+    }
+
+    [RelayCommand]
+    private void Close()
+    {
+        GoBack();
+        CloseRequested?.Invoke();
     }
 
     private static IReadOnlyList<StepTypeItem> GetItemsForCategory(StepCategory category)

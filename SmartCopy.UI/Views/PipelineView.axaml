@@ -207,7 +207,7 @@
                         </Button>
 
                         <Popup x:Name="AddStepPopup"
-                               Placement="Bottom"
+                               Placement="TopEdgeAlignedLeft"
                                PlacementTarget="{Binding ElementName=AddStepButton}">
                             <pipelineViews:AddStepFlyout x:Name="AddStepFlyoutControl"
                                                          DataContext="{Binding AddStep}" />

@@ -339,7 +339,7 @@ tests were authored for the new behavior; test execution remains manual (see ver
   `PipelinePresetStoreTests`, `PipelineValidatorTests`, `StepEditorViewModelTests`,
   `AddStepViewModelTests`, `EditStepDialogViewModelTests`, `PipelineViewModelTests`,
   `PreviewViewModelTests`, `PipelineIntegrationTests`
-- [ ] Manual `dotnet test` execution by maintainer (required in this environment)
+- [X] Manual `dotnet test` execution by maintainer (required in this environment)
 - [ ] Manual UI scenario checks for preview/delete/progress/journal flows
 
 ### Step 6 — Sync Operations (UX Loop Track)
