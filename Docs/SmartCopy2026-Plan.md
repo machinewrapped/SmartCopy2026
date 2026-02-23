@@ -421,19 +421,19 @@ Rename `LivePreviewName` updates on pattern change.
 
 New files:
 - `SmartCopy.UI/ViewModels/Pipeline/AddStepViewModel.cs` — `IsLevel2Visible`, `SelectedCategory`
-  (`Path | Content | Terminal`); `StepTypeItems` list for Level 2; `GoBack()`;
+  (`Path | Content | Executable`); `StepTypeItems` list for Level 2; `GoBack()`;
   events `StepTypeSelected(StepKind)`; `NavigateToCategory(StepCategory)`
 - `SmartCopy.UI/Views/Pipeline/AddStepFlyout.axaml` + `.cs` — `UserControl` hosted in a `Popup`
-  (`PlacementMode=Bottom`); two panels swapped via `IsLevel2Visible`; one-terminal-step replacement
-  notification shown as a tooltip-notification when applicable
+  (`PlacementMode=Bottom`); two panels swapped via `IsLevel2Visible`; multiple executable steps
+  are allowed (no replacement behavior)
 
 Modify: `SmartCopy.UI/Views/PipelineView.axaml` + `.cs` — replace current nested `MenuItem` Add
 step menu with `Popup` + `AddStepFlyout`; code-behind routes `StepTypeSelected` to
 `PipelineViewModel`.
 
 Tests (`SmartCopy.Tests/Pipeline/AddStepViewModelTests.cs`): category navigation; GoBack; all step
-types present in correct categories; `StepTypeSelected` fires; terminal-step replacement flag set
-when pipeline already has a terminal step.
+types present in correct categories; `StepTypeSelected` fires; no replacement flag behavior for
+additional executable steps.
 
 #### Sub-step 5.5 — `EditStepDialog` (modal Window)
 
@@ -465,7 +465,8 @@ Modify `SmartCopy.UI/ViewModels/PipelineViewModel.cs` (significant rewrite):
 - `PipelineStepViewModel` wraps a live `ITransformStep`; `DestinationPath` setter updates
   underlying step config and fires `PipelineChanged`
 - `PipelineViewModel` gains: `PipelinePresetStore` constructor param;
-  `AddStepViewModel AddStep` property; `ITransformPipeline BuildLivePipeline()`;
+  `AddStepViewModel AddStep` property; `TransformPipeline BuildLivePipeline()`;
+  `bool CanRun` (false unless pipeline has at least one executable step and step configs are valid);
   `public event EventHandler? PipelineChanged`; `AddStepFromResult(StepKind, ITransformStep)`;
   `ReplaceStep(PipelineStepViewModel, ITransformStep)`;
   `LoadPreset` command hydrates from `PipelinePresetStore`; `SavePipeline` command writes `.sc2pipe`
@@ -500,6 +501,7 @@ Modify `MainViewModel`:
 - `RunPipelineAsync()` — if `Pipeline.HasDeleteStep`, routes through preview first; otherwise
   executes directly if user chose Run without preview
 - `[👁 Preview & Run]` label on Run button when `Pipeline.HasDeleteStep` (bound in AXAML)
+- Run command disabled when `Pipeline.CanRun == false`
 
 Tests (`SmartCopy.Tests/Pipeline/PreviewViewModelTests.cs`): `LoadFrom` groups actions correctly;
 warning counts match plan; `IsDeletePipeline` sets correct mode; `CanRun` gated by confirmation
@@ -528,7 +530,9 @@ structure; delete pipeline → verify mandatory preview enforced; overwrite Skip
 semantics; journal written and parseable.
 
 #### Acceptance criteria
-- [x] Exactly one terminal step required and validated (`TransformPipeline.Validate()`)
+- [ ] Run remains disabled until pipeline contains at least one executable step with valid config
+- [ ] Multiple executable steps are allowed (for example `Copy → Move`) and execute in order
+- [ ] `DeleteStep` remains preview-mandatory and is validated as final when present
 - [ ] Add Step flyout uses two-level category → type drill-down
 - [ ] Edit pencil on each step card opens `EditStepDialog` pre-populated
 - [ ] OK disabled in `EditStepDialog` when required fields empty (Copy/Move destination, Rename pattern)
@@ -553,6 +557,8 @@ semantics; journal written and parseable.
 - [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "PipelineIntegration"` (≥6 tests)
 - [ ] Manual: launch app, load "Flatten → Copy" preset, verify step cards render correctly
 - [ ] Manual: add a Copy step via flyout, set destination in `EditStepDialog`, verify card shows destination
+- [ ] Manual: create path-only pipeline (`Flatten` only), verify Run is disabled; add Copy and verify Run enables
+- [ ] Manual: build `Copy → Move` pipeline, run against `/mem` fixture, verify both operations execute in order
 - [ ] Manual: build a Delete pipeline, verify Run button becomes "Preview & Run", confirm required
 - [ ] Manual: run a Copy pipeline against `/mem` fixture, verify progress overlay and journal file
 

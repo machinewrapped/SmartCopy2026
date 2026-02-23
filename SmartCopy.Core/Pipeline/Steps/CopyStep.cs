@@ -23,7 +23,7 @@ public sealed class CopyStep : ITransformStep
     public string StepType => "Copy";
     public bool IsPathStep => false;
     public bool IsContentStep => false;
-    public bool IsTerminal => true;
+    public bool IsExecutable => true;
 
     public TransformStepConfig Config => new(
         StepType,

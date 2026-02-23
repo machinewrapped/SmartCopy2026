@@ -10,7 +10,7 @@ public sealed class FlattenStep : ITransformStep
     public string StepType => "Flatten";
     public bool IsPathStep => true;
     public bool IsContentStep => false;
-    public bool IsTerminal => false;
+    public bool IsExecutable => false;
 
     public TransformStepConfig Config => new(StepType, new JsonObject());
 

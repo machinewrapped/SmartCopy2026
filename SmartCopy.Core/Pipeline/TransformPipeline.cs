@@ -24,15 +24,15 @@ public sealed class TransformPipeline
             throw new InvalidOperationException("Pipeline must contain at least one step.");
         }
 
-        var terminalSteps = _steps.Where(step => step.IsTerminal).ToList();
-        if (terminalSteps.Count != 1)
+        var executableSteps = _steps.Where(step => step.IsExecutable).ToList();
+        if (executableSteps.Count != 1)
         {
-            throw new InvalidOperationException("Pipeline must contain exactly one terminal step.");
+            throw new InvalidOperationException("Pipeline must contain at least one executable step.");
         }
 
-        if (!_steps[^1].IsTerminal)
+        if (!_steps[^1].IsExecutable)
         {
-            throw new InvalidOperationException("The terminal step must be the final step in the pipeline.");
+            throw new InvalidOperationException("The final step must be executable.");
         }
     }
 }

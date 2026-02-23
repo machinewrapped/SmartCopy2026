@@ -9,7 +9,7 @@ public sealed class DeleteStep : ITransformStep
     public string StepType => "Delete";
     public bool IsPathStep => false;
     public bool IsContentStep => false;
-    public bool IsTerminal => true;
+    public bool IsExecutable => true;
 
     public TransformStepConfig Config => new(
         StepType,

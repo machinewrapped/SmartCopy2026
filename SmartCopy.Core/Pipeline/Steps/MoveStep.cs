@@ -23,7 +23,7 @@ public sealed class MoveStep : ITransformStep
     public string StepType => "Move";
     public bool IsPathStep => false;
     public bool IsContentStep => false;
-    public bool IsTerminal => true;
+    public bool IsExecutable => true;
 
     public TransformStepConfig Config => new(
         StepType,

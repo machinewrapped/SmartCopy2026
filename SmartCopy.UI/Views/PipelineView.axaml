@@ -200,7 +200,7 @@
                                               CommandParameter="{x:Static vm:StepKind.Convert}" />
                                 </MenuItem>
 
-                                <MenuItem Header="Terminal steps">
+                                <MenuItem Header="Action steps">
                                     <MenuItem Header="Copy"
                                               Command="{Binding AddStepCommand}"
                                               CommandParameter="{x:Static vm:StepKind.Copy}" />

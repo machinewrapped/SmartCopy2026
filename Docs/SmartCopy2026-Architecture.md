@@ -52,9 +52,9 @@ SmartCopy2026/
 │   │   ├── PipelineRunner.cs
 │   │   ├── PipelineConfig.cs
 │   │   └── Steps/
-│   │       ├── CopyStep.cs             # Terminal: write to target
-│   │       ├── MoveStep.cs             # Terminal: move to target
-│   │       ├── DeleteStep.cs           # Terminal: delete source (via trash by default)
+│   │       ├── CopyStep.cs             # Executable: write to target
+│   │       ├── MoveStep.cs             # Executable: move to target
+│   │       ├── DeleteStep.cs           # Executable: delete source (via trash by default)
 │   │       ├── FlattenStep.cs          # Path: strip directory structure
 │   │       ├── RenameStep.cs           # Path: rename by pattern tokens
 │   │       ├── RebaseStep.cs           # Path: add/remove directory levels
@@ -231,7 +231,9 @@ Steps are categorised:
 
 - **Path steps** — modify `TransformContext.CurrentPath` and/or `CurrentExtension`
 - **Content steps** — replace `TransformContext.ContentStream`
-- **Terminal steps** — write or delete; exactly one required as the final step
+- **Executable steps** — perform filesystem side effects (`Copy`, `Move`, `Delete`).
+  A pipeline may contain multiple executable steps. Execution is enabled only when at least one
+  executable step exists and required step configuration is valid.
 
 ```csharp
 public interface ITransformStep
@@ -239,7 +241,7 @@ public interface ITransformStep
     string StepType { get; }
     bool IsPathStep { get; }
     bool IsContentStep { get; }
-    bool IsTerminal { get; }
+    bool IsExecutable { get; }
     TransformStepConfig Config { get; }
 
     TransformResult Preview(TransformContext context);
@@ -265,7 +267,7 @@ through each step in sequence, and reports `OperationProgress` after each file c
 **Destination ownership:** `TargetProvider` in `TransformContext` is populated by `CopyStep` and
 `MoveStep` from their own `Config.DestinationPath` (resolved to an `IFileSystemProvider` at
 pipeline execution time). It is not set from a global target path — there is no global target.
-Each terminal step carries its own destination, which means a single pipeline could in principle
+Each executable step carries its own destination, which means a single pipeline could in principle
 contain multiple Copy/Move steps writing to different locations.
 
 **Example pipelines:**
@@ -278,6 +280,7 @@ contain multiple Copy/Move steps writing to different locations.
 | Transcode | `[ConvertStep(mp3, 320k) → CopyStep]` |
 | Transcode + flatten + rename | `[FlattenStep → ConvertStep(mp3) → RenameStep("{artist} - {title}") → CopyStep]` |
 | Archive move | `[FlattenStep → MoveStep]` |
+| Copy then move | `[CopyStep("/mem/Backup") → MoveStep("/mem/Archive")]` |
 | Delete | `[DeleteStep]` |
 
 Pipelines saved as `.sc2pipe` (JSON). The simple presets (Copy, Move, Delete) appear as toolbar
@@ -870,7 +873,7 @@ Each step in the pipeline strip is a card connected by `→` arrows. Two represe
 ```
 
 - **Icon + name** (top-left) — step type icon and human-readable name
-- **Summary or inline input** — path steps show a one-line description; terminal steps (Copy/Move)
+- **Summary or inline input** — path steps show a one-line description; executable steps (Copy/Move)
   show an inline destination `TextBox` with `📁` browse button directly on the card face
 - **Edit pencil** `✎` — opens `EditStepDialog` for full configuration (overwrite mode,
   conflict strategy, rename pattern, etc.)
@@ -895,7 +898,7 @@ click-outside). Two panels swapped by an `IsLevel2Visible` flag — no secondary
 │  Content steps                 │
 │    Transform file contents     │
 ├────────────────────────────────┤
-│  Terminal steps                │
+│  Executable steps              │
 │    Write or delete the file    │
 └────────────────────────────────┘
 ```
@@ -924,10 +927,10 @@ click-outside). Two panels swapped by an `IsLevel2Visible` flag — no secondary
 └────────────────────────────────┘
 ```
 
-**Level 2 — Terminal steps:**
+**Level 2 — Executable steps:**
 ```
 ┌────────────────────────────────┐
-│  ← Terminal steps              │
+│  ← Executable steps            │
 ├────────────────────────────────┤
 │  Copy To   Copy to destination │
 │  Move To   Move to destination │
@@ -943,9 +946,10 @@ Clicking a step type:
   capture required configuration before the step is added.
 - `←` returns to Level 1.
 
-**One terminal step rule:** A pipeline may only contain one terminal step. If a terminal step
-already exists when the user picks a new one, a tooltip-notification confirms the replacement
-before the old step is removed.
+**Execution eligibility rule:** A pipeline may contain zero or more executable steps.
+`Run` stays disabled until the pipeline contains at least one executable step and all required
+fields for configured steps are valid. Adding Copy/Move does not replace existing executable
+steps. `DeleteStep` remains preview-mandatory and must be the final step when present.
 
 The Add Step flyout has no preset layer (unlike Add Filter). Full pipeline configurations are
 saved and loaded via the `[Load Preset ▾]` button, not per-step presets.
@@ -1104,16 +1108,19 @@ The dialog header and layout change to emphasize the destructive nature:
 ```
 
 For `DeleteMode.Permanent`, the header and confirm button intensify:
-```
+``` 
 │  ⚠ Permanent delete — files CANNOT be recovered.        │
 ...
 │                   [Cancel]   [⚠ Permanently Delete 47]  │
 ```
 
+If the pipeline has no executable step (for example, only `Flatten`/`Rename`/`Rebase`), the main
+run button is disabled until an executable step is added.
+
 #### Pipeline-Specific ViewModels
 
 **`AddStepViewModel`** — mirrors `AddFilterViewModel` pattern:
-- `IsLevel2Visible` bool; `SelectedCategory` (`Path | Content | Terminal`)
+- `IsLevel2Visible` bool; `SelectedCategory` (`Path | Content | Executable`)
 - `StepTypeItems` for Level 2 (name, description, `StepKind` enum value)
 - `StepTypeSelected(StepKind)` event — raised when user picks a type; caller decides
   whether to add immediately or open `EditStepDialog`
@@ -1185,7 +1192,7 @@ Shell checklist:
       Save/Load buttons pinned to bottom of column
 - [x] Pipeline area: horizontal scrollable step chain with → connectors; Load Preset ▾ menu
       (Standard: Copy/Move/Delete presets; My Pipelines; Save current pipeline); + Add step flyout
-      (Path / Content / Terminal step categories); Run and Preview buttons stacked on the right;
+      (Path / Content / Executable step categories); Run and Preview buttons stacked on the right;
       Copy/Move step cards show inline destination path TextBox + stub 📁 Browse button
 - [x] Status bar: placeholder text (file count, size, filtered count, progress bar, time remaining, current file)
 - [x] Window size, position, maximised state, and all three column widths persisted to

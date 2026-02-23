@@ -77,7 +77,7 @@ ViewModels use `[ObservableProperty]` source-gen attributes (no runtime reflecti
 
 - **IFileSystemProvider** — unified interface for local disk, MTP devices, and in-memory (tests). Capabilities are declared via `ProviderCapabilities` flags.
 - **IFilter / FilterChain** — composable filters (Wildcard, Mirror, DateRange, etc.). Each filter returns `Included` or `Excluded` per node.
-- **TransformPipeline** — ordered steps: *path steps* (Flatten, Rebase, Rename), *content steps* (Convert), *terminal steps* (Copy, Move, Delete). Generates an `OperationPlan` for preview before execution.
+- **TransformPipeline** — ordered steps: *path steps* (Flatten, Rebase, Rename), *content steps* (Convert), *executable steps* (Copy, Move, Delete). Generates an `OperationPlan` for preview before execution.
 - **Progressive scanning** — top-level folders appear immediately; children stream in via background priority queue. Tri-state state is preserved across rescans.
 
 ### Design constraints
