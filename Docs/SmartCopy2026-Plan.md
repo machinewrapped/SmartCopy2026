@@ -378,7 +378,7 @@ run/progress/journal.
   layout (including mandatory delete variant), `Load Preset ▾` / Save pipeline menu,
   `AddStepViewModel`, `EditStepDialogViewModel`, `PipelinePresetStore` contracts.
 
-#### Sub-step 5.2 — `PipelinePresetStore` + `PipelineStepFactory` (Core)
+#### Sub-step 5.2 — `PipelinePresetStore` + `PipelineStepFactory` + `PipelineValidator` (Core)
 
 New files:
 - `SmartCopy.Core/Pipeline/PipelinePreset.cs` — `{ Id, Name, IsBuiltIn, PipelineConfig }`
@@ -387,6 +387,12 @@ New files:
   `%APPDATA%/SmartCopy2026/pipelines/*.sc2pipe`), `SaveUserPresetAsync`, `DeleteUserPresetAsync`
 - `SmartCopy.Core/Pipeline/PipelineStepFactory.cs` — static `FromConfig(TransformStepConfig) → ITransformStep`;
   switch on `StepType` string; throws `UnknownStepTypeException` for unrecognised types
+- `SmartCopy.Core/Pipeline/Validation/PipelineValidationIssue.cs` — `{ StepIndex?, Code, Message, Severity }`
+- `SmartCopy.Core/Pipeline/Validation/PipelineValidationResult.cs` — `{ IReadOnlyList<Issue>, bool CanRun }`
+- `SmartCopy.Core/Pipeline/Validation/PipelineValidator.cs` — declarative rule engine that evaluates
+  per-step preconditions/postconditions against fact state (`SourceExists`) and emits issues
+- `SmartCopy.Core/Pipeline/Validation/PipelineStepContracts.cs` — contract map keyed by `StepType`
+  (Phase 1 baseline: Copy/Move/Delete/Flatten/Rename/Rebase/Convert)
 
 Standard presets (hardcoded, never written to disk):
 - "Copy only" → `[CopyStep]`
@@ -397,6 +403,10 @@ Standard presets (hardcoded, never written to disk):
 Tests (`SmartCopy.Tests/Pipeline/PipelinePresetStoreTests.cs`): standard presets always present;
 user save/delete/overwrite round-trips; standard presets precede user presets; `PipelineStepFactory`
 round-trips all implemented step types; unknown type throws cleanly.
+Tests (`SmartCopy.Tests/Pipeline/PipelineValidatorTests.cs`): no-executable pipeline returns blocking
+issue; missing Copy/Move destination returns step-scoped blocking issue; `Copy -> Move` valid;
+`Delete -> Copy` invalid at Copy step due to source-existence precondition; `Move -> Delete` invalid
+at Delete step due to source-existence precondition; delete-final rule enforced.
 
 #### Sub-step 5.3 — `StepEditorViewModel` hierarchy (UI ↔ Core bridge)
 
@@ -464,21 +474,27 @@ surfaces in VM; Flatten conflict strategy roundtrip.
 Modify `SmartCopy.UI/ViewModels/PipelineViewModel.cs` (significant rewrite):
 - `PipelineStepViewModel` wraps a live `ITransformStep`; `DestinationPath` setter updates
   underlying step config and fires `PipelineChanged`
+- `PipelineStepViewModel` gains `string? ValidationMessage`, `bool HasValidationError`
 - `PipelineViewModel` gains: `PipelinePresetStore` constructor param;
+  `PipelineValidator` constructor param;
   `AddStepViewModel AddStep` property; `TransformPipeline BuildLivePipeline()`;
-  `bool CanRun` (false unless pipeline has at least one executable step and step configs are valid);
+  `PipelineValidationResult ValidationResult`;
+  `bool CanRun` (bound to `ValidationResult.CanRun`);
+  `string? BlockingValidationMessage` (first blocking issue for run-button tooltip/helper text);
   `public event EventHandler? PipelineChanged`; `AddStepFromResult(StepKind, ITransformStep)`;
   `ReplaceStep(PipelineStepViewModel, ITransformStep)`;
   `LoadPreset` command hydrates from `PipelinePresetStore`; `SavePipeline` command writes `.sc2pipe`
 - `FirstDestinationPath` computed from first Copy/Move step's real `DestinationPath` (drives
   MirrorFilter suggestion)
+- Recompute validation after any add/remove/edit/reorder and map step-scoped issues back onto step cards
 
 Modify `MainViewModel`: construct and inject `PipelinePresetStore`; keep `PipelineDestinationPath`
 in sync via `Pipeline.PipelineChanged` (already partially wired via `FirstDestinationPath`).
 
 Tests (`SmartCopy.Tests/Pipeline/PipelineViewModelTests.cs`): `BuildLivePipeline` returns correct
 step sequence; add/remove fire `PipelineChanged`; `DestinationPath` inline edit fires `PipelineChanged`;
-`ReplaceStep` updates VM; `FirstDestinationPath` tracks first Copy/Move destination.
+`ReplaceStep` updates VM; `FirstDestinationPath` tracks first Copy/Move destination; invalid step
+shows `ValidationMessage`; `CanRun`/`BlockingValidationMessage` update deterministically.
 
 #### Sub-step 5.7 — Preview dialog wiring
 
@@ -533,6 +549,10 @@ semantics; journal written and parseable.
 - [ ] Run remains disabled until pipeline contains at least one executable step with valid config
 - [ ] Multiple executable steps are allowed (for example `Copy → Move`) and execute in order
 - [ ] `DeleteStep` remains preview-mandatory and is validated as final when present
+- [ ] Declarative precondition/postcondition validation rejects logically invalid sequences
+  (`Delete → Copy`, `Move → Delete`) without pair-specific hardcoded UI checks
+- [ ] Invalid step cards show inline feedback and tooltip with the blocking reason
+- [ ] Run button exposes the first blocking validation reason when disabled
 - [ ] Add Step flyout uses two-level category → type drill-down
 - [ ] Edit pencil on each step card opens `EditStepDialog` pre-populated
 - [ ] OK disabled in `EditStepDialog` when required fields empty (Copy/Move destination, Rename pattern)
@@ -549,6 +569,7 @@ semantics; journal written and parseable.
 
 #### Verification
 - [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "PipelinePresetStore"` (≥5 tests)
+- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "PipelineValidator"` (≥6 tests)
 - [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "StepEditorViewModel"` (≥6 tests)
 - [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "AddStepViewModel"` (≥5 tests)
 - [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "EditStepDialogViewModel"` (≥5 tests)
@@ -559,6 +580,8 @@ semantics; journal written and parseable.
 - [ ] Manual: add a Copy step via flyout, set destination in `EditStepDialog`, verify card shows destination
 - [ ] Manual: create path-only pipeline (`Flatten` only), verify Run is disabled; add Copy and verify Run enables
 - [ ] Manual: build `Copy → Move` pipeline, run against `/mem` fixture, verify both operations execute in order
+- [ ] Manual: build `Delete → Copy` pipeline, verify Copy card shows validation error and Run remains disabled
+- [ ] Manual: build `Move → Delete` pipeline, verify Delete card shows validation error and Run remains disabled
 - [ ] Manual: build a Delete pipeline, verify Run button becomes "Preview & Run", confirm required
 - [ ] Manual: run a Copy pipeline against `/mem` fixture, verify progress overlay and journal file
 

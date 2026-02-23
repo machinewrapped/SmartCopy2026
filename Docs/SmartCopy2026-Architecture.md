@@ -235,6 +235,11 @@ Steps are categorised:
   A pipeline may contain multiple executable steps. Execution is enabled only when at least one
   executable step exists and required step configuration is valid.
 
+Validation is **declarative**. The pipeline is validated by evaluating step preconditions and
+postconditions over a small fact state machine (instead of hardcoded step-pair bans). This allows
+invalid flows like `Delete -> Copy` to be rejected naturally because `Delete` sets `SourceExists=false`
+and `Copy` requires `SourceExists=true`.
+
 ```csharp
 public interface ITransformStep
 {
@@ -263,6 +268,14 @@ public class TransformContext
 
 `PipelineRunner` iterates selected nodes, creates a fresh `TransformContext` for each, passes it
 through each step in sequence, and reports `OperationProgress` after each file completes.
+
+`TransformPipeline.Validate()` delegates to a validator that returns structured issues:
+- pipeline-level blocking issues (for example, no executable step)
+- step-level blocking issues (for example, missing destination path on Copy)
+- sequence blocking issues discovered from fact-state transitions (for example, step requires source
+  to exist after an earlier step made that false)
+
+The UI uses this same result to drive run enablement and per-step feedback.
 
 **Destination ownership:** `TargetProvider` in `TransformContext` is populated by `CopyStep` and
 `MoveStep` from their own `Config.DestinationPath` (resolved to an `IFileSystemProvider` at
@@ -712,6 +725,50 @@ experienced users.
 - Not a full undo system — just a record for the user to review if something went wrong
 - Auto-cleanup: logs older than 30 days are deleted on startup
 
+### 6.12 Pipeline Validation (Declarative Contracts)
+
+Pipeline validation runs whenever steps are added, removed, reordered, or edited. It is evaluated
+as a deterministic pass over step contracts:
+
+1. Start with baseline fact state: `SourceExists=true`
+2. For each step:
+   - validate step-level config requirements
+   - evaluate preconditions against current fact state
+   - emit blocking issue when a precondition fails
+   - apply postconditions to produce the next fact state
+3. Apply pipeline-level rules (for example: at least one executable step)
+4. Return `PipelineValidationResult` (no side effects)
+
+Contract examples for built-in Phase 1 steps:
+
+| Step | Preconditions | Postconditions |
+|---|---|---|
+| `Copy` | `SourceExists=true`, destination path non-empty | `SourceExists=true` |
+| `Move` | `SourceExists=true`, destination path non-empty | `SourceExists=false` |
+| `Delete` | `SourceExists=true` | `SourceExists=false` |
+| `Flatten` | `SourceExists=true` | none |
+| `Rename` | `SourceExists=true`, pattern non-empty | none |
+| `Rebase` | `SourceExists=true`, strip/add prefix has value | none |
+| `Convert` | `SourceExists=true`, plugin/output format valid | none |
+
+This model rejects invalid sequences without pair-specific hardcoding. Example:
+`[Delete -> Copy]` fails at `Copy` because `SourceExists` is false at that point.
+
+Output contract for UI + runner guard:
+
+- `PipelineValidationIssue`:
+  - `StepIndex` (nullable for pipeline-level issue)
+  - `Code` (stable machine-readable id, e.g. `precondition.source_exists`)
+  - `Message` (user-readable)
+  - `Severity` (`Error` blocks run, `Warning` does not)
+- `PipelineValidationResult`:
+  - `Issues` list
+  - `CanRun` (`true` when there are no `Error` issues)
+
+`PipelineViewModel` maps step-scoped issues onto cards and exposes the first blocking message near
+the run controls. `TransformPipeline.Validate()` reuses the same validator and throws only when
+blocking issues exist, ensuring UI and runtime enforce identical rules.
+
 ---
 
 ## 7. UI Design
@@ -951,6 +1008,11 @@ Clicking a step type:
 fields for configured steps are valid. Adding Copy/Move does not replace existing executable
 steps. `DeleteStep` remains preview-mandatory and must be the final step when present.
 
+When validation fails, the first blocking issue is shown as helper text under the pipeline strip,
+and the affected step card is highlighted with inline error text + tooltip (for keyboard and mouse
+users). Example: adding `Copy` after `Delete` marks the `Copy` step invalid with a message such as
+"Source no longer exists at this point in the pipeline."
+
 The Add Step flyout has no preset layer (unlike Add Filter). Full pipeline configurations are
 saved and loaded via the `[Load Preset ▾]` button, not per-step presets.
 
@@ -1130,6 +1192,23 @@ run button is disabled until an executable step is added.
 - `ForEdit(PipelineStepViewModel existing)` — pre-populates form from existing step config
 - `ITransformStep BuildStep()` — produces the Core step instance on OK
 - `bool IsValid` — gates the OK button per type-specific rules above
+
+**`PipelineValidation` (Core + UI contract):**
+- `PipelineValidator.Validate(IReadOnlyList<ITransformStep>) -> PipelineValidationResult`
+- `PipelineValidationResult.CanRun` is true only when there are no blocking issues
+- `PipelineValidationIssue` includes `StepIndex` (nullable for pipeline-level issues), `Code`,
+  `Message`, and `Severity`
+- `PipelineViewModel` maps issues onto step cards (`ValidationMessage`, `HasValidationError`)
+  and exposes an aggregated blocking reason for the run button tooltip/status text
+
+**Fact-state model (Phase 1 baseline):**
+- Fact: `SourceExists` (starts `true` per selected node)
+- `Copy`: precondition `SourceExists=true`; postcondition leaves `SourceExists=true`
+- `Move`: precondition `SourceExists=true`; postcondition sets `SourceExists=false`
+- `Delete`: precondition `SourceExists=true`; postcondition sets `SourceExists=false`
+- `Flatten` / `Rename` / `Rebase` / `Convert`: precondition `SourceExists=true`; no change to
+  `SourceExists`
+- Cross-step rule: `Delete` must be final when present (safety + UX clarity)
 
 **`PipelinePresetStore`** — async CRUD over `.sc2pipe` files in the user data directory:
 - `GetStandardPresetsAsync()` — returns hardcoded read-only list
