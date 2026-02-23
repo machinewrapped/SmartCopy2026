@@ -1,0 +1,54 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vmPipeline="clr-namespace:SmartCopy.UI.ViewModels.Pipeline"
+        xmlns:editorViews="clr-namespace:SmartCopy.UI.Views.Pipeline.StepEditors"
+        x:Class="SmartCopy.UI.Views.Pipeline.EditStepDialog"
+        x:DataType="vmPipeline:EditStepDialogViewModel"
+        Title="{Binding Title}"
+        Width="460"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#1e1e1e">
+    <StackPanel Spacing="12" Margin="20">
+        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="#4facfe" />
+
+        <Border BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="4" Padding="10">
+            <ContentControl Content="{Binding Editor}">
+                <ContentControl.DataTemplates>
+                    <DataTemplate DataType="vmPipeline:CopyStepEditorViewModel">
+                        <editorViews:CopyMoveStepEditor />
+                    </DataTemplate>
+                    <DataTemplate DataType="vmPipeline:MoveStepEditorViewModel">
+                        <editorViews:CopyMoveStepEditor />
+                    </DataTemplate>
+                    <DataTemplate DataType="vmPipeline:DeleteStepEditorViewModel">
+                        <editorViews:DeleteStepEditor />
+                    </DataTemplate>
+                    <DataTemplate DataType="vmPipeline:FlattenStepEditorViewModel">
+                        <editorViews:FlattenStepEditor />
+                    </DataTemplate>
+                    <DataTemplate DataType="vmPipeline:RenameStepEditorViewModel">
+                        <editorViews:RenameStepEditor />
+                    </DataTemplate>
+                    <DataTemplate DataType="vmPipeline:RebaseStepEditorViewModel">
+                        <editorViews:RebaseStepEditor />
+                    </DataTemplate>
+                    <DataTemplate DataType="vmPipeline:ConvertStepEditorViewModel">
+                        <editorViews:ConvertStepEditor />
+                    </DataTemplate>
+                </ContentControl.DataTemplates>
+            </ContentControl>
+        </Border>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button Content="Cancel"
+                    Width="80"
+                    Command="{Binding CancelCommand}" />
+            <Button Content="OK"
+                    Width="80"
+                    IsDefault="True"
+                    Command="{Binding OkCommand}" />
+        </StackPanel>
+    </StackPanel>
+</Window>

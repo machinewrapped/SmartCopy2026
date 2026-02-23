@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using SmartCopy.Core.Pipeline;
 
 namespace SmartCopy.UI.ViewModels;
 
@@ -13,17 +15,134 @@ public partial class PreviewItemViewModel : ViewModelBase
 
     [ObservableProperty]
     private string _action = string.Empty;
+
+    [ObservableProperty]
+    private PlanWarning? _warning;
+}
+
+public partial class PreviewGroupViewModel : ViewModelBase
+{
+    [ObservableProperty]
+    private string _title = string.Empty;
+
+    [ObservableProperty]
+    private bool _isReadyGroup;
+
+    public ObservableCollection<PreviewItemViewModel> Actions { get; } = [];
+
+    public int Count => Actions.Count;
 }
 
 public partial class PreviewViewModel : ViewModelBase
 {
+    private DeleteMode _deleteMode = DeleteMode.Trash;
+
     [ObservableProperty]
-    private bool _isOpen;
+    private bool _isDeletePipeline;
 
-    public ObservableCollection<PreviewItemViewModel> Actions { get; } = new();
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanRun))]
+    private bool _isConfirmed;
 
-    public PreviewViewModel()
+    [ObservableProperty]
+    private long _totalEstimatedOutputBytes;
+
+    [ObservableProperty]
+    private int _totalActionCount;
+
+    public ObservableCollection<PreviewGroupViewModel> Groups { get; } = [];
+
+    public bool CanRun => !IsDeletePipeline || IsConfirmed;
+
+    public string ConfirmButtonText
     {
-        Actions.Add(new PreviewItemViewModel { SourcePath = "Rock/Beatles/Abbey Road/01 Come Together.flac", DestinationPath = "01 Come Together.mp3", Action = "Convert & Copy" });
+        get
+        {
+            if (!IsDeletePipeline)
+            {
+                return $"▶ Run ({TotalActionCount} actions)";
+            }
+
+            return _deleteMode == DeleteMode.Permanent
+                ? $"⚠ Permanently Delete {TotalActionCount}"
+                : $"🗑 Delete {TotalActionCount} files to Bin";
+        }
+    }
+
+    public event Action? RunRequested;
+    public event Action? CancelRequested;
+
+    public void LoadFrom(OperationPlan plan, bool isDeletePipeline, DeleteMode deleteMode)
+    {
+        _deleteMode = deleteMode;
+        IsDeletePipeline = isDeletePipeline;
+        IsConfirmed = false;
+        TotalActionCount = plan.Actions.Count;
+        TotalEstimatedOutputBytes = plan.TotalEstimatedOutputBytes;
+
+        Groups.Clear();
+        var grouped = plan.Actions
+            .GroupBy(action => action.Warning)
+            .OrderBy(group => group.Key.HasValue ? 0 : 1);
+
+        foreach (var group in grouped)
+        {
+            var title = group.Key switch
+            {
+                PlanWarning.DestinationExists => $"Destination Exists ({group.Count()})",
+                PlanWarning.NameConflict => $"Name Conflict ({group.Count()})",
+                PlanWarning.PermissionIssue => $"Permission Issue ({group.Count()})",
+                _ => $"Ready ({group.Count()})",
+            };
+
+            var vm = new PreviewGroupViewModel
+            {
+                Title = title,
+                IsReadyGroup = !group.Key.HasValue,
+            };
+
+            foreach (var action in group)
+            {
+                vm.Actions.Add(new PreviewItemViewModel
+                {
+                    SourcePath = action.SourcePath,
+                    DestinationPath = action.DestinationPath,
+                    Action = action.StepSummary,
+                    Warning = action.Warning,
+                });
+            }
+
+            Groups.Add(vm);
+        }
+
+        RunCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(ConfirmButtonText));
+    }
+
+    partial void OnIsConfirmedChanged(bool value)
+    {
+        _ = value;
+        OnPropertyChanged(nameof(CanRun));
+        RunCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnIsDeletePipelineChanged(bool value)
+    {
+        _ = value;
+        OnPropertyChanged(nameof(CanRun));
+        RunCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(ConfirmButtonText));
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRun))]
+    private void Run()
+    {
+        RunRequested?.Invoke();
+    }
+
+    [RelayCommand]
+    private void Cancel()
+    {
+        CancelRequested?.Invoke();
     }
 }

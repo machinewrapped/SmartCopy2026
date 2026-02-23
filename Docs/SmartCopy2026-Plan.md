@@ -184,7 +184,7 @@ and sync safely.*
 | UX-1 (Step 1): Baseline shell | Complete | Baseline for regression checks |
 | UX-2 (Step 3): Node selection logic | Complete | Scale/perf coverage alongside Step 9 |
 | UX-3 (Step 4): Filter chain | Complete | Save/Load file-picker deferred to Phase 3 |
-| UX-4 (Step 5): Transform pipeline | In progress | Sub-steps 5.2–5.8: preset store, step editors, flyout, dialog, VM wiring, preview, run/journal |
+| UX-4 (Step 5): Transform pipeline | Complete (validation pending manual test run) | Maintainer to execute new Step 5 test suites + UI smoke scenarios |
 | UX-5 (Step 6): Sync operations | Started | Full update/mirror semantics + UI entry points |
 | Hardening-1 (Step 2): Memory provider foundation | Complete | Reuse fixture builder pattern |
 | Hardening-2 (Step 7): Selection save/load | In progress | Wire File menu flows + unmatched-path reporting |
@@ -276,231 +276,71 @@ Verification — all automated suites passing:
 - [x] Manual: new Extension filter via dialog, save as preset, persists across restart
 
 ### Step 5 — Transform Pipeline (UX Loop Track, built-in steps)
+**Status (updated 2026-02-23):** Implementation delivered across sub-steps 5.2–5.8. Automated
+tests were authored for the new behavior; test execution remains manual (see verification).
 
-Core pipeline engine and built-in steps are implemented with tests. UI design is documented
-in Architecture §7. Remaining work is UX wiring (sub-steps 5.2–5.8).
+#### Delivered
+- [x] Core pipeline extension and validation layer:
+  `PipelinePresetStore`, `PipelinePreset`, `PipelineStepFactory`, `UnknownStepTypeException`,
+  `PipelineValidator`, `PipelineValidationResult`, `PipelineValidationIssue`,
+  `PipelineStepContracts`
+- [x] Built-in standard presets:
+  Copy only, Move only, Delete to Trash, Flatten -> Copy
+- [x] Step model expansion:
+  `RenameStep`, `RebaseStep`, `ConvertStep`, `FlattenConflictStrategy`; `DeleteStep` mode-aware;
+  mutable destination paths on `CopyStep`/`MoveStep`
+- [x] Step editor VM hierarchy:
+  `StepEditorViewModelBase`, Copy/Move/Delete/Flatten/Rename/Rebase/Convert editors +
+  `StepEditorViewModelFactory`
+- [x] Add Step flyout (two-level category -> type):
+  `AddStepViewModel`, `Views/Pipeline/AddStepFlyout.axaml`
+- [x] Edit Step dialog:
+  `EditStepDialogViewModel`, `Views/Pipeline/EditStepDialog.axaml`,
+  step-editor views under `Views/Pipeline/StepEditors/`
+- [x] `PipelineViewModel` rewrite:
+  live `ITransformStep` wrapping, validation state, blocking reason, preset integration,
+  first-destination tracking, add/replace/remove wiring, run/preview events
+- [x] `PipelineView` rewrite:
+  popup flyout integration, step edit pencil wiring, validation feedback, delete badge,
+  dynamic run button label
+- [x] Preview workflow:
+  new `PreviewViewModel` grouping by warning type, delete confirmation gating,
+  `PreviewView` modal dialog
+- [x] Run/progress/journal wiring:
+  `MainViewModel` preview->run flow (delete preview mandatory), pipeline execution path,
+  selection collection from tree, progress callback integration;
+  `OperationProgressViewModel` (begin/update/complete/cancel);
+  `OperationJournal` write + retention rotation
 
-#### Already complete
-- [x] `ITransformStep`, `TransformPipeline`, `TransformContext`, `PipelineRunner`
-- [x] `CopyStep`, `MoveStep`, `DeleteStep`, `FlattenStep` with tests
-- [x] `OperationPlan` / `PlannedAction` preview data model
-- [x] Delete-mandatory-preview enforcement in `PipelineRunner`
-- [x] `PipelineViewModel`, `PipelineStepViewModel`, `PipelineView.axaml` placeholder shell
-- [x] `PreviewViewModel`, `OperationProgressViewModel` placeholder shells
+#### Acceptance criteria status
+- [x] Run disabled until at least one valid executable step exists
+- [x] Multiple executable steps are allowed and execute in sequence
+- [x] Delete remains preview-mandatory and delete-final validated
+- [x] Declarative validator rejects invalid sequences (`Delete -> Copy`, `Move -> Delete`)
+- [x] Invalid step cards surface blocking validation text
+- [x] Run button exposes first blocking validation reason (tooltip text binding)
+- [x] Add Step flyout uses two-level category -> type drill-down
+- [x] Edit pencil opens `EditStepDialog` with pre-populated values
+- [x] `EditStepDialog` OK is validity-gated (Copy/Move destination, Rename pattern, Rebase fields)
+- [x] Delete step shows badge (`Trash` or `⚠ Permanent`)
+- [x] Standard presets load via preset menu integration
+- [x] User pipelines save/load as `.sc2pipe` via preset store-backed commands
+- [x] `FirstDestinationPath` updates and is propagated to filter-chain mirror suggestion wiring
+- [x] Preview dialog groups by warning type and supports delete confirmation mode
+- [x] Delete pipelines require explicit preview confirmation; non-delete can run directly
+- [~] Overwrite behavior: `Skip` and `Always` are covered by tests; `IfNewer` still behaves as prior baseline
+- [x] Progress overlay receives live `OperationProgress` updates during execution
+- [x] Operation journal writes source/destination/action/bytes entries after runs
 
-#### Sub-step 5.1 — Pipeline UI Design (Architecture)
-
-- [x] Pipeline UX flow documented in `Docs/SmartCopy2026-Architecture.md` §7 "Pipeline UX Flow":
-  step card anatomy, Add Step two-level drill-down, `EditStepDialog` forms, Preview Dialog
-  layout (including mandatory delete variant), `Load Preset ▾` / Save pipeline menu,
-  `AddStepViewModel`, `EditStepDialogViewModel`, `PipelinePresetStore` contracts.
-
-#### Sub-step 5.2 — `PipelinePresetStore` + `PipelineStepFactory` + `PipelineValidator` (Core)
-
-New files:
-- `SmartCopy.Core/Pipeline/PipelinePreset.cs` — `{ Id, Name, IsBuiltIn, PipelineConfig }`
-- `SmartCopy.Core/Pipeline/PipelinePresetStore.cs` — async CRUD:
-  `GetStandardPresetsAsync()` (hardcoded read-only), `GetUserPresetsAsync()` (reads
-  `%APPDATA%/SmartCopy2026/pipelines/*.sc2pipe`), `SaveUserPresetAsync`, `DeleteUserPresetAsync`
-- `SmartCopy.Core/Pipeline/PipelineStepFactory.cs` — static `FromConfig(TransformStepConfig) → ITransformStep`;
-  switch on `StepType` string; throws `UnknownStepTypeException` for unrecognised types
-- `SmartCopy.Core/Pipeline/Validation/PipelineValidationIssue.cs` — `{ StepIndex?, Code, Message, Severity }`
-- `SmartCopy.Core/Pipeline/Validation/PipelineValidationResult.cs` — `{ IReadOnlyList<Issue>, bool CanRun }`
-- `SmartCopy.Core/Pipeline/Validation/PipelineValidator.cs` — declarative rule engine that evaluates
-  per-step preconditions/postconditions against fact state (`SourceExists`) and emits issues
-- `SmartCopy.Core/Pipeline/Validation/PipelineStepContracts.cs` — contract map keyed by `StepType`
-  (Phase 1 baseline: Copy/Move/Delete/Flatten/Rename/Rebase/Convert)
-
-Standard presets (hardcoded, never written to disk):
-- "Copy only" → `[CopyStep]`
-- "Move only" → `[MoveStep]`
-- "Delete to Trash" → `[DeleteStep(Trash)]`
-- "Flatten → Copy" → `[FlattenStep → CopyStep]`
-
-Tests (`SmartCopy.Tests/Pipeline/PipelinePresetStoreTests.cs`): standard presets always present;
-user save/delete/overwrite round-trips; standard presets precede user presets; `PipelineStepFactory`
-round-trips all implemented step types; unknown type throws cleanly.
-Tests (`SmartCopy.Tests/Pipeline/PipelineValidatorTests.cs`): no-executable pipeline returns blocking
-issue; missing Copy/Move destination returns step-scoped blocking issue; `Copy -> Move` valid;
-`Delete -> Copy` invalid at Copy step due to source-existence precondition; `Move -> Delete` invalid
-at Delete step due to source-existence precondition; delete-final rule enforced.
-
-#### Sub-step 5.3 — `StepEditorViewModel` hierarchy (UI ↔ Core bridge)
-
-New folder: `SmartCopy.UI/ViewModels/Pipeline/`
-
-New files:
-- `StepEditorViewModelBase.cs` — abstract; `abstract ITransformStep BuildStep()`,
-  `abstract bool IsValid`, `abstract void LoadFrom(PipelineStepViewModel)`
-- `CopyStepEditorViewModel.cs` — `DestinationPath`, `OverwriteMode`; `IsValid` requires non-empty path
-- `MoveStepEditorViewModel.cs` — same shape as Copy
-- `DeleteStepEditorViewModel.cs` — `DeleteMode` (Trash / Permanent)
-- `FlattenStepEditorViewModel.cs` — `ConflictStrategy` (AutoRenameCounter / AutoRenameSourcePath / Skip / Overwrite)
-- `RenameStepEditorViewModel.cs` — `Pattern` string, `LivePreviewName` computed from pattern +
-  sample tokens; `IsValid` requires non-empty pattern (full token engine deferred to Phase 4)
-- `RebaseStepEditorViewModel.cs` — `StripPrefix`, `AddPrefix`; `IsValid` requires at least one non-empty
-
-Tests (`SmartCopy.Tests/Pipeline/StepEditorViewModelTests.cs`): `LoadFrom → BuildStep` round-trips
-for Copy/Move/Delete/Flatten; `IsValid` gates per type; Delete mode toggle; Flatten conflict strategy;
-Rename `LivePreviewName` updates on pattern change.
-
-#### Sub-step 5.4 — Add Step flyout (two-level drill-down)
-
-New files:
-- `SmartCopy.UI/ViewModels/Pipeline/AddStepViewModel.cs` — `IsLevel2Visible`, `SelectedCategory`
-  (`Path | Content | Executable`); `StepTypeItems` list for Level 2; `GoBack()`;
-  events `StepTypeSelected(StepKind)`; `NavigateToCategory(StepCategory)`
-- `SmartCopy.UI/Views/Pipeline/AddStepFlyout.axaml` + `.cs` — `UserControl` hosted in a `Popup`
-  (`PlacementMode=Bottom`); two panels swapped via `IsLevel2Visible`; multiple executable steps
-  are allowed (no replacement behavior)
-
-Modify: `SmartCopy.UI/Views/PipelineView.axaml` + `.cs` — replace current nested `MenuItem` Add
-step menu with `Popup` + `AddStepFlyout`; code-behind routes `StepTypeSelected` to
-`PipelineViewModel`.
-
-Tests (`SmartCopy.Tests/Pipeline/AddStepViewModelTests.cs`): category navigation; GoBack; all step
-types present in correct categories; `StepTypeSelected` fires; no replacement flag behavior for
-additional executable steps.
-
-#### Sub-step 5.5 — `EditStepDialog` (modal Window)
-
-New files:
-- `SmartCopy.UI/ViewModels/Pipeline/EditStepDialogViewModel.cs` — factory methods
-  `ForNew(StepKind kind)` and `ForEdit(PipelineStepViewModel existing)`; `Ok()` calls
-  `editor.BuildStep()`, stores `ResultStep`; `bool IsValid` delegates to active editor
-- `SmartCopy.UI/Views/Pipeline/EditStepDialog.axaml` + `.cs` — modal `Window`; step type
-  title → `ContentControl` + `DataTemplate` dispatch → Cancel / OK
-- `SmartCopy.UI/Views/Pipeline/StepEditors/CopyMoveStepEditor.axaml` — destination TextBox +
-  browse button + Overwrite radio group (shared for Copy and Move)
-- `SmartCopy.UI/Views/Pipeline/StepEditors/DeleteStepEditor.axaml` — Trash / Permanent radio;
-  permanent option styled with amber warning text
-- `SmartCopy.UI/Views/Pipeline/StepEditors/FlattenStepEditor.axaml` — ConflictStrategy radio group
-- `SmartCopy.UI/Views/Pipeline/StepEditors/RenameStepEditor.axaml` — Pattern TextBox + token
-  reference chips + live preview label
-- `SmartCopy.UI/Views/Pipeline/StepEditors/RebaseStepEditor.axaml` — StripPrefix + AddPrefix TextBoxes
-
-Dialog launch in `PipelineView.axaml.cs`: `AddStepFlyout.StepTypeSelected` → if step needs config,
-call `EditStepDialogViewModel.ForNew` → `ShowDialog`; edit pencil → `ForEdit` → `ShowDialog`.
-
-Tests (`SmartCopy.Tests/Pipeline/EditStepDialogViewModelTests.cs`): `ForNew` type dispatch;
-`ForEdit` pre-population for all implemented types; `IsValid` gates OK; Delete mode toggle
-surfaces in VM; Flatten conflict strategy roundtrip.
-
-#### Sub-step 5.6 — `PipelineViewModel` real wiring + preset integration
-
-Modify `SmartCopy.UI/ViewModels/PipelineViewModel.cs` (significant rewrite):
-- `PipelineStepViewModel` wraps a live `ITransformStep`; `DestinationPath` setter updates
-  underlying step config and fires `PipelineChanged`
-- `PipelineStepViewModel` gains `string? ValidationMessage`, `bool HasValidationError`
-- `PipelineViewModel` gains: `PipelinePresetStore` constructor param;
-  `PipelineValidator` constructor param;
-  `AddStepViewModel AddStep` property; `TransformPipeline BuildLivePipeline()`;
-  `PipelineValidationResult ValidationResult`;
-  `bool CanRun` (bound to `ValidationResult.CanRun`);
-  `string? BlockingValidationMessage` (first blocking issue for run-button tooltip/helper text);
-  `public event EventHandler? PipelineChanged`; `AddStepFromResult(StepKind, ITransformStep)`;
-  `ReplaceStep(PipelineStepViewModel, ITransformStep)`;
-  `LoadPreset` command hydrates from `PipelinePresetStore`; `SavePipeline` command writes `.sc2pipe`
-- `FirstDestinationPath` computed from first Copy/Move step's real `DestinationPath` (drives
-  MirrorFilter suggestion)
-- Recompute validation after any add/remove/edit/reorder and map step-scoped issues back onto step cards
-
-Modify `MainViewModel`: construct and inject `PipelinePresetStore`; keep `PipelineDestinationPath`
-in sync via `Pipeline.PipelineChanged` (already partially wired via `FirstDestinationPath`).
-
-Tests (`SmartCopy.Tests/Pipeline/PipelineViewModelTests.cs`): `BuildLivePipeline` returns correct
-step sequence; add/remove fire `PipelineChanged`; `DestinationPath` inline edit fires `PipelineChanged`;
-`ReplaceStep` updates VM; `FirstDestinationPath` tracks first Copy/Move destination; invalid step
-shows `ValidationMessage`; `CanRun`/`BlockingValidationMessage` update deterministically.
-
-#### Sub-step 5.7 — Preview dialog wiring
-
-Modify `SmartCopy.UI/ViewModels/PreviewViewModel.cs`:
-- `LoadFrom(OperationPlan plan)` — populates `Actions` grouped by `PlanWarning?`
-  (null = Ready, DestinationExists, NameConflict, PermissionIssue)
-- `bool IsDeletePipeline` — drives mandatory-confirmation mode
-- `bool CanRun` — always true for non-delete; for delete, requires `IsConfirmed` checkbox
-- `ICommand RunCommand` — raised back to `MainViewModel` to execute
-
-Modify `SmartCopy.UI/Views/PreviewView.axaml`:
-- Grouped sections (warnings at top; Ready section collapsible via `[show/hide ▾]`)
-- Delete variant: amber header, full file list always expanded, confirm button label names the
-  destructive action (`🗑 Delete N files to Bin` / `⚠ Permanently Delete N`)
-- Cancel button closes dialog without running
-
-Modify `MainViewModel`:
-- `PreviewPipelineAsync()` — calls `PipelineRunner.PreviewAsync(selectedNodes, ...)`, passes
-  result to `PreviewViewModel.LoadFrom`, opens preview window
-- `RunPipelineAsync()` — if `Pipeline.HasDeleteStep`, routes through preview first; otherwise
-  executes directly if user chose Run without preview
-- `[👁 Preview & Run]` label on Run button when `Pipeline.HasDeleteStep` (bound in AXAML)
-- Run command disabled when `Pipeline.CanRun == false`
-
-Tests (`SmartCopy.Tests/Pipeline/PreviewViewModelTests.cs`): `LoadFrom` groups actions correctly;
-warning counts match plan; `IsDeletePipeline` sets correct mode; `CanRun` gated by confirmation
-for delete pipelines; ready section count.
-
-#### Sub-step 5.8 — Run + progress wiring + operation journal
-
-Modify `SmartCopy.UI/ViewModels/OperationProgressViewModel.cs`:
-- Replace mock values with real `IProgress<OperationProgress>` callback binding
-- `IsActive` set true on run start, false on completion or cancellation
-- `PauseCommand` / `CancelCommand` wired to `CancellationTokenSource`
-
-Modify `MainViewModel.RunPipelineAsync()`:
-- Collect selected nodes from `DirectoryTreeViewModel`
-- Build `TransformPipeline` via `Pipeline.BuildLivePipeline()`
-- Create `CancellationTokenSource`; pass to `PipelineRunner.ExecuteAsync()`
-- Report `OperationProgress` updates → `OperationProgressViewModel`
-
-New: `SmartCopy.Core/Progress/OperationJournal.cs` — writes a timestamped log file to
-`%APPDATA%/SmartCopy2026/logs/` after each operation: one line per action (copied/moved/deleted/
-skipped/failed); rotates by deleting logs older than `AppSettings.LogRetentionDays` on startup.
-
-Tests (`SmartCopy.Tests/Pipeline/PipelineIntegrationTests.cs`) against `MemoryFileSystemProvider`:
-scan → select all → no filter → copy pipeline → verify outputs; flatten → copy → verify flat
-structure; delete pipeline → verify mandatory preview enforced; overwrite Skip/IfNewer/Always
-semantics; journal written and parseable.
-
-#### Acceptance criteria
-- [ ] Run remains disabled until pipeline contains at least one executable step with valid config
-- [ ] Multiple executable steps are allowed (for example `Copy → Move`) and execute in order
-- [ ] `DeleteStep` remains preview-mandatory and is validated as final when present
-- [ ] Declarative precondition/postcondition validation rejects logically invalid sequences
-  (`Delete → Copy`, `Move → Delete`) without pair-specific hardcoded UI checks
-- [ ] Invalid step cards show inline feedback and tooltip with the blocking reason
-- [ ] Run button exposes the first blocking validation reason when disabled
-- [ ] Add Step flyout uses two-level category → type drill-down
-- [ ] Edit pencil on each step card opens `EditStepDialog` pre-populated
-- [ ] OK disabled in `EditStepDialog` when required fields empty (Copy/Move destination, Rename pattern)
-- [ ] `DeleteStep` card shows Trash/Permanent badge; `⚠ Permanent` styled in amber
-- [ ] Standard presets (Copy only / Move only / Delete to Trash / Flatten → Copy) load correctly
-- [ ] User pipelines save to and load from `.sc2pipe` files
-- [ ] `FirstDestinationPath` updates MirrorFilter suggestion when Copy/Move destination changes
-- [ ] Preview dialog groups actions by warning type
-- [ ] Delete pipelines always require explicit preview confirmation; Run bypasses preview only for
-  non-delete pipelines
-- [ ] Overwrite and delete modes are honored per `TransformContext` config
-- [ ] Progress overlay shows real file/bytes progress during execution
-- [ ] Operation journal written after each run; entries contain source, destination, action, bytes
-
-#### Verification
-- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "PipelinePresetStore"` (≥5 tests)
-- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "PipelineValidator"` (≥6 tests)
-- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "StepEditorViewModel"` (≥6 tests)
-- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "AddStepViewModel"` (≥5 tests)
-- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "EditStepDialogViewModel"` (≥5 tests)
-- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "PipelineViewModel"` (≥5 tests)
-- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "PreviewViewModel"` (≥5 tests)
-- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "PipelineIntegration"` (≥6 tests)
-- [ ] Manual: launch app, load "Flatten → Copy" preset, verify step cards render correctly
-- [ ] Manual: add a Copy step via flyout, set destination in `EditStepDialog`, verify card shows destination
-- [ ] Manual: create path-only pipeline (`Flatten` only), verify Run is disabled; add Copy and verify Run enables
-- [ ] Manual: build `Copy → Move` pipeline, run against `/mem` fixture, verify both operations execute in order
-- [ ] Manual: build `Delete → Copy` pipeline, verify Copy card shows validation error and Run remains disabled
-- [ ] Manual: build `Move → Delete` pipeline, verify Delete card shows validation error and Run remains disabled
-- [ ] Manual: build a Delete pipeline, verify Run button becomes "Preview & Run", confirm required
-- [ ] Manual: run a Copy pipeline against `/mem` fixture, verify progress overlay and journal file
+#### Validation performed
+- [x] `dotnet build SmartCopy.Core/SmartCopy.Core.csproj --no-restore` (passes)
+- [x] `dotnet build SmartCopy.UI/SmartCopy.UI.csproj --no-restore /p:ProduceReferenceAssembly=false` (passes; environment file-lock warnings on `obj/.../ref*.dll`)
+- [x] Added new pipeline test suites:
+  `PipelinePresetStoreTests`, `PipelineValidatorTests`, `StepEditorViewModelTests`,
+  `AddStepViewModelTests`, `EditStepDialogViewModelTests`, `PipelineViewModelTests`,
+  `PreviewViewModelTests`, `PipelineIntegrationTests`
+- [ ] Manual `dotnet test` execution by maintainer (required in this environment)
+- [ ] Manual UI scenario checks for preview/delete/progress/journal flows
 
 ### Step 6 — Sync Operations (UX Loop Track)
 

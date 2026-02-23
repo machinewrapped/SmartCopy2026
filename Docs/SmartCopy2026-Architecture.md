@@ -51,6 +51,14 @@ SmartCopy2026/
 │   │   ├── TransformContext.cs
 │   │   ├── PipelineRunner.cs
 │   │   ├── PipelineConfig.cs
+│   │   ├── PipelinePresetStore.cs
+│   │   ├── PipelineStepFactory.cs
+│   │   ├── UnknownStepTypeException.cs
+│   │   ├── Validation/
+│   │   │   ├── PipelineValidator.cs
+│   │   │   ├── PipelineValidationResult.cs
+│   │   │   ├── PipelineValidationIssue.cs
+│   │   │   └── PipelineStepContracts.cs
 │   │   └── Steps/
 │   │       ├── CopyStep.cs             # Executable: write to target
 │   │       ├── MoveStep.cs             # Executable: move to target
@@ -67,7 +75,8 @@ SmartCopy2026/
 │   │   ├── SelectionSerializer.cs      # txt / m3u / json
 │   │   └── SelectionSnapshot.cs
 │   └── Progress/
-│       └── OperationProgress.cs
+│       ├── OperationProgress.cs
+│       └── OperationJournal.cs
 │
 ├── SmartCopy.App/                  # Avalonia application host + DI root
 │   ├── App.axaml / App.axaml.cs
@@ -84,6 +93,10 @@ SmartCopy2026/
 │   │   ├── FileListViewModel.cs
 │   │   ├── FilterChainViewModel.cs
 │   │   ├── PipelineViewModel.cs
+│   │   ├── Pipeline/
+│   │   │   ├── AddStepViewModel.cs
+│   │   │   ├── EditStepDialogViewModel.cs
+│   │   │   └── *StepEditorViewModel.cs
 │   │   ├── OperationProgressViewModel.cs
 │   │   └── PreviewViewModel.cs
 │   ├── Views/
@@ -92,6 +105,10 @@ SmartCopy2026/
 │   │   ├── FileListView.axaml
 │   │   ├── FilterChainView.axaml
 │   │   ├── PipelineView.axaml
+│   │   ├── Pipeline/
+│   │   │   ├── AddStepFlyout.axaml
+│   │   │   ├── EditStepDialog.axaml
+│   │   │   └── StepEditors/*.axaml
 │   │   ├── OperationProgressView.axaml
 │   │   └── PreviewView.axaml
 │   ├── Controls/
@@ -269,6 +286,16 @@ public class TransformContext
 `PipelineRunner` iterates selected nodes, creates a fresh `TransformContext` for each, passes it
 through each step in sequence, and reports `OperationProgress` after each file completes.
 
+Phase 1 implementation notes:
+- `CopyStep` and `MoveStep` carry mutable `DestinationPath`; empty paths are permitted at object
+  construction and blocked by validation (`Step.MissingDestination`).
+- `DeleteStep` carries per-step `Mode` (`Trash`/`Permanent`) in config.
+- `FlattenStep` carries `ConflictStrategy` in config (`AutoRenameCounter` baseline default).
+- `TransformResult` includes `SourcePath` so operation journal entries can include both source and
+  destination values.
+- Standard presets are loaded from `PipelinePresetStore`:
+  `Copy only`, `Move only`, `Delete to Trash`, `Flatten -> Copy`.
+
 `TransformPipeline.Validate()` delegates to a validator that returns structured issues:
 - pipeline-level blocking issues (for example, no executable step)
 - step-level blocking issues (for example, missing destination path on Copy)
@@ -347,9 +374,11 @@ public record OperationProgress(
 );
 ```
 
-`CopyStep` reads in configurable chunks (default 256KB, user-adjustable in settings). After each
-chunk: increment `TotalBytesCompleted`, report progress. ETA = `(TotalBytes - TotalBytesCompleted)
-/ (TotalBytesCompleted / Elapsed.TotalSeconds)`.
+Current Phase 1 behavior reports progress after each file completes (file-level granularity),
+including completed file counts, aggregate bytes, and ETA estimation.
+
+Chunk-level byte streaming progress remains a planned enhancement for Phase 2/3 once provider-level
+copy progress is threaded through `CopyStep`/`MoveStep` end-to-end.
 
 ### 5.6 Directory Scanner
 
@@ -749,7 +778,7 @@ Contract examples for built-in Phase 1 steps:
 | `Flatten` | `SourceExists=true` | none |
 | `Rename` | `SourceExists=true`, pattern non-empty | none |
 | `Rebase` | `SourceExists=true`, strip/add prefix has value | none |
-| `Convert` | `SourceExists=true`, plugin/output format valid | none |
+| `Convert` | `SourceExists=true` | none |
 
 This model rejects invalid sequences without pair-specific hardcoding. Example:
 `[Delete -> Copy]` fails at `Copy` because `SourceExists` is false at that point.
@@ -758,12 +787,12 @@ Output contract for UI + runner guard:
 
 - `PipelineValidationIssue`:
   - `StepIndex` (nullable for pipeline-level issue)
-  - `Code` (stable machine-readable id, e.g. `precondition.source_exists`)
+  - `Code` (stable machine-readable id, e.g. `Step.SourceMissing`)
   - `Message` (user-readable)
-  - `Severity` (`Error` blocks run, `Warning` does not)
+  - `Severity` (`Blocking` blocks run, `Warning` does not)
 - `PipelineValidationResult`:
   - `Issues` list
-  - `CanRun` (`true` when there are no `Error` issues)
+  - `CanRun` (`true` when there are no `Blocking` issues)
 
 `PipelineViewModel` maps step-scoped issues onto cards and exposes the first blocking message near
 the run controls. `TransformPipeline.Validate()` reuses the same validator and throws only when
@@ -1357,11 +1386,18 @@ public record PipelineConfig(
 
 **Copy/Move step parameters** (stored in `TransformStepConfig.Parameters`):
 ```json
-{ "destinationPath": "/mnt/phone/Music", "overwriteMode": "IfNewer" }
+{ "destinationPath": "/mnt/phone/Music" }
 ```
 The destination path is part of the individual step's config, not a top-level pipeline
 property. This allows a single pipeline to contain multiple Copy/Move steps writing to
 different locations.
+
+Additional step parameter keys used in Phase 1:
+- `Delete`: `{ "deleteMode": "Trash" | "Permanent" }`
+- `Flatten`: `{ "conflictStrategy": "AutoRenameCounter" | "AutoRenameSourcePath" | "Skip" | "Overwrite" }`
+- `Rename`: `{ "pattern": "{name}_..." }`
+- `Rebase`: `{ "stripPrefix": "...", "addPrefix": "..." }`
+- `Convert`: `{ "outputExtension": "mp3" }`
 
 ### AppSettings (JSON — `settings.json`)
 

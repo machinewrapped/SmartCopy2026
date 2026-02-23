@@ -1,0 +1,14 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vmPipeline="clr-namespace:SmartCopy.UI.ViewModels.Pipeline"
+             x:Class="SmartCopy.UI.Views.Pipeline.StepEditors.DeleteStepEditor"
+             x:DataType="vmPipeline:DeleteStepEditorViewModel">
+    <StackPanel Spacing="8">
+        <TextBlock Text="Delete Mode" FontSize="12" Opacity="0.7" />
+        <ComboBox ItemsSource="{Binding DeleteModes}"
+                  SelectedItem="{Binding DeleteMode, Mode=TwoWay}" />
+        <TextBlock Text="Permanent delete cannot be recovered."
+                   Foreground="#f0ad4e"
+                   FontSize="11" />
+    </StackPanel>
+</UserControl>

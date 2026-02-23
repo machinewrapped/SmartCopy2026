@@ -1,0 +1,13 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vmPipeline="clr-namespace:SmartCopy.UI.ViewModels.Pipeline"
+             x:Class="SmartCopy.UI.Views.Pipeline.StepEditors.RebaseStepEditor"
+             x:DataType="vmPipeline:RebaseStepEditorViewModel">
+    <StackPanel Spacing="8">
+        <TextBlock Text="Strip Prefix" FontSize="12" Opacity="0.7" />
+        <TextBox Text="{Binding StripPrefix, Mode=TwoWay}" />
+
+        <TextBlock Text="Add Prefix" FontSize="12" Opacity="0.7" />
+        <TextBox Text="{Binding AddPrefix, Mode=TwoWay}" />
+    </StackPanel>
+</UserControl>

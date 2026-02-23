@@ -1,0 +1,69 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
+        x:Class="SmartCopy.UI.Views.PreviewView"
+        x:DataType="vm:PreviewViewModel"
+        Title="Preview"
+        Width="900"
+        Height="560"
+        WindowStartupLocation="CenterOwner"
+        Background="#1e1e1e">
+    <Grid RowDefinitions="Auto,*,Auto" Margin="16">
+        <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,10">
+            <TextBlock Text="Preview"
+                       FontSize="16"
+                       FontWeight="SemiBold"
+                       Foreground="#4facfe" />
+            <TextBlock Text="{Binding TotalActionCount, StringFormat=\{0\} actions}"
+                       Opacity="0.75" />
+            <Border IsVisible="{Binding IsDeletePipeline}"
+                    Background="#3a2f1b"
+                    CornerRadius="4"
+                    Padding="8">
+                <TextBlock Text="Delete confirmation is required before running."
+                           Foreground="#f0ad4e" />
+            </Border>
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Groups}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:PreviewGroupViewModel">
+                        <Expander Header="{Binding Title}"
+                                  IsExpanded="{Binding IsReadyGroup}">
+                            <ItemsControl ItemsSource="{Binding Actions}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:PreviewItemViewModel">
+                                        <Grid ColumnDefinitions="2*,2*,Auto" Margin="0,2,0,2">
+                                            <TextBlock Grid.Column="0" Text="{Binding SourcePath}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding DestinationPath}" Opacity="0.85" />
+                                            <TextBlock Grid.Column="2" Text="{Binding Action}" Opacity="0.75" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Expander>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <Grid Grid.Row="2" ColumnDefinitions="*,Auto,Auto" Margin="0,10,0,0">
+            <CheckBox Grid.Column="0"
+                      IsVisible="{Binding IsDeletePipeline}"
+                      IsChecked="{Binding IsConfirmed, Mode=TwoWay}"
+                      VerticalAlignment="Center"
+                      Content="I confirm this delete operation." />
+            <Button Grid.Column="1"
+                    Content="Cancel"
+                    Width="90"
+                    Margin="0,0,8,0"
+                    Command="{Binding CancelCommand}" />
+            <Button Grid.Column="2"
+                    Content="{Binding ConfirmButtonText}"
+                    Width="200"
+                    Command="{Binding RunCommand}" />
+        </Grid>
+    </Grid>
+</Window>

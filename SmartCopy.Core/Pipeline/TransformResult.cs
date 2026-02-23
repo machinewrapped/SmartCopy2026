@@ -5,5 +5,5 @@ public readonly record struct TransformResult(
     string StepType,
     string? DestinationPath = null,
     long OutputBytes = 0,
-    string? Message = null);
-
+    string? Message = null,
+    string? SourcePath = null);

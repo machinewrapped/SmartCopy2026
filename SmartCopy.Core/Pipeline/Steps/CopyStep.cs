@@ -10,15 +10,10 @@ public sealed class CopyStep : ITransformStep
 {
     public CopyStep(string destinationPath)
     {
-        if (string.IsNullOrWhiteSpace(destinationPath))
-        {
-            throw new ArgumentException("Destination path must not be empty.", nameof(destinationPath));
-        }
-
         DestinationPath = destinationPath;
     }
 
-    public string DestinationPath { get; }
+    public string DestinationPath { get; set; }
 
     public string StepType => "Copy";
     public bool IsPathStep => false;
@@ -37,7 +32,8 @@ public sealed class CopyStep : ITransformStep
             StepType: StepType,
             DestinationPath: destination,
             OutputBytes: context.SourceNode.Size,
-            Message: "Copy preview");
+            Message: "Copy preview",
+            SourcePath: context.SourceNode.FullPath);
     }
 
     public async Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)
@@ -55,7 +51,8 @@ public sealed class CopyStep : ITransformStep
                 StepType: StepType,
                 DestinationPath: destination,
                 OutputBytes: 0,
-                Message: "Skipped existing destination.");
+                Message: "Skipped existing destination.",
+                SourcePath: context.SourceNode.FullPath);
         }
 
         await using var sourceStream = context.ContentStream
@@ -67,7 +64,7 @@ public sealed class CopyStep : ITransformStep
             StepType: StepType,
             DestinationPath: destination,
             OutputBytes: context.SourceNode.Size,
-            Message: "Copied");
+            Message: "Copied",
+            SourcePath: context.SourceNode.FullPath);
     }
 }
-

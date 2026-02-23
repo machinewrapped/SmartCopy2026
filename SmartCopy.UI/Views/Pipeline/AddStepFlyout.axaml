@@ -1,0 +1,83 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vmPipeline="clr-namespace:SmartCopy.UI.ViewModels.Pipeline"
+             xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
+             x:Class="SmartCopy.UI.Views.Pipeline.AddStepFlyout"
+             x:DataType="vmPipeline:AddStepViewModel"
+             Width="300">
+    <Border Background="#1e1e1e" BorderBrush="#555" BorderThickness="1"
+            CornerRadius="6" Padding="4">
+        <Panel>
+            <StackPanel IsVisible="{Binding !IsLevel2Visible}" Spacing="1">
+                <TextBlock Text="Add Step"
+                           Margin="8,6,8,4"
+                           FontWeight="SemiBold"
+                           Foreground="#4facfe" />
+                <Separator Height="1" Background="#3e3e42" Margin="4,0" />
+
+                <Button Content="Path steps"
+                        Background="Transparent"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Left"
+                        Padding="8,6"
+                        CornerRadius="4"
+                        Command="{Binding NavigateToCategoryCommand}"
+                        CommandParameter="{x:Static vm:StepCategory.Path}" />
+
+                <Button Content="Content steps"
+                        Background="Transparent"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Left"
+                        Padding="8,6"
+                        CornerRadius="4"
+                        Command="{Binding NavigateToCategoryCommand}"
+                        CommandParameter="{x:Static vm:StepCategory.Content}" />
+
+                <Button Content="Executable steps"
+                        Background="Transparent"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Left"
+                        Padding="8,6"
+                        CornerRadius="4"
+                        Command="{Binding NavigateToCategoryCommand}"
+                        CommandParameter="{x:Static vm:StepCategory.Executable}" />
+            </StackPanel>
+
+            <StackPanel IsVisible="{Binding IsLevel2Visible}" Spacing="1">
+                <Grid ColumnDefinitions="Auto,*" Margin="4,4,4,2">
+                    <Button Grid.Column="0"
+                            Content="←"
+                            Command="{Binding GoBackCommand}"
+                            Background="Transparent"
+                            Padding="6,2"
+                            CornerRadius="4"
+                            FontSize="14" />
+                    <TextBlock Grid.Column="1"
+                               Margin="4,2,0,0"
+                               Text="Choose step type"
+                               FontWeight="SemiBold" />
+                </Grid>
+                <Separator Height="1" Background="#3e3e42" Margin="4,0" />
+
+                <ItemsControl ItemsSource="{Binding StepTypeItems}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vmPipeline:StepTypeItem">
+                            <Button Background="Transparent"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Left"
+                                    Padding="8,6"
+                                    CornerRadius="4"
+                                    Command="{Binding $parent[UserControl].((vmPipeline:AddStepViewModel)DataContext).SelectStepTypeCommand, FallbackValue={x:Null}}"
+                                    CommandParameter="{Binding Kind}">
+                                <StackPanel Orientation="Vertical" Spacing="1">
+                                    <TextBlock Text="{Binding DisplayName}" FontWeight="Medium" />
+                                    <TextBlock Text="{Binding Description}" FontSize="11" Opacity="0.55" />
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Panel>
+    </Border>
+</UserControl>

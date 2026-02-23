@@ -1,0 +1,11 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vmPipeline="clr-namespace:SmartCopy.UI.ViewModels.Pipeline"
+             x:Class="SmartCopy.UI.Views.Pipeline.StepEditors.FlattenStepEditor"
+             x:DataType="vmPipeline:FlattenStepEditorViewModel">
+    <StackPanel Spacing="8">
+        <TextBlock Text="Conflict Strategy" FontSize="12" Opacity="0.7" />
+        <ComboBox ItemsSource="{Binding ConflictStrategies}"
+                  SelectedItem="{Binding ConflictStrategy, Mode=TwoWay}" />
+    </StackPanel>
+</UserControl>

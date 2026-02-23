@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline;
 
@@ -19,20 +20,12 @@ public sealed class TransformPipeline
 
     public void Validate()
     {
-        if (_steps.Count == 0)
+        var validator = new PipelineValidator();
+        var result = validator.Validate(_steps);
+        if (!result.CanRun)
         {
-            throw new InvalidOperationException("Pipeline must contain at least one step.");
-        }
-
-        var executableSteps = _steps.Where(step => step.IsExecutable);
-        if (!executableSteps.Any())
-        {
-            throw new InvalidOperationException("Pipeline must contain at least one executable step.");
-        }
-
-        if (!_steps[^1].IsExecutable)
-        {
-            throw new InvalidOperationException("The final step must be executable.");
+            var issue = result.FirstBlockingIssue;
+            throw new InvalidOperationException(issue?.Message ?? "Pipeline is invalid.");
         }
     }
 }

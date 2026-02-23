@@ -1,9 +1,13 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using SmartCopy.Core.Progress;
 
 namespace SmartCopy.UI.ViewModels;
 
 public partial class OperationProgressViewModel : ViewModelBase
 {
+    private CancellationTokenSource? _cancellationTokenSource;
+
     [ObservableProperty]
     private bool _isActive;
 
@@ -19,12 +23,52 @@ public partial class OperationProgressViewModel : ViewModelBase
     [ObservableProperty]
     private string _timeRemaining = string.Empty;
 
-    public OperationProgressViewModel()
+    public void Begin(CancellationTokenSource cancellationTokenSource)
     {
+        _cancellationTokenSource = cancellationTokenSource;
         IsActive = true;
-        PercentComplete = 78;
-        StatusText = "142 files (2.3 GB) selected   17 filtered out";
-        TimeRemaining = "0:34 left";
-        CurrentFile = "Abbey Road/01 Come Together.flac";
+        PercentComplete = 0;
+        StatusText = "Starting operation...";
+        CurrentFile = string.Empty;
+        TimeRemaining = string.Empty;
+    }
+
+    public void Complete()
+    {
+        IsActive = false;
+        StatusText = "Completed";
+        TimeRemaining = "0:00 left";
+        _cancellationTokenSource = null;
+    }
+
+    public void Cancelled()
+    {
+        IsActive = false;
+        StatusText = "Cancelled";
+        TimeRemaining = string.Empty;
+        _cancellationTokenSource = null;
+    }
+
+    public void Update(OperationProgress progress)
+    {
+        CurrentFile = progress.CurrentFile;
+        PercentComplete = progress.TotalBytes <= 0
+            ? 0
+            : Math.Round((double)progress.TotalBytesCompleted / progress.TotalBytes * 100, 2);
+        StatusText = $"{progress.FilesCompleted}/{progress.FilesTotal} files";
+        TimeRemaining = $"{progress.EstimatedRemaining:mm\\:ss} left";
+    }
+
+    [RelayCommand]
+    private void Pause()
+    {
+        StatusText = "Pause is not implemented in Phase 1.";
+    }
+
+    [RelayCommand]
+    private void Cancel()
+    {
+        _cancellationTokenSource?.Cancel();
+        Cancelled();
     }
 }
