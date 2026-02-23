@@ -3,25 +3,17 @@
              xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels.Filters"
              x:Class="SmartCopy.UI.Views.FilterEditors.SizeRangeFilterEditorView"
              x:DataType="vm:SizeRangeFilterEditorViewModel">
-    <StackPanel Spacing="10">
-        <Grid ColumnDefinitions="Auto, *, Auto, Auto, Auto, *, Auto" ColumnSpacing="6">
+    <StackPanel Spacing="8">
+
+        <!-- Min row -->
+        <Grid ColumnDefinitions="40, *, Auto" ColumnSpacing="8">
             <TextBlock Grid.Column="0" Text="Min" VerticalAlignment="Center" />
             <NumericUpDown Grid.Column="1"
                            Value="{Binding MinValue}"
                            Minimum="0"
                            FormatString="0.##"
                            Watermark="any" />
-            <TextBlock Grid.Column="2" Text="–" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="3" Text="Max" VerticalAlignment="Center" />
-            <NumericUpDown Grid.Column="4"
-                           Value="{Binding MaxValue}"
-                           Minimum="0"
-                           FormatString="0.##"
-                           Watermark="any" />
-            <!-- Single unit selector (applies to both min and max) -->
-            <ComboBox Grid.Column="5"
-                      SelectedItem="{Binding Unit}"
-                      Margin="6,0,0,0">
+            <ComboBox Grid.Column="2" SelectedItem="{Binding MinUnit}">
                 <ComboBox.Items>
                     <vm:SizeUnit>Bytes</vm:SizeUnit>
                     <vm:SizeUnit>KB</vm:SizeUnit>
@@ -31,6 +23,26 @@
                 </ComboBox.Items>
             </ComboBox>
         </Grid>
+
+        <!-- Max row -->
+        <Grid ColumnDefinitions="40, *, Auto" ColumnSpacing="8">
+            <TextBlock Grid.Column="0" Text="Max" VerticalAlignment="Center" />
+            <NumericUpDown Grid.Column="1"
+                           Value="{Binding MaxValue}"
+                           Minimum="0"
+                           FormatString="0.##"
+                           Watermark="any" />
+            <ComboBox Grid.Column="2" SelectedItem="{Binding MaxUnit}">
+                <ComboBox.Items>
+                    <vm:SizeUnit>Bytes</vm:SizeUnit>
+                    <vm:SizeUnit>KB</vm:SizeUnit>
+                    <vm:SizeUnit>MB</vm:SizeUnit>
+                    <vm:SizeUnit>GB</vm:SizeUnit>
+                    <vm:SizeUnit>TB</vm:SizeUnit>
+                </ComboBox.Items>
+            </ComboBox>
+        </Grid>
+
         <TextBlock Text="Leave a field empty for no bound"
                    FontSize="11" Opacity="0.5" />
     </StackPanel>

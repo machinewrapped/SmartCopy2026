@@ -75,7 +75,7 @@ public sealed class FilterEditorViewModelTests
         var vm = new SizeRangeFilterEditorViewModel
         {
             MinValue = 1.5,
-            Unit = SizeUnit.GB,
+            MinUnit = SizeUnit.GB,
         };
 
         var filter = (SizeRangeFilter)vm.BuildFilter();

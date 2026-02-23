@@ -18,17 +18,20 @@ public partial class SizeRangeFilterEditorViewModel : FilterEditorViewModelBase
     private double? _maxValue;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsValid))]
-    private SizeUnit _unit = SizeUnit.MB;
+    private SizeUnit _minUnit = SizeUnit.MB;
+
+    [ObservableProperty]
+    private SizeUnit _maxUnit = SizeUnit.MB;
 
     partial void OnMinValueChanged(double? value) => AutoUpdateName();
     partial void OnMaxValueChanged(double? value) => AutoUpdateName();
-    partial void OnUnitChanged(SizeUnit value) => AutoUpdateName();
+    partial void OnMinUnitChanged(SizeUnit value) => AutoUpdateName();
+    partial void OnMaxUnitChanged(SizeUnit value) => AutoUpdateName();
 
     public override bool IsValid => MinValue.HasValue || MaxValue.HasValue;
 
-    private long? ToBytes(double? v) =>
-        v.HasValue ? (long)(v.Value * UnitMultiplier(Unit)) : null;
+    private long? ToBytes(double? v, SizeUnit unit) =>
+        v.HasValue ? (long)(v.Value * UnitMultiplier(unit)) : null;
 
     private static long UnitMultiplier(SizeUnit u) => u switch
     {
@@ -40,7 +43,7 @@ public partial class SizeRangeFilterEditorViewModel : FilterEditorViewModelBase
     };
 
     public override IFilter BuildFilter()
-        => new SizeRangeFilter(ToBytes(MinValue), ToBytes(MaxValue), Mode);
+        => new SizeRangeFilter(ToBytes(MinValue, MinUnit), ToBytes(MaxValue, MaxUnit), Mode);
 
     public override void LoadFrom(IFilter filter)
     {
@@ -50,29 +53,26 @@ public partial class SizeRangeFilterEditorViewModel : FilterEditorViewModelBase
         }
 
         Mode = sr.Mode;
-
-        // Back-calculate the best display unit from stored bytes
-        (MinValue, MaxValue, Unit) = BackCalculate(sr.MinBytes, sr.MaxBytes);
+        (MinValue, MinUnit) = BackCalculate(sr.MinBytes);
+        (MaxValue, MaxUnit) = BackCalculate(sr.MaxBytes);
         FilterName = sr.CustomName ?? string.Empty;
     }
 
     public override string GenerateName()
     {
         var prefix = Mode.ToString();
-        var from = MinValue.HasValue ? $"{MinValue} {Unit}" : "any";
-        var to = MaxValue.HasValue ? $"{MaxValue} {Unit}" : "any";
+        var from = MinValue.HasValue ? $"{MinValue} {MinUnit}" : "any";
+        var to = MaxValue.HasValue ? $"{MaxValue} {MaxUnit}" : "any";
         return $"{prefix} size {from} – {to}";
     }
 
-    private static (double? min, double? max, SizeUnit unit) BackCalculate(long? minBytes, long? maxBytes)
+    private static (double? value, SizeUnit unit) BackCalculate(long? bytes)
     {
-        var referenceBytes = maxBytes ?? minBytes ?? 0L;
-        var unit = BestUnitForBytes(referenceBytes);
-
+        if (!bytes.HasValue)
+            return (null, SizeUnit.MB);
+        var unit = BestUnitForBytes(bytes.Value);
         var multiplier = (double)UnitMultiplier(unit);
-        double? min = minBytes.HasValue ? Math.Round(minBytes.Value / multiplier, 2) : null;
-        double? max = maxBytes.HasValue ? Math.Round(maxBytes.Value / multiplier, 2) : null;
-        return (min, max, unit);
+        return (Math.Round(bytes.Value / multiplier, 2), unit);
     }
 
     /// <summary>
