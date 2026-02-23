@@ -24,8 +24,8 @@ public sealed class TransformPipeline
             throw new InvalidOperationException("Pipeline must contain at least one step.");
         }
 
-        var executableSteps = _steps.Where(step => step.IsExecutable).ToList();
-        if (executableSteps.Count != 1)
+        var executableSteps = _steps.Where(step => step.IsExecutable);
+        if (!executableSteps.Any())
         {
             throw new InvalidOperationException("Pipeline must contain at least one executable step.");
         }
