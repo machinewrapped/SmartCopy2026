@@ -183,10 +183,12 @@ public partial class PipelineStepViewModel : ViewModelBase
 public partial class PipelineViewModel : ViewModelBase
 {
     private const string CustomNameParameter = "customName";
+    private const int MaxRecentTargets = 10;
     private readonly PipelinePresetStore _presetStore;
     private readonly PipelineValidator _validator;
     private readonly string? _presetDirectory;
     private readonly StepPresetStore _stepPresetStore;
+    private readonly AppSettings? _appSettings;
 
     public ObservableCollection<PipelineStepViewModel> Steps { get; } = new();
     public ObservableCollection<PipelinePreset> StandardPresets { get; } = new();
@@ -194,6 +196,17 @@ public partial class PipelineViewModel : ViewModelBase
     public AddStepViewModel AddStep { get; }
 
     public StepPresetStore StepPresetStore => _stepPresetStore;
+
+    internal AppSettings? AppSettings => _appSettings;
+
+    internal void RecordRecentTarget(string path)
+    {
+        if (_appSettings is null || string.IsNullOrWhiteSpace(path)) return;
+        _appSettings.RecentTargets.Remove(path);
+        _appSettings.RecentTargets.Insert(0, path);
+        if (_appSettings.RecentTargets.Count > MaxRecentTargets)
+            _appSettings.RecentTargets.RemoveAt(MaxRecentTargets);
+    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanRun))]
@@ -234,6 +247,7 @@ public partial class PipelineViewModel : ViewModelBase
         _validator = validator ?? new PipelineValidator();
         _presetDirectory = presetDirectory;
         _stepPresetStore = stepPresetStore ?? new StepPresetStore();
+        _appSettings = appSettings;
 
         AddStep = new AddStepViewModel(_stepPresetStore, appSettings, stepPresetStorePath);
         AddStep.StepPresetPicked += OnStepPresetPicked;

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using SmartCopy.Core.FileSystem;
@@ -113,13 +114,13 @@ public class DirectoryTreeViewModel(IFileSystemProvider provider, string rootPat
         return root;
     }
 
-    private static FileSystemNode CloneNode(FileSystemNode sourceNode, FileSystemNode? parent)
+    private FileSystemNode CloneNode(FileSystemNode sourceNode, FileSystemNode? parent)
     {
         return new FileSystemNode
         {
             Name = sourceNode.Name,
             FullPath = sourceNode.FullPath,
-            RelativePath = sourceNode.RelativePath,
+            RelativePath = ComputeRelativePath(_rootPath, sourceNode.FullPath),
             IsDirectory = sourceNode.IsDirectory,
             Size = sourceNode.Size,
             CreatedAt = sourceNode.CreatedAt,
@@ -152,5 +153,20 @@ public class DirectoryTreeViewModel(IFileSystemProvider provider, string rootPat
         }
 
         return null;
+    }
+
+    private static string ComputeRelativePath(string rootPath, string fullPath)
+    {
+        if (fullPath.Equals(rootPath, StringComparison.OrdinalIgnoreCase))
+            return string.Empty;
+
+        var root = rootPath.EndsWith('/') || rootPath.EndsWith(Path.DirectorySeparatorChar)
+            ? rootPath
+            : rootPath + '/';
+
+        if (fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+            return fullPath[root.Length..];
+
+        return Path.GetFileName(fullPath);
     }
 }

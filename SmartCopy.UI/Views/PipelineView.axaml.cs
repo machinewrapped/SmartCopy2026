@@ -2,6 +2,7 @@ using System.Collections.Specialized;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using SmartCopy.Core.Pipeline;
+using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.UI.ViewModels;
 using SmartCopy.UI.ViewModels.Pipeline;
 using SmartCopy.UI.Views.Pipeline;
@@ -60,7 +61,7 @@ public partial class PipelineView : UserControl
 
         Dispatcher.UIThread.Post(() => AddStepPopup.IsOpen = false);
 
-        var vm = EditStepDialogViewModel.ForNew(kind);
+        var vm = EditStepDialogViewModel.ForNew(kind, _currentViewModel.AppSettings);
         var dialog = new EditStepDialog { DataContext = vm };
         var result = await dialog.ShowDialog<bool?>(parentWindow);
         if (result == true && vm.ResultStep is not null)
@@ -69,6 +70,11 @@ public partial class PipelineView : UserControl
             {
                 await SaveStepPresetAsync(kind, vm.ResultStep, vm.StepName);
             }
+
+            var destPath = (vm.ResultStep as CopyStep)?.DestinationPath
+                ?? (vm.ResultStep as MoveStep)?.DestinationPath;
+            if (destPath is not null)
+                _currentViewModel.RecordRecentTarget(destPath);
 
             _currentViewModel.AddStepFromResult(kind, vm.ResultStep, vm.ResultCustomName);
         }
@@ -81,7 +87,7 @@ public partial class PipelineView : UserControl
             return;
         }
 
-        var vm = EditStepDialogViewModel.ForEdit(step);
+        var vm = EditStepDialogViewModel.ForEdit(step, _currentViewModel.AppSettings);
         var dialog = new EditStepDialog { DataContext = vm };
         var result = await dialog.ShowDialog<bool?>(parentWindow);
         if (result == true && vm.ResultStep is not null)
@@ -90,6 +96,11 @@ public partial class PipelineView : UserControl
             {
                 await SaveStepPresetAsync(step.Kind, vm.ResultStep, vm.StepName);
             }
+
+            var destPath = (vm.ResultStep as CopyStep)?.DestinationPath
+                ?? (vm.ResultStep as MoveStep)?.DestinationPath;
+            if (destPath is not null)
+                _currentViewModel.RecordRecentTarget(destPath);
 
             _currentViewModel.ReplaceStep(step, vm.ResultStep, vm.ResultCustomName);
         }

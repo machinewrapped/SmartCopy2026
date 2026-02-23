@@ -367,7 +367,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         {
             Name = name,
             FullPath = path,
-            RelativePath = path.Equals(Root, StringComparison.OrdinalIgnoreCase) ? string.Empty : path.TrimStart('/'),
+            RelativePath = GetRelativeToRoot(path),
             IsDirectory = entry.IsDirectory,
             Size = entry.IsDirectory ? 0 : entry.Size,
             CreatedAt = entry.CreatedAt,
@@ -375,6 +375,17 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
             Attributes = entry.Attributes,
             Parent = parent,
         };
+    }
+
+    private static string GetRelativeToRoot(string path)
+    {
+        if (path.Equals(Root, StringComparison.OrdinalIgnoreCase))
+            return string.Empty;
+
+        var root = Root.EndsWith('/') ? Root : Root + '/';
+        return path.StartsWith(root, StringComparison.OrdinalIgnoreCase)
+            ? path[root.Length..]
+            : path.TrimStart('/');
     }
 
     private void TouchParentModifiedTime(string path, DateTime timestamp)

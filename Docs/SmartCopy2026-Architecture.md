@@ -289,6 +289,12 @@ public class TransformContext
 `PipelineRunner` iterates selected nodes, creates a fresh `TransformContext` for each, passes it
 through each step in sequence, and reports `OperationProgress` after each file completes.
 
+**Critical invariant:** `CurrentPath` is initialized from `node.RelativePath`, which must be
+relative to the user's selected source directory (not the filesystem or provider root).
+`DirectoryTreeViewModel.CloneNode` enforces this by recomputing `RelativePath` relative to the
+tree's browsing root. This ensures that `Copy /src → /dest` produces `/dest/<relative-structure>`
+rather than `/dest/<absolute-structure>`.
+
 Phase 1 implementation notes:
 - `CopyStep` and `MoveStep` carry mutable `DestinationPath`; empty paths are permitted at object
   construction and blocked by validation (`Step.MissingDestination`).
@@ -1346,7 +1352,7 @@ public class FileSystemNode : INotifyPropertyChanged
     // Filesystem data (immutable after scan)
     public string Name { get; init; }
     public string FullPath { get; init; }
-    public string RelativePath { get; init; }   // relative to scan root
+    public string RelativePath { get; init; }   // relative to browsing root (set by DirectoryTreeViewModel)
     public bool IsDirectory { get; init; }
     public long Size { get; init; }             // 0 for directories
     public DateTime CreatedAt { get; init; }
