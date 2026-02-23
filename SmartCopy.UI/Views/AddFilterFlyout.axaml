@@ -10,8 +10,18 @@
 
             <!-- Level 1: Filter type selection -->
             <StackPanel IsVisible="{Binding !IsLevel2Visible}" Spacing="1">
-                <TextBlock Text="Add Filter" FontWeight="SemiBold" Foreground="#4facfe"
-                           Margin="8,6,8,6" />
+                <Grid ColumnDefinitions="*, Auto" Margin="8,4,4,2">
+                    <TextBlock Grid.Column="0" Text="Add Filter" FontWeight="SemiBold" Foreground="#4facfe"
+                               VerticalAlignment="Center" Margin="0,2,0,2" />
+                    <Button Grid.Column="1"
+                            Content="✕"
+                            Command="{Binding CloseCommand}"
+                            Background="Transparent"
+                            Padding="6,2"
+                            CornerRadius="4"
+                            FontSize="12"
+                            Foreground="#a0a0a0" />
+                </Grid>
                 <Separator Height="1" Background="#3e3e42" Margin="4,0" />
                 <ItemsControl ItemsSource="{Binding FilterTypes}">
                     <ItemsControl.ItemTemplate>
@@ -37,8 +47,8 @@
             <!-- Level 2: Preset picker for selected type -->
             <StackPanel IsVisible="{Binding IsLevel2Visible}" Spacing="1">
 
-                <!-- Header row with Back button and type name -->
-                <Grid ColumnDefinitions="Auto, *" Margin="4,4,8,2">
+                <!-- Header row with Back button, type name, and close button -->
+                <Grid ColumnDefinitions="Auto, *, Auto" Margin="4,4,4,2">
                     <Button Grid.Column="0"
                             Content="←"
                             Command="{Binding GoBackCommand}"
@@ -51,6 +61,14 @@
                                FontWeight="SemiBold"
                                VerticalAlignment="Center"
                                Margin="4,0,0,0" />
+                    <Button Grid.Column="2"
+                            Content="✕"
+                            Command="{Binding CloseCommand}"
+                            Background="Transparent"
+                            Padding="6,2"
+                            CornerRadius="4"
+                            FontSize="12"
+                            Foreground="#a0a0a0" />
                 </Grid>
 
                 <Separator Height="1" Background="#3e3e42" Margin="4,0" />
@@ -74,15 +92,30 @@
                     <ItemsControl ItemsSource="{Binding RecentPresetsForType}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:PresetItem">
-                                <Button Background="Transparent"
-                                        HorizontalAlignment="Stretch"
-                                        HorizontalContentAlignment="Left"
-                                        Padding="8,5"
-                                        CornerRadius="4"
-                                        Command="{Binding $parent[UserControl].((vm:AddFilterViewModel)DataContext).PickPresetCommand, FallbackValue={x:Null}}"
-                                        CommandParameter="{Binding}">
-                                    <TextBlock Text="{Binding DisplayName}" />
-                                </Button>
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <Button Grid.Column="0"
+                                            Background="Transparent"
+                                            HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Left"
+                                            Padding="8,5"
+                                            CornerRadius="4"
+                                            Command="{Binding $parent[UserControl].((vm:AddFilterViewModel)DataContext).PickPresetCommand, FallbackValue={x:Null}}"
+                                            CommandParameter="{Binding}">
+                                        <TextBlock Text="{Binding DisplayName}" />
+                                    </Button>
+                                    <Button Grid.Column="1"
+                                            IsVisible="{Binding IsUserDefined}"
+                                            Content="🗑"
+                                            Width="28" Height="28" Padding="0"
+                                            HorizontalContentAlignment="Center"
+                                            VerticalContentAlignment="Center"
+                                            CornerRadius="4" Background="Transparent"
+                                            Foreground="#f44736" FontSize="12"
+                                            VerticalAlignment="Center"
+                                            ToolTip.Tip="Delete preset"
+                                            Command="{Binding $parent[UserControl].((vm:AddFilterViewModel)DataContext).DeletePresetCommand, FallbackValue={x:Null}}"
+                                            CommandParameter="{Binding}" />
+                                </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
@@ -94,15 +127,30 @@
                     <ItemsControl ItemsSource="{Binding PresetsForType}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:PresetItem">
-                                <Button Background="Transparent"
-                                        HorizontalAlignment="Stretch"
-                                        HorizontalContentAlignment="Left"
-                                        Padding="8,5"
-                                        CornerRadius="4"
-                                        Command="{Binding $parent[UserControl].((vm:AddFilterViewModel)DataContext).PickPresetCommand, FallbackValue={x:Null}}"
-                                        CommandParameter="{Binding}">
-                                    <TextBlock Text="{Binding DisplayName}" />
-                                </Button>
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <Button Grid.Column="0"
+                                            Background="Transparent"
+                                            HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Left"
+                                            Padding="8,5"
+                                            CornerRadius="4"
+                                            Command="{Binding $parent[UserControl].((vm:AddFilterViewModel)DataContext).PickPresetCommand, FallbackValue={x:Null}}"
+                                            CommandParameter="{Binding}">
+                                        <TextBlock Text="{Binding DisplayName}" />
+                                    </Button>
+                                    <Button Grid.Column="1"
+                                            IsVisible="{Binding IsUserDefined}"
+                                            Content="🗑"
+                                            Width="28" Height="28" Padding="0"
+                                            HorizontalContentAlignment="Center"
+                                            VerticalContentAlignment="Center"
+                                            CornerRadius="4" Background="Transparent"
+                                            Foreground="#f44736" FontSize="12"
+                                            VerticalAlignment="Center"
+                                            ToolTip.Tip="Delete preset"
+                                            Command="{Binding $parent[UserControl].((vm:AddFilterViewModel)DataContext).DeletePresetCommand, FallbackValue={x:Null}}"
+                                            CommandParameter="{Binding}" />
+                                </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>

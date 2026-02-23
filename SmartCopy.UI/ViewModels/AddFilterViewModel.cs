@@ -21,6 +21,7 @@ public sealed record FilterTypeItem(string TypeKey, string DisplayName, string D
 public sealed record PresetItem(FilterPreset Preset, bool IsRecent)
 {
     public string DisplayName => Preset.IsBuiltIn ? $"★ {Preset.Name}" : Preset.Name;
+    public bool IsUserDefined => !Preset.IsBuiltIn;
 }
 
 /// <summary>
@@ -87,6 +88,15 @@ public partial class AddFilterViewModel : ObservableObject
     {
         SelectedType = type;
         await LoadPresetsAsync(type.TypeKey);
+
+        if (PresetsForType.Count == 0 && RecentPresetsForType.Count == 0)
+        {
+            var typeKey = type.TypeKey;
+            GoBack();
+            NewFilterRequested?.Invoke(typeKey);
+            return;
+        }
+
         IsLevel2Visible = true;
     }
 
@@ -116,6 +126,26 @@ public partial class AddFilterViewModel : ObservableObject
         NewFilterRequested?.Invoke(typeKey);
     }
 
+    [RelayCommand]
+    private async Task DeletePresetAsync(PresetItem item)
+    {
+        await _presetStore.DeleteUserPresetAsync(SelectedType!.TypeKey, item.Preset.Id, _presetStorePath);
+
+        // Remove from MRU if present
+        if (_settings.FilterTypeMruPresetIds.TryGetValue(SelectedType.TypeKey, out var mru))
+            mru.Remove(item.Preset.Id);
+
+        // Refresh the preset lists in place
+        await LoadPresetsAsync(SelectedType.TypeKey);
+    }
+
+    [RelayCommand]
+    private void Close()
+    {
+        GoBack();
+        CloseRequested?.Invoke();
+    }
+
     // -------------------------------------------------------------------------
     // Events raised for the parent (FilterChainViewModel / code-behind)
     // -------------------------------------------------------------------------
@@ -125,6 +155,9 @@ public partial class AddFilterViewModel : ObservableObject
 
     /// <summary>Raised when the user chooses "＋ New..." for a given filter type.</summary>
     public event Action<string>? NewFilterRequested;
+
+    /// <summary>Raised when the user dismisses the flyout without picking anything.</summary>
+    public event Action? CloseRequested;
 
     // -------------------------------------------------------------------------
     // Internals

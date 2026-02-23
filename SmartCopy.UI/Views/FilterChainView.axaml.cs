@@ -32,6 +32,7 @@ public partial class FilterChainView : UserControl
                 _currentViewModel.NewFilterDialogRequested -= OnNewFilterDialogRequested;
                 _currentViewModel.EditFilterRequested -= OnEditFilterRequested;
                 _currentViewModel.AddFilter.PresetPicked -= OnPresetPickedClosePopup;
+                _currentViewModel.AddFilter.CloseRequested -= OnCloseRequestedClosePopup;
             }
 
             _currentViewModel = DataContext as FilterChainViewModel;
@@ -42,6 +43,7 @@ public partial class FilterChainView : UserControl
                 _currentViewModel.NewFilterDialogRequested += OnNewFilterDialogRequested;
                 _currentViewModel.EditFilterRequested += OnEditFilterRequested;
                 _currentViewModel.AddFilter.PresetPicked += OnPresetPickedClosePopup;
+                _currentViewModel.AddFilter.CloseRequested += OnCloseRequestedClosePopup;
             }
         };
 
@@ -55,6 +57,7 @@ public partial class FilterChainView : UserControl
     // ---- Add-filter popup ----
 
     private void OnPresetPickedClosePopup(FilterPreset _) => Dispatcher.UIThread.Post(() => AddFilterPopup.IsOpen = false);
+    private void OnCloseRequestedClosePopup() => Dispatcher.UIThread.Post(() => AddFilterPopup.IsOpen = false);
 
     private void OnAddFilterButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
