@@ -73,14 +73,6 @@ ViewModels use `[ObservableProperty]` source-gen attributes (no runtime reflecti
 4. PipelineView (step cards with → connectors)
 5. OperationProgressView (only visible when `IsActive = true`)
 
-### Value converters (SmartCopy.UI/Converters/)
-
-| Converter | Maps |
-|-----------|------|
-| `CheckStateConverter` | `CheckState` ↔ `bool?` (null = Indeterminate) |
-| `FileSizeConverter` | `long` bytes → "2.3 GB" |
-| `FilterResultColorConverter` | `FilterResult.Excluded` → SlateBlue brush |
-
 ### Key abstractions (see Docs/SmartCopy2026-Architecture.md)
 
 - **IFileSystemProvider** — unified interface for local disk, MTP devices, and in-memory (tests). Capabilities are declared via `ProviderCapabilities` flags.
@@ -98,6 +90,8 @@ ViewModels use `[ObservableProperty]` source-gen attributes (no runtime reflecti
 
 - **Architecture, Contracts, UI Behavior, and Data Schemas:** `Docs/SmartCopy2026-Architecture.md`
 - **Execution Plan, Delivery Scope, and Checklists:** `Docs/SmartCopy2026-Plan.md`
+
+Agents should offer to update the architecture and/or the plan after resolving a task, especially if it involved changes to the design or architecture of the system.
 
 ## Implementation Status
 
