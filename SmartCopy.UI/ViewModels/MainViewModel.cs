@@ -1,5 +1,8 @@
+using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Settings;
@@ -9,11 +12,20 @@ namespace SmartCopy.UI.ViewModels;
 
 public partial class MainViewModel : ViewModelBase
 {
+    private const int MaxRecentSources = 10;    // TODO: make this configurable
+
     [ObservableProperty]
     private string _sourcePath = string.Empty;
 
+    [ObservableProperty]
+    private string? _selectedSourceBookmark;
+
     private readonly MemoryFileSystemProvider _memoryProvider;
+    private readonly AppSettings _settings = new();
+    private readonly AppSettingsStore _settingsStore = new();
     private CancellationTokenSource? _filterCts;
+
+    public ObservableCollection<string> SourceBookmarks { get; } = [];
 
     public DirectoryTreeViewModel DirectoryTree { get; }
     public FileListViewModel FileList { get; }
@@ -25,21 +37,20 @@ public partial class MainViewModel : ViewModelBase
     public MainViewModel()
     {
         var presetStore = new FilterPresetStore();
-        var settings = new AppSettings();
 
         _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded();
-        SourcePath = MockMemoryFileSystemFactory.RootPath + "/";
+        SourcePath = MockMemoryFileSystemFactory.SourcePath;
 
-        FilterChain = new FilterChainViewModel(presetStore, settings);
+        FilterChain = new FilterChainViewModel(presetStore, _settings);
         DirectoryTree = new DirectoryTreeViewModel(_memoryProvider, MockMemoryFileSystemFactory.RootPath)
         {
-            ShowFilteredNodesInTree = settings.ShowFilteredNodesInTree
+            ShowFilteredNodesInTree = _settings.ShowFilteredNodesInTree
         };
 
         FilterChain.VisibilityToggled += (_, isVisible) =>
         {
             DirectoryTree.ShowFilteredNodesInTree = isVisible;
-            settings.ShowFilteredNodesInTree = isVisible;
+            _settings.ShowFilteredNodesInTree = isVisible;
         };
 
         FileList = new FileListViewModel(_memoryProvider, MockMemoryFileSystemFactory.DefaultFileListPath);
@@ -75,6 +86,76 @@ public partial class MainViewModel : ViewModelBase
         };
 
         InitializeInBackground();
+    }
+
+    partial void OnSelectedSourceBookmarkChanged(string? value)
+    {
+        if (value is null) return;
+        SourcePath = value;
+        _ = ApplySourcePathCoreAsync(value);
+    }
+
+    [RelayCommand]
+    private void RevertSourcePath()
+    {
+        SourcePath = DirectoryTree.RootNodes.FirstOrDefault()?.FullPath ?? SourcePath;
+    }
+
+    [RelayCommand]
+    private async Task ApplySourcePath()
+    {
+        var path = SourcePath.Trim();
+        if (string.IsNullOrWhiteSpace(path)) return;
+        await ApplySourcePathCoreAsync(path);
+    }
+
+    private async Task ApplySourcePathCoreAsync(string path)
+    {
+        var previousPath = DirectoryTree.RootNodes.FirstOrDefault()?.FullPath ?? path;
+        try
+        {
+            await DirectoryTree.ChangeRootAsync(path);
+            RecordRecentSource(path);
+            await ApplyFiltersAsync();
+            _settings.LastSourcePath = path;
+            await _settingsStore.SaveAsync(_settings);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Failed to change source path to '{path}': {ex}");
+            SourcePath = previousPath;
+        }
+    }
+
+    [RelayCommand]
+    private async Task BookmarkCurrentPath()
+    {
+        var path = SourcePath.Trim();
+        if (string.IsNullOrWhiteSpace(path) || _settings.FavouritePaths.Contains(path))
+            return;
+
+        _settings.FavouritePaths.Insert(0, path);
+        RefreshSourceBookmarks();
+        await _settingsStore.SaveAsync(_settings);
+    }
+
+    private void RecordRecentSource(string path)
+    {
+        _settings.RecentSources.Remove(path);
+        _settings.RecentSources.Insert(0, path);
+        if (_settings.RecentSources.Count > MaxRecentSources)
+        {
+            _settings.RecentSources.RemoveAt(MaxRecentSources);
+        }
+
+        RefreshSourceBookmarks();
+    }
+
+    private void RefreshSourceBookmarks()
+    {
+        SourceBookmarks.Clear();
+        foreach (var path in _settings.FavouritePaths.Concat(_settings.RecentSources).Distinct())
+            SourceBookmarks.Add(path);
     }
 
     private async void OnChainChanged(object? sender, EventArgs e)
@@ -116,6 +197,19 @@ public partial class MainViewModel : ViewModelBase
 
     private async Task InitializeAsync()
     {
+        // Load persisted settings; merge into existing _settings instance
+        // (FilterChainViewModel holds a ref to the same instance).
+        var saved = await _settingsStore.LoadAsync();
+        _settings.RecentSources = saved.RecentSources;
+        _settings.FavouritePaths = saved.FavouritePaths;
+        _settings.LastSourcePath = saved.LastSourcePath;
+
+        if (saved.LastSourcePath is { Length: > 0 })
+        {
+            SourcePath = saved.LastSourcePath;
+        }
+        RefreshSourceBookmarks();
+
         // Phase 1: hardcode /mem/Mirror as the mirror-filter comparison path.
         FilterChain.PipelineDestinationPath = MockMemoryFileSystemFactory.TargetPath;
 
@@ -126,8 +220,26 @@ public partial class MainViewModel : ViewModelBase
 
         await DirectoryTree.InitializeAsync(MockMemoryFileSystemFactory.DefaultFileListPath);
 
+        // TODO: automatically reading the last used directory on startup could be expensive,
+        // especially if it was a network drive or MTP. It should definitely be a setting that can be turned off.
+        // However, for Phase 1 when the filesystem is in-memory it is convenient for validating the UI/UX.
+        if (SourcePath is { Length: > 0 })
+        {
+            try
+            {
+                await DirectoryTree.ChangeRootAsync(SourcePath);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to set initial source path to '{SourcePath}': {ex}");
+                SourcePath = DirectoryTree.RootNodes.FirstOrDefault()?.FullPath ?? SourcePath;
+            }
+        }
+
         if (DirectoryTree.SelectedNode != null)
+        {
             await FileList.LoadFilesForNodeAsync(DirectoryTree.SelectedNode);
+        }
 
         // Apply filters to the freshly loaded tree.
         await ApplyFiltersAsync();

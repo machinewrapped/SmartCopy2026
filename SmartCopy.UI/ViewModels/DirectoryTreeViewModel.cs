@@ -9,7 +9,7 @@ namespace SmartCopy.UI.ViewModels;
 public class DirectoryTreeViewModel(IFileSystemProvider provider, string rootPath) : ViewModelBase
 {
     private readonly IFileSystemProvider _provider = provider;
-    private readonly string _rootPath = rootPath;
+    private string _rootPath = rootPath;
     private FileSystemNode? _selectedNode;
 
     public ObservableCollection<FileSystemNode> RootNodes { get; } = [];
@@ -52,6 +52,12 @@ public class DirectoryTreeViewModel(IFileSystemProvider provider, string rootPat
         {
             SelectByPath(initialSelectionPath);
         }
+    }
+
+    public async Task ChangeRootAsync(string newRootPath, CancellationToken ct = default)
+    {
+        _rootPath = newRootPath;
+        await InitializeAsync(ct: ct);
     }
 
     public bool SelectByPath(string fullPath)
