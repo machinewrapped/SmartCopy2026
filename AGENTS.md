@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 This file provides guidance to AI agents when working with code in this repository.
 
@@ -30,10 +30,10 @@ dotnet publish SmartCopy.App/SmartCopy.App.csproj -c Release --self-contained tr
 
 Four projects in `SmartCopy2026.slnx`:
 
-- **SmartCopy.Core** — Pure business logic, no UI references. Houses `FileSystemNode`, `CheckState`, `FilterResult`, and will contain `IFileSystemProvider`, `IFilter`, `FilterChain`, `TransformPipeline`.
+- **SmartCopy.Core** — Pure business logic, no UI references. Houses `FileSystemNode`, `CheckState`, `FilterResult`, `IFileSystemProvider`, `IFilter`, `FilterChain`, and `TransformPipeline`.
 - **SmartCopy.App** — Avalonia application host. `Program.cs` bootstraps the DI container and Avalonia builder. `App.axaml.cs` wires DI to ViewModels.
 - **SmartCopy.UI** — MVVM layer. ViewModels inherit `CommunityToolkit.Mvvm.ObservableObject`. Views are `.axaml` files.
-- **SmartCopy.Tests** — xUnit + NSubstitute. Uses `MemoryFileSystemProvider` (not yet implemented) for fast, hermetic tests.
+- **SmartCopy.Tests** — xUnit + NSubstitute. Uses `MemoryFileSystemProvider` for fast, hermetic tests.
 
 ## Architecture
 
@@ -81,7 +81,7 @@ ViewModels use `[ObservableProperty]` source-gen attributes (no runtime reflecti
 | `FileSizeConverter` | `long` bytes → "2.3 GB" |
 | `FilterResultColorConverter` | `FilterResult.Excluded` → SlateBlue brush |
 
-### Key abstractions (to be implemented per design doc)
+### Key abstractions (see Docs/SmartCopy2026-Architecture.md)
 
 - **IFileSystemProvider** — unified interface for local disk, MTP devices, and in-memory (tests). Capabilities are declared via `ProviderCapabilities` flags.
 - **IFilter / FilterChain** — composable filters (Wildcard, Mirror, DateRange, etc.). Each filter returns `Included` or `Excluded` per node.
@@ -94,14 +94,16 @@ ViewModels use `[ObservableProperty]` source-gen attributes (no runtime reflecti
 - Trash by default; permanent delete is an explicit opt-in.
 - Filesystem watcher uses a 300 ms debounce before triggering rescan.
 
+## Documentation Signposting
+
+- **Architecture, Contracts, UI Behavior, and Data Schemas:** `Docs/SmartCopy2026-Architecture.md`
+- **Execution Plan, Delivery Scope, and Checklists:** `Docs/SmartCopy2026-Plan.md`
+
 ## Implementation Status
 
-The UI shell and Core models are complete (Phase 1, Step 1). All ViewModels are wired with stub data. Next steps follow `Docs/SmartCopy2026-Plan.md §8`:
+We are deep into Phase 1 (Core Workflows, Memory-Backed). Live local filesystem integration is deferred to Phase 2. Current progress follows `Docs/SmartCopy2026-Plan.md §8`:
 
-1. Core models + `LocalFileSystemProvider`
-2. Directory scanner with progressive loading
-3. Filter chain with all filter types
-4. Transform pipeline with built-in steps
-5. Sync operations, selection save/load, settings persistence, filesystem watcher
-
-The full design — including algorithms, data schemas, and phased roadmap — lives in `Docs/SmartCopy2026-Plan.md`.
+- **Complete:** UI baseline shell, Core Models (`FileSystemNode`, `MemoryFileSystemProvider`), Node Selection Logic (tri-state propagation).
+- **Mostly Complete:** Filter Chain (Live UX is wired, full UI implementation near complete).
+- **In Progress:** Transform pipeline (built-in steps implemented, UI wiring pending), Sync operations, Selection save/load, Settings persistence.
+- **Not Started:** Shell observability updates, Accessibility baseline, live filesystem integration (Phase 2).
