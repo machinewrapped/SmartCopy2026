@@ -1,2 +1,8 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Normalise all text files to LF in repo and working copies.
+# This overrides the global core.autocrlf=true on Windows and keeps
+# line endings consistent across Windows/Linux/macOS contributors.
+* text=auto eol=lf
+
+# Ensure batch files keep CRLF, which Windows requires for execution.
+*.bat text eol=crlf
+*.cmd text eol=crlf
