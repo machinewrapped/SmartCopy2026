@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vmPipeline="clr-namespace:SmartCopy.UI.ViewModels.Pipeline"
              xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
+             xmlns:corePipeline="clr-namespace:SmartCopy.Core.Pipeline;assembly=SmartCopy.Core"
              x:Class="SmartCopy.UI.Views.Pipeline.AddStepFlyout"
              x:DataType="vmPipeline:AddStepViewModel"
              Width="300">
@@ -28,6 +29,15 @@
                 </Grid>
                 <Separator Height="1" Background="#3e3e42" Margin="4,0" />
 
+                <Button Content="Executable steps"
+                        Background="Transparent"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Left"
+                        Padding="8,6"
+                        CornerRadius="4"
+                        Command="{Binding NavigateToCategoryCommand}"
+                        CommandParameter="{x:Static vm:StepCategory.Executable}" />
+
                 <Button Content="Path steps"
                         Background="Transparent"
                         HorizontalAlignment="Stretch"
@@ -37,23 +47,45 @@
                         Command="{Binding NavigateToCategoryCommand}"
                         CommandParameter="{x:Static vm:StepCategory.Path}" />
 
-                <Button Content="Content steps"
-                        Background="Transparent"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Left"
-                        Padding="8,6"
-                        CornerRadius="4"
-                        Command="{Binding NavigateToCategoryCommand}"
-                        CommandParameter="{x:Static vm:StepCategory.Content}" />
+                <Separator Height="1" Background="#3e3e42" Margin="4,4" />
 
-                <Button Content="Executable steps"
+                <Button Content="Load preset ▸"
                         Background="Transparent"
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Left"
                         Padding="8,6"
-                        CornerRadius="4"
-                        Command="{Binding NavigateToCategoryCommand}"
-                        CommandParameter="{x:Static vm:StepCategory.Executable}" />
+                        CornerRadius="4">
+                    <Button.Flyout>
+                        <MenuFlyout Placement="RightEdgeAlignedTop">
+                            <MenuItem Header="Standard" ItemsSource="{Binding StandardPresets, FallbackValue={x:Null}}">
+                                <MenuItem.ItemTemplate>
+                                    <DataTemplate x:DataType="corePipeline:PipelinePreset">
+                                        <MenuItem Header="{Binding Name}"
+                                                  Command="{Binding $parent[UserControl].((vmPipeline:AddStepViewModel)DataContext).LoadPresetCommand, FallbackValue={x:Null}}"
+                                                  CommandParameter="{Binding Name}" />
+                                    </DataTemplate>
+                                </MenuItem.ItemTemplate>
+                            </MenuItem>
+
+                            <Separator />
+
+                            <MenuItem Header="My Pipelines" ItemsSource="{Binding UserPresets, FallbackValue={x:Null}}">
+                                <MenuItem.ItemTemplate>
+                                    <DataTemplate x:DataType="corePipeline:PipelinePreset">
+                                        <MenuItem Header="{Binding Name}"
+                                                  Command="{Binding $parent[UserControl].((vmPipeline:AddStepViewModel)DataContext).LoadPresetCommand, FallbackValue={x:Null}}"
+                                                  CommandParameter="{Binding Name}" />
+                                    </DataTemplate>
+                                </MenuItem.ItemTemplate>
+                            </MenuItem>
+
+                            <Separator />
+
+                            <MenuItem Header="Save current pipeline..."
+                                      Command="{Binding SavePipelineCommand, FallbackValue={x:Null}}" />
+                        </MenuFlyout>
+                    </Button.Flyout>
+                </Button>
             </StackPanel>
 
             <!-- Level 2: Step type selection -->
@@ -112,7 +144,7 @@
                             CornerRadius="4"
                             FontSize="14" />
                     <TextBlock Grid.Column="1"
-                               Text="{Binding SelectedStepType.DisplayName, FallbackValue=''}"
+                               Text="{Binding SelectedStepTypeName}"
                                FontWeight="SemiBold"
                                VerticalAlignment="Center"
                                Margin="4,0,0,0" />

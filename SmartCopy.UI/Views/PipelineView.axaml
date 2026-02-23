@@ -37,42 +37,6 @@
                            FontWeight="SemiBold"
                            Foreground="#4facfe"
                            VerticalAlignment="Center" />
-
-                <Button Content="Load Preset ▾" CornerRadius="4">
-                    <Button.Flyout>
-                        <MenuFlyout Placement="BottomEdgeAlignedLeft">
-                            <MenuItem Header="Standard">
-                                <MenuItem ItemsSource="{Binding StandardPresets}">
-                                    <MenuItem.ItemTemplate>
-                                        <DataTemplate x:DataType="corePipeline:PipelinePreset">
-                                            <MenuItem Header="{Binding Name}"
-                                                      Command="{Binding $parent[UserControl].((vm:PipelineViewModel)DataContext).LoadPresetAsyncCommand}"
-                                                      CommandParameter="{Binding Name}" />
-                                        </DataTemplate>
-                                    </MenuItem.ItemTemplate>
-                                </MenuItem>
-                            </MenuItem>
-
-                            <Separator />
-
-                            <MenuItem Header="My Pipelines" ItemsSource="{Binding UserPresets}">
-                                <MenuItem.ItemTemplate>
-                                    <DataTemplate x:DataType="corePipeline:PipelinePreset">
-                                        <MenuItem Header="{Binding Name}"
-                                                  Command="{Binding $parent[UserControl].((vm:PipelineViewModel)DataContext).LoadPresetAsyncCommand}"
-                                                  CommandParameter="{Binding Name}" />
-                                    </DataTemplate>
-                                </MenuItem.ItemTemplate>
-                            </MenuItem>
-
-                            <Separator />
-
-                            <MenuItem Header="Save current pipeline..."
-                                      Command="{Binding SavePipelineAsyncCommand}" />
-
-                        </MenuFlyout>
-                    </Button.Flyout>
-                </Button>
             </StackPanel>
 
             <ScrollViewer x:Name="StepsScrollViewer"

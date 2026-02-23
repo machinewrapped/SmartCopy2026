@@ -251,6 +251,8 @@ public partial class PipelineViewModel : ViewModelBase
 
         AddStep = new AddStepViewModel(_stepPresetStore, appSettings, stepPresetStorePath);
         AddStep.StepPresetPicked += OnStepPresetPicked;
+        AddStep.LoadPipelinePresetRequested += OnAddStepLoadPipelinePresetRequested;
+        AddStep.SavePipelineRequested += OnAddStepSavePipelineRequested;
 
         Steps.CollectionChanged += OnStepsCollectionChanged;
 
@@ -266,6 +268,16 @@ public partial class PipelineViewModel : ViewModelBase
             ? null
             : preset.Name;
         AddStepFromResult(PipelineStepViewModel.ToKind(step.StepType), step, customName);
+    }
+
+    private void OnAddStepLoadPipelinePresetRequested(string name)
+    {
+        LoadPresetCommand.Execute(name);
+    }
+
+    private void OnAddStepSavePipelineRequested()
+    {
+        SavePipelineCommand.Execute(null);
     }
 
     public TransformPipeline BuildLivePipeline()
@@ -328,6 +340,7 @@ public partial class PipelineViewModel : ViewModelBase
         }
 
         LoadPreset(preset);
+        AddStep.RequestClose();
     }
 
     [RelayCommand]
@@ -434,6 +447,9 @@ public partial class PipelineViewModel : ViewModelBase
         {
             UserPresets.Add(preset);
         }
+
+        AddStep.StandardPresets = StandardPresets;
+        AddStep.UserPresets = UserPresets;
     }
 
     private void Revalidate()

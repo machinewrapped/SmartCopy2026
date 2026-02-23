@@ -70,7 +70,10 @@ public partial class AddStepViewModel : ObservableObject
     private bool _isLevel3Visible;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SelectedStepTypeName))]
     private StepTypeItem? _selectedStepType;
+
+    public string SelectedStepTypeName => SelectedStepType?.DisplayName ?? string.Empty;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasPresets))]
@@ -79,6 +82,16 @@ public partial class AddStepViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasRecentPresets))]
     private IReadOnlyList<StepPresetItem> _recentPresetsForType = [];
+
+    // -------------------------------------------------------------------------
+    // Pipeline presets (Level 1)
+    // -------------------------------------------------------------------------
+
+    [ObservableProperty]
+    private IReadOnlyList<PipelinePreset> _standardPresets = [];
+
+    [ObservableProperty]
+    private IReadOnlyList<PipelinePreset> _userPresets = [];
 
     public bool HasPresets => PresetsForType.Count > 0;
     public bool HasRecentPresets => RecentPresetsForType.Count > 0;
@@ -99,6 +112,12 @@ public partial class AddStepViewModel : ObservableObject
     public event Action<StepCategory>? CategoryNavigated;
 
     public event Action? CloseRequested;
+
+    /// <summary>Raised when the user picks a pipeline preset.</summary>
+    public event Action<string>? LoadPipelinePresetRequested;
+
+    /// <summary>Raised when the user requests saving the current pipeline.</summary>
+    public event Action? SavePipelineRequested;
 
     // -------------------------------------------------------------------------
     // Commands
@@ -177,7 +196,24 @@ public partial class AddStepViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void LoadPreset(string name)
+    {
+        LoadPipelinePresetRequested?.Invoke(name);
+    }
+
+    [RelayCommand]
+    private void SavePipeline()
+    {
+        SavePipelineRequested?.Invoke();
+    }
+
+    [RelayCommand]
     private void Close()
+    {
+        RequestClose();
+    }
+
+    public void RequestClose()
     {
         ResetToLevel1();
         CloseRequested?.Invoke();
