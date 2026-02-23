@@ -47,6 +47,9 @@
             </ContentControl>
         </Border>
 
+        <CheckBox Content="Save as preset"
+                  IsChecked="{Binding SaveAsPreset}" />
+
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
             <Button Content="Cancel"
                     Width="80"

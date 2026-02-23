@@ -30,5 +30,11 @@ public sealed class AppSettings
     /// At most 5 entries per type, most-recently-used first.
     /// </summary>
     public Dictionary<string, List<string>> FilterTypeMruPresetIds { get; set; } = [];
+
+    /// <summary>
+    /// MRU preset IDs per step type. Key = StepType string (e.g. "Delete").
+    /// At most 5 entries per type, most-recently-used first.
+    /// </summary>
+    public Dictionary<string, List<string>> StepTypeMruPresetIds { get; set; } = [];
 }
 

@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Pipeline.Validation;
+using SmartCopy.Core.Settings;
 using SmartCopy.UI.ViewModels.Pipeline;
 
 namespace SmartCopy.UI.ViewModels;
@@ -163,7 +164,7 @@ public partial class PipelineStepViewModel : ViewModelBase
         StepChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private static StepKind ToKind(string stepType)
+    internal static StepKind ToKind(string stepType)
     {
         return stepType switch
         {
@@ -185,11 +186,14 @@ public partial class PipelineViewModel : ViewModelBase
     private readonly PipelinePresetStore _presetStore;
     private readonly PipelineValidator _validator;
     private readonly string? _presetDirectory;
+    private readonly StepPresetStore _stepPresetStore;
 
     public ObservableCollection<PipelineStepViewModel> Steps { get; } = new();
     public ObservableCollection<PipelinePreset> StandardPresets { get; } = new();
     public ObservableCollection<PipelinePreset> UserPresets { get; } = new();
-    public AddStepViewModel AddStep { get; } = new();
+    public AddStepViewModel AddStep { get; }
+
+    public StepPresetStore StepPresetStore => _stepPresetStore;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanRun))]
@@ -202,7 +206,7 @@ public partial class PipelineViewModel : ViewModelBase
 
     public bool HasDeleteStep => Steps.Any(step => step.Step is DeleteStep);
 
-    public string RunButtonLabel => HasDeleteStep ? "👁 Preview & Run" : "▶ Run";
+    public string RunButtonLabel => HasDeleteStep ? "⚠ Run" : "▶ Run";
 
     public string FirstDestinationPath
     {
@@ -221,16 +225,33 @@ public partial class PipelineViewModel : ViewModelBase
     public PipelineViewModel(
         PipelinePresetStore? presetStore = null,
         PipelineValidator? validator = null,
-        string? presetDirectory = null)
+        string? presetDirectory = null,
+        StepPresetStore? stepPresetStore = null,
+        AppSettings? appSettings = null,
+        string? stepPresetStorePath = null)
     {
         _presetStore = presetStore ?? new PipelinePresetStore();
         _validator = validator ?? new PipelineValidator();
         _presetDirectory = presetDirectory;
+        _stepPresetStore = stepPresetStore ?? new StepPresetStore();
+
+        AddStep = new AddStepViewModel(_stepPresetStore, appSettings, stepPresetStorePath);
+        AddStep.StepPresetPicked += OnStepPresetPicked;
 
         Steps.CollectionChanged += OnStepsCollectionChanged;
 
         InitializePresetsInBackground();
         Revalidate();
+    }
+
+    private void OnStepPresetPicked(StepPreset preset)
+    {
+        var step = PipelineStepFactory.FromConfig(preset.Config);
+        var autoName = PipelineStepDisplay.GetSummary(step);
+        var customName = string.Equals(preset.Name, autoName, StringComparison.OrdinalIgnoreCase)
+            ? null
+            : preset.Name;
+        AddStepFromResult(PipelineStepViewModel.ToKind(step.StepType), step, customName);
     }
 
     public TransformPipeline BuildLivePipeline()

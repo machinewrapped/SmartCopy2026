@@ -35,6 +35,9 @@ public partial class EditStepDialogViewModel : ObservableObject
     [ObservableProperty]
     private string _stepName = string.Empty;
 
+    [ObservableProperty]
+    private bool _saveAsPreset;
+
     public bool IsValid => Editor.IsValid;
 
     public event Action? OkRequested;

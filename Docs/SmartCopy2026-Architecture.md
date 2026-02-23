@@ -53,6 +53,9 @@ SmartCopy2026/
 │   │   ├── PipelineConfig.cs
 │   │   ├── PipelinePresetStore.cs
 │   │   ├── PipelineStepFactory.cs
+│   │   ├── StepPreset.cs
+│   │   ├── StepPresetCollection.cs
+│   │   ├── StepPresetStore.cs
 │   │   ├── UnknownStepTypeException.cs
 │   │   ├── Validation/
 │   │   │   ├── PipelineValidator.cs
@@ -972,10 +975,11 @@ summary/subtitle pattern as filter cards:
 `DeleteStep` cards are intentionally quiet for `Trash` mode (single-line summary, no extra badge).
 When `DeleteMode.Permanent` is active, the card shows an amber warning badge.
 
-#### Add Step — Two-Level Drill-Down
+#### Add Step — Three-Level Drill-Down
 
 Clicking `+ Add step` opens a **`Popup`** anchored below the button (light-dismiss on
-click-outside). Two panels swapped by an `IsLevel2Visible` flag — no secondary window.
+click-outside). Three panels swapped by `IsLevel2Visible` and `IsLevel3Visible` flags — no
+secondary window. This mirrors the Add Filter flyout pattern with per-step presets.
 
 **Level 1 — Category selection:**
 ```
@@ -993,31 +997,7 @@ click-outside). Two panels swapped by an `IsLevel2Visible` flag — no secondary
 └────────────────────────────────┘
 ```
 
-**Level 2 — Path steps:**
-```
-┌────────────────────────────────┐
-│  ← Path steps                  │
-├────────────────────────────────┤
-│  Flatten   Strip directory     │
-│            structure           │
-│  Rebase    Add / remove path   │
-│            levels              │
-│  Rename    Token-based name    │
-│            pattern             │
-└────────────────────────────────┘
-```
-
-**Level 2 — Content steps:**
-```
-┌────────────────────────────────┐
-│  ← Content steps               │
-├────────────────────────────────┤
-│  Convert   Change file format  │
-│            (requires plugin)   │
-└────────────────────────────────┘
-```
-
-**Level 2 — Executable steps:**
+**Level 2 — Step type selection** (example: Executable):
 ```
 ┌────────────────────────────────┐
 │  ← Executable steps            │
@@ -1029,9 +1009,45 @@ click-outside). Two panels swapped by an `IsLevel2Visible` flag — no secondary
 └────────────────────────────────┘
 ```
 
-Clicking a step type opens `EditStepDialog` to capture configuration before the step is added.
+**Level 3 — Preset picker for chosen type** (example: Delete):
+```
+┌────────────────────────────────┐
+│  ← Delete                      │
+├────────────────────────────────┤
+│  ＋ New...                     │
+├────────────────────────────────┤
+│  Recently used                 │
+│    Delete to Trash             │
+├────────────────────────────────┤
+│  ★ Delete to Trash             │
+│  ★ Delete permanently          │
+│    My custom delete            │
+└────────────────────────────────┘
+```
+
+- `←` on Level 2 returns to Level 1; `←` on Level 3 returns to Level 2.
+- If no presets exist for a step type (e.g. Copy, Move, Rename), Level 3 is bypassed and
+  `EditStepDialog` opens directly — same bypass pattern as the filter flyout.
+- **"＋ New..."** on Level 3 opens `EditStepDialog` with an empty form for the selected type.
+- **Preset row** — closes flyout, adds step immediately from preset config.
+- "★" prefix = built-in (read-only); plain rows = user-saved presets.
+- "Recently used" shows the last 5 presets of this type from `AppSettings.StepTypeMruPresetIds`.
+
+Clicking a step type (Level 2) that has presets navigates to Level 3.
+Clicking a step type with no presets opens `EditStepDialog` directly.
 This includes optional custom step naming in the same interaction.
-- `←` returns to Level 1.
+
+**Built-in step presets:**
+
+| Step type | Built-in presets |
+|---|---|
+| Delete | "Delete to Trash", "Delete permanently" |
+| Flatten | "Flatten (auto-rename)" |
+| All others | None (destinations/patterns are user-specific) |
+
+Per-step presets are persisted in `step-presets.json` via `StepPresetStore` (single JSON file,
+same pattern as `FilterPresetStore`). Full pipeline configurations remain separately saved and
+loaded via the `[Load Preset ▾]` button.
 
 **Execution eligibility rule:** A pipeline may contain zero or more executable steps.
 `Run` stays disabled until the pipeline contains at least one executable step and all required
@@ -1042,9 +1058,6 @@ When validation fails, the first blocking issue is shown as helper text under th
 and the affected step card is highlighted with inline error text + tooltip (for keyboard and mouse
 users). Example: adding `Copy` after `Delete` marks the `Copy` step invalid with a message such as
 "Source no longer exists at this point in the pipeline."
-
-The Add Step flyout has no preset layer (unlike Add Filter). Full pipeline configurations are
-saved and loaded via the `[Load Preset ▾]` button, not per-step presets.
 
 #### EditStepDialog
 
@@ -1096,17 +1109,21 @@ when adding a step type. Dispatches to a type-specific editor via
 │  │                                    │ │
 │  └────────────────────────────────── ┘ │
 ├─────────────────────────────────────────┤
+│  ☐ Save as preset                       │
+├─────────────────────────────────────────┤
 │            [Cancel]      [OK ✓]         │
 └─────────────────────────────────────────┘
 ```
+
+"Save as preset" sets a flag on the dialog VM; after a successful dialog close,
+`PipelineView.axaml.cs` persists the preset via `StepPresetStore`. The step name is used
+as the preset name.
 
 OK is disabled when:
 - **Copy To / Move To**: destination path is empty
 - **Rename**: pattern string is empty
 - **Rebase**: neither strip-prefix nor add-prefix has a value
 
-`EditStepDialog` does not have a "Save as preset" flag (unlike `EditFilterDialog`). Full
-pipeline saving is handled by the `[Load Preset ▾]` → "✎ Save current pipeline..." path.
 If the entered step name matches the auto-generated name, no custom-name override is persisted.
 
 #### Load Preset ▾ / Save Pipeline
@@ -1178,10 +1195,9 @@ from `OperationPlan` produced by `PipelineRunner.PreviewAsync()`.
 └──────────────────────────────────────────────────────────┘
 ```
 
-**Delete operation preview (mandatory):**
+**Delete operation preview (confirm before delete):**
 
-When the pipeline contains a `DeleteStep`, preview is mandatory — there is no direct "Run"
-path. The `[▶ Run]` button in the main window is replaced by `[👁 Preview & Run]` and
+When the pipeline contains a `DeleteStep`, the `[▶ Run]` button is replaced by `[⚠ Run]` and
 executes `PreviewAsync` first, requiring explicit confirmation in the dialog before proceeding.
 The dialog header and layout change to emphasize the destructive nature:
 
@@ -1392,6 +1408,33 @@ public record PipelineConfig(
 );
 ```
 
+### StepPresetCollection (persistence — `step-presets.json`)
+
+```csharp
+public sealed class StepPreset
+{
+    public string Id { get; set; }                // GUID (hex, no dashes)
+    public string Name { get; set; }              // display name (= step name)
+    public bool IsBuiltIn { get; set; }           // true for shipped presets
+    public TransformStepConfig Config { get; set; }
+}
+
+public sealed class StepPresetCollection
+{
+    public int SchemaVersion { get; set; } = 1;
+    public Dictionary<string, List<StepPreset>> UserPresets { get; set; }
+    // Key = StepType string ("Delete", "Flatten", etc.)
+}
+```
+
+Built-in presets (not persisted, returned by `StepPresetStore`):
+
+| StepType | Preset name           | Config                                              |
+|----------|-----------------------|-----------------------------------------------------|
+| Delete   | Delete to Trash       | `{ "deleteMode": "Trash" }`                         |
+| Delete   | Delete permanently    | `{ "deleteMode": "Permanent" }`                     |
+| Flatten  | Flatten (auto-rename) | `{ "conflictStrategy": "AutoRenameCounter" }`       |
+
 **Copy/Move step parameters** (stored in `TransformStepConfig.Parameters`):
 ```json
 { "destinationPath": "/mnt/phone/Music" }
@@ -1435,6 +1478,8 @@ public class AppSettings
     public List<string> FavouritePaths { get; set; } = [];
     public List<string> RecentFilterChains { get; set; } = [];
     public List<string> RecentPipelines { get; set; } = [];
+    public Dictionary<string, List<string>> FilterTypeMruPresetIds { get; set; } = [];
+    public Dictionary<string, List<string>> StepTypeMruPresetIds { get; set; } = [];
 }
 ```
 

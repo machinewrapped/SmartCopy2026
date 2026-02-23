@@ -93,4 +93,22 @@ public sealed class EditStepDialogViewModelTests
 
         Assert.Equal("Backup Music", vm.ResultCustomName);
     }
+
+    [Fact]
+    public void SaveAsPreset_DefaultsFalse()
+    {
+        var vm = EditStepDialogViewModel.ForNew(StepKind.Delete);
+
+        Assert.False(vm.SaveAsPreset);
+    }
+
+    [Fact]
+    public void SaveAsPreset_CanBeToggled()
+    {
+        var vm = EditStepDialogViewModel.ForNew(StepKind.Copy);
+
+        vm.SaveAsPreset = true;
+
+        Assert.True(vm.SaveAsPreset);
+    }
 }
