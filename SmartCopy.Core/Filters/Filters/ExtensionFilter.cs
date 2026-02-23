@@ -27,6 +27,7 @@ public sealed class ExtensionFilter : FilterBase
 
     public IReadOnlyList<string> Extensions { get; }
 
+    public override string TypeDisplayName => "Extensions";
     public override string Summary => $"Extensions: {string.Join(", ", Extensions.Select(e => "." + e))}";
     public override string Description => $"Extension: {string.Join("; ", Extensions.Select(e => "*." + e))}";
 

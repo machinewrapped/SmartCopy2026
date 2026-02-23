@@ -1,0 +1,66 @@
+using System;
+using CommunityToolkit.Mvvm.ComponentModel;
+using SmartCopy.Core.Filters;
+using SmartCopy.Core.Filters.Filters;
+
+namespace SmartCopy.UI.ViewModels.Filters;
+
+public partial class DateRangeFilterEditorViewModel : FilterEditorViewModelBase
+{
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FieldIsCreated))]
+    [NotifyPropertyChangedFor(nameof(FieldIsModified))]
+    private DateField _field = DateField.Modified;
+
+
+    public bool FieldIsCreated
+    {
+        get => Field == DateField.Created;
+        set { if (value) Field = DateField.Created; }
+    }
+
+    public bool FieldIsModified
+    {
+        get => Field == DateField.Modified;
+        set { if (value) Field = DateField.Modified; }
+    }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsValid))]
+    private DateTime? _minDate;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsValid))]
+    private DateTime? _maxDate;
+
+    partial void OnFieldChanged(DateField value) => AutoUpdateName();
+    partial void OnMinDateChanged(DateTime? value) => AutoUpdateName();
+    partial void OnMaxDateChanged(DateTime? value) => AutoUpdateName();
+
+    public override bool IsValid => MinDate.HasValue || MaxDate.HasValue;
+
+    public override IFilter BuildFilter()
+        => new DateRangeFilter(Field, MinDate, MaxDate, Mode);
+
+    public override void LoadFrom(IFilter filter)
+    {
+        if (filter is not DateRangeFilter dr)
+        {
+            return;
+        }
+
+        Mode = dr.Mode;
+        Field = dr.Field;
+        MinDate = dr.Min;
+        MaxDate = dr.Max;
+        FilterName = dr.CustomName ?? string.Empty;
+    }
+
+    public override string GenerateName()
+    {
+        var prefix = Mode.ToString();
+        var from = MinDate.HasValue ? MinDate.Value.ToString("yyyy-MM-dd") : "any";
+        var to = MaxDate.HasValue ? MaxDate.Value.ToString("yyyy-MM-dd") : "any";
+        return $"{prefix} {Field} {from} – {to}";
+    }
+}

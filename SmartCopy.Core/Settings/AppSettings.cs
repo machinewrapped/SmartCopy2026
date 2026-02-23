@@ -8,6 +8,7 @@ public sealed class AppSettings
     public string? LastSourcePath { get; set; }
     public bool IncludeHidden { get; set; }
     public bool ShowFilteredFiles { get; set; }
+    public bool ShowFilteredNodesInTree { get; set; } = true;
     public bool AutoSelectOnSelectionRestore { get; set; } = true;
     public bool AllowOverwrite { get; set; }
     public bool AllowDeleteReadOnly { get; set; }
@@ -23,5 +24,11 @@ public sealed class AppSettings
     public List<string> FavouritePaths { get; set; } = [];
     public List<string> RecentFilterChains { get; set; } = [];
     public List<string> RecentPipelines { get; set; } = [];
+
+    /// <summary>
+    /// MRU preset IDs per filter type. Key = FilterType string (e.g. "Extension").
+    /// At most 5 entries per type, most-recently-used first.
+    /// </summary>
+    public Dictionary<string, List<string>> FilterTypeMruPresetIds { get; set; } = [];
 }
 

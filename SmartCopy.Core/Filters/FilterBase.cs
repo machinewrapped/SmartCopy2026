@@ -15,8 +15,11 @@ public abstract class FilterBase : IFilter
     }
 
     public string Name { get; }
+    public virtual string TypeDisplayName => Name;
     public FilterMode Mode { get; }
     public bool IsEnabled { get; set; }
+    public string? CustomName { get; set; }
+    public virtual bool AppliesToDirectories => false;
     public abstract string Summary { get; }
     public abstract string Description { get; }
     public abstract ValueTask<bool> MatchesAsync(
@@ -28,7 +31,8 @@ public abstract class FilterBase : IFilter
         FilterType: Name,
         IsEnabled: IsEnabled,
         Mode: Mode.ToString(),
-        Parameters: BuildParameters());
+        Parameters: BuildParameters(),
+        CustomName: CustomName);
 
     protected virtual JsonObject BuildParameters() => [];
 }

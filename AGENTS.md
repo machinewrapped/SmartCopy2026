@@ -16,6 +16,7 @@ dotnet build SmartCopy.App/SmartCopy.App.csproj
 dotnet watch run --project SmartCopy.App/SmartCopy.App.csproj
 
 # Run tests
+# IMPORTANT: Codex (only) is unable to run the tests and must ask the user to run them manually.
 dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj
 
 # Run a single test

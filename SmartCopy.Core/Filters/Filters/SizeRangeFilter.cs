@@ -17,6 +17,7 @@ public sealed class SizeRangeFilter : FilterBase
     public long? MinBytes { get; }
     public long? MaxBytes { get; }
 
+    public override string TypeDisplayName => "Size Range";
     public override string Summary => $"Size range: {MinBytes ?? 0} - {MaxBytes ?? long.MaxValue}";
     public override string Description => "SizeRange filter";
 

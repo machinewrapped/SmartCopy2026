@@ -1,0 +1,11 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels.Filters"
+             x:Class="SmartCopy.UI.Views.FilterEditors.AttributeFilterEditorView"
+             x:DataType="vm:AttributeFilterEditorViewModel">
+    <StackPanel Orientation="Horizontal" Spacing="16">
+        <CheckBox Content="Hidden" IsChecked="{Binding Hidden}" />
+        <CheckBox Content="Read-only" IsChecked="{Binding ReadOnly}" />
+        <CheckBox Content="System" IsChecked="{Binding System}" />
+    </StackPanel>
+</UserControl>

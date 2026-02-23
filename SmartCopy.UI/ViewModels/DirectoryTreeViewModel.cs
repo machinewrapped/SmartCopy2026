@@ -2,26 +2,41 @@ using System.Collections.ObjectModel;
 using System.Threading;
 using System.Threading.Tasks;
 using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.Filters;
 
 namespace SmartCopy.UI.ViewModels;
 
-public class DirectoryTreeViewModel : ViewModelBase
+public class DirectoryTreeViewModel(IFileSystemProvider provider, string rootPath) : ViewModelBase
 {
-    private readonly IFileSystemProvider _provider;
-    private readonly string _rootPath;
+    private readonly IFileSystemProvider _provider = provider;
+    private readonly string _rootPath = rootPath;
     private FileSystemNode? _selectedNode;
 
-    public ObservableCollection<FileSystemNode> RootNodes { get; } = new();
+    public ObservableCollection<FileSystemNode> RootNodes { get; } = [];
+
     public FileSystemNode? SelectedNode
     {
         get => _selectedNode;
         set => SetProperty(ref _selectedNode, value);
     }
 
-    public DirectoryTreeViewModel(IFileSystemProvider provider, string rootPath)
+    private bool _showFilteredNodesInTree = true;
+    public bool ShowFilteredNodesInTree
     {
-        _provider = provider;
-        _rootPath = rootPath;
+        get => _showFilteredNodesInTree;
+        set => SetProperty(ref _showFilteredNodesInTree, value);
+    }
+
+    /// <summary>
+    /// Applies <paramref name="chain"/> to every node in the tree, setting
+    /// <see cref="FileSystemNode.FilterResult"/> and <see cref="FileSystemNode.ExcludedByFilter"/>.
+    /// </summary>
+    public async Task ApplyFiltersAsync(
+        FilterChain chain,
+        IFileSystemProvider? comparisonProvider,
+        CancellationToken ct = default)
+    {
+        await chain.ApplyToTreeAsync(RootNodes, comparisonProvider, ct);
     }
 
     public async Task InitializeAsync(string? initialSelectionPath = null, CancellationToken ct = default)
@@ -76,14 +91,16 @@ public class DirectoryTreeViewModel : ViewModelBase
             var children = await _provider.GetChildrenAsync(current.FullPath, ct);
             foreach (var child in children)
             {
-                if (!child.IsDirectory)
-                {
-                    continue;
-                }
-
                 var clonedChild = CloneNode(child, current);
-                current.Children.Add(clonedChild);
-                stack.Push(clonedChild);
+                if (child.IsDirectory)
+                {
+                    current.Children.Add(clonedChild);
+                    stack.Push(clonedChild);
+                }
+                else
+                {
+                    current.Files.Add(clonedChild);
+                }
             }
         }
 

@@ -1,0 +1,57 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels.Filters"
+             x:Class="SmartCopy.UI.Views.FilterEditors.ExtensionFilterEditorView"
+             x:DataType="vm:ExtensionFilterEditorViewModel">
+    <StackPanel Spacing="8">
+
+        <!-- Chip list of added extensions -->
+        <ItemsControl ItemsSource="{Binding Extensions}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                    <Border Background="#333" BorderBrush="#555" BorderThickness="1"
+                            CornerRadius="3" Padding="6,3" Margin="0,0,4,4">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <TextBlock Text="{Binding StringFormat='.{0}'}"
+                                       VerticalAlignment="Center" FontSize="12" />
+                            <Button Content="×"
+                                    Width="16" Height="16" Padding="0"
+                                    FontSize="11"
+                                    Background="Transparent" Foreground="#aaa"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    Command="{Binding $parent[UserControl].((vm:ExtensionFilterEditorViewModel)DataContext).RemoveExtensionCommand}"
+                                    CommandParameter="{Binding}" />
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Text input + Add button -->
+        <Grid ColumnDefinitions="*, Auto" ColumnSpacing="6">
+            <TextBox Grid.Column="0"
+                     Text="{Binding InputText}"
+                     Watermark="mp3; flac; jpg  (separate with ;)"
+                     AcceptsReturn="False">
+                <TextBox.KeyBindings>
+                    <KeyBinding Gesture="Return"
+                                Command="{Binding AddExtensionCommand}" />
+                </TextBox.KeyBindings>
+            </TextBox>
+            <Button Grid.Column="1"
+                    Content="Add"
+                    Command="{Binding AddExtensionCommand}"
+                    Padding="10,0" />
+        </Grid>
+
+        <TextBlock Text="Type extensions separated by ; or press Enter after each"
+                   FontSize="11" Opacity="0.5" />
+
+    </StackPanel>
+</UserControl>

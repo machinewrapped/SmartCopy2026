@@ -1,0 +1,36 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels.Filters"
+             x:Class="SmartCopy.UI.Views.FilterEditors.MirrorFilterEditorView"
+             x:DataType="vm:MirrorFilterEditorViewModel">
+    <StackPanel Spacing="10">
+
+        <!-- Comparison path -->
+        <StackPanel Spacing="4">
+            <TextBlock Text="Comparison path" FontSize="12" Opacity="0.7" />
+            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="6">
+                <TextBox Grid.Column="0"
+                         Text="{Binding ComparisonPath}"
+                         Watermark="/path/to/target" />
+                <!-- Browse stub: will be wired in Phase 2 with real folder picker -->
+                <Button Grid.Column="1" Content="…"
+                        Width="32" IsEnabled="False"
+                        ToolTip.Tip="Browse (available in Phase 2)" />
+            </Grid>
+        </StackPanel>
+
+        <!-- Compare mode -->
+        <StackPanel Spacing="4">
+            <TextBlock Text="Compare by" FontSize="12" Opacity="0.7" />
+            <StackPanel Orientation="Horizontal" Spacing="16">
+                <RadioButton Content="Name only"
+                             IsChecked="{Binding CompareModeIsNameOnly}"
+                             GroupName="CompareMode" />
+                <RadioButton Content="Name + size"
+                             IsChecked="{Binding CompareModeIsNameAndSize}"
+                             GroupName="CompareMode" />
+            </StackPanel>
+        </StackPanel>
+
+    </StackPanel>
+</UserControl>
