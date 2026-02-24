@@ -6,6 +6,33 @@
              x:Class="SmartCopy.UI.Views.Pipeline.AddStepFlyout"
              x:DataType="vmPipeline:AddStepViewModel"
              Width="300">
+    <UserControl.DataTemplates>
+        <TreeDataTemplate DataType="vmPipeline:AddStepMenuItem" ItemsSource="{Binding Items}">
+            <Panel>
+                <Grid ColumnDefinitions="*, Auto" Margin="0,1" IsVisible="{Binding !IsSeparator}">
+                    <TextBlock Grid.Column="0" Text="{Binding Header}" VerticalAlignment="Center" Margin="0,0,16,0" />
+                    <Button Grid.Column="1"
+                            IsVisible="{Binding IsUserDefined}"
+                            Content="🗑" Width="28" Height="28" Padding="0"
+                            HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                            CornerRadius="4" Background="Transparent" Foreground="#f44736" FontSize="12"
+                            Command="{Binding DeleteCommand}"
+                            CommandParameter="{Binding DeleteCommandParameter}" />
+                </Grid>
+                <Separator Height="1" Background="#3e3e42" Margin="-12,0" IsVisible="{Binding IsSeparator}" />
+            </Panel>
+        </TreeDataTemplate>
+    </UserControl.DataTemplates>
+    <UserControl.Styles>
+        <Style Selector="MenuItem">
+            <Setter Property="Command" Value="{Binding Command}" />
+            <Setter Property="CommandParameter" Value="{Binding CommandParameter}" />
+            <Setter Property="IsEnabled" Value="{Binding IsEnabled}" />
+        </Style>
+        <Style Selector="MenuItem > Border:disabled">
+            <Setter Property="Opacity" Value="0.5" />
+        </Style>
+    </UserControl.Styles>
     <Border Background="#1e1e1e" BorderBrush="#555" BorderThickness="1"
             CornerRadius="6" Padding="4">
         <Panel>
@@ -29,55 +56,51 @@
                 </Grid>
                 <Separator Height="1" Background="#3e3e42" Margin="4,0" />
 
-                <Button Background="Transparent"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Left"
-                        Padding="8,6"
-                        CornerRadius="4"
-                        Command="{Binding SelectTopLevelStepTypeCommand}"
-                        CommandParameter="{x:Static corePipeline:StepKind.Copy}">
-                    <StackPanel Orientation="Vertical" Spacing="1">
-                        <TextBlock Text="Copy" FontWeight="Medium" />
-                        <TextBlock Text="Copy to destination" FontSize="11" Opacity="0.55" />
-                    </StackPanel>
-                </Button>
-
-                <Button Background="Transparent"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Left"
-                        Padding="8,6"
-                        CornerRadius="4"
-                        Command="{Binding SelectTopLevelStepTypeCommand}"
-                        CommandParameter="{x:Static corePipeline:StepKind.Move}">
-                    <StackPanel Orientation="Vertical" Spacing="1">
-                        <TextBlock Text="Move" FontWeight="Medium" />
-                        <TextBlock Text="Move to destination" FontSize="11" Opacity="0.55" />
-                    </StackPanel>
-                </Button>
-
-                <Button Background="Transparent"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Left"
-                        Padding="8,6"
-                        CornerRadius="4"
-                        Command="{Binding SelectTopLevelStepTypeCommand}"
-                        CommandParameter="{x:Static corePipeline:StepKind.Delete}">
-                    <StackPanel Orientation="Vertical" Spacing="1">
-                        <TextBlock Text="Delete" FontWeight="Medium" />
-                        <TextBlock Text="Delete source file" FontSize="11" Opacity="0.55" />
-                    </StackPanel>
-                </Button>
-
-                <Separator Height="1" Background="#3e3e42" Margin="4,4" />
-
-                <Button Content="Path steps"
+                <Button Content="Copy ▸"
                         Background="Transparent"
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Left"
                         Padding="8,6"
-                        CornerRadius="4"
-                        Command="{Binding NavigateToCategoryCommand}"
-                        CommandParameter="{x:Static vm:StepCategory.Path}" />
+                        CornerRadius="4">
+                    <Button.Flyout>
+                        <MenuFlyout Placement="RightEdgeAlignedTop" ItemsSource="{Binding CopyMenuItems, FallbackValue={x:Null}}" />
+                    </Button.Flyout>
+                </Button>
+
+                <Button Content="Move ▸"
+                        Background="Transparent"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Left"
+                        Padding="8,6"
+                        CornerRadius="4">
+                    <Button.Flyout>
+                        <MenuFlyout Placement="RightEdgeAlignedTop" ItemsSource="{Binding MoveMenuItems, FallbackValue={x:Null}}" />
+                    </Button.Flyout>
+                </Button>
+
+                <Button Content="Delete ▸"
+                        Background="Transparent"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Left"
+                        Padding="8,6"
+                        CornerRadius="4">
+                    <Button.Flyout>
+                        <MenuFlyout Placement="RightEdgeAlignedTop" ItemsSource="{Binding DeleteMenuItems, FallbackValue={x:Null}}" />
+                    </Button.Flyout>
+                </Button>
+
+                <Separator Height="1" Background="#3e3e42" Margin="4,4" />
+
+                <Button Content="Path steps ▸"
+                        Background="Transparent"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Left"
+                        Padding="8,6"
+                        CornerRadius="4">
+                    <Button.Flyout>
+                        <MenuFlyout Placement="RightEdgeAlignedTop" ItemsSource="{Binding PathMenuItems, FallbackValue={x:Null}}" />
+                    </Button.Flyout>
+                </Button>
 
                 <Separator Height="1" Background="#3e3e42" Margin="4,4" />
 
@@ -130,156 +153,7 @@
                 </Button>
             </StackPanel>
 
-            <!-- Level 2: Step type selection -->
-            <StackPanel IsVisible="{Binding IsLevel2VisibleOnly}" Spacing="1">
-                <Grid ColumnDefinitions="Auto,*,Auto" Margin="4,4,4,2">
-                    <Button Grid.Column="0"
-                            Content="←"
-                            Command="{Binding GoBackCommand}"
-                            Background="Transparent"
-                            Padding="6,2"
-                            CornerRadius="4"
-                            FontSize="14" />
-                    <TextBlock Grid.Column="1"
-                               Margin="4,2,0,0"
-                               Text="Choose step type"
-                               FontWeight="SemiBold" />
-                    <Button Grid.Column="2"
-                            Content="✕"
-                            Command="{Binding CloseCommand}"
-                            Background="Transparent"
-                            Padding="6,2"
-                            CornerRadius="4"
-                            FontSize="12"
-                            Foreground="#a0a0a0" />
-                </Grid>
-                <Separator Height="1" Background="#3e3e42" Margin="4,0" />
 
-                <ItemsControl ItemsSource="{Binding StepTypeItems}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vmPipeline:StepTypeItem">
-                            <Button Background="Transparent"
-                                    HorizontalAlignment="Stretch"
-                                    HorizontalContentAlignment="Left"
-                                    Padding="8,6"
-                                    CornerRadius="4"
-                                    Command="{Binding $parent[UserControl].((vmPipeline:AddStepViewModel)DataContext).SelectStepTypeCommand, FallbackValue={x:Null}}"
-                                    CommandParameter="{Binding Kind}">
-                                <StackPanel Orientation="Vertical" Spacing="1">
-                                    <TextBlock Text="{Binding DisplayName}" FontWeight="Medium" />
-                                    <TextBlock Text="{Binding Description}" FontSize="11" Opacity="0.55" />
-                                </StackPanel>
-                            </Button>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </StackPanel>
-
-            <!-- Level 3: Preset picker for chosen step type -->
-            <StackPanel IsVisible="{Binding IsLevel3Visible}" Spacing="1">
-                <Grid ColumnDefinitions="Auto,*,Auto" Margin="4,4,4,2">
-                    <Button Grid.Column="0"
-                            Content="←"
-                            Command="{Binding GoBackToLevel2Command}"
-                            Background="Transparent"
-                            Padding="6,2"
-                            CornerRadius="4"
-                            FontSize="14" />
-                    <TextBlock Grid.Column="1"
-                               Text="{Binding SelectedStepTypeName}"
-                               FontWeight="SemiBold"
-                               VerticalAlignment="Center"
-                               Margin="4,0,0,0" />
-                    <Button Grid.Column="2"
-                            Content="✕"
-                            Command="{Binding CloseCommand}"
-                            Background="Transparent"
-                            Padding="6,2"
-                            CornerRadius="4"
-                            FontSize="12"
-                            Foreground="#a0a0a0" />
-                </Grid>
-                <Separator Height="1" Background="#3e3e42" Margin="4,0" />
-
-                <!-- ＋ New... -->
-                <Button Background="Transparent"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Left"
-                        Padding="8,6"
-                        CornerRadius="4"
-                        Command="{Binding RequestNewStepCommand}">
-                    <TextBlock Text="＋ New..." Foreground="#4facfe" />
-                </Button>
-                <Separator Height="1" Background="#3e3e42" Margin="4,0" />
-
-                <!-- Recently used section -->
-                <StackPanel IsVisible="{Binding HasRecentPresets}">
-                    <TextBlock Text="Recently used" FontSize="11" Opacity="0.5" Margin="8,4,8,2" />
-                    <ItemsControl ItemsSource="{Binding RecentPresetsForType}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vmPipeline:StepPresetItem">
-                                <Grid ColumnDefinitions="*, Auto">
-                                    <Button Grid.Column="0"
-                                            Background="Transparent"
-                                            HorizontalAlignment="Stretch"
-                                            HorizontalContentAlignment="Left"
-                                            Padding="8,5"
-                                            CornerRadius="4"
-                                            Command="{Binding $parent[UserControl].((vmPipeline:AddStepViewModel)DataContext).PickPresetCommand, FallbackValue={x:Null}}"
-                                            CommandParameter="{Binding}">
-                                        <TextBlock Text="{Binding DisplayName}" />
-                                    </Button>
-                                    <Button Grid.Column="1"
-                                            IsVisible="{Binding IsUserDefined}"
-                                            Content="🗑" Width="28" Height="28" Padding="0"
-                                            HorizontalContentAlignment="Center"
-                                            VerticalContentAlignment="Center"
-                                            CornerRadius="4" Background="Transparent"
-                                            Foreground="#f44736" FontSize="12"
-                                            VerticalAlignment="Center"
-                                            ToolTip.Tip="Delete preset"
-                                            Command="{Binding $parent[UserControl].((vmPipeline:AddStepViewModel)DataContext).DeletePresetCommand, FallbackValue={x:Null}}"
-                                            CommandParameter="{Binding}" />
-                                </Grid>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <Separator Height="1" Background="#3e3e42" Margin="4,0" />
-                </StackPanel>
-
-                <!-- All presets (non-recent) -->
-                <StackPanel IsVisible="{Binding HasPresets}">
-                    <ItemsControl ItemsSource="{Binding PresetsForType}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vmPipeline:StepPresetItem">
-                                <Grid ColumnDefinitions="*, Auto">
-                                    <Button Grid.Column="0"
-                                            Background="Transparent"
-                                            HorizontalAlignment="Stretch"
-                                            HorizontalContentAlignment="Left"
-                                            Padding="8,5"
-                                            CornerRadius="4"
-                                            Command="{Binding $parent[UserControl].((vmPipeline:AddStepViewModel)DataContext).PickPresetCommand, FallbackValue={x:Null}}"
-                                            CommandParameter="{Binding}">
-                                        <TextBlock Text="{Binding DisplayName}" />
-                                    </Button>
-                                    <Button Grid.Column="1"
-                                            IsVisible="{Binding IsUserDefined}"
-                                            Content="🗑" Width="28" Height="28" Padding="0"
-                                            HorizontalContentAlignment="Center"
-                                            VerticalContentAlignment="Center"
-                                            CornerRadius="4" Background="Transparent"
-                                            Foreground="#f44736" FontSize="12"
-                                            VerticalAlignment="Center"
-                                            ToolTip.Tip="Delete preset"
-                                            Command="{Binding $parent[UserControl].((vmPipeline:AddStepViewModel)DataContext).DeletePresetCommand, FallbackValue={x:Null}}"
-                                            CommandParameter="{Binding}" />
-                                </Grid>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
-            </StackPanel>
 
             <!-- Level 4: Name input for saving pipeline -->
             <StackPanel IsVisible="{Binding IsSavingPipeline}" Spacing="1">

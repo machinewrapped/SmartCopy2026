@@ -43,7 +43,7 @@ public partial class PipelineView : UserControl
 
     private void OnAddStepButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        _currentViewModel?.AddStep.GoBackCommand.Execute(null);
+        _currentViewModel?.AddStep.CancelSavePipelineCommand.Execute(null);
         AddStepPopup.IsOpen = true;
     }
 
