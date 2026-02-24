@@ -3,27 +3,21 @@
         xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
         x:Class="SmartCopy.UI.Views.PreviewView"
         x:DataType="vm:PreviewViewModel"
-        Title="Preview"
+        Title="{Binding TotalActionCount, StringFormat=Preview (\{0\} actions)}"
         Width="900"
         Height="560"
         WindowStartupLocation="CenterOwner"
         Background="#1e1e1e">
     <Grid RowDefinitions="Auto,*,Auto" Margin="16">
-        <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,10">
-            <TextBlock Text="Preview"
-                       FontSize="16"
-                       FontWeight="SemiBold"
-                       Foreground="#4facfe" />
-            <TextBlock Text="{Binding TotalActionCount, StringFormat=\{0\} actions}"
-                       Opacity="0.75" />
-            <Border IsVisible="{Binding IsDeletePipeline}"
-                    Background="#3a2f1b"
-                    CornerRadius="4"
-                    Padding="8">
-                <TextBlock Text="Delete confirmation is required before running."
-                           Foreground="#f0ad4e" />
-            </Border>
-        </StackPanel>
+        <Border Grid.Row="0"
+                IsVisible="{Binding IsDeletePipeline}"
+                Background="#3a2f1b"
+                CornerRadius="4"
+                Padding="8"
+                Margin="0,0,0,10">
+            <TextBlock Text="Delete confirmation is required before running."
+                       Foreground="#f0ad4e" />
+        </Border>
 
         <ScrollViewer Grid.Row="1"
                       VerticalScrollBarVisibility="Auto">
@@ -31,13 +25,17 @@
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:PreviewGroupViewModel">
                         <Expander Header="{Binding Title}"
-                                  IsExpanded="{Binding IsReadyGroup}">
-                            <ItemsControl ItemsSource="{Binding Actions}">
+                                  IsExpanded="{Binding IsReadyGroup}"
+                                  HorizontalAlignment="Stretch"
+                                  HorizontalContentAlignment="Stretch"
+                                  Margin="0,0,0,8">
+                            <ItemsControl ItemsSource="{Binding Actions}"
+                                          HorizontalAlignment="Stretch">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:PreviewItemViewModel">
                                         <Grid ColumnDefinitions="2*,2*,Auto" Margin="0,2,0,2">
-                                            <TextBlock Grid.Column="0" Text="{Binding SourcePath}" />
-                                            <TextBlock Grid.Column="1" Text="{Binding DestinationPath}" Opacity="0.85" />
+                                            <TextBlock Grid.Column="0" Text="{Binding SourcePath}" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                                            <TextBlock Grid.Column="1" Text="{Binding DestinationPath}" Opacity="0.85" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
                                             <TextBlock Grid.Column="2" Text="{Binding Action}" Opacity="0.75" />
                                         </Grid>
                                     </DataTemplate>
