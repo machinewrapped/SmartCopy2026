@@ -71,9 +71,13 @@ public partial class PreviewViewModel : ViewModelBase
 
     public event Action? RunRequested;
     public event Action? CancelRequested;
+    public event Func<string, Task>? SaveReportRequested;
+
+    private OperationPlan? _currentPlan;
 
     public void LoadFrom(OperationPlan plan, bool isDeletePipeline, DeleteMode deleteMode)
     {
+        _currentPlan = plan;
         _deleteMode = deleteMode;
         IsDeletePipeline = isDeletePipeline;
         IsConfirmed = false;
@@ -144,5 +148,47 @@ public partial class PreviewViewModel : ViewModelBase
     private void Cancel()
     {
         CancelRequested?.Invoke();
+    }
+
+    [RelayCommand]
+    private async Task SaveReportAsync()
+    {
+        if (_currentPlan is null || SaveReportRequested is null) return;
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"# SmartCopy2026 Preview Report");
+        sb.AppendLine($"**Generated:** {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine();
+        sb.AppendLine($"**Total Actions:** {TotalActionCount}");
+        sb.AppendLine($"**Estimated Output Size:** {TotalEstimatedOutputBytes} bytes");
+        sb.AppendLine();
+
+        var grouped = _currentPlan.Actions
+            .GroupBy(action => action.Warning)
+            .OrderBy(group => group.Key.HasValue ? 0 : 1);
+
+        foreach (var group in grouped)
+        {
+            var title = group.Key switch
+            {
+                PlanWarning.DestinationExists => $"Destination Exists ({group.Count()})",
+                PlanWarning.NameConflict => $"Name Conflict ({group.Count()})",
+                PlanWarning.PermissionIssue => $"Permission Issue ({group.Count()})",
+                _ => $"Ready ({group.Count()})",
+            };
+
+            sb.AppendLine($"## {title}");
+            sb.AppendLine();
+            sb.AppendLine("| Source | Destination | Action |");
+            sb.AppendLine("|---|---|---|");
+
+            foreach (var action in group)
+            {
+                sb.AppendLine($"| `{action.SourcePath}` | `{action.DestinationPath}` | {action.StepSummary} |");
+            }
+            sb.AppendLine();
+        }
+
+        await SaveReportRequested.Invoke(sb.ToString());
     }
 }
