@@ -90,6 +90,6 @@ public sealed class OperationJournal
             return "skipped";
         }
 
-        return result.StepType.ToLowerInvariant();
+        return result.StepType.ToString().ToLowerInvariant();
     }
 }

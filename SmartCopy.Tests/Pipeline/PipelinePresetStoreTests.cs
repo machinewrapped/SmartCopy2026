@@ -21,7 +21,7 @@ public sealed class PipelinePresetStoreTests
     {
         var store = new PipelinePresetStore();
 
-        var presets = await store.GetStandardPresetsAsync();
+        var presets = await PipelinePresetStore.GetStandardPresetsAsync();
 
         Assert.Contains(presets, preset => preset.Name == "Copy only");
         Assert.Contains(presets, preset => preset.Name == "Move only");
@@ -40,7 +40,7 @@ public sealed class PipelinePresetStoreTests
             Description: "copy music",
             Steps:
             [
-                new TransformStepConfig("Copy", new JsonObject { ["destinationPath"] = "/mem/Mirror" }),
+                new TransformStepConfig(StepKind.Copy, new JsonObject { ["destinationPath"] = "/mem/Mirror" }),
             ],
             OverwriteMode: OverwriteMode.IfNewer.ToString(),
             DeleteMode: DeleteMode.Trash.ToString());
@@ -67,7 +67,7 @@ public sealed class PipelinePresetStoreTests
             Description: null,
             Steps:
             [
-                new TransformStepConfig("Copy", new JsonObject { ["destinationPath"] = "/a" }),
+                new TransformStepConfig(StepKind.Copy, new JsonObject { ["destinationPath"] = "/a" }),
             ],
             OverwriteMode: OverwriteMode.IfNewer.ToString(),
             DeleteMode: DeleteMode.Trash.ToString());
@@ -76,7 +76,7 @@ public sealed class PipelinePresetStoreTests
         {
             Steps =
             [
-                new TransformStepConfig("Move", new JsonObject { ["destinationPath"] = "/b" }),
+                new TransformStepConfig(StepKind.Move, new JsonObject { ["destinationPath"] = "/b" }),
             ],
         };
 
@@ -85,7 +85,7 @@ public sealed class PipelinePresetStoreTests
 
         var loaded = await store.GetUserPresetsAsync(dir);
         Assert.Single(loaded);
-        Assert.Equal("Move", loaded[0].Config.Steps[0].StepType);
+        Assert.Equal(StepKind.Move, loaded[0].Config.Steps[0].StepType);
     }
 
     [Fact]
@@ -98,7 +98,7 @@ public sealed class PipelinePresetStoreTests
             Description: null,
             Steps:
             [
-                new TransformStepConfig("Copy", new JsonObject { ["destinationPath"] = "/mem/out" }),
+                new TransformStepConfig(StepKind.Copy, new JsonObject { ["destinationPath"] = "/mem/out" }),
             ],
             OverwriteMode: OverwriteMode.IfNewer.ToString(),
             DeleteMode: DeleteMode.Trash.ToString());
@@ -140,7 +140,7 @@ public sealed class PipelinePresetStoreTests
     [Fact]
     public void PipelineStepFactory_UnknownStepType_ThrowsUnknownStepTypeException()
     {
-        var config = new TransformStepConfig("Nope", new JsonObject());
+        var config = new TransformStepConfig((StepKind)999, []);
 
         Assert.Throws<UnknownStepTypeException>(() => PipelineStepFactory.FromConfig(config));
     }

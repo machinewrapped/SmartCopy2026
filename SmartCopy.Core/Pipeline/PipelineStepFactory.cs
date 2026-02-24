@@ -9,15 +9,15 @@ public static class PipelineStepFactory
     {
         return config.StepType switch
         {
-            "Copy" => new CopyStep(GetRequiredString(config, "destinationPath")),
-            "Move" => new MoveStep(GetRequiredString(config, "destinationPath")),
-            "Delete" => new DeleteStep(ParseDeleteMode(config)),
-            "Flatten" => new FlattenStep(ParseFlattenConflictStrategy(config)),
-            "Rename" => new RenameStep(GetRequiredString(config, "pattern")),
-            "Rebase" => new RebaseStep(
+            StepKind.Copy => new CopyStep(GetRequiredString(config, "destinationPath")),
+            StepKind.Move => new MoveStep(GetRequiredString(config, "destinationPath")),
+            StepKind.Delete => new DeleteStep(ParseDeleteMode(config)),
+            StepKind.Flatten => new FlattenStep(ParseFlattenConflictStrategy(config)),
+            StepKind.Rename => new RenameStep(GetRequiredString(config, "pattern")),
+            StepKind.Rebase => new RebaseStep(
                 GetOptionalString(config, "stripPrefix"),
                 GetOptionalString(config, "addPrefix")),
-            "Convert" => new ConvertStep(GetOptionalString(config, "outputExtension")),
+            StepKind.Convert => new ConvertStep(GetOptionalString(config, "outputExtension")),
             _ => throw new UnknownStepTypeException(config.StepType),
         };
     }

@@ -7,7 +7,7 @@ namespace SmartCopy.Core.Pipeline.Validation;
 
 public sealed class PipelineValidator
 {
-    public PipelineValidationResult Validate(IReadOnlyList<ITransformStep> steps)
+    public static PipelineValidationResult Validate(IReadOnlyList<ITransformStep> steps)
     {
         var issues = new List<PipelineValidationIssue>();
         if (steps.Count == 0)
@@ -76,7 +76,7 @@ public sealed class PipelineValidator
                     Severity: PipelineValidationSeverity.Blocking));
             }
 
-            if (string.Equals(step.StepType, "Delete", StringComparison.OrdinalIgnoreCase)
+            if (step.StepType == StepKind.Delete
                 && i != steps.Count - 1)
             {
                 issues.Add(new PipelineValidationIssue(

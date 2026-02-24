@@ -11,17 +11,7 @@ using SmartCopy.UI.ViewModels.Pipeline;
 
 namespace SmartCopy.UI.ViewModels;
 
-public enum StepKind
-{
-    Flatten,
-    Rebase,
-    Rename,
-    Convert,
-    Copy,
-    Move,
-    Delete,
-    Custom,
-}
+
 
 public enum StepCategory
 {
@@ -38,7 +28,6 @@ public partial class PipelineStepViewModel : ViewModelBase
     private string? _validationMessage;
     private bool _hasValidationError;
 
-    #pragma warning disable IDE0290 // Use primary constructor
     public PipelineStepViewModel(ITransformStep step, string? customName = null)
     {
         _step = step;
@@ -47,7 +36,7 @@ public partial class PipelineStepViewModel : ViewModelBase
 
     public ITransformStep Step => _step;
 
-    public StepKind Kind => ToKind(_step.StepType);
+    public StepKind Kind => _step.StepType;
 
     public string? CustomName => string.IsNullOrWhiteSpace(_customName) ? null : _customName;
 
@@ -166,7 +155,7 @@ public partial class PipelineStepViewModel : ViewModelBase
         StepChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    internal static StepKind ToKind(string stepType)
+    internal static StepKind @ToKind(string stepType)
     {
         return stepType switch
         {
@@ -187,7 +176,7 @@ public partial class PipelineViewModel : ViewModelBase
     private const string CustomNameParameter = "customName";
     private const int MaxRecentTargets = 10;
     private readonly PipelinePresetStore _presetStore;
-    private readonly PipelineValidator _validator;
+
     private readonly string? _presetDirectory;
     private readonly StepPresetStore _stepPresetStore;
     private readonly AppSettings? _appSettings;
@@ -239,14 +228,14 @@ public partial class PipelineViewModel : ViewModelBase
 
     public PipelineViewModel(
         PipelinePresetStore? presetStore = null,
-        PipelineValidator? validator = null,
+
         string? presetDirectory = null,
         StepPresetStore? stepPresetStore = null,
         AppSettings? appSettings = null,
         string? stepPresetStorePath = null)
     {
         _presetStore = presetStore ?? new PipelinePresetStore();
-        _validator = validator ?? new PipelineValidator();
+
         _presetDirectory = presetDirectory;
         _stepPresetStore = stepPresetStore ?? new StepPresetStore();
         _appSettings = appSettings;
@@ -269,7 +258,7 @@ public partial class PipelineViewModel : ViewModelBase
         var customName = string.Equals(preset.Name, autoName, StringComparison.OrdinalIgnoreCase)
             ? null
             : preset.Name;
-        AddStepFromResult(PipelineStepViewModel.ToKind(step.StepType), step, customName);
+        AddStepFromResult(step.StepType, step, customName);
     }
 
     private void OnAddStepLoadPipelinePresetRequested(string name)
@@ -435,7 +424,7 @@ public partial class PipelineViewModel : ViewModelBase
 
     private async Task RefreshPresetsAsync()
     {
-        var standards = await _presetStore.GetStandardPresetsAsync();
+        var standards = await PipelinePresetStore.GetStandardPresetsAsync();
         var users = await _presetStore.GetUserPresetsAsync(_presetDirectory);
 
         StandardPresets.Clear();
@@ -462,7 +451,7 @@ public partial class PipelineViewModel : ViewModelBase
             step.HasValidationError = false;
         }
 
-        var result = _validator.Validate([.. Steps.Select(step => step.Step)]);
+        var result = PipelineValidator.Validate([.. Steps.Select(step => step.Step)]);
         ValidationResult = result;
         BlockingValidationMessage = result.FirstBlockingIssue?.Message;
 

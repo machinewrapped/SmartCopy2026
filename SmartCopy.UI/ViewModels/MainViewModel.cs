@@ -53,8 +53,7 @@ public partial class MainViewModel : ViewModelBase
 
         FilterChain = new FilterChainViewModel(presetStore, _settings);
         Pipeline = new PipelineViewModel(
-            presetStore: new PipelinePresetStore(),
-            validator: new PipelineValidator());
+            presetStore: new PipelinePresetStore());
 
         DirectoryTree = new DirectoryTreeViewModel(_memoryProvider, MockMemoryFileSystemFactory.RootPath)
         {
@@ -348,7 +347,7 @@ public partial class MainViewModel : ViewModelBase
                 progress,
                 _runCts.Token);
 
-            await _operationJournal.WriteAsync(results.Where(r => r.StepType is "Copy" or "Move" or "Delete"));
+            await _operationJournal.WriteAsync(results.Where(r => r.StepType is StepKind.Copy or StepKind.Move or StepKind.Delete));
             OperationProgress.Complete();
         }
         catch (OperationCanceledException)

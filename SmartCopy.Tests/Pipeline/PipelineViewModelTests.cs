@@ -17,8 +17,8 @@ public sealed class PipelineViewModelTests
         var pipeline = vm.BuildLivePipeline();
 
         Assert.Equal(2, pipeline.Steps.Count);
-        Assert.Equal("Flatten", pipeline.Steps[0].StepType);
-        Assert.Equal("Copy", pipeline.Steps[1].StepType);
+        Assert.Equal(StepKind.Flatten, pipeline.Steps[0].StepType);
+        Assert.Equal(StepKind.Copy, pipeline.Steps[1].StepType);
     }
 
     [Fact]
@@ -108,7 +108,7 @@ public sealed class PipelineViewModelTests
                 Steps:
                 [
                     new TransformStepConfig(
-                        "Copy",
+                        StepKind.Copy,
                         new JsonObject
                         {
                             ["destinationPath"] = "/mem/out",

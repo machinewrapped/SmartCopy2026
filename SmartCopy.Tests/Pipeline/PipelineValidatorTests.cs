@@ -8,9 +8,7 @@ public sealed class PipelineValidatorTests
     [Fact]
     public void PathOnlyPipeline_ReturnsNoExecutableBlockingIssue()
     {
-        var validator = new PipelineValidator();
-
-        var result = validator.Validate([new FlattenStep()]);
+        var result = PipelineValidator.Validate([new FlattenStep()]);
 
         Assert.False(result.CanRun);
         Assert.Contains(result.Issues, issue => issue.Code == "Pipeline.NoExecutableStep");
@@ -19,9 +17,7 @@ public sealed class PipelineValidatorTests
     [Fact]
     public void MissingDestination_ReturnsStepScopedBlockingIssue()
     {
-        var validator = new PipelineValidator();
-
-        var result = validator.Validate([new CopyStep("")]);
+        var result = PipelineValidator.Validate([new CopyStep("")]);
 
         Assert.False(result.CanRun);
         var issue = Assert.Single(result.Issues, i => i.Code == "Step.MissingDestination");
@@ -31,9 +27,7 @@ public sealed class PipelineValidatorTests
     [Fact]
     public void CopyThenMove_IsValid()
     {
-        var validator = new PipelineValidator();
-
-        var result = validator.Validate(
+        var result = PipelineValidator.Validate(
         [
             new CopyStep("/mem/backup"),
             new MoveStep("/mem/archive"),
@@ -46,9 +40,7 @@ public sealed class PipelineValidatorTests
     [Fact]
     public void DeleteThenCopy_InvalidAtCopyStep_BecauseSourceNoLongerExists()
     {
-        var validator = new PipelineValidator();
-
-        var result = validator.Validate(
+        var result = PipelineValidator.Validate(
         [
             new DeleteStep(),
             new CopyStep("/mem/out"),
@@ -61,9 +53,7 @@ public sealed class PipelineValidatorTests
     [Fact]
     public void MoveThenDelete_InvalidAtDeleteStep_BecauseSourceNoLongerExists()
     {
-        var validator = new PipelineValidator();
-
-        var result = validator.Validate(
+        var result = PipelineValidator.Validate(
         [
             new MoveStep("/mem/out"),
             new DeleteStep(),
@@ -76,9 +66,7 @@ public sealed class PipelineValidatorTests
     [Fact]
     public void DeleteMustBeFinal_IsEnforced()
     {
-        var validator = new PipelineValidator();
-
-        var result = validator.Validate(
+        var result = PipelineValidator.Validate(
         [
             new CopyStep("/mem/out"),
             new DeleteStep(),

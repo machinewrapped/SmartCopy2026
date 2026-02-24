@@ -13,7 +13,7 @@ public sealed class DeleteStep : ITransformStep
 
     public DeleteMode Mode { get; set; }
 
-    public string StepType => "Delete";
+    public StepKind StepType => StepKind.Delete;
     public bool IsPathStep => false;
     public bool IsContentStep => false;
     public bool IsExecutable => true;

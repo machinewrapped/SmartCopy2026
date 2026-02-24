@@ -38,7 +38,7 @@ internal static class PipelineStepDisplay
             RenameStep => "Rename files",
             RebaseStep => "Rebase paths",
             ConvertStep => "Convert files",
-            _ => step.StepType,
+            _ => step.StepType.ToString(),
         };
     }
 
@@ -61,7 +61,7 @@ internal static class PipelineStepDisplay
             ConvertStep convertStep => string.IsNullOrWhiteSpace(convertStep.OutputExtension)
                 ? "Output extension: required"
                 : $"Output extension: .{convertStep.OutputExtension}",
-            _ => step.StepType,
+            _ => step.StepType.ToString(),
         };
     }
 

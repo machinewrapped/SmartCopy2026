@@ -121,23 +121,23 @@ public sealed class StepPresetStore
 
     private static readonly IReadOnlyList<StepPreset> BuiltInDeletePresets =
     [
-        MakeBuiltIn("Delete to Trash", "Delete",
+        MakeBuiltIn("Delete to Trash", StepKind.Delete,
             new JsonObject { ["deleteMode"] = "Trash" }),
-        MakeBuiltIn("Delete permanently", "Delete",
+        MakeBuiltIn("Delete permanently", StepKind.Delete,
             new JsonObject { ["deleteMode"] = "Permanent" }),
     ];
 
     private static readonly IReadOnlyList<StepPreset> BuiltInFlattenPresets =
     [
-        MakeBuiltIn("Flatten (auto-rename)", "Flatten",
+        MakeBuiltIn("Flatten (auto-rename)", StepKind.Flatten,
             new JsonObject { ["conflictStrategy"] = "AutoRenameCounter" }),
     ];
 
-    private static StepPreset MakeBuiltIn(string name, string stepType, JsonObject parameters)
+    private static StepPreset MakeBuiltIn(string name, StepKind stepType, JsonObject parameters)
     {
         return new StepPreset
         {
-            Id = $"builtin_{stepType}_{name.Replace(' ', '_').ToLowerInvariant()}",
+            Id = $"builtin_{stepType.ToString().ToLowerInvariant()}_{name.Replace(' ', '_').ToLowerInvariant()}",
             Name = name,
             IsBuiltIn = true,
             Config = new TransformStepConfig(stepType, parameters),

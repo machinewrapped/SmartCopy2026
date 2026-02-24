@@ -16,7 +16,7 @@ public sealed class RebaseStep : ITransformStep
     public string StripPrefix { get; set; }
     public string AddPrefix { get; set; }
 
-    public string StepType => "Rebase";
+    public StepKind StepType => StepKind.Rebase;
     public bool IsPathStep => true;
     public bool IsContentStep => false;
     public bool IsExecutable => false;

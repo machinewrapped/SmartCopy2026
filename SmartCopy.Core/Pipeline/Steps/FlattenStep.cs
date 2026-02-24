@@ -14,7 +14,7 @@ public sealed class FlattenStep : ITransformStep
 
     public FlattenConflictStrategy ConflictStrategy { get; set; }
 
-    public string StepType => "Flatten";
+    public StepKind StepType => StepKind.Flatten;
     public bool IsPathStep => true;
     public bool IsContentStep => false;
     public bool IsExecutable => false;

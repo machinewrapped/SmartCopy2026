@@ -1,3 +1,4 @@
+using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Settings;
 
 namespace SmartCopy.UI.ViewModels.Pipeline;

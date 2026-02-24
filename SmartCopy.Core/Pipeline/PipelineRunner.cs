@@ -52,7 +52,7 @@ public sealed class PipelineRunner
                 {
                     var warning = await GetWarningAsync(preview.DestinationPath, targetProvider, ct);
                     actions.Add(new PlannedAction(
-                        StepSummary: step.StepType,
+                        StepSummary: step.StepType.ToString(),
                         SourcePath: node.FullPath,
                         DestinationPath: preview.DestinationPath!,
                         InputBytes: node.Size,

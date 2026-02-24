@@ -16,7 +16,7 @@ public sealed class PipelinePresetStore
         WriteIndented = true,
     };
 
-    public Task<IReadOnlyList<PipelinePreset>> GetStandardPresetsAsync(CancellationToken ct = default)
+    public static Task<IReadOnlyList<PipelinePreset>> GetStandardPresetsAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         return Task.FromResult<IReadOnlyList<PipelinePreset>>(
@@ -24,21 +24,21 @@ public sealed class PipelinePresetStore
             BuildStandardPreset(
                 "copy_only",
                 "Copy only",
-                [new TransformStepConfig("Copy", new JsonObject { ["destinationPath"] = "/mem/Target" })]),
+                [new TransformStepConfig(StepKind.Copy, new JsonObject { ["destinationPath"] = "/mem/Target" })]),
             BuildStandardPreset(
                 "move_only",
                 "Move only",
-                [new TransformStepConfig("Move", new JsonObject { ["destinationPath"] = "/mem/Target" })]),
+                [new TransformStepConfig(StepKind.Move, new JsonObject { ["destinationPath"] = "/mem/Target" })]),
             BuildStandardPreset(
                 "delete_to_trash",
                 "Delete to Trash",
-                [new TransformStepConfig("Delete", new JsonObject { ["deleteMode"] = DeleteMode.Trash.ToString() })]),
+                [new TransformStepConfig(StepKind.Delete, new JsonObject { ["deleteMode"] = DeleteMode.Trash.ToString() })]),
             BuildStandardPreset(
                 "flatten_copy",
                 "Flatten -> Copy",
                 [
-                    new TransformStepConfig("Flatten", new JsonObject()),
-                    new TransformStepConfig("Copy", new JsonObject { ["destinationPath"] = "/mem/Target" }),
+                    new TransformStepConfig(StepKind.Flatten, []),
+                    new TransformStepConfig(StepKind.Copy, new JsonObject { ["destinationPath"] = "/mem/Target" }),
                 ]),
         ]);
     }
@@ -87,9 +87,7 @@ public sealed class PipelinePresetStore
             }
         }
 
-        return presets
-            .OrderBy(preset => preset.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        return [.. presets.OrderBy(preset => preset.Name, StringComparer.OrdinalIgnoreCase)];
     }
 
     public async Task<IReadOnlyList<PipelinePreset>> GetAllPresetsAsync(

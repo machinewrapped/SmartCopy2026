@@ -16,12 +16,11 @@ public sealed class TransformPipeline
 
     public IReadOnlyList<ITransformStep> Steps => _steps;
 
-    public bool HasDeleteStep => _steps.Any(step => step.StepType == "Delete");
+    public bool HasDeleteStep => _steps.Any(step => step.StepType == StepKind.Delete);
 
     public void Validate()
     {
-        var validator = new PipelineValidator();
-        var result = validator.Validate(_steps);
+        var result = PipelineValidator.Validate(_steps);
         if (!result.CanRun)
         {
             var issue = result.FirstBlockingIssue;

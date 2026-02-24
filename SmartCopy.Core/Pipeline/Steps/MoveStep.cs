@@ -15,7 +15,7 @@ public sealed class MoveStep : ITransformStep
 
     public string DestinationPath { get; set; }
 
-    public string StepType => "Move";
+    public StepKind StepType => StepKind.Move;
     public bool IsPathStep => false;
     public bool IsContentStep => false;
     public bool IsExecutable => true;

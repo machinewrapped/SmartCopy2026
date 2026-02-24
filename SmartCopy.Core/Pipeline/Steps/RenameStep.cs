@@ -15,7 +15,7 @@ public sealed class RenameStep : ITransformStep
 
     public string Pattern { get; set; }
 
-    public string StepType => "Rename";
+    public StepKind StepType => StepKind.Rename;
     public bool IsPathStep => true;
     public bool IsContentStep => false;
     public bool IsExecutable => false;

@@ -43,7 +43,7 @@ public sealed class PipelineRunnerTests
             progress: null,
             CancellationToken.None);
 
-        Assert.Contains(results, r => r.StepType == "Copy" && r.Success);
+        Assert.Contains(results, r => r.StepType == StepKind.Copy && r.Success);
         Assert.True(await targetProvider.ExistsAsync("/Mirror/source/song.flac", CancellationToken.None));
     }
 

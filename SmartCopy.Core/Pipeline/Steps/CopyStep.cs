@@ -15,7 +15,7 @@ public sealed class CopyStep : ITransformStep
 
     public string DestinationPath { get; set; }
 
-    public string StepType => "Copy";
+    public StepKind StepType => StepKind.Copy;
     public bool IsPathStep => false;
     public bool IsContentStep => false;
     public bool IsExecutable => true;
