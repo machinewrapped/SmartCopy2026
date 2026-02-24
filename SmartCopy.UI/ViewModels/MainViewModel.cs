@@ -75,6 +75,7 @@ public partial class MainViewModel : ViewModelBase
 
         // Subscribe to chain changes — re-evaluate filters within ~100 ms.
         FilterChain.ChainChanged += OnChainChanged;
+        DirectoryTree.SelectionChanged += (_, _) => RefreshIdleStats();
 
         DirectoryTree.PropertyChanged += async (_, e) =>
         {
@@ -191,6 +192,38 @@ public partial class MainViewModel : ViewModelBase
 
         await DirectoryTree.ApplyFiltersAsync(chain, _memoryProvider, ct);
         await FileList.ReapplyFiltersAsync(ct);
+        RefreshIdleStats();
+    }
+
+    private void RefreshIdleStats()
+    {
+        int selected = 0;
+        long totalBytes = 0;
+        int filteredOut = 0;
+
+        foreach (var root in DirectoryTree.RootNodes)
+            CollectStatsRecursive(root, ref selected, ref totalBytes, ref filteredOut);
+
+        OperationProgress.UpdateIdleStats(selected, totalBytes, filteredOut);
+    }
+
+    private static void CollectStatsRecursive(FileSystemNode node, ref int selected, ref long totalBytes, ref int filteredOut)
+    {
+        foreach (var file in node.Files)
+        {
+            if (file.IsSelected)
+            {
+                selected++;
+                totalBytes += file.Size;
+            }
+            else if (file.CheckState == CheckState.Checked && file.FilterResult == FilterResult.Excluded)
+            {
+                filteredOut++;
+            }
+        }
+
+        foreach (var child in node.Children)
+            CollectStatsRecursive(child, ref selected, ref totalBytes, ref filteredOut);
     }
 
     private async void InitializeInBackground()
