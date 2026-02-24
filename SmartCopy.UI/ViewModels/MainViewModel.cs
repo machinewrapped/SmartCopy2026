@@ -394,7 +394,7 @@ public partial class MainViewModel : ViewModelBase
         }
     }
 
-    private IReadOnlyList<FileSystemNode> CollectSelectedFiles()
+    private List<FileSystemNode> CollectSelectedFiles()
     {
         var selected = new List<FileSystemNode>();
 
