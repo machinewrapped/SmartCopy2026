@@ -52,6 +52,9 @@ public partial class AddStepViewModel : ObservableObject
     private readonly AppSettings _settings;
     private readonly string? _presetStorePath;
 
+    /// <summary>Task that completes when async menu initialization is finished. Useful in tests.</summary>
+    public Task Initialization { get; }
+
     public AddStepViewModel(
         StepPresetStore? presetStore = null,
         AppSettings? settings = null,
@@ -60,7 +63,7 @@ public partial class AddStepViewModel : ObservableObject
         _presetStore = presetStore ?? new StepPresetStore();
         _settings = settings ?? new AppSettings();
         _presetStorePath = presetStorePath;
-        _ = InitializeMenusAsync();
+        Initialization = InitializeMenusAsync();
     }
 
     [ObservableProperty]

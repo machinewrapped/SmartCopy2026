@@ -5,17 +5,18 @@
              xmlns:corePipeline="clr-namespace:SmartCopy.Core.Pipeline;assembly=SmartCopy.Core"
              x:Class="SmartCopy.UI.Views.Pipeline.AddStepFlyout"
              x:DataType="vmPipeline:AddStepViewModel"
-             Width="300">
+             MinWidth="180">
     <UserControl.DataTemplates>
         <TreeDataTemplate DataType="vmPipeline:AddStepMenuItem" ItemsSource="{Binding Items}">
-            <Panel>
-                <Grid ColumnDefinitions="*, Auto" Margin="0,1" IsVisible="{Binding !IsSeparator}">
+            <Panel HorizontalAlignment="Stretch" MinWidth="200">
+                <Grid ColumnDefinitions="*, Auto" Margin="0,1" HorizontalAlignment="Stretch" IsVisible="{Binding !IsSeparator}">
                     <TextBlock Grid.Column="0" Text="{Binding Header}" VerticalAlignment="Center" Margin="0,0,16,0" />
                     <Button Grid.Column="1"
                             IsVisible="{Binding IsUserDefined}"
-                            Content="🗑" Width="28" Height="28" Padding="0"
+                            Content="✕" Width="28" Height="28" Padding="0"
                             HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                            CornerRadius="4" Background="Transparent" Foreground="#f44736" FontSize="12"
+                            CornerRadius="4" Background="Transparent"
+                            Foreground="{DynamicResource DangerForegroundBrush}" FontSize="12"
                             Command="{Binding DeleteCommand}"
                             CommandParameter="{Binding DeleteCommandParameter}" />
                 </Grid>
@@ -121,11 +122,11 @@
                                             <Grid ColumnDefinitions="*, Auto">
                                                 <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center" Margin="0,0,16,0" />
                                                 <Button Grid.Column="1"
-                                                        Content="🗑" Width="28" Height="28" Padding="0"
+                                                        Content="✕" Width="28" Height="28" Padding="0"
                                                         HorizontalContentAlignment="Center"
                                                         VerticalContentAlignment="Center"
                                                         CornerRadius="4" Background="Transparent"
-                                                        Foreground="#ff6b6b" FontSize="12"
+                                                        Foreground="{DynamicResource DangerForegroundBrush}" FontSize="12"
                                                         VerticalAlignment="Center"
                                                         ToolTip.Tip="Delete pipeline"
                                                         Click="OnDeletePipelineClick"

@@ -91,7 +91,7 @@
                                                         HorizontalContentAlignment="Center"
                                                         VerticalContentAlignment="Center"
                                                         Background="Transparent"
-                                                        Foreground="#f44336"
+                                                        Foreground="{DynamicResource DangerForegroundBrush}"
                                                         FontSize="10"
                                                         VerticalAlignment="Top"
                                                         Margin="8,0,0,0" />

@@ -286,8 +286,15 @@ public partial class PipelineViewModel : ViewModelBase
 
     private async void OnAddStepDeletePipelineRequested(string name)
     {
-        await _presetStore.DeleteUserPresetAsync(name, _presetDirectory);
-        await RefreshPresetsAsync();
+        try
+        {
+            await _presetStore.DeleteUserPresetAsync(name, _presetDirectory);
+            await RefreshPresetsAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ERROR] Failed to delete pipeline preset '{name}': {ex.Message}");
+        }
     }
 
     public TransformPipeline BuildLivePipeline()

@@ -32,9 +32,7 @@ public sealed class AddStepViewModelTests
     public async Task Initialize_BuildsMenuTypeHierarchies()
     {
         var (vm, _, _) = CreateVm();
-        
-        // Wait a bit for the async initialization to complete
-        await Task.Delay(100);
+        await vm.Initialization;
 
         Assert.NotEmpty(vm.CopyMenuItems);
         Assert.NotEmpty(vm.MoveMenuItems);
@@ -56,7 +54,7 @@ public sealed class AddStepViewModelTests
     public async Task DeleteMenu_ContainsNewAndBuiltInPresets()
     {
         var (vm, _, _) = CreateVm();
-        await Task.Delay(100);
+        await vm.Initialization;
 
         var menu = vm.DeleteMenuItems;
         
@@ -88,7 +86,7 @@ public sealed class AddStepViewModelTests
     public async Task PickPreset_RaisesStepPresetPickedAndUpdatesSettings()
     {
         var (vm, settings, _) = CreateVm();
-        await Task.Delay(100); // let menus build
+        await vm.Initialization;
         
         StepPreset? pickedPreset = null;
         vm.StepPresetPicked += preset => pickedPreset = preset;
