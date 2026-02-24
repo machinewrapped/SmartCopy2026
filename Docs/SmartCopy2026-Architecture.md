@@ -4,20 +4,19 @@
 **Source:** Extracted from `Docs/SmartCopy2026-Plan.md` to keep execution planning and implementation reference separate.
 
 This document is the implementation-oriented reference for architecture, technical contracts,
-algorithms, UI design, and persisted data models. It preserves section numbering used by the plan
-(for example `Section 6.11`) so cross-references remain stable.
+algorithms, UI design, and persisted data models.
 
 ## Table of Contents
 
-1. [Architecture Design](#4-architecture-design)
-2. [Key Technical Designs](#5-key-technical-designs)
-3. [Algorithms and Implementation Notes](#6-algorithms-and-implementation-notes)
-4. [UI Design](#7-ui-design)
-5. [Data Models](#10-data-models)
+1. [Architecture Design](#1-architecture-design)
+2. [Key Technical Designs](#2-key-technical-designs)
+3. [Algorithms and Implementation Notes](#3-algorithms-and-implementation-notes)
+4. [UI Design](#4-ui-design)
+5. [Data Models](#5-data-models)
 
 ---
 
-## 4. Architecture Design
+## 1. Architecture Design
 
 ```
 SmartCopy2026/
@@ -132,9 +131,9 @@ SmartCopy2026/
 
 ---
 
-## 5. Key Technical Designs
+## 2. Key Technical Designs
 
-### 5.1 IFileSystemProvider
+### 2.1 IFileSystemProvider
 
 The single abstraction that makes all pipeline steps provider-agnostic:
 
@@ -173,7 +172,7 @@ public record ProviderCapabilities(
 operations in a retry policy (up to 3 attempts, 500ms back-off) inside the provider itself — transparent to
 the pipeline. `LocalFileSystemProvider` needs no retry logic.
 
-### 5.2 IFilter and FilterChain
+### 2.2 IFilter and FilterChain
 
 ```csharp
 public interface IFilter
@@ -242,14 +241,14 @@ directory nodes (`AppliesToDirectories`).
 |---|---|---|
 | `WildcardFilter` | `Pattern` (`;`-separated) | Matches on filename only; `*` and `?` wildcards |
 | `ExtensionFilter` | `Extensions` list | Case-insensitive; normalised without leading dot |
-| `MirrorFilter` | `ComparisonPath`, `CompareMode` | See §6.3 for full algorithm. `ComparisonPath` is suggested from the first Copy/Move destination path in the current pipeline. |
+| `MirrorFilter` | `ComparisonPath`, `CompareMode` | See §3.3 for full algorithm. `ComparisonPath` is suggested from the first Copy/Move destination path in the current pipeline. |
 | `DateRangeFilter` | `Field` (Created/Modified), `Min`, `Max` | Either bound can be null (open range) |
 | `SizeRangeFilter` | `MinBytes`, `MaxBytes` | Either bound can be null |
 | `AttributeFilter` | `Attributes` flags | Hidden, ReadOnly, System |
 
-Saved as `.sc2filter` (JSON). See §10 for `FilterChainConfig` schema.
+Saved as `.sc2filter` (JSON). See §5 for `FilterChainConfig` schema.
 
-### 5.3 Transform Pipeline
+### 2.3 Transform Pipeline
 
 A **pipeline** is an ordered sequence of `ITransformStep` objects applied to each selected file.
 Steps are categorised:
@@ -342,7 +341,7 @@ contain multiple Copy/Move steps writing to different locations.
 Pipelines saved as `.sc2pipe` (JSON). The simple presets (Copy, Move, Delete) appear as toolbar
 buttons and internally create single-step pipelines.
 
-### 5.4 Preview Mode
+### 2.4 Preview Mode
 
 `PipelineRunner.PreviewAsync()` calls `step.Preview()` on each step for each selected node (no side
 effects). Returns an `OperationPlan`:
@@ -374,7 +373,7 @@ preview before execution. The user must explicitly confirm. This is not optional
 do not have a "just run" path. Copy and move operations can run directly or via preview at the
 user's choice.
 
-### 5.5 Fine-Grained Progress
+### 2.5 Fine-Grained Progress
 
 ```csharp
 public record OperationProgress(
@@ -396,7 +395,7 @@ including completed file counts, aggregate bytes, and ETA estimation.
 Chunk-level byte streaming progress remains a planned enhancement for Phase 2/3 once provider-level
 copy progress is threaded through `CopyStep`/`MoveStep` end-to-end.
 
-### 5.6 Directory Scanner
+### 2.6 Directory Scanner
 
 **Default: progressive scan.** The scanner shows top-level folders immediately, then streams
 children in the background via `IAsyncEnumerable<FileSystemNode>`. The user can browse and start
@@ -429,7 +428,7 @@ All enumeration runs on the threadpool. `DirectoryScanner` yields `FileSystemNod
 subtrees) run at normal priority. When the user expands a tree node or checks a folder, a high-priority
 task for that specific subtree is enqueued at the front, so it appears before background work continues.
 
-### 5.7 Filesystem Watcher
+### 2.7 Filesystem Watcher
 
 `DirectoryWatcher` wraps `FileSystemWatcher` with:
 - 300ms debounce (reset timer on each new event before firing)
@@ -437,9 +436,9 @@ task for that specific subtree is enqueued at the front, so it appears before ba
 - Fires `DirectoryChanged(string affectedPath)` event
 
 `DirectoryTreeViewModel` handles this by rescanning only the affected subtree and running
-save-selections / rescan / restore-selections for that subtree (see §6.5).
+save-selections / rescan / restore-selections for that subtree (see §3.5).
 
-### 5.8 Conversion Plugin Interface
+### 2.8 Conversion Plugin Interface
 
 ```csharp
 public interface IConversionPlugin
@@ -469,12 +468,12 @@ contains a `plugin.json` manifest and a DLL loaded via `AssemblyLoadContext` for
 
 ---
 
-## 6. Algorithms and Implementation Notes
+## 3. Algorithms and Implementation Notes
 
 This section documents the key algorithms and behaviours from the predecessor that must be
 correctly reimplemented. It exists because the predecessor source is not in this repository.
 
-### 6.1 Node Selection State
+### 3.1 Node Selection State
 
 Each `FileSystemNode` carries two independent pieces of application state:
 
@@ -507,7 +506,7 @@ IsSelected = CheckState == Checked && FilterResult == Included
 Filtered files are hidden from the file list by default, controlled by `ShowFilteredFiles = true`.
 Filtered nodes in the tree are similarly controlled by `ShowFilteredNodesInTree = true`. When visible, they appear with a distinct opacity/colour and are non-selectable (checkboxes are disabled).
 
-### 6.2 Tri-State Checkbox Propagation
+### 3.2 Tri-State Checkbox Propagation
 
 Rules for maintaining consistency when check states change:
 
@@ -546,7 +545,7 @@ using (node.BeginBatchUpdate())  // suspends PropertyChanged on subtree
 When `ShowFilteredFiles = false`, filtered nodes are hidden in the tree but their `CheckState`
 is preserved. If a filter is removed, previously-filtered nodes reappear with their prior state.
 
-### 6.3 Mirror Filter
+### 3.3 Mirror Filter
 
 Determines whether a source node has a counterpart at `ComparisonPath + RelativePath` in a
 comparison provider (typically the target side).
@@ -570,7 +569,7 @@ Implementation notes (current code path):
 When opening `EditFilterDialog` for a mirror filter, the editor is pre-populated with that
 suggested path.
 
-### 6.4 Wildcard Pattern Matching
+### 3.4 Wildcard Pattern Matching
 
 Pattern string uses `;` as separator for multiple patterns. Each pattern is applied to the
 **filename only** (not the full path), unless the pattern contains a directory separator.
@@ -585,7 +584,7 @@ Matching is case-insensitive. If any pattern in a `;`-separated list matches, th
 
 Example: `*.mp3;*.flac;*.ogg` matches any file ending in `.mp3`, `.flac`, or `.ogg`.
 
-### 6.5 Tree Rescan with Selection Preservation
+### 3.5 Tree Rescan with Selection Preservation
 
 When a full rescan is triggered (user action or filesystem watcher on a subtree root):
 
@@ -601,7 +600,7 @@ The snapshot can use relative paths (relative to the scan root) for portability 
 For a full rescan of the source root, the snapshot covers the entire tree; for an incremental
 watcher-triggered rescan, only the affected subtree is snapshotted and restored.
 
-### 6.6 Selection File Formats
+### 3.6 Selection File Formats
 
 Three formats for saving and restoring selections:
 
@@ -648,7 +647,7 @@ Rock/Beatles/Abbey Road/02 Something.flac
 - Unmatched paths are silently skipped (file may have been deleted or moved)
 - `#NODE` / `selectedFolders` entries check all their descendants via `CheckState = Checked`
 
-### 6.7 Sync Operations
+### 3.7 Sync Operations
 
 The predecessor had four sync modes, each expressible as a filter + pipeline combination:
 
@@ -659,14 +658,14 @@ The predecessor had four sync modes, each expressible as a filter + pipeline com
 | **Merge** | Copy files differing in either direction (bidirectional) | Two update passes: source→target, then target→source |
 | **Find orphans** | List target files with no match in source (no copying) | Enumerate target root, apply `MirrorFilter(ExcludeMatched)` against source, display result |
 
-**Safety:** Mirror target's delete pass always shows a mandatory preview (see §5.4). The preview
+**Safety:** Mirror target's delete pass always shows a mandatory preview (see §2.4). The preview
 clearly labels which files will be deleted and from where. The user must confirm before any
 deletions execute.
 
 **Destination resolution:** In the filter + pipeline combinations above, "target" means the
 `DestinationPath` of the `CopyStep` or `MoveStep` in the pipeline. There is no separate global
 target path field — the pipeline step is the authoritative source of the destination. The
-`MirrorFilter`'s comparison path is auto-derived from that same step (see §6.3).
+`MirrorFilter`'s comparison path is auto-derived from that same step (see §3.3).
 
 Overwrite strategy when a file exists at the destination (applies to copy and sync operations):
 - `Skip` — never overwrite; skip if destination file exists
@@ -675,7 +674,7 @@ Overwrite strategy when a file exists at the destination (applies to copy and sy
 
 This is configured per-pipeline, not globally. The overwrite mode is carried in `TransformContext`.
 
-### 6.8 Move Operation Strategy
+### 3.8 Move Operation Strategy
 
 `MoveStep` should attempt the efficient path first:
 
@@ -693,7 +692,7 @@ This is configured per-pipeline, not globally. The overwrite mode is carried in 
 4. **Empty directory cleanup** — after moving all files from a directory, check if the source
    directory is now empty; if so, delete it. Walk up ancestors and delete empty directories.
 
-### 6.9 Flatten Conflict Detection
+### 3.9 Flatten Conflict Detection
 
 When `FlattenStep` strips directory structure, files with the same name from different directories
 collide at the destination. `FlattenStep` must detect this during preview and handle it at
@@ -713,7 +712,7 @@ Default strategy: **auto-rename with counter suffix**
 - `Skip` — log a warning and skip conflicting files
 - `Overwrite` — overwrite silently
 
-### 6.10 Status Bar Statistics
+### 3.10 Status Bar Statistics
 
 The status bar shows live-updating counts derived from the current tree state:
 - Files selected (CheckState = Checked, FilterResult = Included)
@@ -731,7 +730,7 @@ new app, `StatusBarViewModel` exposes observable properties updated via:
 For large trees, maintain running totals that are incrementally updated on node state changes
 rather than re-scanning the entire tree from scratch each time.
 
-### 6.11 Safety Defaults for Destructive Operations
+### 3.11 Safety Defaults for Destructive Operations
 
 The predecessor had no safety net for destructive operations. SmartCopy2026 adds explicit safety
 defaults that protect users from accidental data loss while remaining easy to override for
@@ -741,7 +740,7 @@ experienced users.
 - `DeleteStep` uses the platform trash/recycle bin by default (`DeleteMode.Trash`)
 - A `DeleteMode.Permanent` option is available in settings and per-pipeline config
 - When `DeleteMode.Permanent` is selected, the pipeline displays a warning badge in the UI
-- All delete operations (both trash and permanent) require mandatory preview (see §5.4)
+- All delete operations (both trash and permanent) require mandatory preview (see §2.4)
 
 **Trash service (`TrashService`):**
 - Windows: `Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile()` with `SendToRecycleBin`
@@ -770,7 +769,7 @@ experienced users.
 - Not a full undo system — just a record for the user to review if something went wrong
 - Auto-cleanup: logs older than 30 days are deleted on startup
 
-### 6.12 Pipeline Validation (Declarative Contracts)
+### 3.12 Pipeline Validation (Declarative Contracts)
 
 Pipeline validation runs whenever steps are added, removed, reordered, or edited. It is evaluated
 as a deterministic pass over step contracts:
@@ -784,7 +783,7 @@ as a deterministic pass over step contracts:
 3. Apply pipeline-level rules (for example: at least one executable step)
 4. Return `PipelineValidationResult` (no side effects)
 
-Contract examples for built-in Phase 1 steps:
+Contract examples:
 
 | Step | Preconditions | Postconditions |
 |---|---|---|
@@ -816,431 +815,7 @@ blocking issues exist, ensuring UI and runtime enforce identical rules.
 
 ---
 
-## 7. UI Design
-
-### Main Window Layout
-
-The main content area uses a **3-column layout** — Filters | Folders | Files — all at the same
-height and separated by draggable `GridSplitter`s. This places the filter controls in direct
-visual proximity to the tree and file list they affect, making the data-flow left-to-right and
-immediately legible to new users.
-
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│  Source [/home/user/Music                              ▾] [📁]               │
-│  ────────────────────────────────────────────────────────────────────────    │
-│  ┌─────────────────┐ ║ ┌──────────────────┐ ║ ┌───────────────────────────┐ │
-│  │ FILTERS         │ ║ │ ▶ □  Rock        │ ║ │ ☑  Name         Modified  │ │
-│  │                 │ ║ │ ▶ ☑  Jazz        │ ║ │ ☑  Come Together.flac … │ │
-│  │ ☑ Only .mp3 /   │ ║ │ ▶ ☐  Classical   │ ║ │ ☐  Something.flac      … │ │
-│  │   .flac files   │ ║ │                  │ ║ │ ☑  cover.jpg           … │ │
-│  │   Ext:*.mp3;…   │ ║ │                  │ ║ │ ☑  desktop.ini         … │ │
-│  │                 │ ║ │                  │ ║ │                           │ │
-│  │ ☑ Skip files    │ ║ │                  │ ║ │                           │ │
-│  │   already on    │ ║ │                  │ ║ │                           │ │
-│  │   target        │ ║ │                  │ ║ │                           │ │
-│  │   Mirror: from  │ ║ │                  │ ║ │                           │ │
-│  │   pipeline ▾    │ ║ │                  │ ║ │                           │ │
-│  │ + Add filter    │ ║ │                  │ ║ │                           │ │
-│  │─────────────────│ ║ │                  │ ║ │                           │ │
-│  │ [Save ▾][Load ▾]│ ║ │                  │ ║ │                           │ │
-│  └─────────────────┘ ║ └──────────────────┘ ║ └───────────────────────────┘ │
-│  ──────────────────────────────────────────────────────────── [▶ Run      ] │
-│  PIPELINE  [Load Preset ▾]                                     [👁 Preview  ] │
-│  [⊞ Flatten] → [⚙ Convert  ] → [→ Copy To                  ] →  + Add step │
-│              →  [mp3 320k  ]    [/mnt/phone/Music         📁]               │
-│  ────────────────────────────────────────────────────────────────────────    │
-│  142 files (2.3 GB) selected   17 filtered out  │  ████████░░ 78%  0:34 left │
-│  Abbey Road/01 Come Together.flac                                            │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
-
-`║` = draggable GridSplitter between columns
-
-**Filter card anatomy** (each filter in the Filters column):
-```
-┌──────────────────────────────────────────────────┐
-│ ☑  Only .mp3 and .flac files        ≡  ✎  ✕    │
-│    Extension: *.mp3; *.flac                       │
-└──────────────────────────────────────────────────┘
-```
-- **Checkbox** (left) — enable/disable the filter in-place
-- **Summary** (bold) — human-readable one-liner generated from filter config
-- **Description** (dimmed subtitle) — raw technical spec for power users
-- **Drag handle** `≡`, **edit pencil** `✎`, **remove** `✕` (right-aligned)
-- The mode selector (`ONLY` / `ADD` / `EXCLUDE`) and detailed config live in the edit dialog, not the card face
-
-### Filter UX Flow
-
-#### Add Filter — Two-Level Drill-Down
-
-Clicking "+ Add filter" opens a **`Popup`** anchored below the button (light-dismiss on
-click-outside). The flyout uses two panels swapped by a boolean flag — no secondary window.
-
-**Level 1 — Filter type selection:**
-```
-┌────────────────────────────────┐
-│  Add Filter                    │
-├────────────────────────────────┤
-│  Extension    Filter by ext.   │
-│  Wildcard     Name pattern     │
-│  Date Range   Created/Modified │
-│  Size Range   Min/Max bytes    │
-│  Mirror       Skip on target   │
-│  Attribute    Hidden/ReadOnly  │
-└────────────────────────────────┘
-```
-
-**Level 2 — Preset picker for chosen type:**
-```
-┌────────────────────────────────┐
-│  ← Extension                   │
-├────────────────────────────────┤
-│  ＋ New...                     │
-├────────────────────────────────┤
-│  Recently used                 │
-│    My music (*.mp3;*.flac)     │
-├────────────────────────────────┤
-│  ★ Audio files                 │
-│  ★ Images                      │
-│  ★ Documents                   │
-│  ★ Log files                   │
-│    My custom preset            │
-└────────────────────────────────┘
-```
-
-- **"＋ New..."** — closes flyout, opens `EditFilterDialog` with empty form for selected type
-- **Preset row** — closes flyout, adds card immediately, triggers tree/file list update
-- **"←"** — returns to Level 1; "★" = built-in (read-only); plain rows = user-saved presets
-- "Recently used" shows the last 5 presets of this type from `AppSettings.FilterTypeMruPresetIds`
-
-#### EditFilterDialog
-
-A **modal `Window`** (`ShowDialog<bool?>`) opened via "＋ New..." or the edit pencil on any card.
-The dialog dispatches to a type-specific editor view via `ContentControl` + `DataTemplate`.
-
-```
-┌─────────────────────────────────────────┐
-│  Edit Filter                            │
-├─────────────────────────────────────────┤
-│  [ONLY ●] [ADD ○] [EXCLUDE ○]           │  ← mode radio group
-├─────────────────────────────────────────┤
-│  Name: [Only .mp3 and .flac       ]     │  ← auto-generated, user-overridable
-├─────────────────────────────────────────┤
-│  ┌── type-specific form ──────────────┐ │
-│  │ Extension: [.mp3 ×][.flac ×] +Add  │ │  chips + input
-│  │ Wildcard:  [*.tmp;*.bak          ]│ │  single text box
-│  │ Date Range: ○Created ●Modified    │ │  radio + two CalendarDatePickers
-│  │ Size Range: Min[1.5] Max[──] [MB▾] │ │  shared unit selector
-│  │ Mirror:     [/mem/Mirror     ][…] │ │  browse button disabled in Phase 1
-│  │             ○Name  ●Name+Size     │ │
-│  │ Attribute:  ☐Hidden ☐RO ☐System  │ │
-│  └────────────────────────────────── ┘ │
-├─────────────────────────────────────────┤
-│  ☐ Save as preset                       │
-├─────────────────────────────────────────┤
-│            [Cancel]      [OK ✓]         │  ← OK disabled when !IsValid
-└─────────────────────────────────────────┘
-```
-
-"Save as preset" sets a flag on the dialog VM; after a successful dialog close,
-`FilterChainView.axaml.cs` persists the preset via `FilterPresetStore`.
-
-#### Filter Results in Tree / File List
-
-- **`FilterResult.Excluded` + `ShowFilteredFiles=true`**: files remain visible; tree rows are dimmed
-  (`Opacity = 0.4`) and excluded file names are styled (`SlateBlue`)
-- **`FilterResult.Excluded` + `ShowFilteredFiles=false`**: excluded files are removed from
-  `VisibleFiles`; tree remains navigable with excluded directories still shown dimmed
-- All filter changes propagate within ~100 ms via a debounced `CancellationTokenSource`
-- Drag handle `≡` on filter cards reorders the chain (Avalonia `DragDrop`); order affects
-  chain evaluation sequence
-
-### Pipeline UX Flow
-
-#### Pipeline Step Card Anatomy
-
-Each step in the pipeline strip is a card connected by `→` arrows. Cards follow the same
-summary/subtitle pattern as filter cards:
-
-```
-┌──────────────────────────────────────────────────┐
-│ → Copy to Mirror                        ✎  ✕    │
-│   Destination: /mem/Mirror                      │
-└──────────────────────────────────────────────────┘
-
-┌──────────────────────────────────────────────────┐
-│ 🗑 Delete permanently                   ✎  ✕    │
-│   This cannot be undone.                        │
-│   ⚠ Permanent delete                           │
-└──────────────────────────────────────────────────┘
-```
-
-- **Icon + summary** (top-left) — icon plus human-readable summary; auto-generated from step parameters
-  unless user overrides it in `EditStepDialog`
-- **Technical subtitle** — compact detail line (for example destination path, pattern, strategy)
-- **Edit pencil** `✎` — opens `EditStepDialog` for full configuration (overwrite mode,
-  conflict strategy, rename pattern, etc.)
-- **Remove** `✕` — removes the step; pipeline revalidates after each removal
-
-`DeleteStep` cards are intentionally quiet for `Trash` mode (single-line summary, no extra badge).
-When `DeleteMode.Permanent` is active, the card shows an amber warning badge.
-
-#### Add Step — Three-Level Drill-Down
-
-Clicking `+ Add step` opens a **`Popup`** anchored below the button (light-dismiss on
-click-outside). Three panels swapped by `IsLevel2Visible` and `IsLevel3Visible` flags — no
-secondary window. This mirrors the Add Filter flyout pattern with per-step presets.
-
-**Level 1 — Category selection:**
-```
-┌────────────────────────────────┐
-│  Add Step                      │
-├────────────────────────────────┤
-│  Path steps                    │
-│    Modify the output path      │
-├────────────────────────────────┤
-│  Content steps                 │
-│    Transform file contents     │
-├────────────────────────────────┤
-│  Executable steps              │
-│    Write or delete the file    │
-└────────────────────────────────┘
-```
-
-**Level 2 — Step type selection** (example: Executable):
-```
-┌────────────────────────────────┐
-│  ← Executable steps            │
-├────────────────────────────────┤
-│  Copy To   Copy to destination │
-│  Move To   Move to destination │
-│  Delete    Remove source file  │
-│            ⚠ requires preview  │
-└────────────────────────────────┘
-```
-
-**Level 3 — Preset picker for chosen type** (example: Delete):
-```
-┌────────────────────────────────┐
-│  ← Delete                      │
-├────────────────────────────────┤
-│  ＋ New...                     │
-├────────────────────────────────┤
-│  Recently used                 │
-│    Delete to Trash             │
-├────────────────────────────────┤
-│  ★ Delete to Trash             │
-│  ★ Delete permanently          │
-│    My custom delete            │
-└────────────────────────────────┘
-```
-
-- `←` on Level 2 returns to Level 1; `←` on Level 3 returns to Level 2.
-- If no presets exist for a step type (e.g. Copy, Move, Rename), Level 3 is bypassed and
-  `EditStepDialog` opens directly — same bypass pattern as the filter flyout.
-- **"＋ New..."** on Level 3 opens `EditStepDialog` with an empty form for the selected type.
-- **Preset row** — closes flyout, adds step immediately from preset config.
-- "★" prefix = built-in (read-only); plain rows = user-saved presets.
-- "Recently used" shows the last 5 presets of this type from `AppSettings.StepTypeMruPresetIds`.
-
-Clicking a step type (Level 2) that has presets navigates to Level 3.
-Clicking a step type with no presets opens `EditStepDialog` directly.
-This includes optional custom step naming in the same interaction.
-
-**Built-in step presets:**
-
-| Step type | Built-in presets |
-|---|---|
-| Delete | "Delete to Trash", "Delete permanently" |
-| Flatten | "Flatten (auto-rename)" |
-| All others | None (destinations/patterns are user-specific) |
-
-Per-step presets are persisted in `step-presets.json` via `StepPresetStore` (single JSON file,
-same pattern as `FilterPresetStore`). Full pipeline configurations remain separately saved and
-loaded via the `[Load Preset ▾]` button.
-
-**Execution eligibility rule:** A pipeline may contain zero or more executable steps.
-`Run` stays disabled until the pipeline contains at least one executable step and all required
-fields for configured steps are valid. Adding Copy/Move does not replace existing executable
-steps. `DeleteStep` remains preview-mandatory and must be the final step when present.
-
-When validation fails, the first blocking issue is shown as helper text under the pipeline strip,
-and the affected step card is highlighted with inline error text + tooltip (for keyboard and mouse
-users). Example: adding `Copy` after `Delete` marks the `Copy` step invalid with a message such as
-"Source no longer exists at this point in the pipeline."
-
-#### EditStepDialog
-
-A **modal `Window`** (`ShowDialog<bool?>`) opened by `✎` on any step card, or automatically
-when adding a step type. Dispatches to a type-specific editor via
-`ContentControl` + `DataTemplate`.
-
-```
-┌─────────────────────────────────────────┐
-│  Edit Step: Copy To                     │
-├─────────────────────────────────────────┤
-│  Name: [Copy to Mirror              ]   │
-│       (auto-generated, overridable)     │
-├─────────────────────────────────────────┤
-│  ┌── type-specific form ──────────────┐ │
-│  │                                    │ │
-│  │  [Copy To / Move To]               │ │
-│  │  Destination:                      │ │
-│  │  [/mnt/phone/Music          ][…]   │ │
-│  │                                    │ │
-│  │  Overwrite:                        │ │
-│  │  ○ Skip  ● If Newer  ○ Always      │ │
-│  │                                    │ │
-│  │  [Flatten]                         │ │
-│  │  Conflict strategy:                │ │
-│  │  ● Auto-rename  (song (2).mp3)     │ │
-│  │  ○ Prefix source path              │ │
-│  │  ○ Skip conflicting files          │ │
-│  │  ○ Overwrite silently              │ │
-│  │                                    │ │
-│  │  [Rename]                          │ │
-│  │  Pattern: [{name}              ]   │ │
-│  │  Tokens:  {name} {ext} {date}      │ │
-│  │           {artist} {album}         │ │
-│  │           {track:00} {title}       │ │
-│  │  Preview: [artist - title.mp3   ]  │ │
-│  │                                    │ │
-│  │  [Delete]                          │ │
-│  │  ● Send to Recycle Bin (safe)      │ │
-│  │  ○ Delete permanently  ⚠          │ │
-│  │                                    │ │
-│  │  [Rebase]                          │ │
-│  │  Strip prefix: [Music/          ]  │ │
-│  │  Add prefix:   [Archive/        ]  │ │
-│  │                                    │ │
-│  │  [Convert]  (Phase 4)              │ │
-│  │  Output format: [mp3 ▾]            │ │
-│  │  Quality:       [320k ▾]           │ │
-│  │                                    │ │
-│  └────────────────────────────────── ┘ │
-├─────────────────────────────────────────┤
-│  ☐ Save as preset                       │
-├─────────────────────────────────────────┤
-│            [Cancel]      [OK ✓]         │
-└─────────────────────────────────────────┘
-```
-
-"Save as preset" sets a flag on the dialog VM; after a successful dialog close,
-`PipelineView.axaml.cs` persists the preset via `StepPresetStore`. The step name is used
-as the preset name.
-
-OK is disabled when:
-- **Copy To / Move To**: destination path is empty
-- **Rename**: pattern string is empty
-- **Rebase**: neither strip-prefix nor add-prefix has a value
-
-If the entered step name matches the auto-generated name, no custom-name override is persisted.
-
-#### Load Preset ▾ / Save Pipeline
-
-The `[Load Preset ▾]` button opens a menu:
-
-```
-┌──────────────────────────────────────┐
-│  Standard                            │
-│    Copy only                         │
-│    Move only                         │
-│    Delete to Trash                   │
-│    Flatten → Copy                    │
-├──────────────────────────────────────┤
-│  My Pipelines                        │
-│    Music to phone                    │
-│    Archive old files                 │
-├──────────────────────────────────────┤
-│  ✎ Save current pipeline...         │
-└──────────────────────────────────────┘
-```
-
-**Standard** presets (hardcoded, read-only):
-
-| Name | Steps |
-|---|---|
-| Copy only | `[CopyStep]` |
-| Move only | `[MoveStep]` |
-| Delete to Trash | `[DeleteStep(Trash)]` |
-| Flatten → Copy | `[FlattenStep → CopyStep]` |
-
-**My Pipelines** — user-saved `.sc2pipe` files from `%APPDATA%/SmartCopy2026/pipelines/`.
-
-**Save current pipeline** — prompts for a name (inline text input in the menu or a small
-dialog), then writes a `.sc2pipe` file. If a file with that name already exists, confirms
-overwrite.
-
-Loading a preset replaces the entire current pipeline. A tooltip-notification at the bottom of
-the pipeline strip confirms the name of the loaded preset.
-
-#### Preview Dialog
-
-`PreviewPipeline` opens the **Preview Dialog** (a modal `Window`, not a side panel), populated
-from `OperationPlan` produced by `PipelineRunner.PreviewAsync()`.
-
-```
-┌──────────────────────────────────────────────────────────┐
-│  Preview — 142 files · 2.3 GB                            │
-├──────────────────────────────────────────────────────────┤
-│  ✓ 138 ready    ⚠ 3 destination exists    ✕ 1 conflict  │
-├──────────────────────────────────────────────────────────┤
-│  ⚠ Destination Exists (3)                               │
-│  ┌────────────────────────────┬─────────────┬─────────┐  │
-│  │ Source                     │ Destination │    Size │  │
-│  ├────────────────────────────┼─────────────┼─────────┤  │
-│  │ Abbey Road/Come Together   │ same·newer  │  45 MB  │  │
-│  │ Abbey Road/Something       │ same·same   │  38 MB  │  │
-│  │ Jazz/Kind of Blue          │ same·older  │  92 MB  │  │
-│  └────────────────────────────┴─────────────┴─────────┘  │
-│                                                          │
-│  ✕ Name Conflict (1)                                     │
-│  ┌────────────────────────────┬─────────────┬─────────┐  │
-│  │ Rock/track01.flac          │ track01(2)  │  28 MB  │  │
-│  └────────────────────────────┴─────────────┴─────────┘  │
-│                                                          │
-│  ✓ Ready (138 files)                      [show/hide ▾]  │
-├──────────────────────────────────────────────────────────┤
-│                       [Cancel]    [▶ Run (142 files)]    │
-└──────────────────────────────────────────────────────────┘
-```
-
-**Delete operation preview (confirm before delete):**
-
-When the pipeline contains a `DeleteStep`, the `[▶ Run]` button is replaced by `[⚠ Run]` and
-executes `PreviewAsync` first, requiring explicit confirmation in the dialog before proceeding.
-The dialog header and layout change to emphasize the destructive nature:
-
-```
-┌──────────────────────────────────────────────────────────┐
-│  ⚠ Delete Preview — confirmation required                │
-├──────────────────────────────────────────────────────────┤
-│  Files will be sent to the Recycle Bin.                  │
-│  (To delete permanently, edit the Delete step.)          │
-├──────────────────────────────────────────────────────────┤
-│  47 files to delete · 1.2 GB                             │
-│  ┌──────────────────────────────────────────────────────┐ │
-│  │ Abbey Road/01 Come Together.flac               45 MB │ │
-│  │ Abbey Road/02 Something.flac                   38 MB │ │
-│  │ ...                                                  │ │
-│  └──────────────────────────────────────────────────────┘ │
-├──────────────────────────────────────────────────────────┤
-│                   [Cancel]   [🗑 Delete 47 files to Bin] │
-└──────────────────────────────────────────────────────────┘
-```
-
-For `DeleteMode.Permanent`, the header and confirm button intensify:
-``` 
-│  ⚠ Permanent delete — files CANNOT be recovered.        │
-...
-│                   [Cancel]   [⚠ Permanently Delete 47]  │
-```
-
-If the pipeline has no executable step (for example, only `Flatten`/`Rename`/`Rebase`), the main
-run button is disabled until an executable step is added.
-
-#### Pipeline-Specific ViewModels
+### 3.13 Pipeline-Specific ViewModels
 
 **`AddStepViewModel`** — mirrors `AddFilterViewModel` pattern:
 - `IsLevel2Visible` bool; `SelectedCategory` (`Path | Content | Executable`)
@@ -1319,35 +894,7 @@ All critical actions must be keyboard-accessible from the initial shell:
 Screen-reader labels and focus states are part of the UI shell, not a polish item. Avalonia
 supports `AutomationProperties.Name` — use it from the start.
 
-### UI Shell Scope (Phase 1, Step 1)
-
-The shell must be built first with placeholder/hardcoded data before any business logic is wired.
-This validates the layout and UX before architecture decisions are locked in.
-
-Shell checklist:
-- [x] Main window with correct proportions, resizable split panes (3-column: Filters/Folders/Files)
-- [x] Source field with browse button (no real browsing yet); target path removed — destination
-      is owned by Copy/Move pipeline step cards
-- [x] TreeView with 2–3 levels of hardcoded nodes, tri-state checkbox behaviour fully working
-- [x] FileListView with hardcoded rows, all columns (Name/Size/Modified), column resizing, click-to-sort
-- [x] Filter chain area: two placeholder filter cards with human-readable summary + technical subtitle,
-      enable/disable checkbox, edit (pencil) button, remove button, inline "+ Add filter" ghost card,
-      Save/Load buttons pinned to bottom of column
-- [x] Pipeline area: horizontal scrollable step chain with → connectors; Load Preset ▾ menu
-      (Standard: Copy/Move/Delete presets; My Pipelines; Save current pipeline); + Add step flyout
-      (Path / Content / Executable step categories); Run and Preview buttons stacked on the right;
-      step cards show summary + technical subtitle and edit/remove actions
-- [x] Status bar: placeholder text (file count, size, filtered count, progress bar, time remaining, current file)
-- [x] Window size, position, maximised state, and all three column widths persisted to
-      `%LOCALAPPDATA%/SmartCopy2026/window.json`; restored on next open with off-screen safety guard
-- [ ] Operation progress overlay: progress bars, pause/cancel buttons, status labels — no real operation
-- [ ] Log panel: collapsible, scrollable, a few placeholder log entries
-- [ ] Full keyboard navigation: Tab order, arrow keys in tree/list, Space to toggle, focus indicators
-- [ ] Automation properties on all interactive controls (screen-reader baseline)
-
----
-
-## 10. Data Models
+## 5. Data Models
 
 ### FileSystemNode
 

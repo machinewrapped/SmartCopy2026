@@ -106,7 +106,7 @@ Path comparisons for filter matching should follow idiomatic behavior for the ho
 
 Avalonia's `VirtualizingStackPanel` handles large lists efficiently, but propagating tri-state
 checkbox state across a deep tree of 100k+ nodes requires deliberate care. The state propagation
-algorithm must be efficient (see Architecture `Section 6.2`). This is an implementation concern,
+algorithm must be efficient (see Architecture `Tri-State Checkbox Propagation`). This is an implementation concern,
 not a reason to switch framework.
 
 **TreeDataGrid:** Avalonia's `TreeDataGrid` control (stable in 11+) may outperform a hand-rolled
@@ -124,7 +124,7 @@ installed, `global.json` can pin the SDK version. Self-contained publish (`--sel
 ## 4. Architecture Design
 
 Canonical architecture reference lives in:
-- `Docs/SmartCopy2026-Architecture.md#4-architecture-design`
+- `Docs/SmartCopy2026-Architecture.md#1-architecture-design`
 
 This plan keeps only execution sequencing and acceptance criteria. When architecture or contract details change, update the architecture reference first, then update impacted plan steps.
 
@@ -133,7 +133,7 @@ This plan keeps only execution sequencing and acceptance criteria. When architec
 ## 5. Key Technical Designs
 
 Detailed technical contracts (providers, filters, pipeline, preview/progress, scanner/watcher, plugin interface) now live in:
-- `Docs/SmartCopy2026-Architecture.md#5-key-technical-designs`
+- `Docs/SmartCopy2026-Architecture.md#2-key-technical-designs`
 
 Do not duplicate full class/interface signatures here unless a step requires an explicit temporary delta.
 
@@ -142,16 +142,16 @@ Do not duplicate full class/interface signatures here unless a step requires an 
 ## 6. Algorithms and Implementation Notes
 
 Canonical algorithm/invariant reference (selection state, tri-state propagation, mirror matching, wildcard matching, sync semantics, safety defaults) now lives in:
-- `Docs/SmartCopy2026-Architecture.md#6-algorithms-and-implementation-notes`
+- `Docs/SmartCopy2026-Architecture.md#3-algorithms-and-implementation-notes`
 
-Step acceptance criteria may reference algorithm sections (for example `Section 6.11`) but normative algorithm text is maintained in the architecture reference.
+Step acceptance criteria may reference algorithm sections (for example `Safety Defaults for Destructive Operations`) but normative algorithm text is maintained in the architecture reference.
 
 ---
 
 ## 7. UI Design
 
 Canonical UI behavior and interaction specs now live in:
-- `Docs/SmartCopy2026-Architecture.md#7-ui-design`
+- `Docs/SmartCopy2026-UIUX.md`
 
 Plan-level rule: keep UI implementation tasks and verification in Phase steps; keep stable interaction specs in architecture.
 
@@ -162,7 +162,7 @@ Plan-level rule: keep UI implementation tasks and verification in Phase steps; k
 *Goal: ship a reliable cross-platform v1 that can scan, select, filter, preview, copy/move/delete,
 and sync safely.*
 
-### Phase 1 sequencing principle (revised 2026-02-22)
+### Phase 1 sequencing principle
 
 1. Prove and refine UX using `MemoryFileSystemProvider` first; seeded `/mem` remains the default integration source until the end-to-end flow is demoable.
 2. Treat the UX loop as the primary critical path: scan/seed -> select -> filter -> preview -> run -> verify.
@@ -192,6 +192,29 @@ and sync safely.*
 | Polish-1 (Step 9): Shell observability + status | Not started | After UX loop proven |
 | Polish-2 (Step 10): Keyboard + accessibility | Not started | After Step 9 |
 
+### UI/UX Validation (Phase 1)
+
+The UI must be built first with test data to validate the layout and UX.
+
+UI/UX checklist:
+- [x] Main window with correct proportions, resizable split panes (3-column: Filters/Folders/Files)
+- [x] Window size, position, maximised state, and column widths persisted to
+      `%LOCALAPPDATA%/SmartCopy2026/window.json`; restored on next open with off-screen safety guard
+- [x] Source field with browse button (no real browsing yet)
+- [x] TreeView with tri-state checkbox behaviour fully working
+- [x] FileListView with all columns (Name/Size/Modified), column resizing, click-to-sort
+- [x] Filter chain area: filter cards with human-readable summary + technical subtitle,
+      enable/disable checkbox, edit (pencil) button, remove button, inline "+ Add filter" ghost card,
+      Save/Load buttons pinned to bottom of column
+- [x] Pipeline area: horizontal scrollable step chain with → connectors; + Add step flyout
+      (Executable / Path / Content step categories); Run and Preview buttons stacked on the right;
+      step cards show summary + technical subtitle and edit/remove actions
+- [ ] Status bar: file count, size, filtered count, progress bar, time remaining, current file
+- [ ] Operation progress overlay: progress bars, pause/cancel buttons, status labels — no real operation
+- [ ] Log panel: collapsible, scrollable, a few placeholder log entries
+- [ ] Full keyboard navigation: Tab order, arrow keys in tree/list, Space to toggle, focus indicators
+- [ ] Automation properties on all interactive controls (screen-reader baseline)
+
 ### Step 1 — Project Scaffold + Baseline UI Shell (UX Loop Track)
 
 Deliverables:
@@ -212,7 +235,7 @@ Verification:
 ### Step 2 — Core Models + MemoryFileSystemProvider (Memory-Backed Hardening Track, test-first foundation)
 
 Deliverables:
-- [x] Implement `FileSystemNode` full model contract from Architecture `Section 10`
+- [x] Implement `FileSystemNode` full model contract from Architecture `Data Models`
 - [x] Implement `IFileSystemProvider` + `ProviderCapabilities`
 - [x] Implement `MemoryFileSystemProvider` for fast hermetic tests
 - [x] Create shared test fixtures/builders that default to `MemoryFileSystemProvider`
@@ -229,7 +252,7 @@ Verification:
 ### Step 3 — Node Selection Logic (UX Loop Track, validation-priority)
 
 Deliverables:
-- [x] Tri-state propagation algorithm from Architecture `Section 6.2` in production nodes/view models
+- [x] Tri-state propagation algorithm from Architecture `Tri-State Checkbox Propagation` in production nodes/view models
 - [x] `IsSelected` wiring (`CheckState == Checked && FilterResult == Included`)
 
 Acceptance criteria:
@@ -242,7 +265,7 @@ Verification:
 ### Step 4 — Filter Chain (UX Loop Track) ✓
 
 **Completed 2026-02-23.** Full filter chain implementation delivered across six sub-steps (4a–4f).
-Implementation details for contracts, UI flows, and filter types are in Architecture §5.2 and §7.
+Implementation details for contracts, UI flows, and filter types are in Architecture `IFilter and FilterChain` and UIUX documentation.
 
 Delivered:
 - [x] Core filter engine: `IFilter`, `FilterChain`, `FilterConfig`, `FilterChainConfig`
@@ -257,11 +280,11 @@ Delivered:
 - [x] Live filter application to tree + file list via debounced `ApplyFiltersAsync`
 - [x] `FilterResultOpacityConverter`, `ShowFilteredFiles` toggle, excluded-node checkbox disabling
 
-Remaining follow-up (deferred to Phase 3):
+Remaining follow-up:
 - [ ] Save/Load chain file-picker integration (`.sc2filter` JSON round-trip wiring in the shell)
 
 Acceptance criteria — all met:
-- [x] `Only`/`Add`/`Exclude` semantics match Architecture §5.2
+- [x] `Only`/`Add`/`Exclude` semantics match Architecture `IFilter and FilterChain`
 - [x] Disabled filters have zero effect; parent excluded when all children excluded
 - [x] Excluded nodes non-selectable; tree toggle hides/shows excluded nodes
 - [x] Mirror filter comparison path suggestion derives from pipeline destination
@@ -276,8 +299,6 @@ Verification — all automated suites passing:
 - [x] Manual: new Extension filter via dialog, save as preset, persists across restart
 
 ### Step 5 — Transform Pipeline (UX Loop Track, built-in steps)
-**Status (updated 2026-02-23):** Implementation delivered across sub-steps 5.2–5.8. Automated
-tests were authored for the new behavior; test execution remains manual (see verification).
 
 #### Delivered
 - [x] Core pipeline extension and validation layer:
@@ -339,7 +360,7 @@ tests were authored for the new behavior; test execution remains manual (see ver
   `PipelinePresetStoreTests`, `PipelineValidatorTests`, `StepEditorViewModelTests`,
   `AddStepViewModelTests`, `EditStepDialogViewModelTests`, `PipelineViewModelTests`,
   `PreviewViewModelTests`, `PipelineIntegrationTests`
-- [X] Manual `dotnet test` execution by maintainer (required in this environment)
+- [X] `dotnet test` execution
 - [ ] Manual UI scenario checks for preview/delete/progress/journal flows
 
 ### Step 6 — Sync Operations (UX Loop Track)
@@ -347,13 +368,13 @@ tests were authored for the new behavior; test execution remains manual (see ver
 Deliverables:
 - [ ] Update target workflow (`MirrorFilter` + `CopyStep` + `IfNewer`)
 - [ ] Mirror target workflow (second orphan-delete pass with mandatory preview)
-- [x] Find-orphans report mode
+- [ ] Find-orphans report mode
 - [ ] Menu/preset entry points
 
 Acceptance criteria:
 - [ ] Update mode never deletes files
 - [ ] Mirror mode deletes only items confirmed in preview
-- [x] Find-orphans performs no write/delete actions
+- [ ] Find-orphans performs no write/delete actions
 
 Verification:
 - [ ] Integration tests against repeatable fixtures for update/mirror/orphan scenarios
@@ -393,7 +414,7 @@ Verification:
 
 Deliverables:
 - [ ] Collapsible log panel with placeholder entries in the shell layout
-- [ ] Status bar live counts/size from Architecture `Section 6.10`
+- [ ] Status bar live counts/size from Architecture `Status Bar Statistics`
 - [ ] Cross-check status-bar values against selected/filter states under `/mem` fixtures
 
 Acceptance criteria:
@@ -434,7 +455,7 @@ Scope:
 - [ ] Local provider/scanner integration in `DirectoryTreeViewModel` via progressive streams
 - [ ] Platform `TrashService` adapters with timeout/fallback behavior
 - [ ] Real-disk cancellation and scan-options validation coverage
-- [ ] Incremental subtree rescan with selection preservation (Architecture `Section 6.5`)
+- [ ] Incremental subtree rescan with selection preservation (Architecture `Tree Rescan with Selection Preservation`)
 - [ ] Watcher enable/disable settings, including provider capability gating
 - [ ] Debounce/coalescing and subtree-only update tests
 - [ ] Add provider parity checks so memory and local providers are exercised against the same
@@ -488,7 +509,7 @@ Exit criteria:
 ## 10. Data Models
 
 Canonical data model and persistence schemas now live in:
-- `Docs/SmartCopy2026-Architecture.md#10-data-models`
+- `Docs/SmartCopy2026-Architecture.md#4-data-models`
 
 Plan-level rule: schema changes should be authored in the architecture reference and then referenced from the relevant implementation step checklists.
 
@@ -510,4 +531,4 @@ Decision notes:
 1. Packaging: installer is optional for v1; prioritize reliable portable binaries.
 2. Plugin trust: code-signing and central registry are deferred until plugin ecosystem justifies complexity.
 3. Snapshot size: optimize only when measured data shows real UX/storage pain.
-4. Network trash behavior is defined in Architecture `Section 6.11` and should be implemented as a hard safety rule.
+4. Network trash behavior is defined in Architecture `Safety Defaults for Destructive Operations` and should be implemented as a hard safety rule.
