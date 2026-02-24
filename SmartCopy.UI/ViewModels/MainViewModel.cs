@@ -40,7 +40,7 @@ public partial class MainViewModel : ViewModelBase
     public FileListViewModel FileList { get; }
     public FilterChainViewModel FilterChain { get; }
     public PipelineViewModel Pipeline { get; }
-    public OperationProgressViewModel OperationProgress { get; } = new();
+    public StatusBarViewModel StatusBar { get; } = new();
     public PreviewViewModel Preview { get; } = new();
 
     public MainViewModel()
@@ -204,7 +204,7 @@ public partial class MainViewModel : ViewModelBase
         foreach (var root in DirectoryTree.RootNodes)
             CollectStatsRecursive(root, ref selected, ref totalBytes, ref filteredOut);
 
-        OperationProgress.UpdateIdleStats(selected, totalBytes, filteredOut);
+        StatusBar.Selection.UpdateStats(selected, totalBytes, filteredOut);
     }
 
     private static void CollectStatsRecursive(FileSystemNode node, ref int selected, ref long totalBytes, ref int filteredOut)
@@ -366,8 +366,8 @@ public partial class MainViewModel : ViewModelBase
         _runCts?.Dispose();
         _runCts = new CancellationTokenSource();
 
-        OperationProgress.Begin(_runCts);
-        var progress = new Progress<OperationProgress>(OperationProgress.Update);
+        StatusBar.Progress.Begin(_runCts);
+        var progress = new Progress<OperationProgress>(StatusBar.Progress.Update);
 
         try
         {
@@ -381,11 +381,11 @@ public partial class MainViewModel : ViewModelBase
                 _runCts.Token);
 
             await _operationJournal.WriteAsync(results.Where(r => r.StepType is StepKind.Copy or StepKind.Move or StepKind.Delete));
-            OperationProgress.Complete();
+            StatusBar.Progress.Complete();
         }
         catch (OperationCanceledException)
         {
-            OperationProgress.Cancelled();
+            StatusBar.Progress.Cancelled();
         }
     }
 

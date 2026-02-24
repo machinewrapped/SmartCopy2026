@@ -23,38 +23,6 @@ public partial class OperationProgressViewModel : ViewModelBase
     [ObservableProperty]
     private string _timeRemaining = string.Empty;
 
-    [ObservableProperty]
-    private string _idleStatusText = "No files selected";
-
-    public void UpdateIdleStats(int selectedFileCount, long selectedTotalBytes, int filteredOutCount)
-    {
-        if (IsActive) return;
-
-        if (selectedFileCount == 0)
-        {
-            IdleStatusText = filteredOutCount > 0
-                ? $"No files selected  ·  {filteredOutCount} filtered out"
-                : "No files selected";
-            return;
-        }
-
-        var sizeText = FormatBytes(selectedTotalBytes);
-        IdleStatusText = filteredOutCount > 0
-            ? $"{selectedFileCount} files selected  ·  {sizeText}  ·  {filteredOutCount} filtered out"
-            : $"{selectedFileCount} files selected  ·  {sizeText}";
-    }
-
-    private static string FormatBytes(long bytes)
-    {
-        return bytes switch
-        {
-            < 1024 => $"{bytes} B",
-            < 1024 * 1024 => $"{bytes / 1024.0:F1} KB",
-            < 1024L * 1024 * 1024 => $"{bytes / (1024.0 * 1024):F1} MB",
-            _ => $"{bytes / (1024.0 * 1024 * 1024):F2} GB",
-        };
-    }
-
     public void Begin(CancellationTokenSource cancellationTokenSource)
     {
         _cancellationTokenSource = cancellationTokenSource;

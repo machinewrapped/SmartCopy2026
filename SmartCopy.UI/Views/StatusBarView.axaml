@@ -1,0 +1,13 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
+             xmlns:views="clr-namespace:SmartCopy.UI.Views"
+             x:Class="SmartCopy.UI.Views.StatusBarView"
+             x:DataType="vm:StatusBarViewModel">
+    <DockPanel>
+        <views:OperationProgressView DockPanel.Dock="Right"
+                                     DataContext="{Binding Progress}"
+                                     IsVisible="{Binding Progress.IsActive}" />
+        <views:SelectionView DataContext="{Binding Selection}" />
+    </DockPanel>
+</UserControl>
