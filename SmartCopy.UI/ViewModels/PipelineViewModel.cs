@@ -245,6 +245,7 @@ public partial class PipelineViewModel : ViewModelBase
         AddStep.StepPresetPicked += OnStepPresetPicked;
         AddStep.LoadPipelinePresetRequested += OnAddStepLoadPipelinePresetRequested;
         AddStep.SavePipelineRequested += OnAddStepSavePipelineRequested;
+        AddStep.DeletePipelineRequested += OnAddStepDeletePipelineRequested;
 
         Steps.CollectionChanged += OnStepsCollectionChanged;
 
@@ -279,9 +280,15 @@ public partial class PipelineViewModel : ViewModelBase
         LoadPresetCommand.Execute(name);
     }
 
-    private void OnAddStepSavePipelineRequested()
+    private void OnAddStepSavePipelineRequested(string? name)
     {
-        SavePipelineCommand.Execute(null);
+        SavePipelineCommand.Execute(name);
+    }
+
+    private async void OnAddStepDeletePipelineRequested(string name)
+    {
+        await _presetStore.DeleteUserPresetAsync(name, _presetDirectory);
+        await RefreshPresetsAsync();
     }
 
     public TransformPipeline BuildLivePipeline()
@@ -365,6 +372,7 @@ public partial class PipelineViewModel : ViewModelBase
             _presetDirectory);
 
         await RefreshPresetsAsync();
+        AddStep.RequestClose();
     }
 
     [RelayCommand(CanExecute = nameof(CanRun))]
@@ -458,6 +466,8 @@ public partial class PipelineViewModel : ViewModelBase
 
     private void Revalidate()
     {
+        AddStep.HasSteps = Steps.Count > 0;
+
         foreach (var step in Steps)
         {
             step.ValidationMessage = null;

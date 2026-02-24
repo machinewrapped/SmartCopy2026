@@ -86,6 +86,14 @@ ViewModels use `[ObservableProperty]` source-gen attributes (no runtime reflecti
 - Trash by default; permanent delete is an explicit opt-in.
 - Filesystem watcher uses a 300 ms debounce before triggering rescan.
 
+## UI Guidelines & Anti-Patterns
+
+### Avalonia DataBinding
+- **Avoid `$parent` DataContext binding in DataTemplates or Flyouts/Menus**: Binding to `$parent[UserControl].((MyViewModel)DataContext).MyCommand` often fails or behaves unreliably, especially inside popups or menu items because they exist in a different visual tree root.
+- **Instead, use Code-Behind Events**: For nested list items, menus, or flyouts where you need to access a parent ViewModel's command, use a `Click` (or similar) event handler in the `.axaml.cs` code-behind.
+  - In the handler, set `e.Handled = true` to prevent unwanted event bubbling (e.g., stopping a menu item from triggering its own action when a nested button is clicked).
+  - Extract the command parameter from the `sender` and execute the command manually by casting the View's `DataContext` to the appropriate ViewModel type.
+
 ## Documentation Signposting
 
 - **Architecture, Contracts, UI Behavior, and Data Schemas:** `Docs/SmartCopy2026-Architecture.md`

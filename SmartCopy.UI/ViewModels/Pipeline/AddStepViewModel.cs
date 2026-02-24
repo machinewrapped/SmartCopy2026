@@ -49,7 +49,7 @@ public partial class AddStepViewModel : ObservableObject
     // -------------------------------------------------------------------------
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsLevel2VisibleOnly))]
+    [NotifyPropertyChangedFor(nameof(IsLevel1Visible))]
     private bool _isLevel2Visible;
 
     [ObservableProperty]
@@ -66,7 +66,7 @@ public partial class AddStepViewModel : ObservableObject
     // -------------------------------------------------------------------------
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsLevel2VisibleOnly))]
+    [NotifyPropertyChangedFor(nameof(IsLevel1Visible))]
     private bool _isLevel3Visible;
 
     [ObservableProperty]
@@ -93,11 +93,24 @@ public partial class AddStepViewModel : ObservableObject
     [ObservableProperty]
     private IReadOnlyList<PipelinePreset> _userPresets = [];
 
+    [ObservableProperty]
+    private bool _hasSteps;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsLevel1Visible))]
+    private bool _isSavingPipeline;
+
+    [ObservableProperty]
+    private string _newPipelineName = string.Empty;
+
     public bool HasPresets => PresetsForType.Count > 0;
     public bool HasRecentPresets => RecentPresetsForType.Count > 0;
 
     /// <summary>Level 2 should be visible only when Level 3 is not.</summary>
     public bool IsLevel2VisibleOnly => IsLevel2Visible && !IsLevel3Visible;
+
+    /// <summary>Level 1 should be visible when neither Level 2, 3, nor Saving are visible.</summary>
+    public bool IsLevel1Visible => !IsLevel2VisibleOnly && !IsLevel3Visible && !IsSavingPipeline;
 
     // -------------------------------------------------------------------------
     // Events
@@ -117,7 +130,10 @@ public partial class AddStepViewModel : ObservableObject
     public event Action<string>? LoadPipelinePresetRequested;
 
     /// <summary>Raised when the user requests saving the current pipeline.</summary>
-    public event Action? SavePipelineRequested;
+    public event Action<string?>? SavePipelineRequested;
+
+    /// <summary>Raised when the user requests deleting a user pipeline preset.</summary>
+    public event Action<string>? DeletePipelineRequested;
 
     // -------------------------------------------------------------------------
     // Commands
@@ -146,6 +162,25 @@ public partial class AddStepViewModel : ObservableObject
             return;
         }
 
+        IsLevel3Visible = true;
+    }
+
+    [RelayCommand]
+    private async Task SelectTopLevelStepTypeAsync(StepKind kind)
+    {
+        SelectedCategory = null;
+        SelectedStepType = GetItemsForCategory(StepCategory.Executable).FirstOrDefault(i => i.Kind == kind);
+        await LoadPresetsAsync(kind.ToString());
+
+        if (PresetsForType.Count == 0 && RecentPresetsForType.Count == 0)
+        {
+            var capturedKind = kind;
+            ResetToLevel1();
+            StepTypeSelected?.Invoke(capturedKind);
+            return;
+        }
+
+        IsLevel2Visible = true;
         IsLevel3Visible = true;
     }
 
@@ -184,6 +219,11 @@ public partial class AddStepViewModel : ObservableObject
         SelectedStepType = null;
         PresetsForType = [];
         RecentPresetsForType = [];
+
+        if (SelectedCategory == null)
+        {
+            IsLevel2Visible = false;
+        }
     }
 
     [RelayCommand]
@@ -202,15 +242,38 @@ public partial class AddStepViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void SavePipeline()
+    private void BeginSavePipeline()
     {
-        SavePipelineRequested?.Invoke();
+        IsSavingPipeline = true;
+        NewPipelineName = string.Empty;
+    }
+
+    [RelayCommand]
+    private void CancelSavePipeline()
+    {
+        IsSavingPipeline = false;
+        NewPipelineName = string.Empty;
+    }
+
+    [RelayCommand]
+    private void ConfirmSavePipeline()
+    {
+        var nameToSave = string.IsNullOrWhiteSpace(NewPipelineName) ? null : NewPipelineName;
+        SavePipelineRequested?.Invoke(nameToSave);
+        IsSavingPipeline = false;
+        NewPipelineName = string.Empty;
     }
 
     [RelayCommand]
     private void Close()
     {
         RequestClose();
+    }
+
+    [RelayCommand]
+    private void DeletePipeline(string name)
+    {
+        DeletePipelineRequested?.Invoke(name);
     }
 
     public void RequestClose()
@@ -232,6 +295,8 @@ public partial class AddStepViewModel : ObservableObject
         IsLevel2Visible = false;
         SelectedCategory = null;
         StepTypeItems = [];
+        IsSavingPipeline = false;
+        NewPipelineName = string.Empty;
     }
 
     private async Task LoadPresetsAsync(string stepType, CancellationToken ct = default)

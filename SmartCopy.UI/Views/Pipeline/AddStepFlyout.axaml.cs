@@ -22,11 +22,16 @@ public partial class AddStepFlyout : UserControl
         vm.LoadPresetCommand.Execute(presetName);
     }
 
-    private void OnSavePipelineMenuItemClick(object? sender, RoutedEventArgs e)
+    private void OnDeletePipelineClick(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is not AddStepViewModel vm)
+        e.Handled = true; // Prevent the menu item from handling it (which would trigger load)
+
+        if (DataContext is not AddStepViewModel vm || sender is not Button button)
             return;
 
-        vm.SavePipelineCommand.Execute(null);
+        if (button.CommandParameter is not string pipelineName || string.IsNullOrWhiteSpace(pipelineName))
+            return;
+
+        vm.DeletePipelineCommand.Execute(pipelineName);
     }
 }
