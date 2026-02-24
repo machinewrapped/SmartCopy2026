@@ -17,33 +17,6 @@ public sealed class PipelinePresetStore
         WriteIndented = true,
     };
 
-    public static Task<IReadOnlyList<PipelinePreset>> GetStandardPresetsAsync(CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        return Task.FromResult<IReadOnlyList<PipelinePreset>>(
-        [
-            BuildStandardPreset(
-                "copy_only",
-                "Copy only",
-                [new TransformStepConfig(StepKind.Copy, new JsonObject { ["destinationPath"] = "/mem/Target" })]),
-            BuildStandardPreset(
-                "move_only",
-                "Move only",
-                [new TransformStepConfig(StepKind.Move, new JsonObject { ["destinationPath"] = "/mem/Target" })]),
-            BuildStandardPreset(
-                "delete_to_trash",
-                "Delete to Trash",
-                [new TransformStepConfig(StepKind.Delete, new JsonObject { ["deleteMode"] = DeleteMode.Trash.ToString() })]),
-            BuildStandardPreset(
-                "flatten_copy",
-                "Flatten -> Copy",
-                [
-                    new TransformStepConfig(StepKind.Flatten, []),
-                    new TransformStepConfig(StepKind.Copy, new JsonObject { ["destinationPath"] = "/mem/Target" }),
-                ]),
-        ]);
-    }
-
     public async Task<IReadOnlyList<PipelinePreset>> GetUserPresetsAsync(
         string? explicitDirectory = null,
         CancellationToken ct = default)
@@ -83,15 +56,6 @@ public sealed class PipelinePresetStore
         }
 
         return [.. presets.OrderBy(preset => preset.Name, StringComparer.OrdinalIgnoreCase)];
-    }
-
-    public async Task<IReadOnlyList<PipelinePreset>> GetAllPresetsAsync(
-        string? explicitDirectory = null,
-        CancellationToken ct = default)
-    {
-        var standard = await GetStandardPresetsAsync(ct);
-        var user = await GetUserPresetsAsync(explicitDirectory, ct);
-        return [.. standard, .. user];
     }
 
     public async Task SaveUserPresetAsync(
@@ -165,25 +129,6 @@ public sealed class PipelinePresetStore
 
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         return Path.Combine(home, ".config", "SmartCopy2026", "pipelines");
-    }
-
-    private static PipelinePreset BuildStandardPreset(
-        string id,
-        string name,
-        IReadOnlyList<TransformStepConfig> steps)
-    {
-        return new PipelinePreset
-        {
-            Id = id,
-            Name = name,
-            IsBuiltIn = true,
-            Config = new PipelineConfig(
-                Name: name,
-                Description: null,
-                Steps: [.. steps],
-                OverwriteMode: OverwriteMode.IfNewer.ToString(),
-                DeleteMode: DeleteMode.Trash.ToString()),
-        };
     }
 
     private static string ToSafeId(string value)

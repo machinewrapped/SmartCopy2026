@@ -183,7 +183,6 @@ public partial class PipelineViewModel : ViewModelBase
     private int _selectedIncludedFileCount;
 
     public ObservableCollection<PipelineStepViewModel> Steps { get; } = [];
-    public ObservableCollection<PipelinePreset> StandardPresets { get; } = [];
     public ObservableCollection<PipelinePreset> UserPresets { get; } = [];
     public AddStepViewModel AddStep { get; }
 
@@ -342,7 +341,7 @@ public partial class PipelineViewModel : ViewModelBase
     [RelayCommand]
     private async Task LoadPresetAsync(string name)
     {
-        var all = await _presetStore.GetAllPresetsAsync(_presetDirectory);
+        var all = await _presetStore.GetUserPresetsAsync(_presetDirectory);
         var preset = all.FirstOrDefault(p =>
             string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
         if (preset is null)
@@ -445,14 +444,7 @@ public partial class PipelineViewModel : ViewModelBase
 
     private async Task RefreshPresetsAsync()
     {
-        var standards = await PipelinePresetStore.GetStandardPresetsAsync();
         var users = await _presetStore.GetUserPresetsAsync(_presetDirectory);
-
-        StandardPresets.Clear();
-        foreach (var preset in standards)
-        {
-            StandardPresets.Add(preset);
-        }
 
         UserPresets.Clear();
         foreach (var preset in users)
@@ -460,7 +452,6 @@ public partial class PipelineViewModel : ViewModelBase
             UserPresets.Add(preset);
         }
 
-        AddStep.StandardPresets = StandardPresets;
         AddStep.UserPresets = UserPresets;
     }
 

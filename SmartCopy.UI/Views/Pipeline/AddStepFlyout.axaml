@@ -89,43 +89,29 @@
                         CornerRadius="4"
                         IsVisible="{Binding !HasSteps}">
                     <Button.Flyout>
-                        <MenuFlyout Placement="RightEdgeAlignedTop">
-                            <MenuItem Header="Standard" ItemsSource="{Binding StandardPresets, FallbackValue={x:Null}}">
-                                <MenuItem.ItemTemplate>
-                                    <DataTemplate x:DataType="corePipeline:PipelinePreset">
-                                        <MenuItem Header="{Binding Name}"
-                                                  Click="OnPipelinePresetMenuItemClick"
-                                                  CommandParameter="{Binding Name}" />
-                                    </DataTemplate>
-                                </MenuItem.ItemTemplate>
-                            </MenuItem>
-
-                            <Separator />
-
-                            <MenuItem Header="My Pipelines" ItemsSource="{Binding UserPresets, FallbackValue={x:Null}}">
-                                <MenuItem.ItemTemplate>
-                                    <DataTemplate x:DataType="corePipeline:PipelinePreset">
-                                        <MenuItem Click="OnPipelinePresetMenuItemClick"
-                                                  CommandParameter="{Binding Name}">
-                                            <MenuItem.Header>
-                                                <Grid ColumnDefinitions="*, Auto">
-                                                    <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center" Margin="0,0,16,0" />
-                                                    <Button Grid.Column="1"
-                                                            Content="🗑" Width="28" Height="28" Padding="0"
-                                                            HorizontalContentAlignment="Center"
-                                                            VerticalContentAlignment="Center"
-                                                            CornerRadius="4" Background="Transparent"
-                                                            Foreground="#ff6b6b" FontSize="12"
-                                                            VerticalAlignment="Center"
-                                                            ToolTip.Tip="Delete pipeline"
-                                                            Click="OnDeletePipelineClick"
-                                                            CommandParameter="{Binding Name}" />
-                                                </Grid>
-                                            </MenuItem.Header>
-                                        </MenuItem>
-                                    </DataTemplate>
-                                </MenuItem.ItemTemplate>
-                            </MenuItem>
+                        <MenuFlyout Placement="RightEdgeAlignedTop" ItemsSource="{Binding UserPresets, FallbackValue={x:Null}}">
+                            <MenuFlyout.ItemTemplate>
+                                <DataTemplate x:DataType="corePipeline:PipelinePreset">
+                                    <MenuItem Click="OnPipelinePresetMenuItemClick"
+                                              CommandParameter="{Binding Name}">
+                                        <MenuItem.Header>
+                                            <Grid ColumnDefinitions="*, Auto">
+                                                <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center" Margin="0,0,16,0" />
+                                                <Button Grid.Column="1"
+                                                        Content="🗑" Width="28" Height="28" Padding="0"
+                                                        HorizontalContentAlignment="Center"
+                                                        VerticalContentAlignment="Center"
+                                                        CornerRadius="4" Background="Transparent"
+                                                        Foreground="#ff6b6b" FontSize="12"
+                                                        VerticalAlignment="Center"
+                                                        ToolTip.Tip="Delete pipeline"
+                                                        Click="OnDeletePipelineClick"
+                                                        CommandParameter="{Binding Name}" />
+                                            </Grid>
+                                        </MenuItem.Header>
+                                    </MenuItem>
+                                </DataTemplate>
+                            </MenuFlyout.ItemTemplate>
                         </MenuFlyout>
                     </Button.Flyout>
                 </Button>

@@ -17,20 +17,6 @@ public sealed class PipelinePresetStoreTests
     }
 
     [Fact]
-    public async Task GetStandardPresets_AlwaysReturnsBaselineSet()
-    {
-        var store = new PipelinePresetStore();
-
-        var presets = await PipelinePresetStore.GetStandardPresetsAsync();
-
-        Assert.Contains(presets, preset => preset.Name == "Copy only");
-        Assert.Contains(presets, preset => preset.Name == "Move only");
-        Assert.Contains(presets, preset => preset.Name == "Delete to Trash");
-        Assert.Contains(presets, preset => preset.Name == "Flatten -> Copy");
-        Assert.All(presets, preset => Assert.True(preset.IsBuiltIn));
-    }
-
-    [Fact]
     public async Task SaveGetDeleteUserPreset_RoundTrips()
     {
         var store = new PipelinePresetStore();
@@ -86,34 +72,6 @@ public sealed class PipelinePresetStoreTests
         var loaded = await store.GetUserPresetsAsync(dir);
         Assert.Single(loaded);
         Assert.Equal(StepKind.Move, loaded[0].Config.Steps[0].StepType);
-    }
-
-    [Fact]
-    public async Task GetAllPresets_StandardPrecedesUser()
-    {
-        var store = new PipelinePresetStore();
-        var dir = CreateTempDirectory();
-        var config = new PipelineConfig(
-            Name: "Z Last",
-            Description: null,
-            Steps:
-            [
-                new TransformStepConfig(StepKind.Copy, new JsonObject { ["destinationPath"] = "/mem/out" }),
-            ],
-            OverwriteMode: OverwriteMode.IfNewer.ToString(),
-            DeleteMode: DeleteMode.Trash.ToString());
-
-        await store.SaveUserPresetAsync("Z Last", config, dir);
-
-        var all = await store.GetAllPresetsAsync(dir);
-
-        Assert.True(all.Count >= 5);
-        Assert.True(all[0].IsBuiltIn);
-        Assert.True(all[1].IsBuiltIn);
-        Assert.True(all[2].IsBuiltIn);
-        Assert.True(all[3].IsBuiltIn);
-        Assert.False(all[^1].IsBuiltIn);
-        Assert.Equal("Z Last", all[^1].Name);
     }
 
     [Fact]

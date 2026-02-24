@@ -88,9 +88,6 @@ public partial class AddStepViewModel : ObservableObject
     // -------------------------------------------------------------------------
 
     [ObservableProperty]
-    private IReadOnlyList<PipelinePreset> _standardPresets = [];
-
-    [ObservableProperty]
     private IReadOnlyList<PipelinePreset> _userPresets = [];
 
     [ObservableProperty]
