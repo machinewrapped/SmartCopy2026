@@ -10,20 +10,15 @@ public sealed class MoveStep : ITransformStep
 {
     public MoveStep(string destinationPath)
     {
-        if (string.IsNullOrWhiteSpace(destinationPath))
-        {
-            throw new ArgumentException("Destination path must not be empty.", nameof(destinationPath));
-        }
-
         DestinationPath = destinationPath;
     }
 
-    public string DestinationPath { get; }
+    public string DestinationPath { get; set; }
 
-    public string StepType => "Move";
+    public StepKind StepType => StepKind.Move;
     public bool IsPathStep => false;
     public bool IsContentStep => false;
-    public bool IsTerminal => true;
+    public bool IsExecutable => true;
 
     public TransformStepConfig Config => new(
         StepType,
@@ -37,7 +32,8 @@ public sealed class MoveStep : ITransformStep
             StepType: StepType,
             DestinationPath: destination,
             OutputBytes: context.SourceNode.Size,
-            Message: "Move preview");
+            Message: "Move preview",
+            SourcePath: context.SourceNode.FullPath);
     }
 
     public async Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)
@@ -55,7 +51,8 @@ public sealed class MoveStep : ITransformStep
                 StepType: StepType,
                 DestinationPath: destination,
                 OutputBytes: 0,
-                Message: "Skipped existing destination.");
+                Message: "Skipped existing destination.",
+                SourcePath: context.SourceNode.FullPath);
         }
 
         if (ReferenceEquals(targetProvider, context.SourceProvider) && targetProvider.Capabilities.CanAtomicMove)
@@ -66,7 +63,8 @@ public sealed class MoveStep : ITransformStep
                 StepType: StepType,
                 DestinationPath: destination,
                 OutputBytes: context.SourceNode.Size,
-                Message: "Moved atomically.");
+                Message: "Moved atomically.",
+                SourcePath: context.SourceNode.FullPath);
         }
 
         await using var sourceStream = context.ContentStream
@@ -79,7 +77,7 @@ public sealed class MoveStep : ITransformStep
             StepType: StepType,
             DestinationPath: destination,
             OutputBytes: context.SourceNode.Size,
-            Message: "Moved via copy+delete.");
+            Message: "Moved via copy+delete.",
+            SourcePath: context.SourceNode.FullPath);
     }
 }
-

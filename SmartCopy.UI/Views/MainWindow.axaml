@@ -81,9 +81,9 @@
         <!-- Pipeline Area -->
         <views:PipelineView Grid.Row="3" DataContext="{Binding Pipeline}" Margin="10,5,10,10" />
 
-        <!-- Status & Progress -->
+        <!-- Status Bar -->
         <Border Grid.Row="4" Background="#007acc" BorderBrush="#3e3e42" BorderThickness="0,1,0,0" Padding="12,6">
-            <views:OperationProgressView DataContext="{Binding OperationProgress}" Foreground="White" />
+            <views:StatusBarView DataContext="{Binding StatusBar}" Foreground="White" />
         </Border>
     </Grid>
 </Window>

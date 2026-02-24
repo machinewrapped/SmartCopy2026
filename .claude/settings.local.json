@@ -3,7 +3,9 @@
     "allow": [
       "Bash(dotnet build:*)",
       "mcp__plugin_github_github__pull_request_read",
-      "Bash(dotnet test:*)"
+      "Bash(dotnet test:*)",
+      "mcp__plugin_github_github__get_me",
+      "mcp__plugin_github_github__list_pull_requests"
     ]
   }
 }

@@ -1,144 +1,543 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
-using System.ComponentModel;
+using System.Text.Json.Nodes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SmartCopy.Core.Pipeline;
+using SmartCopy.Core.Pipeline.Steps;
+using SmartCopy.Core.Pipeline.Validation;
+using SmartCopy.Core.Settings;
+using SmartCopy.UI.ViewModels.Pipeline;
 
 namespace SmartCopy.UI.ViewModels;
 
-public enum StepKind { Flatten, Rebase, Rename, Convert, Copy, Move, Delete, Custom }
+
+
+public enum StepCategory
+{
+    Executable,
+    Path,
+    Content,
+    Selection,
+}
 
 public partial class PipelineStepViewModel : ViewModelBase
 {
-    [ObservableProperty]
-    private StepKind _kind = StepKind.Custom;
+    private ITransformStep _step;
+    private string _customName;
+    private string? _validationMessage;
+    private bool _hasValidationError;
 
-    [ObservableProperty]
-    private string _label = string.Empty;
+    public PipelineStepViewModel(ITransformStep step, string? customName = null)
+    {
+        _step = step;
+        _customName = PipelineStepDisplay.NormalizeCustomName(customName);
+    }
 
-    [ObservableProperty]
-    private string _icon = string.Empty;
+    public ITransformStep Step => _step;
 
-    [ObservableProperty]
-    private string _details = string.Empty;
+    public StepKind Kind => _step.StepType;
 
-    [ObservableProperty]
-    private string _destinationPath = string.Empty;
+    public string? CustomName => string.IsNullOrWhiteSpace(_customName) ? null : _customName;
 
-    // True for steps that require a destination path (Copy, Move).
-    public bool HasDestination => Kind is StepKind.Copy or StepKind.Move;
+    public string AutoSummary => PipelineStepDisplay.GetSummary(_step);
 
-    partial void OnKindChanged(StepKind value) => OnPropertyChanged(nameof(HasDestination));
+    public string Summary => string.IsNullOrWhiteSpace(_customName)
+        ? AutoSummary
+        : _customName;
+
+    public string Description => PipelineStepDisplay.GetDescription(_step);
+
+    // Keep old names for compatibility with tests and any remaining bindings.
+    public string Label => Summary;
+
+    public string Icon => Kind switch
+    {
+        StepKind.Copy => "→",
+        StepKind.Move => "⇒",
+        StepKind.Delete => "🗑",
+        StepKind.Flatten => "⊞",
+        StepKind.Rename => "✏",
+        StepKind.Rebase => "⤢",
+        StepKind.Convert => "⚙",
+        _ => "?",
+    };
+
+    // Keep old names for compatibility with tests and any remaining bindings.
+    public string Details => Description;
+
+    public bool HasDescription => !string.IsNullOrWhiteSpace(Description);
+
+    public bool HasDestination => _step is CopyStep or MoveStep;
+
+    public string DestinationPath
+    {
+        get => _step switch
+        {
+            CopyStep copyStep => copyStep.DestinationPath,
+            MoveStep moveStep => moveStep.DestinationPath,
+            _ => string.Empty,
+        };
+        set
+        {
+            var destination = value ?? string.Empty;
+            var changed = false;
+            switch (_step)
+            {
+                case CopyStep copyStep when copyStep.DestinationPath != destination:
+                    copyStep.DestinationPath = destination;
+                    changed = true;
+                    break;
+                case MoveStep moveStep when moveStep.DestinationPath != destination:
+                    moveStep.DestinationPath = destination;
+                    changed = true;
+                    break;
+            }
+
+            if (changed)
+            {
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(AutoSummary));
+                OnPropertyChanged(nameof(Summary));
+                OnPropertyChanged(nameof(Label));
+                OnPropertyChanged(nameof(Details));
+                OnPropertyChanged(nameof(Description));
+                OnPropertyChanged(nameof(HasDescription));
+                OnPropertyChanged(nameof(ShowDeleteBadge));
+                OnPropertyChanged(nameof(DeleteBadge));
+                StepChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+    }
+
+    public bool ShowDeleteBadge => _step is DeleteStep { Mode: DeleteMode.Permanent };
+
+    public bool IsPermanentDelete => _step is DeleteStep { Mode: DeleteMode.Permanent };
+
+    public string? DeleteBadge =>
+        _step is DeleteStep deleteStep
+            ? deleteStep.Mode == DeleteMode.Permanent ? "⚠ Permanent delete" : null
+            : null;
+
+    public string? ValidationMessage
+    {
+        get => _validationMessage;
+        set => SetProperty(ref _validationMessage, value);
+    }
+
+    public bool HasValidationError
+    {
+        get => _hasValidationError;
+        set => SetProperty(ref _hasValidationError, value);
+    }
+
+    public event EventHandler? StepChanged;
+
+    public void ReplaceStep(ITransformStep newStep, string? customName = null)
+    {
+        _step = newStep;
+        _customName = PipelineStepDisplay.NormalizeCustomName(customName);
+        OnPropertyChanged(nameof(Step));
+        OnPropertyChanged(nameof(Kind));
+        OnPropertyChanged(nameof(CustomName));
+        OnPropertyChanged(nameof(AutoSummary));
+        OnPropertyChanged(nameof(Summary));
+        OnPropertyChanged(nameof(Label));
+        OnPropertyChanged(nameof(Icon));
+        OnPropertyChanged(nameof(Details));
+        OnPropertyChanged(nameof(Description));
+        OnPropertyChanged(nameof(HasDescription));
+        OnPropertyChanged(nameof(HasDestination));
+        OnPropertyChanged(nameof(DestinationPath));
+        OnPropertyChanged(nameof(ShowDeleteBadge));
+        OnPropertyChanged(nameof(IsPermanentDelete));
+        OnPropertyChanged(nameof(DeleteBadge));
+        StepChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    internal static StepKind @ToKind(string stepType)
+    {
+        return stepType switch
+        {
+            "Flatten" => StepKind.Flatten,
+            "Rebase" => StepKind.Rebase,
+            "Rename" => StepKind.Rename,
+            "Convert" => StepKind.Convert,
+            "Copy" => StepKind.Copy,
+            "Move" => StepKind.Move,
+            "Delete" => StepKind.Delete,
+            _ => StepKind.Custom,
+        };
+    }
 }
 
 public partial class PipelineViewModel : ViewModelBase
 {
-    public ObservableCollection<PipelineStepViewModel> Steps { get; } = new();
-    public ObservableCollection<string> SavedPipelineNames { get; } = new();
+    private const string CustomNameParameter = "customName";
+    private const int MaxRecentTargets = 10;
+    private readonly PipelinePresetStore _presetStore;
 
-    // The destination path of the first Copy or Move step in the pipeline.
-    // Empty if no such step exists. MainViewModel propagates this to FilterChainViewModel.
+    private readonly string? _presetDirectory;
+    private readonly StepPresetStore _stepPresetStore;
+    private readonly AppSettings? _appSettings;
+    private int _selectedIncludedFileCount;
+
+    public ObservableCollection<PipelineStepViewModel> Steps { get; } = [];
+    public ObservableCollection<PipelinePreset> StandardPresets { get; } = [];
+    public ObservableCollection<PipelinePreset> UserPresets { get; } = [];
+    public AddStepViewModel AddStep { get; }
+
+    public StepPresetStore StepPresetStore => _stepPresetStore;
+
+    internal AppSettings? AppSettings => _appSettings;
+
+    internal void RecordRecentTarget(string path)
+    {
+        if (_appSettings is null || string.IsNullOrWhiteSpace(path)) return;
+        _appSettings.RecentTargets.Remove(path);
+        _appSettings.RecentTargets.Insert(0, path);
+        if (_appSettings.RecentTargets.Count > MaxRecentTargets)
+            _appSettings.RecentTargets.RemoveAt(MaxRecentTargets);
+    }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanRun))]
+    private PipelineValidationResult _validationResult = new([]);
+
+    [ObservableProperty]
+    private string? _blockingValidationMessage;
+
+    public bool CanRun => ValidationResult.CanRun;
+
+    public bool HasDeleteStep => Steps.Any(step => step.Step is DeleteStep);
+
+    public string RunButtonLabel => HasDeleteStep ? "⚠ Run" : "▶ Run";
+
     public string FirstDestinationPath
     {
         get
         {
-            var step = Steps.FirstOrDefault(s => s.Kind is StepKind.Copy or StepKind.Move);
+            var step = Steps.FirstOrDefault(s => s.Step is CopyStep or MoveStep);
             return step?.DestinationPath ?? string.Empty;
         }
     }
 
-    public PipelineViewModel()
+    public event EventHandler? PipelineChanged;
+    public event EventHandler? RunRequested;
+    public event EventHandler? PreviewRequested;
+    public event EventHandler<PipelineStepViewModel>? EditStepRequested;
+
+    public PipelineViewModel(
+        PipelinePresetStore? presetStore = null,
+
+        string? presetDirectory = null,
+        StepPresetStore? stepPresetStore = null,
+        AppSettings? appSettings = null,
+        string? stepPresetStorePath = null)
     {
+        _presetStore = presetStore ?? new PipelinePresetStore();
+
+        _presetDirectory = presetDirectory;
+        _stepPresetStore = stepPresetStore ?? new StepPresetStore();
+        _appSettings = appSettings;
+
+        AddStep = new AddStepViewModel(_stepPresetStore, appSettings, stepPresetStorePath);
+        AddStep.StepPresetPicked += OnStepPresetPicked;
+        AddStep.LoadPipelinePresetRequested += OnAddStepLoadPipelinePresetRequested;
+        AddStep.SavePipelineRequested += OnAddStepSavePipelineRequested;
+
         Steps.CollectionChanged += OnStepsCollectionChanged;
 
-        Steps.Add(new PipelineStepViewModel { Kind = StepKind.Flatten, Label = "Flatten", Icon = "⊞", Details = "Strip directory structure" });
-        Steps.Add(new PipelineStepViewModel { Kind = StepKind.Convert, Label = "Convert", Icon = "⚙", Details = "mp3 320k" });
-        Steps.Add(new PipelineStepViewModel { Kind = StepKind.Copy,    Label = "Copy To", Icon = "→", DestinationPath = "/mnt/phone/Music" });
+        InitializePresetsInBackground();
+        Revalidate();
     }
 
-    private void OnStepsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    public void SetSelectedIncludedFileCount(int selectedIncludedFileCount)
     {
-        if (e.NewItems != null)
-            foreach (PipelineStepViewModel step in e.NewItems)
-                step.PropertyChanged += OnStepPropertyChanged;
+        var normalizedCount = Math.Max(0, selectedIncludedFileCount);
+        if (_selectedIncludedFileCount == normalizedCount)
+        {
+            return;
+        }
 
-        if (e.OldItems != null)
-            foreach (PipelineStepViewModel step in e.OldItems)
-                step.PropertyChanged -= OnStepPropertyChanged;
-
-        OnPropertyChanged(nameof(FirstDestinationPath));
+        _selectedIncludedFileCount = normalizedCount;
+        Revalidate();
     }
 
-    private void OnStepPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    private void OnStepPresetPicked(StepPreset preset)
     {
-        if (e.PropertyName is nameof(PipelineStepViewModel.DestinationPath)
-                           or nameof(PipelineStepViewModel.Kind))
-            OnPropertyChanged(nameof(FirstDestinationPath));
+        var step = PipelineStepFactory.FromConfig(preset.Config);
+        var autoName = PipelineStepDisplay.GetSummary(step);
+        var customName = string.Equals(preset.Name, autoName, StringComparison.OrdinalIgnoreCase)
+            ? null
+            : preset.Name;
+        AddStepFromResult(step.StepType, step, customName);
+    }
+
+    private void OnAddStepLoadPipelinePresetRequested(string name)
+    {
+        LoadPresetCommand.Execute(name);
+    }
+
+    private void OnAddStepSavePipelineRequested()
+    {
+        SavePipelineCommand.Execute(null);
+    }
+
+    public TransformPipeline BuildLivePipeline()
+    {
+        return new TransformPipeline(Steps.Select(step => step.Step));
+    }
+
+    public void AddStepFromResult(StepKind kind, ITransformStep step, string? customName = null)
+    {
+        _ = kind;
+        Steps.Add(new PipelineStepViewModel(step, customName));
+        Revalidate();
+    }
+
+    public void ReplaceStep(PipelineStepViewModel existing, ITransformStep replacement, string? customName = null)
+    {
+        existing.ReplaceStep(replacement, customName);
+        Revalidate();
+    }
+
+    public void LoadPreset(PipelinePreset preset)
+    {
+        Steps.Clear();
+        foreach (var configStep in preset.Config.Steps)
+        {
+            var customName = GetOptionalParameter(configStep, CustomNameParameter);
+            Steps.Add(new PipelineStepViewModel(PipelineStepFactory.FromConfig(configStep), customName));
+        }
+
+        Revalidate();
     }
 
     [RelayCommand]
-    private void AddStep(StepKind kind)
+    private void AddStepLegacy(StepKind kind)
     {
-        var step = kind switch
-        {
-            StepKind.Flatten => new PipelineStepViewModel { Kind = kind, Label = "Flatten", Icon = "⊞", Details = "Strip directory structure" },
-            StepKind.Rebase  => new PipelineStepViewModel { Kind = kind, Label = "Rebase",  Icon = "⤢", Details = "Change root path" },
-            StepKind.Rename  => new PipelineStepViewModel { Kind = kind, Label = "Rename",  Icon = "✏", Details = "Rename pattern" },
-            StepKind.Convert => new PipelineStepViewModel { Kind = kind, Label = "Convert", Icon = "⚙", Details = "Configure format" },
-            StepKind.Copy    => new PipelineStepViewModel { Kind = kind, Label = "Copy To", Icon = "→" },
-            StepKind.Move    => new PipelineStepViewModel { Kind = kind, Label = "Move To", Icon = "⇒" },
-            StepKind.Delete  => new PipelineStepViewModel { Kind = kind, Label = "Delete",  Icon = "🗑", Details = "Send to trash" },
-            _                => new PipelineStepViewModel { Kind = kind, Label = "Custom",  Icon = "?", Details = "Configure step" },
-        };
-        Steps.Add(step);
+        AddStepFromResult(kind, CreateDefaultStep(kind));
     }
 
     [RelayCommand]
     private void RemoveStep(PipelineStepViewModel step)
     {
-        Steps.Remove(step);
-    }
-
-    [RelayCommand]
-    private void LoadPreset(string name)
-    {
-        var steps = name switch
+        if (step is null)
         {
-            "Copy"   => BuildCopyPreset(),
-            "Move"   => BuildMovePreset(),
-            "Delete" => BuildDeletePreset(),
-            _        => null,
-        };
-        if (steps is null) return;
-        Steps.Clear();
-        foreach (var s in steps)
-            Steps.Add(s);
+            return;
+        }
+
+        Steps.Remove(step);
+        Revalidate();
     }
 
     [RelayCommand]
-    private void SavePipeline()
+    private async Task LoadPresetAsync(string name)
     {
-        SavedPipelineNames.Add($"My Pipeline {SavedPipelineNames.Count + 1}");
+        var all = await _presetStore.GetAllPresetsAsync(_presetDirectory);
+        var preset = all.FirstOrDefault(p =>
+            string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (preset is null)
+        {
+            return;
+        }
+
+        LoadPreset(preset);
+        AddStep.RequestClose();
     }
 
     [RelayCommand]
-    private void RunPipeline() { }
+    private async Task SavePipelineAsync(string? name = null)
+    {
+        if (Steps.Count == 0)
+        {
+            return;
+        }
+
+        var pipelineName = string.IsNullOrWhiteSpace(name)
+            ? $"Pipeline {DateTime.Now:yyyy-MM-dd HHmmss}"
+            : name.Trim();
+
+        await _presetStore.SaveUserPresetAsync(
+            pipelineName,
+            ToConfig(pipelineName),
+            _presetDirectory);
+
+        await RefreshPresetsAsync();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRun))]
+    private void RunPipeline()
+    {
+        if (HasDeleteStep)
+        {
+            PreviewRequested?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        RunRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRun))]
+    private void PreviewPipeline()
+    {
+        PreviewRequested?.Invoke(this, EventArgs.Empty);
+    }
 
     [RelayCommand]
-    private void PreviewPipeline() { }
+    private void RequestEditStep(PipelineStepViewModel step)
+    {
+        if (step is null)
+        {
+            return;
+        }
 
-    private static List<PipelineStepViewModel> BuildCopyPreset() =>
-    [
-        new() { Kind = StepKind.Copy, Label = "Copy To", Icon = "→" },
-    ];
+        EditStepRequested?.Invoke(this, step);
+    }
 
-    private static List<PipelineStepViewModel> BuildMovePreset() =>
-    [
-        new() { Kind = StepKind.Move, Label = "Move To", Icon = "⇒" },
-    ];
+    private void OnStepsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.NewItems is not null)
+        {
+            foreach (PipelineStepViewModel step in e.NewItems)
+            {
+                step.StepChanged += OnStepChanged;
+            }
+        }
 
-    private static List<PipelineStepViewModel> BuildDeletePreset() =>
-    [
-        new() { Kind = StepKind.Delete, Label = "Delete", Icon = "🗑", Details = "Send to trash" },
-    ];
+        if (e.OldItems is not null)
+        {
+            foreach (PipelineStepViewModel step in e.OldItems)
+            {
+                step.StepChanged -= OnStepChanged;
+            }
+        }
+
+        Revalidate();
+    }
+
+    private void OnStepChanged(object? sender, EventArgs e)
+    {
+        _ = sender;
+        _ = e;
+        Revalidate();
+    }
+
+    private async void InitializePresetsInBackground()
+    {
+        try
+        {
+            await RefreshPresetsAsync();
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task RefreshPresetsAsync()
+    {
+        var standards = await PipelinePresetStore.GetStandardPresetsAsync();
+        var users = await _presetStore.GetUserPresetsAsync(_presetDirectory);
+
+        StandardPresets.Clear();
+        foreach (var preset in standards)
+        {
+            StandardPresets.Add(preset);
+        }
+
+        UserPresets.Clear();
+        foreach (var preset in users)
+        {
+            UserPresets.Add(preset);
+        }
+
+        AddStep.StandardPresets = StandardPresets;
+        AddStep.UserPresets = UserPresets;
+    }
+
+    private void Revalidate()
+    {
+        foreach (var step in Steps)
+        {
+            step.ValidationMessage = null;
+            step.HasValidationError = false;
+        }
+
+        var result = PipelineValidator.Validate(
+            [.. Steps.Select(step => step.Step)],
+            new PipelineValidationContext(_selectedIncludedFileCount > 0));
+        ValidationResult = result;
+        BlockingValidationMessage = result.FirstBlockingIssue?.Message;
+
+        foreach (var issue in result.Issues.Where(i => i.StepIndex.HasValue))
+        {
+            var index = issue.StepIndex!.Value;
+            if (index < 0 || index >= Steps.Count)
+            {
+                continue;
+            }
+
+            var step = Steps[index];
+            if (string.IsNullOrWhiteSpace(step.ValidationMessage))
+            {
+                step.ValidationMessage = issue.Message;
+                step.HasValidationError = issue.Severity == PipelineValidationSeverity.Blocking;
+            }
+        }
+
+        OnPropertyChanged(nameof(FirstDestinationPath));
+        OnPropertyChanged(nameof(HasDeleteStep));
+        OnPropertyChanged(nameof(RunButtonLabel));
+        RunPipelineCommand.NotifyCanExecuteChanged();
+        PreviewPipelineCommand.NotifyCanExecuteChanged();
+        PipelineChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private PipelineConfig ToConfig(string name)
+    {
+        return new PipelineConfig(
+            Name: name,
+            Description: null,
+            Steps: [.. Steps.Select(BuildConfigWithUiMetadata)],
+            OverwriteMode: OverwriteMode.IfNewer.ToString(),
+            DeleteMode: DeleteMode.Trash.ToString());
+    }
+
+    private static TransformStepConfig BuildConfigWithUiMetadata(PipelineStepViewModel stepViewModel)
+    {
+        var baseConfig = stepViewModel.Step.Config;
+        var parameters = baseConfig.Parameters.DeepClone() as JsonObject ?? [];
+        if (string.IsNullOrWhiteSpace(stepViewModel.CustomName))
+        {
+            parameters.Remove(CustomNameParameter);
+        }
+        else
+        {
+            parameters[CustomNameParameter] = stepViewModel.CustomName;
+        }
+
+        return new TransformStepConfig(baseConfig.StepType, parameters);
+    }
+
+    private static string? GetOptionalParameter(TransformStepConfig config, string name)
+    {
+        var value = config.Parameters[name]?.GetValue<string>()?.Trim();
+        return string.IsNullOrWhiteSpace(value) ? null : value;
+    }
+
+    private static ITransformStep CreateDefaultStep(StepKind kind)
+    {
+        return kind switch
+        {
+            StepKind.Flatten => new FlattenStep(),
+            StepKind.Rebase => new RebaseStep("", ""),
+            StepKind.Rename => new RenameStep("{name}"),
+            StepKind.Convert => new ConvertStep("mp3"),
+            StepKind.Copy => new CopyStep(""),
+            StepKind.Move => new MoveStep(""),
+            StepKind.Delete => new DeleteStep(DeleteMode.Trash),
+            _ => new FlattenStep(),
+        };
+    }
 }

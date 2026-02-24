@@ -5,10 +5,10 @@ namespace SmartCopy.Core.Pipeline;
 
 public interface ITransformStep
 {
-    string StepType { get; }
+    StepKind StepType { get; }
     bool IsPathStep { get; }
     bool IsContentStep { get; }
-    bool IsTerminal { get; }
+    bool IsExecutable { get; }
     TransformStepConfig Config { get; }
 
     TransformResult Preview(TransformContext context);

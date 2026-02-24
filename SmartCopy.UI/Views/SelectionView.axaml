@@ -1,0 +1,7 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
+             x:Class="SmartCopy.UI.Views.SelectionView"
+             x:DataType="vm:SelectionViewModel">
+    <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" />
+</UserControl>

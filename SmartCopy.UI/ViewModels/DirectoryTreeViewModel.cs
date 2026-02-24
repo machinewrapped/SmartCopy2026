@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Threading;
 using System.Threading.Tasks;
 using SmartCopy.Core.FileSystem;
@@ -6,13 +7,22 @@ using SmartCopy.Core.Filters;
 
 namespace SmartCopy.UI.ViewModels;
 
-public class DirectoryTreeViewModel(IFileSystemProvider provider, string rootPath) : ViewModelBase
+public class DirectoryTreeViewModel : ViewModelBase
 {
-    private readonly IFileSystemProvider _provider = provider;
-    private string _rootPath = rootPath;
+    private readonly IFileSystemProvider _provider;
+    private string _rootPath;
     private FileSystemNode? _selectedNode;
 
+    /// <summary>Raised when any node's <see cref="FileSystemNode.CheckState"/> changes.</summary>
+    public event EventHandler? SelectionChanged;
+
     public ObservableCollection<FileSystemNode> RootNodes { get; } = [];
+
+    public DirectoryTreeViewModel(IFileSystemProvider provider, string rootPath)
+    {
+        _provider = provider;
+        _rootPath = rootPath;
+    }
 
     public FileSystemNode? SelectedNode
     {
@@ -41,10 +51,15 @@ public class DirectoryTreeViewModel(IFileSystemProvider provider, string rootPat
 
     public async Task InitializeAsync(string? initialSelectionPath = null, CancellationToken ct = default)
     {
+        // Unsubscribe from old roots before clearing
+        foreach (var oldRoot in RootNodes)
+            oldRoot.PropertyChanged -= OnRootNodePropertyChanged;
+
         RootNodes.Clear();
 
         var root = await BuildNodeTreeAsync(_rootPath, ct);
         root.IsExpanded = true;
+        root.PropertyChanged += OnRootNodePropertyChanged;
         RootNodes.Add(root);
         SelectedNode = root;
 
@@ -75,6 +90,15 @@ public class DirectoryTreeViewModel(IFileSystemProvider provider, string rootPat
 
         SelectedNode = match;
         return true;
+    }
+
+    private void OnRootNodePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        // null property name = batch reset; CheckState or IsSelected = individual change
+        if (e.PropertyName is null or nameof(FileSystemNode.CheckState) or nameof(FileSystemNode.IsSelected))
+        {
+            SelectionChanged?.Invoke(this, EventArgs.Empty);
+        }
     }
 
     private async Task<FileSystemNode> BuildNodeTreeAsync(string path, CancellationToken ct)
@@ -113,13 +137,13 @@ public class DirectoryTreeViewModel(IFileSystemProvider provider, string rootPat
         return root;
     }
 
-    private static FileSystemNode CloneNode(FileSystemNode sourceNode, FileSystemNode? parent)
+    private FileSystemNode CloneNode(FileSystemNode sourceNode, FileSystemNode? parent)
     {
         return new FileSystemNode
         {
             Name = sourceNode.Name,
             FullPath = sourceNode.FullPath,
-            RelativePath = sourceNode.RelativePath,
+            RelativePath = _provider.GetRelativePath(_rootPath, sourceNode.FullPath),
             IsDirectory = sourceNode.IsDirectory,
             Size = sourceNode.Size,
             CreatedAt = sourceNode.CreatedAt,
@@ -153,4 +177,5 @@ public class DirectoryTreeViewModel(IFileSystemProvider provider, string rootPat
 
         return null;
     }
+
 }

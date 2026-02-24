@@ -7,12 +7,24 @@ namespace SmartCopy.Core.Pipeline.Steps;
 
 public sealed class FlattenStep : ITransformStep
 {
-    public string StepType => "Flatten";
+    public FlattenStep(FlattenConflictStrategy conflictStrategy = FlattenConflictStrategy.AutoRenameCounter)
+    {
+        ConflictStrategy = conflictStrategy;
+    }
+
+    public FlattenConflictStrategy ConflictStrategy { get; set; }
+
+    public StepKind StepType => StepKind.Flatten;
     public bool IsPathStep => true;
     public bool IsContentStep => false;
-    public bool IsTerminal => false;
+    public bool IsExecutable => false;
 
-    public TransformStepConfig Config => new(StepType, new JsonObject());
+    public TransformStepConfig Config => new(
+        StepType,
+        new JsonObject
+        {
+            ["conflictStrategy"] = ConflictStrategy.ToString(),
+        });
 
     public TransformResult Preview(TransformContext context)
     {
@@ -35,4 +47,3 @@ public sealed class FlattenStep : ITransformStep
             Message: "Path flattened"));
     }
 }
-

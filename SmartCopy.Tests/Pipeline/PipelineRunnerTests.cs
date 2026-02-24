@@ -43,7 +43,7 @@ public sealed class PipelineRunnerTests
             progress: null,
             CancellationToken.None);
 
-        Assert.Contains(results, r => r.StepType == "Copy" && r.Success);
+        Assert.Contains(results, r => r.StepType == StepKind.Copy && r.Success);
         Assert.True(await targetProvider.ExistsAsync("/Mirror/source/song.flac", CancellationToken.None));
     }
 
@@ -185,5 +185,37 @@ public sealed class PipelineRunnerTests
         var bytes = new byte[stream.Length];
         _ = await stream.ReadAsync(bytes, CancellationToken.None);
         Assert.Equal("existing"u8.ToArray(), bytes);
+    }
+
+    [Fact]
+    public async Task ExecutablePipeline_RequiresAtLeastOneSelectedInput()
+    {
+        var provider = MemoryFileSystemFixtures.Create(fixture => fixture
+            .WithDirectory("/source")
+            .WithDirectory("/dest"));
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/dest")]));
+
+        var previewError = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            runner.PreviewAsync(
+                [],
+                provider,
+                provider,
+                OverwriteMode.Always,
+                DeleteMode.Trash,
+                CancellationToken.None));
+
+        Assert.Contains("At least one file must be selected", previewError.Message);
+
+        var executeError = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            runner.ExecuteAsync(
+                [],
+                provider,
+                provider,
+                OverwriteMode.Always,
+                DeleteMode.Trash,
+                progress: null,
+                ct: CancellationToken.None));
+
+        Assert.Contains("At least one file must be selected", executeError.Message);
     }
 }

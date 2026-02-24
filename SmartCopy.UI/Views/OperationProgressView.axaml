@@ -3,13 +3,21 @@
              xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
              x:Class="SmartCopy.UI.Views.OperationProgressView"
              x:DataType="vm:OperationProgressViewModel">
-    <StackPanel Orientation="Vertical" Spacing="2" Margin="0" IsVisible="{Binding IsActive}">
+    <StackPanel Orientation="Vertical" Spacing="2">
         <StackPanel Orientation="Horizontal" Spacing="12">
             <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" FontWeight="SemiBold" />
             <TextBlock Text="|" VerticalAlignment="Center" Opacity="0.5" />
             <ProgressBar Value="{Binding PercentComplete}" Width="150" Height="14" CornerRadius="7" Foreground="#4facfe" />
             <TextBlock Text="{Binding PercentComplete, StringFormat=\{0\}%}" VerticalAlignment="Center" />
             <TextBlock Text="{Binding TimeRemaining}" VerticalAlignment="Center" />
+            <Button Content="Pause"
+                    Command="{Binding PauseCommand}"
+                    CornerRadius="4"
+                    Padding="8,2" />
+            <Button Content="Cancel"
+                    Command="{Binding CancelCommand}"
+                    CornerRadius="4"
+                    Padding="8,2" />
         </StackPanel>
         <TextBlock Text="{Binding CurrentFile}" Opacity="0.7" FontSize="11" />
     </StackPanel>

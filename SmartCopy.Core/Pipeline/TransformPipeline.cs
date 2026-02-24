@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline;
 
@@ -15,24 +16,15 @@ public sealed class TransformPipeline
 
     public IReadOnlyList<ITransformStep> Steps => _steps;
 
-    public bool HasDeleteStep => _steps.Any(step => step.StepType == "Delete");
+    public bool HasDeleteStep => _steps.Any(step => step.StepType == StepKind.Delete);
 
-    public void Validate()
+    public void Validate(PipelineValidationContext? context = null)
     {
-        if (_steps.Count == 0)
+        var result = PipelineValidator.Validate(_steps, context);
+        if (!result.CanRun)
         {
-            throw new InvalidOperationException("Pipeline must contain at least one step.");
-        }
-
-        var terminalSteps = _steps.Where(step => step.IsTerminal).ToList();
-        if (terminalSteps.Count != 1)
-        {
-            throw new InvalidOperationException("Pipeline must contain exactly one terminal step.");
-        }
-
-        if (!_steps[^1].IsTerminal)
-        {
-            throw new InvalidOperationException("The terminal step must be the final step in the pipeline.");
+            var issue = result.FirstBlockingIssue;
+            throw new InvalidOperationException(issue?.Message ?? "Pipeline is invalid.");
         }
     }
 }

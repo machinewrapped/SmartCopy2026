@@ -106,7 +106,7 @@ Path comparisons for filter matching should follow idiomatic behavior for the ho
 
 Avalonia's `VirtualizingStackPanel` handles large lists efficiently, but propagating tri-state
 checkbox state across a deep tree of 100k+ nodes requires deliberate care. The state propagation
-algorithm must be efficient (see Architecture `Section 6.2`). This is an implementation concern,
+algorithm must be efficient (see Architecture `Tri-State Checkbox Propagation`). This is an implementation concern,
 not a reason to switch framework.
 
 **TreeDataGrid:** Avalonia's `TreeDataGrid` control (stable in 11+) may outperform a hand-rolled
@@ -124,7 +124,7 @@ installed, `global.json` can pin the SDK version. Self-contained publish (`--sel
 ## 4. Architecture Design
 
 Canonical architecture reference lives in:
-- `Docs/SmartCopy2026-Architecture.md#4-architecture-design`
+- `Docs/SmartCopy2026-Architecture.md#1-architecture-design`
 
 This plan keeps only execution sequencing and acceptance criteria. When architecture or contract details change, update the architecture reference first, then update impacted plan steps.
 
@@ -133,7 +133,7 @@ This plan keeps only execution sequencing and acceptance criteria. When architec
 ## 5. Key Technical Designs
 
 Detailed technical contracts (providers, filters, pipeline, preview/progress, scanner/watcher, plugin interface) now live in:
-- `Docs/SmartCopy2026-Architecture.md#5-key-technical-designs`
+- `Docs/SmartCopy2026-Architecture.md#2-key-technical-designs`
 
 Do not duplicate full class/interface signatures here unless a step requires an explicit temporary delta.
 
@@ -142,16 +142,16 @@ Do not duplicate full class/interface signatures here unless a step requires an 
 ## 6. Algorithms and Implementation Notes
 
 Canonical algorithm/invariant reference (selection state, tri-state propagation, mirror matching, wildcard matching, sync semantics, safety defaults) now lives in:
-- `Docs/SmartCopy2026-Architecture.md#6-algorithms-and-implementation-notes`
+- `Docs/SmartCopy2026-Architecture.md#3-algorithms-and-implementation-notes`
 
-Step acceptance criteria may reference algorithm sections (for example `Section 6.11`) but normative algorithm text is maintained in the architecture reference.
+Step acceptance criteria may reference algorithm sections (for example `Safety Defaults for Destructive Operations`) but normative algorithm text is maintained in the architecture reference.
 
 ---
 
 ## 7. UI Design
 
 Canonical UI behavior and interaction specs now live in:
-- `Docs/SmartCopy2026-Architecture.md#7-ui-design`
+- `Docs/SmartCopy2026-UIUX.md`
 
 Plan-level rule: keep UI implementation tasks and verification in Phase steps; keep stable interaction specs in architecture.
 
@@ -162,7 +162,7 @@ Plan-level rule: keep UI implementation tasks and verification in Phase steps; k
 *Goal: ship a reliable cross-platform v1 that can scan, select, filter, preview, copy/move/delete,
 and sync safely.*
 
-### Phase 1 sequencing principle (revised 2026-02-22)
+### Phase 1 sequencing principle
 
 1. Prove and refine UX using `MemoryFileSystemProvider` first; seeded `/mem` remains the default integration source until the end-to-end flow is demoable.
 2. Treat the UX loop as the primary critical path: scan/seed -> select -> filter -> preview -> run -> verify.
@@ -177,20 +177,43 @@ and sync safely.*
 2. Validation-first hardening track (prioritised while behaviour is still fresh)
 3. UX polish track (after end-to-end flow is proven)
 
-### Phase 1 status snapshot (as of 2026-02-22)
+### Phase 1 status snapshot (as of 2026-02-23)
 
-| Workstream item | Status | Evidence | Next action |
-|---|---|---|---|
-| UX-1 (Step 1): Baseline shell | Complete | 3-column shell, seeded `/mem` source, tree->file-list sync, persisted window/column state, CI matrix in place; verification checklist closed | Keep as baseline for UX-loop regression checks in later steps |
-| UX-2 (Step 3): Node selection logic | Complete | Tri-state propagation and `IsSelected` behavior implemented in `FileSystemNode` and covered by dedicated transition tests | Expand with scale/perf coverage alongside Step 10 observability work |
-| UX-3 (Step 4): Filter chain | Mostly complete | Live filter UX is wired end-to-end (presets, add/edit dialog, drag reorder, tree/file-list reapply), and dedicated filter test suites are in place | Finish chain Save/Load file-picker integration and close the remaining manual verification item |
-| UX-4 (Step 6): Transform pipeline | In progress | Core pipeline (`TransformPipeline`, `PipelineRunner`) and built-in steps (`Copy/Move/Delete/Flatten`) implemented with tests | Wire Preview/Run in UI, enforce delete-confirm preview policy, add journal/progress integration |
-| UX-5 (Step 7): Sync operations | Started (core skeleton) | `SyncWorkflow` has find-orphans and basic update/mirror builders | Implement full update/mirror semantics (`IfNewer`, orphan delete pass with confirmation) + UI entry points |
-| Hardening-1 (Step 2): Memory provider foundation | Complete | `FileSystemNode`, `IFileSystemProvider`, `ProviderCapabilities`, `MemoryFileSystemProvider`, provider contract tests, and shared memory-first fixture builders are implemented | Reuse the shared fixture builder pattern for all new core workflow tests |
-| Hardening-2 (Step 8): Selection save/load | In progress | `SelectionSerializer` (`.txt`, `.m3u`, `.sc2sel`) and `SelectionManager` implemented with round-trip tests | Wire File menu flows and add unmatched-path reporting behavior |
-| Hardening-3 (Step 9): Settings persistence | In progress | `AppSettings` + `AppSettingsStore` implemented with corrupt-file fallback tests and cross-platform path resolution | Add schema migration path and startup/shutdown wiring for persisted defaults |
-| Polish-1 (Step 10): Shell observability + status | Not started | Scope split out of overloaded Step 1/Step 4 | Implement after Step 7 end-to-end UX loop is proven |
-| Polish-2 (Step 11): Keyboard + accessibility baseline | Not started | Scope split out of overloaded Step 1 | Implement after Step 10 |
+| Workstream item | Status | Next action |
+|---|---|---|
+| UX-1 (Step 1): Baseline shell | Complete | Baseline for regression checks |
+| UX-2 (Step 3): Node selection logic | Complete | Scale/perf coverage alongside Step 9 |
+| UX-3 (Step 4): Filter chain | Complete | Save/Load file-picker deferred to Phase 3 |
+| UX-4 (Step 5): Transform pipeline | Complete (validation pending manual test run) | Maintainer to execute new Step 5 test suites + UI smoke scenarios |
+| UX-5 (Step 6): Sync operations | Started | Full update/mirror semantics + UI entry points |
+| Hardening-1 (Step 2): Memory provider foundation | Complete | Reuse fixture builder pattern |
+| Hardening-2 (Step 7): Selection save/load | In progress | Wire File menu flows + unmatched-path reporting |
+| Hardening-3 (Step 8): Settings persistence | In progress | Schema migration path; remaining persisted defaults |
+| Polish-1 (Step 9): Shell observability + status | Not started | After UX loop proven |
+| Polish-2 (Step 10): Keyboard + accessibility | Not started | After Step 9 |
+
+### UI/UX Validation (Phase 1)
+
+The UI must be built first with test data to validate the layout and UX.
+
+UI/UX checklist:
+- [x] Main window with correct proportions, resizable split panes (3-column: Filters/Folders/Files)
+- [x] Window size, position, maximised state, and column widths persisted to
+      `%LOCALAPPDATA%/SmartCopy2026/window.json`; restored on next open with off-screen safety guard
+- [x] Source field with browse button (no real browsing yet)
+- [x] TreeView with tri-state checkbox behaviour fully working
+- [x] FileListView with all columns (Name/Size/Modified), column resizing, click-to-sort
+- [x] Filter chain area: filter cards with human-readable summary + technical subtitle,
+      enable/disable checkbox, edit (pencil) button, remove button, inline "+ Add filter" ghost card,
+      Save/Load buttons pinned to bottom of column
+- [x] Pipeline area: horizontal scrollable step chain with → connectors; + Add step flyout
+      (Executable / Path / Content step categories); Run and Preview buttons stacked on the right;
+      step cards show summary + technical subtitle and edit/remove actions
+- [ ] Status bar: file count, size, filtered count, progress bar, time remaining, current file
+- [ ] Operation progress overlay: progress bars, pause/cancel buttons, status labels — no real operation
+- [ ] Log panel: collapsible, scrollable, a few placeholder log entries
+- [ ] Full keyboard navigation: Tab order, arrow keys in tree/list, Space to toggle, focus indicators
+- [ ] Automation properties on all interactive controls (screen-reader baseline)
 
 ### Step 1 — Project Scaffold + Baseline UI Shell (UX Loop Track)
 
@@ -212,7 +235,7 @@ Verification:
 ### Step 2 — Core Models + MemoryFileSystemProvider (Memory-Backed Hardening Track, test-first foundation)
 
 Deliverables:
-- [x] Implement `FileSystemNode` full model contract from Architecture `Section 10`
+- [x] Implement `FileSystemNode` full model contract from Architecture `Data Models`
 - [x] Implement `IFileSystemProvider` + `ProviderCapabilities`
 - [x] Implement `MemoryFileSystemProvider` for fast hermetic tests
 - [x] Create shared test fixtures/builders that default to `MemoryFileSystemProvider`
@@ -229,7 +252,7 @@ Verification:
 ### Step 3 — Node Selection Logic (UX Loop Track, validation-priority)
 
 Deliverables:
-- [x] Tri-state propagation algorithm from Architecture `Section 6.2` in production nodes/view models
+- [x] Tri-state propagation algorithm from Architecture `Tri-State Checkbox Propagation` in production nodes/view models
 - [x] `IsSelected` wiring (`CheckState == Checked && FilterResult == Included`)
 
 Acceptance criteria:
@@ -239,154 +262,119 @@ Acceptance criteria:
 Verification:
 - [x] Unit tests for checked/unchecked/indeterminate transitions
 
-### Step 4 — Filter Chain (UX Loop Track)
+### Step 4 — Filter Chain (UX Loop Track) ✓
 
-Status update (2026-02-22): sub-steps 4a-4f are implemented in current code and covered by
-automated tests. Remaining follow-up is UI completion for chain Save/Load flow (file picker +
-JSON round-trip wiring in the shell).
+**Completed 2026-02-23.** Full filter chain implementation delivered across six sub-steps (4a–4f).
+Implementation details for contracts, UI flows, and filter types are in Architecture `IFilter and FilterChain` and UIUX documentation.
 
-#### Already complete
-- [x] `IFilter`, `FilterChain`, `FilterConfig`, `FilterChainConfig`
-- [x] `Wildcard`, `Extension`, `Mirror`, `DateRange`, `SizeRange`, `Attribute` filters
-- [x] Basic `FilterChain` unit tests
-- [x] Filter mode model evolved to `Only | Add | Exclude` with ordered set-based evaluation
+Delivered:
+- [x] Core filter engine: `IFilter`, `FilterChain`, `FilterConfig`, `FilterChainConfig`
+- [x] All Phase 1 filter types: Wildcard, Extension, Mirror, DateRange, SizeRange, Attribute
+- [x] `Only | Add | Exclude` ordered set-based evaluation semantics
+- [x] `FilterPresetStore` with built-in presets (Audio, Images, Documents, Log files, Temp files)
+- [x] `FilterFactory` — `FromConfig(FilterConfig) → IFilter` for all 6 types
+- [x] `FilterEditorViewModel` hierarchy — one editor per type with `BuildFilter`/`LoadFrom` round-trips
+- [x] Add-Filter two-level drill-down flyout (type → preset/MRU picker)
+- [x] `EditFilterDialog` modal with mode toggle, type-specific editors, save-as-preset
+- [x] `FilterChainViewModel` live wiring: `BuildLiveChain()`, `ChainChanged`, drag reorder
+- [x] Live filter application to tree + file list via debounced `ApplyFiltersAsync`
+- [x] `FilterResultOpacityConverter`, `ShowFilteredFiles` toggle, excluded-node checkbox disabling
 
-#### Sub-step 4a — `FilterPresetStore` + `FilterFactory` (Core)
+Remaining follow-up:
+- [ ] Save/Load chain file-picker integration (`.sc2filter` JSON round-trip wiring in the shell)
 
-New files:
-- `SmartCopy.Core/Filters/FilterPreset.cs` — `{ Id, Name, IsBuiltIn, FilterConfig }`
-- `SmartCopy.Core/Filters/FilterPresetCollection.cs` — JSON root `{ SchemaVersion, Dictionary<string, List<FilterPreset>> UserPresets }`
-- `SmartCopy.Core/Filters/FilterPresetStore.cs` — async CRUD: `GetPresetsForTypeAsync`, `SaveUserPresetAsync`, `DeleteUserPresetAsync`; built-ins always prepended; persists to `%APPDATA%/SmartCopy2026/filter-presets.json`
-- `SmartCopy.Core/Filters/FilterFactory.cs` — static `FromConfig(FilterConfig) → IFilter`; switch on `FilterType` string
-
-Modify:
-- `SmartCopy.Core/Settings/AppSettings.cs` — add `Dictionary<string, List<string>> FilterTypeMruPresetIds`
-
-Built-in presets (hardcoded, never written to disk):
-- Extension / "Only Audio files": `mp3;flac;aac;ogg;wav;m4a`, Only
-- Extension / "Only Images": `jpg;jpeg;png;gif;webp;bmp;tiff;svg`, Only
-- Extension / "Only Documents": `pdf;docx;xlsx;pptx;txt;odt`, Only
-- Extension / "Only Log files": `log;txt`, Only
-- Wildcard / "Exclude Temp files": `*.tmp;*.bak;~*;Thumbs.db`, Exclude
-
-Tests (`SmartCopy.Tests/Filters/FilterPresetStoreTests.cs`): built-ins present when no user file; save/delete/overwrite round-trips; built-ins precede user presets; `FilterFactory` round-trips all 6 filter types.
-
-#### Sub-step 4b — `FilterEditorViewModel` hierarchy (UI ↔ Core bridge)
-
-New folder: `SmartCopy.UI/ViewModels/Filters/`
-
-New files:
-- `FilterEditorViewModelBase.cs` — abstract; `FilterMode Mode`, `string FilterName`, `bool SaveAsPreset`; `abstract IFilter BuildFilter()`, `abstract bool IsValid`, `abstract void LoadFrom(IFilter)`, `virtual string GenerateName()`
-- One concrete subclass per filter type: `ExtensionFilterEditorViewModel`, `WildcardFilterEditorViewModel`, `DateRangeFilterEditorViewModel`, `SizeRangeFilterEditorViewModel`, `MirrorFilterEditorViewModel`, `AttributeFilterEditorViewModel`
-- `SizeUnit` enum: Bytes/KB/MB/GB/TB (in the size range editor)
-
-Tests (`SmartCopy.Tests/Filters/FilterEditorViewModelTests.cs`): extension normalisation and deduplication; size unit conversion; `LoadFrom → BuildFilter` round-trips for all 6 types.
-
-#### Sub-step 4c — Add-Filter flyout (two-level drill-down)
-
-New files:
-- `SmartCopy.UI/ViewModels/AddFilterViewModel.cs` — level-1: 6 `FilterTypeItem` entries; level-2: loads presets + MRU; events `PresetPicked(FilterPreset)`, `NewFilterRequested(string filterType)`; updates MRU on pick (prepend, cap at 5, deduplicate)
-- `SmartCopy.UI/Views/AddFilterFlyout.axaml` + `.cs` — `UserControl` hosted in a `Popup` (`PlacementMode=Bottom`); two panels swapped via `IsLevel2Visible`
-
-Modify: `SmartCopy.UI/Views/FilterChainView.axaml` + `.cs` — replace `AddFilter` button with `Popup`; code-behind routes events to `FilterChainViewModel`.
-
-Tests (`SmartCopy.Tests/Filters/AddFilterViewModelTests.cs`): level navigation; MRU population; GoBack; MRU update on pick.
-
-#### Sub-step 4d — `EditFilterDialog` (modal Window)
-
-New files:
-- `SmartCopy.UI/ViewModels/EditFilterDialogViewModel.cs` — factory methods `ForNew(filterType, pipelineDestinationPath = "")` and `ForEdit(existingFilter, pipelineDestinationPath = "")`; `Ok()` builds `ResultFilter`; `SaveAsPreset` flag is exposed for caller handling
-- `SmartCopy.UI/Views/EditFilterDialog.axaml` + `.cs` — modal `Window`; Only/Add/Exclude toggle → name field → `ContentControl` + `DataTemplate` dispatch → "Save as preset" → Cancel/OK
-- `SmartCopy.UI/Views/FilterEditors/` — 6 `UserControl` files (one per type): Extension chips, Wildcard text box, DateRange date pickers, SizeRange numeric inputs, Mirror path + compare mode, Attribute checkboxes
-
-Dialog launch + preset persistence in `FilterChainView.axaml.cs`: `NewFilterDialogRequested` → `ForNew` → `ShowDialog`; edit pencil → `ForEdit` → `ShowDialog`; if OK + SaveAsPreset, save through `FilterPresetStore` before adding/replacing the card.
-
-Tests (`SmartCopy.Tests/Filters/EditFilterDialogViewModelTests.cs`): `ForNew` type dispatch; `ForEdit` pre-population; mode toggles (`Only/Add/Exclude`) update editor state; `IsValid` gates OK; mirror path suggestion is applied.
-
-#### Sub-step 4e — `FilterViewModel` real `IFilter` wiring + `BuildLiveChain()`
-
-Modify `SmartCopy.UI/ViewModels/FilterChainViewModel.cs` (significant rewrite):
-- `FilterViewModel` wraps a live `IFilter`; `IsEnabled` toggle fires `ChainChanged`; `ReplaceFilter(IFilter)` swaps instance
-- `FilterChainViewModel` gains: `FilterPresetStore`/`AppSettings` constructor params; `AddFilterViewModel AddFilter`; `FilterChain BuildLiveChain()`; `public event EventHandler? ChainChanged`; `AddFilterFromResult`, `ReplaceFilter`, `MoveFilter(int, int)`; `NewFilterDialogRequested` event; `SaveChain`/`LoadChain` commands that raise `SaveChainRequested`/`LoadChainRequested`
-- `FilterChainView.axaml.cs` wires Avalonia `DragDrop` on the `ItemsControl`; drop handler calls `MoveFilter`
-
-Modify `MainViewModel`: construct `AppSettings` + `FilterPresetStore`; pass to `FilterChainViewModel`; keep `PipelineDestinationPath` synchronized with pipeline destination.
-
-Tests (`SmartCopy.Tests/Filters/FilterChainViewModelTests.cs`): `BuildLiveChain`; add/remove fire `ChainChanged`; `IsEnabled` toggle fires `ChainChanged`; `ReplaceFilter` updates VM.
-
-#### Sub-step 4f — Live wiring: filter application to tree + file list
-
-Modify `MainViewModel`: subscribe `FilterChain.ChainChanged` → `ApplyFiltersAsync()` (CancellationTokenSource debounce; passes same `MemoryFileSystemProvider` as `comparisonProvider`).
-
-Modify `DirectoryTreeViewModel`: add `ApplyFiltersAsync(FilterChain, IFileSystemProvider?, CancellationToken)` delegating to `chain.ApplyToTreeAsync(RootNodes, …)`.
-
-Modify `FileListViewModel`: remove stub `FilterResult` logic; add `UpdateChain`, `ReapplyFiltersAsync`; expose `VisibleFiles` (respects `ShowFilteredFiles`).
-
-New: `SmartCopy.UI/Converters/FilterResultOpacityConverter.cs` — `Excluded → 0.4`, `Included → 1.0`.
-
-Modify `DirectoryTreeView.axaml`: add `Opacity` style binding via `FilterResultOpacityConverter`. Wire `FileListView.axaml` `DataGrid.ItemsSource` to `VisibleFiles`.
-
-Tests (`SmartCopy.Tests/Filters/FilterLiveWiringTests.cs`) against `MemoryFileSystemProvider`: extension filter excludes non-matching files; `Only`+`Exclude` chain behavior; `ShowFilteredFiles` toggle; disabled filter resets excluded nodes; `ReapplyFiltersAsync` updates existing loaded file nodes.
-
-#### Acceptance criteria
-- [x] `Only`/`Add`/`Exclude` semantics match Architecture `Section 5.2`
-- [x] Disabled filters have zero effect on `FilterResult`
-- [x] Parent node is excluded if all its children and files are excluded
-- [x] Excluded nodes have their checkboxes disabled in the tree and file list
-- [x] Tree view has a toggle to hide or show excluded nodes
+Acceptance criteria — all met:
+- [x] `Only`/`Add`/`Exclude` semantics match Architecture `IFilter and FilterChain`
+- [x] Disabled filters have zero effect; parent excluded when all children excluded
+- [x] Excluded nodes non-selectable; tree toggle hides/shows excluded nodes
 - [x] Mirror filter comparison path suggestion derives from pipeline destination
-- [x] Add-filter flyout shows type list → preset list drill-down
-- [x] "★ Only Audio files" built-in preset adds a filter and updates tree/file list
-- [x] "＋ New..." opens `EditFilterDialog`; OK adds filter and updates tree/file list
-- [x] Edit pencil re-opens dialog pre-populated; save-as-preset path is wired
-- [x] Filter card checkbox toggle re-evaluates chain without reopening dialog
+- [x] Full add/edit/toggle/reorder/preset workflow operational end-to-end
 - [x] `VisibleFiles` respects `ShowFilteredFiles` toggle
-- [x] Drag handle `≡` reorders filter cards; chain re-evaluated after reorder
-- [x] MirrorFilter is evaluated with comparison provider wiring in memory-backed Phase 1 flow
-- [ ] Save/Load chain completes full UI round-trip (file picker + JSON persistence wiring)
+- [x] MirrorFilter evaluated with comparison provider in memory-backed flow
 
-#### Verification
-- [x] Automated filter suites are currently passing in the user environment (Codex cannot execute tests in this environment)
-- [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "FilterPresetStore"` (≥5 tests)
-- [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "FilterEditorViewModel"` (≥6 tests)
-- [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "AddFilterViewModel"` (≥5 tests)
-- [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "EditFilterDialogViewModel"` (≥6 tests)
-- [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "FilterChainViewModel"` (≥6 tests)
-- [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "FilterLiveWiring"` (≥6 tests)
-- [ ] Manual: launch app, add "★ Only Audio files" preset, verify tree/file-list filtering behavior
-- [ ] Manual: create new Extension filter via dialog, save as preset, reload app, verify preset persists
-- [ ] Manual: "Save ▾" writes `.json`; "Load ▾" restores chain from file
+Verification — all automated suites passing:
+- [x] `FilterPresetStore` (≥5), `FilterEditorViewModel` (≥6), `AddFilterViewModel` (≥5)
+- [x] `EditFilterDialogViewModel` (≥6), `FilterChainViewModel` (≥6), `FilterLiveWiring` (≥6)
+- [x] Manual: built-in preset adds filter and updates tree/file-list
+- [x] Manual: new Extension filter via dialog, save as preset, persists across restart
 
 ### Step 5 — Transform Pipeline (UX Loop Track, built-in steps)
 
-Deliverables:
-- [x] `ITransformStep`, `TransformPipeline`, `TransformContext`, `PipelineRunner`
-- [x] `CopyStep`, `MoveStep`, `DeleteStep`, `FlattenStep`
-- [ ] Preview generation (`OperationPlan`) and preview UI wiring (core complete; UI wiring pending)
-- [ ] Progress overlay wired to real operation events
-- [ ] Operation journal written to `%APPDATA%/SmartCopy2026/logs/`
+#### Delivered
+- [x] Core pipeline extension and validation layer:
+  `PipelinePresetStore`, `PipelinePreset`, `PipelineStepFactory`, `UnknownStepTypeException`,
+  `PipelineValidator`, `PipelineValidationResult`, `PipelineValidationIssue`,
+  `PipelineStepContracts`
+- [x] Built-in standard presets:
+  Copy only, Move only, Delete to Trash, Flatten -> Copy
+- [x] Step model expansion:
+  `RenameStep`, `RebaseStep`, `ConvertStep`, `FlattenConflictStrategy`; `DeleteStep` mode-aware;
+  mutable destination paths on `CopyStep`/`MoveStep`
+- [x] Step editor VM hierarchy:
+  `StepEditorViewModelBase`, Copy/Move/Delete/Flatten/Rename/Rebase/Convert editors +
+  `StepEditorViewModelFactory`
+- [x] Add Step flyout (two-level category -> type):
+  `AddStepViewModel`, `Views/Pipeline/AddStepFlyout.axaml`
+- [x] Edit Step dialog:
+  `EditStepDialogViewModel`, `Views/Pipeline/EditStepDialog.axaml`,
+  step-editor views under `Views/Pipeline/StepEditors/`
+- [x] `PipelineViewModel` rewrite:
+  live `ITransformStep` wrapping, validation state, blocking reason, preset integration,
+  first-destination tracking, add/replace/remove wiring, run/preview events
+- [x] `PipelineView` rewrite:
+  popup flyout integration, step edit pencil wiring, validation feedback, delete badge,
+  dynamic run button label
+- [x] Preview workflow:
+  new `PreviewViewModel` grouping by warning type, delete confirmation gating,
+  `PreviewView` modal dialog
+- [x] Run/progress/journal wiring:
+  `MainViewModel` preview->run flow (delete preview mandatory), pipeline execution path,
+  selection collection from tree, progress callback integration;
+  `OperationProgressViewModel` (begin/update/complete/cancel);
+  `OperationJournal` write + retention rotation
 
-Acceptance criteria:
-- [x] Exactly one terminal step required and validated
-- [ ] Delete pipelines always require explicit preview confirmation
-- [ ] Overwrite and delete modes are honored per context/config
+#### Acceptance criteria status
+- [x] Run disabled until at least one valid executable step exists
+- [x] Multiple executable steps are allowed and execute in sequence
+- [x] Delete remains preview-mandatory and delete-final validated
+- [x] Declarative validator rejects invalid sequences (`Delete -> Copy`, `Move -> Delete`)
+- [x] Invalid step cards surface blocking validation text
+- [x] Run button exposes first blocking validation reason (tooltip text binding)
+- [x] Add Step flyout uses two-level category -> type drill-down
+- [x] Edit pencil opens `EditStepDialog` with pre-populated values
+- [x] `EditStepDialog` OK is validity-gated (Copy/Move destination, Rename pattern, Rebase fields)
+- [x] Delete step shows badge (`Trash` or `⚠ Permanent`)
+- [x] Standard presets load via preset menu integration
+- [x] User pipelines save/load as `.sc2pipe` via preset store-backed commands
+- [x] `FirstDestinationPath` updates and is propagated to filter-chain mirror suggestion wiring
+- [x] Preview dialog groups by warning type and supports delete confirmation mode
+- [x] Delete pipelines require explicit preview confirmation; non-delete can run directly
+- [~] Overwrite behavior: `Skip` and `Always` are covered by tests; `IfNewer` still behaves as prior baseline
+- [x] Progress overlay receives live `OperationProgress` updates during execution
+- [x] Operation journal writes source/destination/action/bytes entries after runs
 
-Verification:
-- [ ] Unit tests for copy/move/delete/flatten behavior and conflict handling
-- [ ] Integration test: scan -> select -> filter -> preview -> execute -> verify outputs
+#### Validation performed
+- [x] `dotnet build SmartCopy.Core/SmartCopy.Core.csproj --no-restore` (passes)
+- [x] `dotnet build SmartCopy.UI/SmartCopy.UI.csproj --no-restore /p:ProduceReferenceAssembly=false` (passes; environment file-lock warnings on `obj/.../ref*.dll`)
+- [x] Added new pipeline test suites:
+  `PipelinePresetStoreTests`, `PipelineValidatorTests`, `StepEditorViewModelTests`,
+  `AddStepViewModelTests`, `EditStepDialogViewModelTests`, `PipelineViewModelTests`,
+  `PreviewViewModelTests`, `PipelineIntegrationTests`
+- [X] `dotnet test` execution
+- [ ] Manual UI scenario checks for preview/delete/progress/journal flows
 
 ### Step 6 — Sync Operations (UX Loop Track)
 
 Deliverables:
 - [ ] Update target workflow (`MirrorFilter` + `CopyStep` + `IfNewer`)
 - [ ] Mirror target workflow (second orphan-delete pass with mandatory preview)
-- [x] Find-orphans report mode
+- [ ] Find-orphans report mode
 - [ ] Menu/preset entry points
 
 Acceptance criteria:
 - [ ] Update mode never deletes files
 - [ ] Mirror mode deletes only items confirmed in preview
-- [x] Find-orphans performs no write/delete actions
+- [ ] Find-orphans performs no write/delete actions
 
 Verification:
 - [ ] Integration tests against repeatable fixtures for update/mirror/orphan scenarios
@@ -411,7 +399,8 @@ Verification:
 Deliverables:
 - [x] `AppSettings` load/save + schema version
 - [x] Cross-platform settings paths (`%APPDATA%` / `~/.config`)
-- [ ] Persisted UI and workflow defaults (sort, scan options, recents)
+- [x] Source path persistence: `LastSourcePath` restored on startup; `RecentSources`/`FavouritePaths` populate source ComboBox and save on change (pulled forward from Phase 3 as a Phase 1 UX necessity)
+- [ ] Remaining persisted defaults (sort order, scan options, other UI state)
 
 Acceptance criteria:
 - [x] Missing/corrupt settings file falls back to defaults without crash
@@ -425,7 +414,7 @@ Verification:
 
 Deliverables:
 - [ ] Collapsible log panel with placeholder entries in the shell layout
-- [ ] Status bar live counts/size from Architecture `Section 6.10`
+- [ ] Status bar live counts/size from Architecture `Status Bar Statistics`
 - [ ] Cross-check status-bar values against selected/filter states under `/mem` fixtures
 
 Acceptance criteria:
@@ -466,7 +455,7 @@ Scope:
 - [ ] Local provider/scanner integration in `DirectoryTreeViewModel` via progressive streams
 - [ ] Platform `TrashService` adapters with timeout/fallback behavior
 - [ ] Real-disk cancellation and scan-options validation coverage
-- [ ] Incremental subtree rescan with selection preservation (Architecture `Section 6.5`)
+- [ ] Incremental subtree rescan with selection preservation (Architecture `Tree Rescan with Selection Preservation`)
 - [ ] Watcher enable/disable settings, including provider capability gating
 - [ ] Debounce/coalescing and subtree-only update tests
 - [ ] Add provider parity checks so memory and local providers are exercised against the same
@@ -484,7 +473,8 @@ Scope:
 - [ ] Pipeline save/load (`.sc2pipe`) + preset library UI
 - [ ] Windows MTP provider (`MtpFileSystemProvider`) + WPD device picker integration
 - [ ] `DuplicateFilter` and `PathDepthFilter`
-- [ ] Drag-and-drop and bookmarks/favorites for source field and pipeline destination fields
+- [x] Bookmarks/favorites for source field (pulled forward to Phase 1 as a UX necessity; editable ComboBox with `RecentSources`/`FavouritePaths` persistence)
+- [ ] Drag-and-drop for source/destination fields; bookmarks for pipeline destination field
 
 Exit criteria:
 - [ ] MTP copy round-trip validated on at least two physical devices
@@ -519,7 +509,7 @@ Exit criteria:
 ## 10. Data Models
 
 Canonical data model and persistence schemas now live in:
-- `Docs/SmartCopy2026-Architecture.md#10-data-models`
+- `Docs/SmartCopy2026-Architecture.md#4-data-models`
 
 Plan-level rule: schema changes should be authored in the architecture reference and then referenced from the relevant implementation step checklists.
 
@@ -541,4 +531,4 @@ Decision notes:
 1. Packaging: installer is optional for v1; prioritize reliable portable binaries.
 2. Plugin trust: code-signing and central registry are deferred until plugin ecosystem justifies complexity.
 3. Snapshot size: optimize only when measured data shows real UX/storage pain.
-4. Network trash behavior is defined in Architecture `Section 6.11` and should be implemented as a hard safety rule.
+4. Network trash behavior is defined in Architecture `Safety Defaults for Destructive Operations` and should be implemented as a hard safety rule.
