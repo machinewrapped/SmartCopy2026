@@ -1,0 +1,7 @@
+# Top-most EditorConfig file
+root = true
+
+[*.cs]
+# Disable IDE0290: Use primary constructor
+dotnet_diagnostic.IDE0290.severity = none
+csharp_style_prefer_primary_constructors = false:none
