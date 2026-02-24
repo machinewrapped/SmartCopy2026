@@ -108,8 +108,6 @@ public partial class AddStepViewModel : ObservableObject
     /// <summary>Raised when the user picks a step preset. Caller applies it directly.</summary>
     public event Action<StepPreset>? StepPresetPicked;
 
-    public event Action<StepCategory>? CategoryNavigated;
-
     public event Action? CloseRequested;
 
     /// <summary>Raised when the user picks a pipeline preset.</summary>
