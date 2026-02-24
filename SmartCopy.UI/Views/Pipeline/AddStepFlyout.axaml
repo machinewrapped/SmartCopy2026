@@ -61,7 +61,7 @@
                                 <MenuItem.ItemTemplate>
                                     <DataTemplate x:DataType="corePipeline:PipelinePreset">
                                         <MenuItem Header="{Binding Name}"
-                                                  Command="{Binding $parent[UserControl].((vmPipeline:AddStepViewModel)DataContext).LoadPresetCommand, FallbackValue={x:Null}}"
+                                                  Click="OnPipelinePresetMenuItemClick"
                                                   CommandParameter="{Binding Name}" />
                                     </DataTemplate>
                                 </MenuItem.ItemTemplate>
@@ -73,7 +73,7 @@
                                 <MenuItem.ItemTemplate>
                                     <DataTemplate x:DataType="corePipeline:PipelinePreset">
                                         <MenuItem Header="{Binding Name}"
-                                                  Command="{Binding $parent[UserControl].((vmPipeline:AddStepViewModel)DataContext).LoadPresetCommand, FallbackValue={x:Null}}"
+                                                  Click="OnPipelinePresetMenuItemClick"
                                                   CommandParameter="{Binding Name}" />
                                     </DataTemplate>
                                 </MenuItem.ItemTemplate>
@@ -82,7 +82,7 @@
                             <Separator />
 
                             <MenuItem Header="Save current pipeline..."
-                                      Command="{Binding SavePipelineCommand, FallbackValue={x:Null}}" />
+                                      Click="OnSavePipelineMenuItemClick" />
                         </MenuFlyout>
                     </Button.Flyout>
                 </Button>
