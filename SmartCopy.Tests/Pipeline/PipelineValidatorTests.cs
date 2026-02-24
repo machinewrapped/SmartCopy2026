@@ -25,6 +25,17 @@ public sealed class PipelineValidatorTests
     }
 
     [Fact]
+    public void ExecutablePipelineWithoutSelectedInputs_ReturnsBlockingIssue()
+    {
+        var result = PipelineValidator.Validate(
+            [new CopyStep("/mem/out")],
+            new PipelineValidationContext(HasSelectedIncludedInputs: false));
+
+        Assert.False(result.CanRun);
+        Assert.Contains(result.Issues, issue => issue.Code == "Pipeline.NoSelectedInputs" && issue.StepIndex is null);
+    }
+
+    [Fact]
     public void CopyThenMove_IsValid()
     {
         var result = PipelineValidator.Validate(
@@ -35,6 +46,16 @@ public sealed class PipelineValidatorTests
 
         Assert.True(result.CanRun);
         Assert.Empty(result.Issues);
+    }
+
+    [Fact]
+    public void PathOnlyPipeline_DoesNotRequireSelectedInputs()
+    {
+        var result = PipelineValidator.Validate(
+            [new FlattenStep()],
+            new PipelineValidationContext(HasSelectedIncludedInputs: false));
+
+        Assert.DoesNotContain(result.Issues, issue => issue.Code == "Pipeline.NoSelectedInputs");
     }
 
     [Fact]

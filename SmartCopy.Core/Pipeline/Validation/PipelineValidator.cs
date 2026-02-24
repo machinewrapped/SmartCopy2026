@@ -7,8 +7,11 @@ namespace SmartCopy.Core.Pipeline.Validation;
 
 public sealed class PipelineValidator
 {
-    public static PipelineValidationResult Validate(IReadOnlyList<ITransformStep> steps)
+    public static PipelineValidationResult Validate(
+        IReadOnlyList<ITransformStep> steps,
+        PipelineValidationContext? context = null)
     {
+        context ??= new PipelineValidationContext();
         var issues = new List<PipelineValidationIssue>();
         if (steps.Count == 0)
         {
@@ -21,6 +24,7 @@ public sealed class PipelineValidator
         }
 
         var hasExecutable = false;
+        var hasExecutableRequiringSelectedInputs = false;
         var sourceExists = true;
 
         for (var i = 0; i < steps.Count; i++)
@@ -37,6 +41,7 @@ public sealed class PipelineValidator
             }
 
             hasExecutable |= contract.IsExecutable;
+            hasExecutableRequiringSelectedInputs |= contract.RequiresSelectedIncludedInputs;
 
             if (contract.RequiresDestinationPath && string.IsNullOrWhiteSpace(GetDestinationPath(step)))
             {
@@ -90,6 +95,15 @@ public sealed class PipelineValidator
             {
                 sourceExists = contract.SetsSourceExists.Value;
             }
+        }
+
+        if (hasExecutableRequiringSelectedInputs && !context.HasSelectedIncludedInputs)
+        {
+            issues.Add(new PipelineValidationIssue(
+                StepIndex: null,
+                Code: "Pipeline.NoSelectedInputs",
+                Message: "At least one file must be selected.",
+                Severity: PipelineValidationSeverity.Blocking));
         }
 
         if (!hasExecutable)

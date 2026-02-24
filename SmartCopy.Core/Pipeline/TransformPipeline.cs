@@ -18,9 +18,9 @@ public sealed class TransformPipeline
 
     public bool HasDeleteStep => _steps.Any(step => step.StepType == StepKind.Delete);
 
-    public void Validate()
+    public void Validate(PipelineValidationContext? context = null)
     {
-        var result = PipelineValidator.Validate(_steps);
+        var result = PipelineValidator.Validate(_steps, context);
         if (!result.CanRun)
         {
             var issue = result.FirstBlockingIssue;

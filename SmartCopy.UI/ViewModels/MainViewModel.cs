@@ -204,6 +204,7 @@ public partial class MainViewModel : ViewModelBase
         foreach (var root in DirectoryTree.RootNodes)
             CollectStatsRecursive(root, ref selected, ref totalBytes, ref filteredOut);
 
+        Pipeline.SetSelectedIncludedFileCount(selected);
         StatusBar.Selection.UpdateStats(selected, totalBytes, filteredOut);
     }
 
@@ -292,12 +293,14 @@ public partial class MainViewModel : ViewModelBase
 
     private async Task PreviewPipelineAsync()
     {
+        var selectedFiles = CollectSelectedFiles();
+        Pipeline.SetSelectedIncludedFileCount(selectedFiles.Count);
+
         if (!Pipeline.CanRun)
         {
             return;
         }
 
-        var selectedFiles = CollectSelectedFiles();
         if (selectedFiles.Count == 0)
         {
             return;
@@ -332,6 +335,9 @@ public partial class MainViewModel : ViewModelBase
 
     private async Task RunPipelineAsync()
     {
+        var selectedFiles = CollectSelectedFiles();
+        Pipeline.SetSelectedIncludedFileCount(selectedFiles.Count);
+
         if (!Pipeline.CanRun)
         {
             return;
@@ -344,7 +350,6 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
-        var selectedFiles = CollectSelectedFiles();
         if (selectedFiles.Count == 0)
         {
             return;

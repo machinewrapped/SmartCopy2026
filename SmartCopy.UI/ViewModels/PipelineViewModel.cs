@@ -180,6 +180,7 @@ public partial class PipelineViewModel : ViewModelBase
     private readonly string? _presetDirectory;
     private readonly StepPresetStore _stepPresetStore;
     private readonly AppSettings? _appSettings;
+    private int _selectedIncludedFileCount;
 
     public ObservableCollection<PipelineStepViewModel> Steps { get; } = [];
     public ObservableCollection<PipelinePreset> StandardPresets { get; } = [];
@@ -248,6 +249,18 @@ public partial class PipelineViewModel : ViewModelBase
         Steps.CollectionChanged += OnStepsCollectionChanged;
 
         InitializePresetsInBackground();
+        Revalidate();
+    }
+
+    public void SetSelectedIncludedFileCount(int selectedIncludedFileCount)
+    {
+        var normalizedCount = Math.Max(0, selectedIncludedFileCount);
+        if (_selectedIncludedFileCount == normalizedCount)
+        {
+            return;
+        }
+
+        _selectedIncludedFileCount = normalizedCount;
         Revalidate();
     }
 
@@ -451,7 +464,9 @@ public partial class PipelineViewModel : ViewModelBase
             step.HasValidationError = false;
         }
 
-        var result = PipelineValidator.Validate([.. Steps.Select(step => step.Step)]);
+        var result = PipelineValidator.Validate(
+            [.. Steps.Select(step => step.Step)],
+            new PipelineValidationContext(_selectedIncludedFileCount > 0));
         ValidationResult = result;
         BlockingValidationMessage = result.FirstBlockingIssue?.Message;
 

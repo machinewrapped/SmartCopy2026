@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.Pipeline.Validation;
 using SmartCopy.Core.Progress;
 
 namespace SmartCopy.Core.Pipeline;
@@ -32,6 +33,7 @@ public sealed class PipelineRunner
     {
         var actions = new List<PlannedAction>();
         var selected = selectedNodes.ToList();
+        _pipeline.Validate(new PipelineValidationContext(selected.Count > 0));
 
         foreach (var node in selected)
         {
@@ -85,13 +87,15 @@ public sealed class PipelineRunner
         IProgress<OperationProgress>? progress = null,
         CancellationToken ct = default)
     {
+        var selected = selectedNodes.ToList();
+        _pipeline.Validate(new PipelineValidationContext(selected.Count > 0));
+
         if (_pipeline.HasDeleteStep && !_previewCompleted)
         {
             throw new InvalidOperationException(
                 "Pipelines containing a DeleteStep must be previewed before execution.");
         }
 
-        var selected = selectedNodes.ToList();
         var results = new List<TransformResult>();
         var stopwatch = Stopwatch.StartNew();
         long totalBytes = selected.Sum(node => node.Size);

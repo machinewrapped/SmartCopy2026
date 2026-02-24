@@ -84,6 +84,21 @@ public sealed class PipelineViewModelTests
     }
 
     [Fact]
+    public void ExecutablePipeline_RequiresSelectedIncludedFiles()
+    {
+        var vm = new PipelineViewModel();
+        vm.AddStepFromResult(StepKind.Copy, new CopyStep("/mem/out"));
+
+        Assert.False(vm.CanRun);
+        Assert.Equal("At least one file must be selected.", vm.BlockingValidationMessage);
+
+        vm.SetSelectedIncludedFileCount(1);
+
+        Assert.True(vm.CanRun);
+        Assert.Null(vm.BlockingValidationMessage);
+    }
+
+    [Fact]
     public void AddStep_CustomName_OverridesAutoSummary()
     {
         var vm = new PipelineViewModel();
