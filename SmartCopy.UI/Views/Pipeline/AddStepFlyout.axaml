@@ -8,7 +8,7 @@
              MinWidth="180">
     <UserControl.DataTemplates>
         <TreeDataTemplate DataType="vmPipeline:AddStepMenuItem" ItemsSource="{Binding Items}">
-            <Panel HorizontalAlignment="Stretch" MinWidth="200">
+            <Panel HorizontalAlignment="Stretch">
                 <Grid ColumnDefinitions="*, Auto" Margin="0,1" HorizontalAlignment="Stretch" IsVisible="{Binding !IsSeparator}">
                     <TextBlock Grid.Column="0" Text="{Binding Header}" VerticalAlignment="Center" Margin="0,0,16,0" />
                     <Button Grid.Column="1"
@@ -29,6 +29,9 @@
             <Setter Property="Command" Value="{Binding Command}" />
             <Setter Property="CommandParameter" Value="{Binding CommandParameter}" />
             <Setter Property="IsEnabled" Value="{Binding IsEnabled}" />
+        </Style>
+        <Style Selector="MenuItem /template/ ContentPresenter#PART_HeaderPresenter">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
         </Style>
         <Style Selector="MenuItem > Border:disabled">
             <Setter Property="Opacity" Value="0.5" />
