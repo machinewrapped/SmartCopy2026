@@ -355,7 +355,6 @@ Verification — all automated suites passing:
 
 #### Validation performed
 - [x] `dotnet build SmartCopy.Core/SmartCopy.Core.csproj --no-restore` (passes)
-- [x] `dotnet build SmartCopy.UI/SmartCopy.UI.csproj --no-restore /p:ProduceReferenceAssembly=false` (passes; environment file-lock warnings on `obj/.../ref*.dll`)
 - [x] Added new pipeline test suites:
   `PipelinePresetStoreTests`, `PipelineValidatorTests`, `StepEditorViewModelTests`,
   `AddStepViewModelTests`, `EditStepDialogViewModelTests`, `PipelineViewModelTests`,
@@ -363,21 +362,24 @@ Verification — all automated suites passing:
 - [X] `dotnet test` execution
 - [ ] Manual UI scenario checks for preview/delete/progress/journal flows
 
-### Step 6 — Sync Operations (UX Loop Track)
+### Step 6 - Workflow Presets and Menu (UX Loop Track)
+Allow users to persist entire workflows - source directory, filters and pipeline steps.
 
 Deliverables:
-- [ ] Update target workflow (`MirrorFilter` + `CopyStep` + `IfNewer`)
-- [ ] Mirror target workflow (second orphan-delete pass with mandatory preview)
-- [ ] Find-orphans report mode
-- [ ] Menu/preset entry points
+- [ ] `WorkflowPresetStore` + `WorkflowPreset`
+- [ ] `WorkflowPresetMenuViewModel`
+- [ ] `WorkflowPresetMenuView`
 
 Acceptance criteria:
-- [ ] Update mode never deletes files
-- [ ] Mirror mode deletes only items confirmed in preview
-- [ ] Find-orphans performs no write/delete actions
+- [ ] Entire workflow can be persisted as `.sc2workflow` via preset store-backed commands
+- [ ] Workflow presets load via preset menu integration
+- [ ] Workflow presets can be deleted via preset menu
+- [ ] Unit tests for `WorkflowPresetStore` and `WorkflowPresetMenuViewModel`
 
 Verification:
-- [ ] Integration tests against repeatable fixtures for update/mirror/orphan scenarios
+- [ ] `dotnet build SmartCopy.App/SmartCopy.App.csproj`
+- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj`
+- [ ] Manual UI scenario checks for workflow menu integration
 
 ### Step 7 — Selection Save/Load (Memory-Backed Hardening Track)
 
@@ -438,7 +440,6 @@ Acceptance criteria:
 
 Verification:
 - [ ] Keyboard-only smoke test for scan/selection/filter/pipeline-preview path
-- [ ] Accessibility checklist pass for automation-name coverage on required controls
 
 ---
 
