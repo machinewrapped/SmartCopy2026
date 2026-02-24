@@ -28,11 +28,13 @@ public sealed class OperationJournal
         foreach (var file in Directory.EnumerateFiles(LogDirectory, "*.log", SearchOption.TopDirectoryOnly))
         {
             ct.ThrowIfCancellationRequested();
-            var writeTime = File.GetLastWriteTimeUtc(file);
-            if (writeTime < cutoff)
+            try
             {
-                File.Delete(file);
+                if (File.GetLastWriteTimeUtc(file) < cutoff)
+                    File.Delete(file);
             }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
         }
 
         await Task.CompletedTask;

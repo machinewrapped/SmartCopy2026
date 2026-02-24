@@ -43,9 +43,11 @@ public sealed class PipelineRunner
             {
                 var preview = step.Preview(context);
 
-                // Propagate the transformed path so downstream steps (e.g. CopyStep after
-                // FlattenStep) preview against the correct path, matching what execution produces.
-                if (step.IsPathStep && !string.IsNullOrWhiteSpace(preview.DestinationPath))
+                // Propagate the transformed path so downstream steps preview against the correct
+                // path, matching what execution produces. This applies to both path steps (e.g.
+                // FlattenStep) and content steps (e.g. ConvertStep, which changes the extension).
+                // Executable steps (Copy, Move, Delete) consume the path — they don't transform it.
+                if (!step.IsExecutable && !string.IsNullOrWhiteSpace(preview.DestinationPath))
                 {
                     context.CurrentPath = preview.DestinationPath;
                 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -163,18 +164,9 @@ public sealed class StepPresetStore
             var collection = JsonSerializer.Deserialize<StepPresetCollection>(json, _jsonOptions);
             return collection ?? new StepPresetCollection();
         }
-        catch (JsonException)
-        {
-            return new StepPresetCollection();
-        }
-        catch (IOException)
-        {
-            return new StepPresetCollection();
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return new StepPresetCollection();
-        }
+        catch (JsonException ex)            { Debug.WriteLine($"[StepPresetStore] Skipping preset file '{path}': {ex.Message}"); return new StepPresetCollection(); }
+        catch (IOException ex)              { Debug.WriteLine($"[StepPresetStore] Skipping preset file '{path}': {ex.Message}"); return new StepPresetCollection(); }
+        catch (UnauthorizedAccessException ex) { Debug.WriteLine($"[StepPresetStore] Skipping preset file '{path}': {ex.Message}"); return new StepPresetCollection(); }
     }
 
     private async Task SaveCollectionAsync(StepPresetCollection collection, string? explicitPath, CancellationToken ct)

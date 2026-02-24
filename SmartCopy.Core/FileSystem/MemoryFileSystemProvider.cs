@@ -237,6 +237,18 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         return Normalize(basePath.TrimEnd('/') + "/" + relativePath.Replace('\\', '/'));
     }
 
+    public string GetRelativePath(string basePath, string fullPath)
+    {
+        var root = Normalize(basePath);
+        var full = Normalize(fullPath);
+        if (full.Equals(root, StringComparison.OrdinalIgnoreCase))
+            return string.Empty;
+        var prefix = root.EndsWith('/') ? root : root + '/';
+        return full.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+            ? full[prefix.Length..]
+            : full.TrimStart('/');
+    }
+
     public void SeedDirectory(string path)
     {
         var normalizedPath = Normalize(path);

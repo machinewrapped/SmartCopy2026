@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -76,15 +77,9 @@ public sealed class PipelinePresetStore
                     Config = config,
                 });
             }
-            catch (JsonException)
-            {
-            }
-            catch (IOException)
-            {
-            }
-            catch (UnauthorizedAccessException)
-            {
-            }
+            catch (JsonException ex)            { Debug.WriteLine($"[PipelinePresetStore] Skipping preset '{file}': {ex.Message}"); }
+            catch (IOException ex)              { Debug.WriteLine($"[PipelinePresetStore] Skipping preset '{file}': {ex.Message}"); }
+            catch (UnauthorizedAccessException ex) { Debug.WriteLine($"[PipelinePresetStore] Skipping preset '{file}': {ex.Message}"); }
         }
 
         return [.. presets.OrderBy(preset => preset.Name, StringComparer.OrdinalIgnoreCase)];

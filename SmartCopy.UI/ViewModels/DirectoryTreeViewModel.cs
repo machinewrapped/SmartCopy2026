@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using SmartCopy.Core.FileSystem;
@@ -144,7 +143,7 @@ public class DirectoryTreeViewModel : ViewModelBase
         {
             Name = sourceNode.Name,
             FullPath = sourceNode.FullPath,
-            RelativePath = ComputeRelativePath(_rootPath, sourceNode.FullPath),
+            RelativePath = _provider.GetRelativePath(_rootPath, sourceNode.FullPath),
             IsDirectory = sourceNode.IsDirectory,
             Size = sourceNode.Size,
             CreatedAt = sourceNode.CreatedAt,
@@ -179,18 +178,4 @@ public class DirectoryTreeViewModel : ViewModelBase
         return null;
     }
 
-    private static string ComputeRelativePath(string rootPath, string fullPath)
-    {
-        if (fullPath.Equals(rootPath, StringComparison.OrdinalIgnoreCase))
-            return string.Empty;
-
-        var root = rootPath.EndsWith('/') || rootPath.EndsWith(Path.DirectorySeparatorChar)
-            ? rootPath
-            : rootPath + '/';
-
-        if (fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase))
-            return fullPath[root.Length..];
-
-        return Path.GetFileName(fullPath);
-    }
 }
