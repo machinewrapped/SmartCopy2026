@@ -25,18 +25,20 @@ public enum StepKind
 
 public enum StepCategory
 {
+    Executable,
     Path,
     Content,
-    Executable,
+    Selection,
 }
 
 public partial class PipelineStepViewModel : ViewModelBase
 {
     private ITransformStep _step;
-    private string _customName = string.Empty;
+    private string _customName;
     private string? _validationMessage;
     private bool _hasValidationError;
 
+    #pragma warning disable IDE0290 // Use primary constructor
     public PipelineStepViewModel(ITransformStep step, string? customName = null)
     {
         _step = step;
@@ -190,9 +192,9 @@ public partial class PipelineViewModel : ViewModelBase
     private readonly StepPresetStore _stepPresetStore;
     private readonly AppSettings? _appSettings;
 
-    public ObservableCollection<PipelineStepViewModel> Steps { get; } = new();
-    public ObservableCollection<PipelinePreset> StandardPresets { get; } = new();
-    public ObservableCollection<PipelinePreset> UserPresets { get; } = new();
+    public ObservableCollection<PipelineStepViewModel> Steps { get; } = [];
+    public ObservableCollection<PipelinePreset> StandardPresets { get; } = [];
+    public ObservableCollection<PipelinePreset> UserPresets { get; } = [];
     public AddStepViewModel AddStep { get; }
 
     public StepPresetStore StepPresetStore => _stepPresetStore;
@@ -460,7 +462,7 @@ public partial class PipelineViewModel : ViewModelBase
             step.HasValidationError = false;
         }
 
-        var result = _validator.Validate(Steps.Select(step => step.Step).ToList());
+        var result = _validator.Validate([.. Steps.Select(step => step.Step)]);
         ValidationResult = result;
         BlockingValidationMessage = result.FirstBlockingIssue?.Message;
 
@@ -493,7 +495,7 @@ public partial class PipelineViewModel : ViewModelBase
         return new PipelineConfig(
             Name: name,
             Description: null,
-            Steps: Steps.Select(BuildConfigWithUiMetadata).ToList(),
+            Steps: [.. Steps.Select(BuildConfigWithUiMetadata)],
             OverwriteMode: OverwriteMode.IfNewer.ToString(),
             DeleteMode: DeleteMode.Trash.ToString());
     }
@@ -501,7 +503,7 @@ public partial class PipelineViewModel : ViewModelBase
     private static TransformStepConfig BuildConfigWithUiMetadata(PipelineStepViewModel stepViewModel)
     {
         var baseConfig = stepViewModel.Step.Config;
-        var parameters = baseConfig.Parameters.DeepClone() as JsonObject ?? new JsonObject();
+        var parameters = baseConfig.Parameters.DeepClone() as JsonObject ?? [];
         if (string.IsNullOrWhiteSpace(stepViewModel.CustomName))
         {
             parameters.Remove(CustomNameParameter);
