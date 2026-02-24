@@ -100,11 +100,12 @@ public sealed class MirrorFilterTests
     }
 
     // -------------------------------------------------------------------------
-    // Directory matching (always NameOnly regardless of compareMode)
+    // Directory matching — a directory is "mirrored" only if it exists in the
+    // mirror AND every direct file inside it also exists (and matches) there.
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task MatchesAsync_Directory_ReturnsTrueWhenDirectoryExistsInMirror()
+    public async Task MatchesAsync_Directory_ReturnsTrueWhenEmptyDirectoryExistsInMirror()
     {
         var fs = new MemoryFileSystemProvider();
         fs.SeedDirectory("/mirror/Alternative");
@@ -112,6 +113,7 @@ public sealed class MirrorFilterTests
         var dir = MakeDirectory("Alternative", relativePath: "Alternative");
         var filter = new MirrorFilter("/mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude);
 
+        // No files inside → vacuously all files are mirrored
         Assert.True(await filter.MatchesAsync(dir, fs));
     }
 
@@ -123,6 +125,54 @@ public sealed class MirrorFilterTests
 
         var dir = MakeDirectory("NewBand", relativePath: "NewBand");
         var filter = new MirrorFilter("/mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude);
+
+        Assert.False(await filter.MatchesAsync(dir, fs));
+    }
+
+    [Fact]
+    public async Task MatchesAsync_Directory_ReturnsTrueWhenAllFilesInMirror()
+    {
+        var fs = new MemoryFileSystemProvider();
+        fs.SeedDirectory("/mirror/Alternative");
+        fs.SeedSimulatedFile("/mirror/Alternative/song.mp3", size: 1000);
+
+        var dir = MakeDirectory("Alternative", relativePath: "Alternative");
+        var file = MakeFile("song.mp3", relativePath: "Alternative/song.mp3", size: 1000);
+        dir.Files.Add(file);
+
+        var filter = new MirrorFilter("/mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude);
+
+        Assert.True(await filter.MatchesAsync(dir, fs));
+    }
+
+    [Fact]
+    public async Task MatchesAsync_Directory_ReturnsFalseWhenSomeFilesNotInMirror()
+    {
+        var fs = new MemoryFileSystemProvider();
+        fs.SeedDirectory("/mirror/Alternative");
+        fs.SeedSimulatedFile("/mirror/Alternative/old.mp3", size: 1000);
+        // "new.mp3" is NOT seeded in the mirror
+
+        var dir = MakeDirectory("Alternative", relativePath: "Alternative");
+        dir.Files.Add(MakeFile("old.mp3", relativePath: "Alternative/old.mp3", size: 1000));
+        dir.Files.Add(MakeFile("new.mp3", relativePath: "Alternative/new.mp3", size: 800));
+
+        var filter = new MirrorFilter("/mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude);
+
+        Assert.False(await filter.MatchesAsync(dir, fs));
+    }
+
+    [Fact]
+    public async Task MatchesAsync_Directory_NameAndSize_ReturnsFalseWhenFileSizeDiffers()
+    {
+        var fs = new MemoryFileSystemProvider();
+        fs.SeedDirectory("/mirror/Alternative");
+        fs.SeedSimulatedFile("/mirror/Alternative/song.mp3", size: 999); // different size
+
+        var dir = MakeDirectory("Alternative", relativePath: "Alternative");
+        dir.Files.Add(MakeFile("song.mp3", relativePath: "Alternative/song.mp3", size: 1000));
+
+        var filter = new MirrorFilter("/mirror", MirrorCompareMode.NameAndSize, FilterMode.Exclude);
 
         Assert.False(await filter.MatchesAsync(dir, fs));
     }

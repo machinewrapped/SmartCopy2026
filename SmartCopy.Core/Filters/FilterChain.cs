@@ -98,16 +98,13 @@ public sealed class FilterChain
     }
 
     /// <summary>
-    /// If <paramref name="node"/> is a non-empty directory that was not explicitly excluded
-    /// by a filter, sets its <see cref="FileSystemNode.FilterResult"/> based on whether
-    /// any child or file is still included.
+    /// For a non-empty directory, sets its <see cref="FileSystemNode.FilterResult"/> based on
+    /// whether any child or file is still included. A directory is only excluded when ALL its
+    /// content is excluded; individual filter evaluation on the directory itself is overridden.
     /// </summary>
     private static void UpdateDirectoryExclusion(FileSystemNode node)
     {
         if (!node.IsDirectory || (node.Children.Count == 0 && node.Files.Count == 0))
-            return;
-
-        if (node.FilterResult != FilterResult.Included && node.ExcludedByFilter != AllChildrenExcluded)
             return;
 
         bool hasIncluded = node.Children.Any(c => c.FilterResult == FilterResult.Included) ||

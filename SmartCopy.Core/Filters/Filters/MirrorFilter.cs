@@ -49,8 +49,29 @@ public sealed class MirrorFilter : FilterBase
             return false;
         }
 
-        if (CompareMode == MirrorCompareMode.NameOnly || node.IsDirectory)
+        if (CompareMode == MirrorCompareMode.NameOnly && !node.IsDirectory)
         {
+            return true;
+        }
+
+        if (node.IsDirectory)
+        {
+            // A directory is only "mirrored" if every file directly inside it also exists
+            // (and matches) in the mirror. Sub-directory contents are propagated bottom-up
+            // by the filter chain infrastructure, so we only need to check direct files here.
+            foreach (var file in node.Files)
+            {
+                var fileMirrorPath = comparisonProvider.CombinePath(ComparisonPath, file.RelativePath);
+                if (!await comparisonProvider.ExistsAsync(fileMirrorPath, ct))
+                    return false;
+
+                if (CompareMode == MirrorCompareMode.NameAndSize)
+                {
+                    var mirrorFile = await comparisonProvider.GetNodeAsync(fileMirrorPath, ct);
+                    if (mirrorFile.Size != file.Size)
+                        return false;
+                }
+            }
             return true;
         }
 

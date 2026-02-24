@@ -198,6 +198,75 @@ public sealed class FilterChainTests
         Assert.Equal(FilterResult.Excluded, dir.FilterResult);
     }
 
+    [Fact]
+    public async Task ApplyToTree_MirrorExclude_DirectoryWithMixedChildren_IsIncluded()
+    {
+        // Reproduces the bug: a directory that exists in the mirror but has some non-mirrored
+        // children was being marked Excluded even though it has included content.
+        var fs = new MemoryFileSystemProvider();
+        fs.SeedDirectory("/mirror/Alternative");
+        fs.SeedSimulatedFile("/mirror/Alternative/mirrored.flac", size: 1000);
+        // "new.flac" is NOT in the mirror
+
+        var alt = CreateDirectory("Alternative");
+        var mirrored = new FileSystemNode
+        {
+            Name = "mirrored.flac",
+            FullPath = "/source/Alternative/mirrored.flac",
+            RelativePath = "Alternative/mirrored.flac",
+            IsDirectory = false,
+            Size = 1000,
+            Parent = alt,
+        };
+        var newFile = new FileSystemNode
+        {
+            Name = "new.flac",
+            FullPath = "/source/Alternative/new.flac",
+            RelativePath = "Alternative/new.flac",
+            IsDirectory = false,
+            Size = 800,
+            Parent = alt,
+        };
+        alt.Files.Add(mirrored);
+        alt.Files.Add(newFile);
+
+        var chain = new FilterChain([new MirrorFilter("/mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude)]);
+        await chain.ApplyToTreeAsync([alt], comparisonProvider: fs);
+
+        // Directory has a non-mirrored file → must stay Included
+        Assert.Equal(FilterResult.Included, alt.FilterResult);
+        Assert.Null(alt.ExcludedByFilter);
+        Assert.Equal(FilterResult.Excluded, mirrored.FilterResult);
+        Assert.Equal(FilterResult.Included, newFile.FilterResult);
+    }
+
+    [Fact]
+    public async Task ApplyToTree_MirrorExclude_DirectoryFullyMirrored_IsExcluded()
+    {
+        var fs = new MemoryFileSystemProvider();
+        fs.SeedDirectory("/mirror/Alternative");
+        fs.SeedSimulatedFile("/mirror/Alternative/song.flac", size: 1000);
+
+        var alt = CreateDirectory("Alternative");
+        var song = new FileSystemNode
+        {
+            Name = "song.flac",
+            FullPath = "/source/Alternative/song.flac",
+            RelativePath = "Alternative/song.flac",
+            IsDirectory = false,
+            Size = 1000,
+            Parent = alt,
+        };
+        alt.Files.Add(song);
+
+        var chain = new FilterChain([new MirrorFilter("/mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude)]);
+        await chain.ApplyToTreeAsync([alt], comparisonProvider: fs);
+
+        // All content is mirrored → directory should be Excluded
+        Assert.Equal(FilterResult.Excluded, alt.FilterResult);
+        Assert.Equal(FilterResult.Excluded, song.FilterResult);
+    }
+
     private static FileSystemNode CreateFile(string name, long size, FileSystemNode? parent = null)
     {
         return new FileSystemNode
