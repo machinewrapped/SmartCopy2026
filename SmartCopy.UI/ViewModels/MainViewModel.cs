@@ -41,6 +41,9 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private bool _autoOpenLogOnRun = true;
 
+    [ObservableProperty]
+    private bool _showExcludedNodesByDefault = true;
+
     private readonly MemoryFileSystemProvider _memoryProvider;
     private readonly AppSettings _settings = new();
     private readonly AppSettingsStore _settingsStore = new();
@@ -82,7 +85,6 @@ public partial class MainViewModel : ViewModelBase
         FilterChain.VisibilityToggled += (_, isVisible) =>
         {
             DirectoryTree.ShowFilteredNodesInTree = isVisible;
-            _settings.ShowFilteredNodesInTree = isVisible;
         };
 
         FileList = new FileListViewModel(_memoryProvider, MockMemoryFileSystemFactory.DefaultFileListPath);
@@ -149,6 +151,14 @@ public partial class MainViewModel : ViewModelBase
     {
         _settings.AutoOpenLogOnRun = value;
         _ = _settingsStore.SaveAsync(_settings);
+    }
+
+    partial void OnShowExcludedNodesByDefaultChanged(bool value)
+    {
+        _settings.ShowFilteredNodesInTree = value;
+        _ = _settingsStore.SaveAsync(_settings);
+        FilterChain.ShowExcludedNodesInTree = value;
+        DirectoryTree.ShowFilteredNodesInTree = value;
     }
 
     // ── Selection commands ──────────────────────────────────────────────────────
@@ -398,8 +408,10 @@ public partial class MainViewModel : ViewModelBase
         _settings.LogRetentionDays = saved.LogRetentionDays;
         _settings.UseAbsolutePathsForSelectionSave = saved.UseAbsolutePathsForSelectionSave;
         _settings.AutoOpenLogOnRun = saved.AutoOpenLogOnRun;
+        _settings.ShowFilteredNodesInTree = saved.ShowFilteredNodesInTree;
         UseAbsolutePathsForSelection = saved.UseAbsolutePathsForSelectionSave;
         AutoOpenLogOnRun = saved.AutoOpenLogOnRun;
+        ShowExcludedNodesByDefault = saved.ShowFilteredNodesInTree;
 
         if (saved.LastSourcePath is { Length: > 0 })
         {

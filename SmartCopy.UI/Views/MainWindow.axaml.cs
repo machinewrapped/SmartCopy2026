@@ -40,6 +40,7 @@ public partial class MainWindow : Window
     private WorkflowMenuViewModel? _workflowMenu;
     private MenuItem? _absolutePathsMenuItem;
     private MenuItem? _autoOpenLogMenuItem;
+    private MenuItem? _showExcludedNodesMenuItem;
 
     public MainWindow()
     {
@@ -178,6 +179,19 @@ public partial class MainWindow : Window
                 _mainVm.AutoOpenLogOnRun = !_mainVm.AutoOpenLogOnRun;
         };
         OptionsMenu.Items.Add(_autoOpenLogMenuItem);
+
+        _showExcludedNodesMenuItem = new MenuItem
+        {
+            Header = "Show _Excluded Nodes in Tree",
+            ToggleType = MenuItemToggleType.CheckBox,
+            IsChecked = _mainVm?.ShowExcludedNodesByDefault ?? true,
+        };
+        _showExcludedNodesMenuItem.Click += (_, _) =>
+        {
+            if (_mainVm is not null)
+                _mainVm.ShowExcludedNodesByDefault = !_mainVm.ShowExcludedNodesByDefault;
+        };
+        OptionsMenu.Items.Add(_showExcludedNodesMenuItem);
     }
 
     private void OnMainViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -192,6 +206,12 @@ public partial class MainWindow : Window
             && _autoOpenLogMenuItem is not null)
         {
             _autoOpenLogMenuItem.IsChecked = _mainVm?.AutoOpenLogOnRun ?? true;
+        }
+
+        if (e.PropertyName == nameof(MainViewModel.ShowExcludedNodesByDefault)
+            && _showExcludedNodesMenuItem is not null)
+        {
+            _showExcludedNodesMenuItem.IsChecked = _mainVm?.ShowExcludedNodesByDefault ?? true;
         }
     }
 
