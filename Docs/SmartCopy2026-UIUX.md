@@ -20,7 +20,7 @@ The main content area uses a **3-column layout** — Filters | Folders | Files �
 
 ```text
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ File  Settings  Filters  Pipeline  Help                                      │
+│ File  Options  Selection  Workflows Help                                     │
 ├──────────────────────────────────────────────────────────────────────────────┤
 │ Source [/mem/Music                                       ▾] [★] [📁 Browse]  │
 ├─────────────────┬─┬──────────────────┬─┬─────────────────────────────────────┤
@@ -321,25 +321,7 @@ If the entered step name matches the auto-generated name, no custom-name overrid
 
 The `Load preset ▸` and `Save current pipeline...` options are integrated into the main `+ Add step` menu. To prevent destructive mistakes, `Load preset ▸` is only visible when the pipeline is empty, while `Save current pipeline...` is only visible when there are steps present.
 
-Expanding `Load preset ▸` reveals:
-
-```text
-┌──────────────────────────────────────┐
-│  Standard ▸                          │
-│  My Pipelines ▸                      │
-└──────────────────────────────────────┘
-```
-
-**Standard** presets (hardcoded, read-only):
-
-| Name | Steps |
-|---|---|
-| Copy only | `[CopyStep]` |
-| Move only | `[MoveStep]` |
-| Delete to Trash | `[DeleteStep(Trash)]` |
-| Flatten → Copy | `[FlattenStep → CopyStep]` |
-
-**My Pipelines** — user-saved `.sc2pipe` files from `%APPDATA%/SmartCopy2026/pipelines/`. Users can delete custom pipelines directly from this menu by clicking the inline Delete (🗑) icon next to the name.
+Expanding `Load preset ▸` reveals user-saved `.sc2pipe` files from `%APPDATA%/SmartCopy2026/pipelines/`. Users can delete custom pipelines directly from this menu by clicking the inline Delete (🗑) icon next to the name.
 
 **Save current pipeline...** — transforms the bottom of the flyout into an inline input form prompting for a name. If left blank, it falls back to a timestamped name.
 
@@ -422,7 +404,7 @@ If the pipeline has no executable step (for example, only `Flatten`/`Rename`/`Re
 9. **Filter cards are human-friendly** — each card shows a readable summary ("Only Audio files") above a dimmed technical subtitle; enable/disable via checkbox; edit via pencil icon
 10. **Status bar** — Split into two always-present zones. `SelectionView` (left) shows the live count, total size, and filtered-out count of checked files, updating instantly on every check/filter change. `OperationProgressView` (right) appears only during an active operation and shows progress percentage, ETA, and Pause/Cancel controls.
 11. **Preview** — shows exactly what will happen before running
-12. **Device picker** — MTP devices appear in the destination path picker on Copy/Move pipeline steps alongside local paths (the 📁 Browse button becomes a "Local folder... / Phone (MTP)..." split flyout when MTP devices are available)
+12. **Device picker** — MTP devices appear in the destination path picker on Copy/Move pipeline steps alongside local paths, if the platform supports the protocol.
 13. **Log panel** — collapsible panel at the bottom showing timestamped operation log
 14. **Keyboard-first** — every action reachable via keyboard; focus indicators on all controls
 15. **Window state persistence** — size, position, maximised state, and all column widths saved to `%LOCALAPPDATA%/SmartCopy2026/window.json`; off-screen position safety check on restore

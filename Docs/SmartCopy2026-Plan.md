@@ -360,7 +360,7 @@ Verification — all automated suites passing:
   `AddStepViewModelTests`, `EditStepDialogViewModelTests`, `PipelineViewModelTests`,
   `PreviewViewModelTests`, `PipelineIntegrationTests`
 - [X] `dotnet test` execution
-- [ ] Manual UI scenario checks for preview/delete/progress/journal flows
+- [X] Manual UI scenario checks for preview/delete/progress/journal flows
 
 ### Step 6 - Workflow Presets and Menu (UX Loop Track)
 Allow users to persist entire workflows - source directory, filters and pipeline steps.
@@ -415,12 +415,12 @@ Verification:
 ### Step 9 — Shell Observability and Status Feedback (UX Polish Track)
 
 Deliverables:
-- [ ] Collapsible log panel with placeholder entries in the shell layout
-- [ ] Status bar live counts/size from Architecture `Status Bar Statistics`
+- [X] Status bar live counts/size from Architecture `Status Bar Statistics`
 - [ ] Cross-check status-bar values against selected/filter states under `/mem` fixtures
+- [ ] Collapsible log panel with placeholder entries in the shell layout
 
 Acceptance criteria:
-- [ ] Users can see deterministic selected/file-size/count feedback while changing selection and filters
+- [X] Users can see deterministic selected/file-size/count feedback while changing selection and filters
 - [ ] Log panel does not interfere with core tree/list/filter/pipeline interactions
 
 Verification:
