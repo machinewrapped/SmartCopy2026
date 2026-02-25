@@ -470,6 +470,12 @@ Acceptance criteria:
 Verification:
 - [ ] Keyboard-only smoke test for scan/selection/filter/pipeline-preview path
 
+### Step 11 - usability tweaks (UX Polish Track) 
+
+Deliverables:
+- [ ] Option to restore last used workflow on startup
+- [ ] Option to restore last used source path on startup (redundant if workflow option is restored)
+
 ---
 
 ## 9. Remaining Phases
