@@ -73,14 +73,14 @@
 
                 <Separator Height="1" Background="#3e3e42" Margin="4,0" />
 
-                <!-- ＋ New... -->
+                <!-- ＋ Configure... -->
                 <Button Background="Transparent"
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Left"
                         Padding="8,6"
                         CornerRadius="4"
                         Command="{Binding RequestNewFilterCommand}">
-                    <TextBlock Text="＋ New..." Foreground="#4facfe" />
+                    <TextBlock Text="＋ Configure..." Foreground="#4facfe" />
                 </Button>
 
                 <Separator Height="1" Background="#3e3e42" Margin="4,0" />

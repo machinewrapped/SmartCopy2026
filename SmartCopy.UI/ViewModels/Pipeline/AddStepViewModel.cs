@@ -98,6 +98,10 @@ public partial class AddStepViewModel : ObservableObject
     private bool _isSavingPipeline;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsLevel1Visible))]
+    private bool _isLoadingPipeline;
+
+    [ObservableProperty]
     private string _newPipelineName = string.Empty;
 
     public bool HasPresets => PresetsForType.Count > 0;
@@ -106,14 +110,14 @@ public partial class AddStepViewModel : ObservableObject
     /// <summary>Level 2 should be visible only when Level 3 is not.</summary>
     public bool IsLevel2VisibleOnly => IsLevel2Visible && !IsLevel3Visible;
 
-    /// <summary>Level 1 should be visible when neither Level 2, 3, nor Saving are visible.</summary>
-    public bool IsLevel1Visible => !IsLevel2VisibleOnly && !IsLevel3Visible && !IsSavingPipeline;
+    /// <summary>Level 1 should be visible when neither Level 2, 3, Saving, nor Loading are visible.</summary>
+    public bool IsLevel1Visible => !IsLevel2VisibleOnly && !IsLevel3Visible && !IsSavingPipeline && !IsLoadingPipeline;
 
     // -------------------------------------------------------------------------
     // Events
     // -------------------------------------------------------------------------
 
-    /// <summary>Raised when the user picks "＋ New..." or a type with no presets. Caller opens EditStepDialog.</summary>
+    /// <summary>Raised when the user picks "＋ Configure..." or a type with no presets. Caller opens EditStepDialog.</summary>
     public event Action<StepKind>? StepTypeSelected;
 
     /// <summary>Raised when the user picks a step preset. Caller applies it directly.</summary>
@@ -233,6 +237,19 @@ public partial class AddStepViewModel : ObservableObject
     private void LoadPreset(string name)
     {
         LoadPipelinePresetRequested?.Invoke(name);
+        ResetToLevel1();
+    }
+
+    [RelayCommand]
+    private void BeginLoadPipeline()
+    {
+        IsLoadingPipeline = true;
+    }
+
+    [RelayCommand]
+    private void CancelLoadPipeline()
+    {
+        IsLoadingPipeline = false;
     }
 
     [RelayCommand]
@@ -291,6 +308,7 @@ public partial class AddStepViewModel : ObservableObject
         StepTypeItems = [];
         IsSavingPipeline = false;
         NewPipelineName = string.Empty;
+        IsLoadingPipeline = false;
     }
 
     private async Task LoadPresetsAsync(string stepType, CancellationToken ct = default)

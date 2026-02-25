@@ -153,7 +153,7 @@ public partial class AddFilterViewModel : ObservableObject
     /// <summary>Raised when the user picks a preset. The caller adds it to the chain directly.</summary>
     public event Action<FilterPreset>? PresetPicked;
 
-    /// <summary>Raised when the user chooses "＋ New..." for a given filter type.</summary>
+    /// <summary>Raised when the user chooses "＋ Configure..." for a given filter type.</summary>
     public event Action<string>? NewFilterRequested;
 
     /// <summary>Raised when the user dismisses the flyout without picking anything.</summary>

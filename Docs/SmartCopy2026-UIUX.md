@@ -98,7 +98,7 @@ Clicking "+ Add filter" opens a **`Popup`** anchored below the button (light-dis
 ┌────────────────────────────────┐
 │  ← Extension                   │
 ├────────────────────────────────┤
-│  ＋ New...                     │
+│  ＋ Configure...               │
 ├────────────────────────────────┤
 │  Recently used                 │
 │    My music (*.mp3;*.flac)     │
@@ -111,14 +111,14 @@ Clicking "+ Add filter" opens a **`Popup`** anchored below the button (light-dis
 └────────────────────────────────┘
 ```
 
-- **"＋ New..."** — closes flyout, opens `EditFilterDialog` with empty form for selected type
+- **"＋ Configure..."** — closes flyout, opens `EditFilterDialog` with empty form for selected type
 - **Preset row** — closes flyout, adds card immediately, triggers tree/file list update
 - **"←"** — returns to Level 1; "★" = built-in (read-only); plain rows = user-saved presets
 - "Recently used" shows the last 5 presets of this type from `AppSettings.FilterTypeMruPresetIds`
 
 ### EditFilterDialog
 
-A **modal `Window`** (`ShowDialog<bool?>`) opened via "＋ New..." or the edit pencil on any card.
+A **modal `Window`** (`ShowDialog<bool?>`) opened via "＋ Configure..." or the edit pencil on any card.
 The dialog dispatches to a type-specific editor view via `ContentControl` + `DataTemplate`.
 
 ```text
@@ -184,24 +184,29 @@ Each step in the pipeline strip is a card connected by `→` arrows. Cards follo
 
 ### Add Step — Integrated Dropdown
 
-Clicking `+ Add step` opens a **`Popup`** anchored below the button (light-dismiss on click-outside). This dropdown now integrates loading standard or custom pipeline presets, and saving the current pipeline, directly into the step addition flow.
+Clicking `+ Add step` opens a **`Popup`** anchored above the button (light-dismiss on click-outside). 
+This dropdown integrates loading and saving pipelines along with pipeline operations.
 
 **Level 1 — Main Category Selection:**
 ```text
 ┌────────────────────────────────┐
 │  Add Step                    ✕ │
 ├────────────────────────────────┤
-│  Copy To                     ▸ │
-│  Move To                     ▸ │
-│  Delete                      ▸ │
-│  ────────────────────────────  │
-│  Path steps                  ▸ │
-│  Content steps               ▸ │
-│  Selection steps             ▸ │
-│  ────────────────────────────  │
-│  Load preset ▸                 │
-│  ────────────────────────────  │
+│  Load preset                   │
 │  Save current pipeline...      │
+├────────────────────────────────┤
+│  Content steps               ▸ │
+│  Path steps                  ▸ │
+│  Selection steps             ▸ │
+├────────────────────────────────┤
+│  Delete                        │
+│  Delete source file            │
+├────────────────────────────────┤
+│  Move                          │
+│  Move to destination           │
+│                                │
+│  Copy                          │
+│  Copy to destination           │
 └────────────────────────────────┘
 ```
 
@@ -221,7 +226,7 @@ Clicking `+ Add step` opens a **`Popup`** anchored below the button (light-dismi
 ┌────────────────────────────────┐
 │  ← Delete                      │
 ├────────────────────────────────┤
-│  ＋ New...                     │
+│  ＋ Configure...               │
 ├────────────────────────────────┤
 │  Recently used                 │
 │    Delete to Trash             │
@@ -234,7 +239,7 @@ Clicking `+ Add step` opens a **`Popup`** anchored below the button (light-dismi
 
 - `←` on Level 2 returns to Level 1; `←` on Level 3 returns to Level 1 (for top-level executable steps) or Level 2 (for categorized steps).
 - If no presets exist for a step type (e.g. Copy, Move, Rename), Level 3 is bypassed and `EditStepDialog` opens directly — same bypass pattern as the filter flyout.
-- **"＋ New..."** on Level 3 opens `EditStepDialog` with an empty form for the selected type.
+- **"＋ Configure..."** on Level 3 opens `EditStepDialog` with an empty form for the selected type.
 - **Preset row** — closes flyout, adds step immediately from preset config.
 - "★" prefix = built-in (read-only); plain rows = user-saved presets.
 - "Recently used" shows the last 5 presets of this type from `AppSettings.StepTypeMruPresetIds`.

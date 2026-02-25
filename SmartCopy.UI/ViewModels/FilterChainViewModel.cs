@@ -93,7 +93,7 @@ public partial class FilterChainViewModel : ViewModelBase
     public event EventHandler? ChainChanged;
 
     /// <summary>
-    /// Raised when the user clicks "＋ New..." in the flyout.
+    /// Raised when the user clicks "＋ Configure..." in the flyout.
     /// The code-behind opens <see cref="Views.EditFilterDialog"/> and calls back with the result.
     /// </summary>
     public event EventHandler<string>? NewFilterDialogRequested;
