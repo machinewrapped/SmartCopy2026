@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Text.Json;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Platform;
 using SmartCopy.UI.ViewModels;
@@ -37,6 +38,7 @@ public partial class MainWindow : Window
 
     private MainViewModel? _mainVm;
     private WorkflowMenuViewModel? _workflowMenu;
+    private MenuItem? _absolutePathsMenuItem;
 
     public MainWindow()
     {
@@ -52,6 +54,9 @@ public partial class MainWindow : Window
             _workflowMenu.PropertyChanged -= OnWorkflowMenuPropertyChanged;
         }
 
+        if (_mainVm is not null)
+            _mainVm.PropertyChanged -= OnMainViewModelPropertyChanged;
+
         _mainVm = DataContext as MainViewModel;
         _workflowMenu = _mainVm?.WorkflowMenu;
 
@@ -61,7 +66,11 @@ public partial class MainWindow : Window
             _workflowMenu.PropertyChanged += OnWorkflowMenuPropertyChanged;
         }
 
+        if (_mainVm is not null)
+            _mainVm.PropertyChanged += OnMainViewModelPropertyChanged;
+
         RebuildWorkflowsMenu();
+        BuildSelectionMenu();
     }
 
     private void OnSavedWorkflowsChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -104,6 +113,59 @@ public partial class MainWindow : Window
                 item.Click += (_, _) => _workflowMenu?.LoadWorkflowCommand.Execute(name);
                 WorkflowsMenu.Items.Add(item);
             }
+        }
+    }
+
+    private void BuildSelectionMenu()
+    {
+        SelectionMenu.Items.Clear();
+
+        Add(item("Select _All",       new KeyGesture(Key.A, KeyModifiers.Control)),
+            () => _mainVm?.SelectAllCommand.Execute(null));
+        Add(item("_Invert Selection", new KeyGesture(Key.I, KeyModifiers.Control)),
+            () => _mainVm?.InvertSelectionCommand.Execute(null));
+        Add(item("_Clear Selection",  new KeyGesture(Key.A, KeyModifiers.Control | KeyModifiers.Shift)),
+            () => _mainVm?.ClearSelectionCommand.Execute(null));
+
+        SelectionMenu.Items.Add(new Separator());
+
+        Add(item("Save as _Text..."),      () => _mainVm?.SaveSelectionAsTextCommand.Execute(null));
+        Add(item("Save as _Playlist..."),  () => _mainVm?.SaveSelectionAsPlaylistCommand.Execute(null));
+        Add(item("_Restore From File..."), () => _mainVm?.RestoreSelectionCommand.Execute(null));
+
+        SelectionMenu.Items.Add(new Separator());
+
+        _absolutePathsMenuItem = new MenuItem
+        {
+            Header = "Save With _Absolute Paths",
+            ToggleType = MenuItemToggleType.CheckBox,
+            IsChecked = _mainVm?.UseAbsolutePathsForSelection ?? false,
+        };
+        _absolutePathsMenuItem.Click += (_, _) =>
+        {
+            if (_mainVm is not null)
+                _mainVm.UseAbsolutePathsForSelection = !_mainVm.UseAbsolutePathsForSelection;
+        };
+        SelectionMenu.Items.Add(_absolutePathsMenuItem);
+
+        return;
+
+        static MenuItem item(string header, KeyGesture? gesture = null)
+            => new() { Header = header, InputGesture = gesture };
+
+        void Add(MenuItem m, Action onClick)
+        {
+            m.Click += (_, _) => onClick();
+            SelectionMenu.Items.Add(m);
+        }
+    }
+
+    private void OnMainViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainViewModel.UseAbsolutePathsForSelection)
+            && _absolutePathsMenuItem is not null)
+        {
+            _absolutePathsMenuItem.IsChecked = _mainVm?.UseAbsolutePathsForSelection ?? false;
         }
     }
 

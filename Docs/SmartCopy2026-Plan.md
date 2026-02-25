@@ -187,7 +187,7 @@ and sync safely.*
 | UX-4 (Step 5): Transform pipeline | Complete (validation pending manual test run) | Maintainer to execute new Step 5 test suites + UI smoke scenarios |
 | UX-5 (Step 6): Workflow presets and menu | Complete | Manual UI smoke scenario pending |
 | Hardening-1 (Step 2): Memory provider foundation | Complete | Reuse fixture builder pattern |
-| Hardening-2 (Step 7): Selection save/load | In progress | Wire File menu flows + unmatched-path reporting |
+| Hardening-2 (Step 7): Selection save/load | Complete | Manual UI smoke scenarios pending |
 | Hardening-3 (Step 8): Settings persistence | In progress | Schema migration path; remaining persisted defaults |
 | Polish-1 (Step 9): Shell observability + status | Not started | After UX loop proven |
 | Polish-2 (Step 10): Keyboard + accessibility | Not started | After Step 9 |
@@ -388,28 +388,38 @@ Verification:
 - [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj` (165/165 passing)
 - [ ] Manual UI scenario checks for workflow menu integration
 
-### Step 7 — Selection management (UX Loop Track / Memory-Backed Hardening Track)
+### Step 7 — Selection management (UX Loop Track / Memory-Backed Hardening Track) ✓
 
-Deliverables:
+**Completed 2026-02-25.** Full selection save/load and bulk selection operations delivered; Selection menu wired via code-behind following the workflow menu pattern.
+
+Delivered:
 - [x] `SelectionSerializer` for `.txt`, `.m3u`, `.sc2sel`
-- [ ] `SelectionSerializer` for `.m3u8` (UTF-8 playlist format)
-- [x] `SelectionManager` snapshot/restore for rescans
-- [ ] Select All, Clear Selection and Invert Selection menu options with keyboard shortcuts
-- [ ] Separate menu options to save as text (`.txt` or `.sc2sel`) or playlist (`.m3u`, `.m3u8`)
-- [ ] User can select where to save the file on the host filesystem (path and name)
-- [ ] Option (checkable menu item) to save as absolute paths instead of relative
-- [ ] If the save path is not the source root, absolute paths are used by default
-- [ ] Unified restore option (from text or playlist)
+- [x] `SelectionSerializer` for `.m3u8` (UTF-8 playlist format)
+- [x] `SelectionRestoreResult` — `MatchedCount`, `UnmatchedPaths`, `HasUnmatched`
+- [x] `SelectionManager.Restore` returns `SelectionRestoreResult`; accepts both relative and absolute-path snapshots
+- [x] `SelectionManager.Capture` — `useAbsolutePaths` opt-in parameter
+- [x] `SelectionManager` bulk ops: `SelectAll`, `ClearAll`, `InvertAll`
+- [x] `SelectionSerializer` unified `LoadAsync`/`SaveAsync` dispatchers (route by extension)
+- [x] `AppSettings.UseAbsolutePathsForSelectionSave` persisted
+- [x] `MainViewModel`: 6 new commands (`SelectAll`, `ClearSelection`, `InvertSelection`, `SaveSelectionAsText`, `SaveSelectionAsPlaylist`, `RestoreSelection`) + `UseAbsolutePathsForSelection` observable property
+- [x] Selection menu wired in `MainWindow.axaml.cs` code-behind with separators, input gestures, and a checkable "Save With Absolute Paths" item
+- [x] Window-level `Ctrl+A` / `Ctrl+Shift+A` / `Ctrl+I` key bindings
+- [x] Bug fix: root nodes no longer collapse when unchecked (`FileSystemNode.CheckState` setter guards on `Parent is not null`)
+- [x] `Traverse` extended to yield `node.Files` in addition to `node.Children`
 
 Acceptance criteria:
-- [ ] Save and restore works with non-ASCII characters (as long as they are valid paths)
-- [ ] Relative path portability works across machines
-- [ ] Missing/unmatched paths are reported and skipped without aborting restore
+- [x] Save and restore works with non-ASCII characters (as long as they are valid paths)
+- [x] Relative path portability works across machines
+- [x] Missing/unmatched paths are reported and skipped without aborting restore
 
 Verification:
-- [ ] Round-trip tests for all formats
-- [ ] Regression tests for mixed path separators and case differences
-- [ ] Manual testing of UI/UX flows
+- [x] Round-trip tests for all formats (including M3U8)
+- [x] Regression tests for mixed path separators and case differences
+- [x] Non-ASCII path round-trip tests across `.txt`, `.m3u8`, `.sc2sel`
+- [x] `Restore_ReturnsMatchedCount`, `Restore_ReturnsUnmatchedPaths`, `Capture_AbsolutePaths_UsesFullPath`, `SelectAll`, `ClearAll`, `InvertAll` unit tests
+- [x] `dotnet build SmartCopy.App/SmartCopy.App.csproj`
+- [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj` (175/175 passing)
+- [ ] Manual UI smoke scenarios for save/restore/bulk-selection flows
 
 ### Step 8 — Settings Persistence (Memory-Backed Hardening Track)
 

@@ -13,6 +13,12 @@
         Background="#1e1e1e"
         Foreground="#e0e0e0">
 
+    <Window.KeyBindings>
+        <KeyBinding Gesture="Ctrl+A"       Command="{Binding SelectAllCommand}"/>
+        <KeyBinding Gesture="Ctrl+Shift+A" Command="{Binding ClearSelectionCommand}"/>
+        <KeyBinding Gesture="Ctrl+I"       Command="{Binding InvertSelectionCommand}"/>
+    </Window.KeyBindings>
+
     <Grid RowDefinitions="Auto, Auto, *, Auto, Auto">
         <!-- Menu Bar -->
         <Border Grid.Row="0" Background="#2d2d30" BorderBrush="#3e3e42" BorderThickness="0,0,0,1">
@@ -21,7 +27,7 @@
                     <MenuItem Header="_Quit" />
                 </MenuItem>
                 <MenuItem Header="_Options" />
-                <MenuItem Header="_Selection" />
+                <MenuItem Header="_Selection" x:Name="SelectionMenu" />
                 <MenuItem Header="_Workflows" x:Name="WorkflowsMenu" />
                 <MenuItem Header="_Help" />
             </Menu>

@@ -1,8 +1,11 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SmartCopy.Core.FileSystem;
@@ -11,6 +14,7 @@ using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Pipeline.Validation;
 using SmartCopy.Core.Progress;
+using SmartCopy.Core.Selection;
 using SmartCopy.Core.Settings;
 using SmartCopy.Core.Workflows;
 using SmartCopy.UI.Services;
@@ -30,11 +34,16 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private string? _selectedSourceBookmark;
 
+    [ObservableProperty]
+    private bool _useAbsolutePathsForSelection;
+
     private readonly MemoryFileSystemProvider _memoryProvider;
     private readonly AppSettings _settings = new();
     private readonly AppSettingsStore _settingsStore = new();
     private readonly OperationJournal _operationJournal = new();
     private readonly WorkflowPresetStore _workflowStore = new();
+    private readonly SelectionManager _selectionManager = new();
+    private readonly SelectionSerializer _selectionSerializer = new();
     private CancellationTokenSource? _filterCts;
     private CancellationTokenSource? _runCts;
 
@@ -119,6 +128,115 @@ public partial class MainViewModel : ViewModelBase
         SourcePath = value;
         _ = ApplySourcePathCoreAsync(value);
     }
+
+    partial void OnUseAbsolutePathsForSelectionChanged(bool value)
+    {
+        _settings.UseAbsolutePathsForSelectionSave = value;
+        _ = _settingsStore.SaveAsync(_settings);
+    }
+
+    // ── Selection commands ──────────────────────────────────────────────────────
+
+    [RelayCommand]
+    private void SelectAll()
+    {
+        _selectionManager.SelectAll(DirectoryTree.RootNodes);
+        RefreshIdleStats();
+    }
+
+    [RelayCommand]
+    private void ClearSelection()
+    {
+        _selectionManager.ClearAll(DirectoryTree.RootNodes);
+        RefreshIdleStats();
+    }
+
+    [RelayCommand]
+    private void InvertSelection()
+    {
+        _selectionManager.InvertAll(DirectoryTree.RootNodes);
+        RefreshIdleStats();
+    }
+
+    [RelayCommand]
+    private async Task SaveSelectionAsText()
+    {
+        var mainWindow = GetMainWindow();
+        if (mainWindow is null) return;
+
+        var file = await mainWindow.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Save Selection",
+            SuggestedFileName = "selection",
+            DefaultExtension = ".sc2sel",
+            FileTypeChoices =
+            [
+                new FilePickerFileType("SmartCopy Selection") { Patterns = ["*.sc2sel"] },
+                new FilePickerFileType("Text File")           { Patterns = ["*.txt"]    },
+            ],
+        });
+
+        if (file is null) return;
+        var path = file.Path.LocalPath;
+        var snapshot = _selectionManager.Capture(DirectoryTree.RootNodes, UseAbsolutePathsForSelection);
+        await _selectionSerializer.SaveAsync(path, snapshot);
+    }
+
+    [RelayCommand]
+    private async Task SaveSelectionAsPlaylist()
+    {
+        var mainWindow = GetMainWindow();
+        if (mainWindow is null) return;
+
+        var file = await mainWindow.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Save Selection as Playlist",
+            SuggestedFileName = "selection",
+            DefaultExtension = ".m3u",
+            FileTypeChoices =
+            [
+                new FilePickerFileType("M3U Playlist")          { Patterns = ["*.m3u"]  },
+                new FilePickerFileType("M3U8 UTF-8 Playlist")   { Patterns = ["*.m3u8"] },
+            ],
+        });
+
+        if (file is null) return;
+        var path = file.Path.LocalPath;
+        var snapshot = _selectionManager.Capture(DirectoryTree.RootNodes, UseAbsolutePathsForSelection);
+        await _selectionSerializer.SaveAsync(path, snapshot);
+    }
+
+    [RelayCommand]
+    private async Task RestoreSelection()
+    {
+        var mainWindow = GetMainWindow();
+        if (mainWindow is null) return;
+
+        var files = await mainWindow.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Restore Selection",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("Selection Files") { Patterns = ["*.sc2sel", "*.txt", "*.m3u", "*.m3u8"] },
+                new FilePickerFileType("All Files")       { Patterns = ["*.*"] },
+            ],
+        });
+
+        if (files is not { Count: > 0 }) return;
+        var path = files[0].Path.LocalPath;
+        var snapshot = await _selectionSerializer.LoadAsync(path);
+        var result = _selectionManager.Restore(DirectoryTree.RootNodes, snapshot);
+        RefreshIdleStats();
+
+        if (result.HasUnmatched)
+            Debug.WriteLine($"[Selection] Restored {result.MatchedCount} of {snapshot.RelativePaths.Count}; "
+                + $"{result.UnmatchedPaths.Count} unmatched: {string.Join(", ", result.UnmatchedPaths)}");
+    }
+
+    private Window? GetMainWindow()
+        => Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime d
+            ? d.MainWindow : null;
 
     [RelayCommand]
     private void RevertSourcePath()
@@ -262,6 +380,8 @@ public partial class MainViewModel : ViewModelBase
         _settings.FavouritePaths = saved.FavouritePaths;
         _settings.LastSourcePath = saved.LastSourcePath;
         _settings.LogRetentionDays = saved.LogRetentionDays;
+        _settings.UseAbsolutePathsForSelectionSave = saved.UseAbsolutePathsForSelectionSave;
+        UseAbsolutePathsForSelection = saved.UseAbsolutePathsForSelectionSave;
 
         if (saved.LastSourcePath is { Length: > 0 })
         {

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -70,6 +71,50 @@ public sealed class SelectionSerializer
         var json = await File.ReadAllTextAsync(path, ct);
         var payload = JsonSerializer.Deserialize<SelectionPayload>(json) ?? new SelectionPayload();
         return new SelectionSnapshot(payload.RelativePaths.Select(NormalizePath));
+    }
+
+    public async Task SaveM3u8Async(string path, SelectionSnapshot snapshot, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        var lines = new List<string> { "#EXTM3U" };
+        lines.AddRange(snapshot.RelativePaths
+            .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+            .Select(NormalizePath));
+        await File.WriteAllLinesAsync(path, lines, Encoding.UTF8, ct);
+    }
+
+    public async Task<SelectionSnapshot> LoadM3u8Async(string path, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        var lines = await File.ReadAllLinesAsync(path, Encoding.UTF8, ct);
+        return new SelectionSnapshot(lines
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .Where(line => !line.StartsWith('#'))
+            .Select(NormalizePath));
+    }
+
+    /// <summary>Unified saver: routes by extension (.m3u, .m3u8, .sc2sel, else .txt).</summary>
+    public Task SaveAsync(string path, SelectionSnapshot snapshot, CancellationToken ct = default)
+    {
+        return Path.GetExtension(path).ToLowerInvariant() switch
+        {
+            ".m3u"    => SaveM3uAsync(path, snapshot, ct),
+            ".m3u8"   => SaveM3u8Async(path, snapshot, ct),
+            ".sc2sel" => SaveSc2SelAsync(path, snapshot, ct),
+            _         => SaveTxtAsync(path, snapshot, ct),
+        };
+    }
+
+    /// <summary>Unified loader: routes by extension (.m3u, .m3u8, .sc2sel, else .txt).</summary>
+    public Task<SelectionSnapshot> LoadAsync(string path, CancellationToken ct = default)
+    {
+        return Path.GetExtension(path).ToLowerInvariant() switch
+        {
+            ".m3u"    => LoadM3uAsync(path, ct),
+            ".m3u8"   => LoadM3u8Async(path, ct),
+            ".sc2sel" => LoadSc2SelAsync(path, ct),
+            _         => LoadTxtAsync(path, ct),
+        };
     }
 
     private static string NormalizePath(string path)

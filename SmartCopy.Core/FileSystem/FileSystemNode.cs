@@ -35,7 +35,7 @@ public class FileSystemNode : INotifyPropertyChanged
                 {
                     IsExpanded = true;
                 }
-                else if (value == CheckState.Unchecked)
+                else if (value == CheckState.Unchecked && Parent is not null)
                 {
                     IsExpanded = false;
                 }
