@@ -394,12 +394,12 @@ Deliverables:
 - [x] `SelectionSerializer` for `.txt`, `.m3u`, `.sc2sel`
 - [ ] `SelectionSerializer` for `.m3u8` (UTF-8 playlist format)
 - [x] `SelectionManager` snapshot/restore for rescans
-- [ ] Selection menu wiring
 - [ ] Select All, Clear Selection and Invert Selection menu options with keyboard shortcuts
-- [ ] Separate options to save as text (`.txt` or `.sc2sel`) or playlist (`.m3u`, `.m3u8`)
-- [ ] User can select where to save the file (path and name)
-- [ ] Unified restore option (from text or playlist)
+- [ ] Separate menu options to save as text (`.txt` or `.sc2sel`) or playlist (`.m3u`, `.m3u8`)
+- [ ] User can select where to save the file on the host filesystem (path and name)
 - [ ] Option (checkable menu item) to save as absolute paths instead of relative
+- [ ] If the save path is not the source root, absolute paths are used by default
+- [ ] Unified restore option (from text or playlist)
 
 Acceptance criteria:
 - [ ] Save and restore works with non-ASCII characters (as long as they are valid paths)
