@@ -473,12 +473,41 @@ Verification:
 ### Step 11 - User Options and usability tweaks (UX Polish Track) 
 
 Expand the configuration options available in the Options menu to provide users with more control.
+Options are grouped into categories with separators.
 
 Deliverables:
-- [ ] Option to restore last used workflow on startup
-- [ ] Option to restore last used source path on startup (redundant/disabled if last used workflow is restored)
-- [ ] Export presets (collect all presets - workflows, filters, pipelines, pipeline steps) and save to archive file
-- [ ] Import presets (extract from archive file)
+- [ ] Startup option: restore last used workflow on startup
+- [ ] Startup option: restore last used source path on startup (redundant/disabled if last used workflow is restored)
+- [ ] Pipeline option: disable destructive preview (run delete/overwrite pipelines without confirmation)
+- [ ] Pipeline option: default overwrite mode (skip, always, if newer)
+- [ ] Pipeline option: delete to recycle bin (if available)
+- [ ] Scan option: perform full scan instead of progressive scan
+- [ ] Scan option: perform lazy scan (only scan inspected or selected paths)
+
+Acceptance criteria:
+- [ ] All options are persisted across application restarts
+- [ ] All options are accessible from the Options menu
+- [ ] All options are documented in the README.md
+
+Verification:
+- [ ] `dotnet build` passes
+- [ ] All tests pass
+
+### Step 12 - Export and Import Presets (UX Polish Track) 
+
+Support exporting and importing presets for migration and sharing.
+
+Deliverables:
+- [ ] Export presets (collect workflow, filter, pipeline and pipeline step presets and write to archive)
+- [ ] Import presets (extract from archive)
+
+Acceptance criteria:
+- [ ] Exported presets can be imported and restored
+- [ ] Unit tests for export and import
+
+Verification:
+- [ ] `dotnet build` passes
+- [ ] All tests pass
 
 ---
 
