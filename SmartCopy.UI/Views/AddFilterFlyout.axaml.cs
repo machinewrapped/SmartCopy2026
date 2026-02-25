@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
 using SmartCopy.UI.ViewModels;
 
@@ -27,6 +28,27 @@ public partial class AddFilterFlyout : UserControl
     {
         if (e.PropertyName == nameof(AddFilterViewModel.IsLevel2Visible))
             Dispatcher.UIThread.Post(() => Focus(), DispatcherPriority.Loaded);
+    }
+
+    private void OnSelectFilterTypeClick(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (_vm is null || sender is not Control { DataContext: FilterTypeItem item }) return;
+        _vm.SelectFilterTypeCommand.Execute(item);
+    }
+
+    private void OnPickPresetClick(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (_vm is null || sender is not Control { DataContext: PresetItem item }) return;
+        _vm.PickPresetCommand.Execute(item);
+    }
+
+    private void OnDeletePresetClick(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (_vm is null || sender is not Control { DataContext: PresetItem item }) return;
+        _vm.DeletePresetCommand.Execute(item);
     }
 
     protected override void OnKeyDown(KeyEventArgs e)

@@ -1,7 +1,9 @@
 using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
+using SmartCopy.Core.Pipeline;
 using SmartCopy.UI.ViewModels.Pipeline;
 
 namespace SmartCopy.UI.Views.Pipeline;
@@ -33,6 +35,41 @@ public partial class AddStepFlyout : UserControl
             nameof(AddStepViewModel.IsSavingPipeline) or
             nameof(AddStepViewModel.IsLoadingPipeline))
             Dispatcher.UIThread.Post(() => Focus(), DispatcherPriority.Loaded);
+    }
+
+    private void OnSelectStepTypeClick(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (_vm is null || sender is not Control { DataContext: StepTypeItem item }) return;
+        _vm.SelectStepTypeCommand.Execute(item.Kind);
+    }
+
+    private void OnPickPresetClick(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (_vm is null || sender is not Control { DataContext: StepPresetItem item }) return;
+        _vm.PickPresetCommand.Execute(item);
+    }
+
+    private void OnDeletePresetClick(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (_vm is null || sender is not Control { DataContext: StepPresetItem item }) return;
+        _vm.DeletePresetCommand.Execute(item);
+    }
+
+    private void OnLoadPresetClick(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (_vm is null || sender is not Control { DataContext: PipelinePreset item }) return;
+        _vm.LoadPresetCommand.Execute(item.Name);
+    }
+
+    private void OnDeletePipelineClick(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (_vm is null || sender is not Control { DataContext: PipelinePreset item }) return;
+        _vm.DeletePipelineCommand.Execute(item.Name);
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
