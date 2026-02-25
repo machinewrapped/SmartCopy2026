@@ -12,14 +12,14 @@ public partial class SelectionViewModel : ViewModelBase
         if (fileCount == 0)
         {
             StatusText = filteredOut > 0
-                ? $"No files selected  ·  {filteredOut} filtered out"
+                ? $"No files selected  ·  {filteredOut} files filtered out"
                 : "No files selected";
             return;
         }
 
         var sizeText = FormatBytes(totalBytes);
         StatusText = filteredOut > 0
-            ? $"{fileCount} files selected  ·  {sizeText}  ·  {filteredOut} filtered out"
+            ? $"{fileCount} files selected  ·  {sizeText}  ·  {filteredOut} files filtered out"
             : $"{fileCount} files selected  ·  {sizeText}";
     }
 
