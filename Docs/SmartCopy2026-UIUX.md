@@ -103,17 +103,17 @@ Clicking "+ Add filter" opens a **`Popup`** anchored below the button (light-dis
 │  Recently used                 │
 │    My music (*.mp3;*.flac)     │
 ├────────────────────────────────┤
-│  ★ Audio files                 │
-│  ★ Images                      │
-│  ★ Documents                   │
-│  ★ Log files                   │
+│    Audio files                 │
+│    Images                      │
+│    Documents                   │
+│    Log files                   │
 │    My custom preset            │
 └────────────────────────────────┘
 ```
 
 - **"＋ Configure..."** — closes flyout, opens `EditFilterDialog` with empty form for selected type
 - **Preset row** — closes flyout, adds card immediately, triggers tree/file list update
-- **"←"** — returns to Level 1; "★" = built-in (read-only); plain rows = user-saved presets
+- **"←"** — returns to Level 1; built-in (read-only); user-saved presets
 - "Recently used" shows the last 5 presets of this type from `AppSettings.FilterTypeMruPresetIds`
 
 ### EditFilterDialog
@@ -231,8 +231,8 @@ This dropdown integrates loading and saving pipelines along with pipeline operat
 │  Recently used                 │
 │    Delete to Trash             │
 ├────────────────────────────────┤
-│  ★ Delete to Trash             │
-│  ★ Delete permanently          │
+│    Delete to Trash             │
+│    Delete permanently          │
 │    My custom delete            │
 └────────────────────────────────┘
 ```
@@ -241,7 +241,7 @@ This dropdown integrates loading and saving pipelines along with pipeline operat
 - If no presets exist for a step type (e.g. Copy, Move, Rename), Level 3 is bypassed and `EditStepDialog` opens directly — same bypass pattern as the filter flyout.
 - **"＋ Configure..."** on Level 3 opens `EditStepDialog` with an empty form for the selected type.
 - **Preset row** — closes flyout, adds step immediately from preset config.
-- "★" prefix = built-in (read-only); plain rows = user-saved presets.
+- built-in (read-only); user-saved presets.
 - "Recently used" shows the last 5 presets of this type from `AppSettings.StepTypeMruPresetIds`.
 
 Clicking a category (Level 1) navigates to Level 2.
