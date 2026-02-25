@@ -201,15 +201,18 @@ UI/UX checklist:
 - [x] Window size, position, maximised state, and column widths persisted to
       `%LOCALAPPDATA%/SmartCopy2026/window.json`; restored on next open with off-screen safety guard
 - [x] Source field with browse button (no real browsing yet)
+- [x] Bookmarks/favorites for source field; editable ComboBox with `RecentSources`/`FavouritePaths` persistence
 - [x] TreeView with tri-state checkbox behaviour fully working
 - [x] FileListView with all columns (Name/Size/Modified), column resizing, click-to-sort
 - [x] Filter chain area: filter cards with human-readable summary + technical subtitle,
       enable/disable checkbox, edit (pencil) button, remove button, inline "+ Add filter" ghost card,
       Save/Load buttons pinned to bottom of column
+- [X] Filter chain save/load (`.sc2filter`) + preset library UI
 - [x] Pipeline area: horizontal scrollable step chain with → connectors; + Add step flyout
       (Executable / Path / Content step categories); Run and Preview buttons stacked on the right;
       step cards show summary + technical subtitle and edit/remove actions
-- [ ] Status bar: file count, size, filtered count, progress bar, time remaining, current file
+- [X] Pipeline save/load (`.sc2pipe`) + preset library UI
+- [x] Status bar: file count, size, filtered count, progress bar, time remaining, current file
 - [ ] Operation progress overlay: progress bars, pause/cancel buttons, status labels — no real operation
 - [ ] Log panel: collapsible, scrollable, a few placeholder log entries
 - [ ] Full keyboard navigation: Tab order, arrow keys in tree/list, Space to toggle, focus indicators
@@ -385,28 +388,35 @@ Verification:
 - [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj` (165/165 passing)
 - [ ] Manual UI scenario checks for workflow menu integration
 
-### Step 7 — Selection Save/Load (Memory-Backed Hardening Track)
+### Step 7 — Selection management (UX Loop Track / Memory-Backed Hardening Track)
 
 Deliverables:
 - [x] `SelectionSerializer` for `.txt`, `.m3u`, `.sc2sel`
+- [ ] `SelectionSerializer` for `.m3u8` (UTF-8 playlist format)
 - [x] `SelectionManager` snapshot/restore for rescans
-- [ ] File menu wiring (save/load/restore)
+- [ ] Selection menu wiring
+- [ ] Select All, Clear Selection and Invert Selection menu options with keyboard shortcuts
+- [ ] Separate options to save as text (`.txt` or `.sc2sel`) or playlist (`.m3u`, `.m3u8`)
+- [ ] User can select where to save the file (path and name)
+- [ ] Unified restore option (from text or playlist)
+- [ ] Option (checkable menu item) to save as absolute paths instead of relative
 
 Acceptance criteria:
-- [x] Relative path portability works across machines
-- [ ] Missing/unmatched paths are reported and skipped without aborting load
+- [ ] Save and restore works with non-ASCII characters (as long as they are valid paths)
+- [ ] Relative path portability works across machines
+- [ ] Missing/unmatched paths are reported and skipped without aborting restore
 
 Verification:
-- [x] Round-trip tests for all formats
+- [ ] Round-trip tests for all formats
 - [ ] Regression tests for mixed path separators and case differences
+- [ ] Manual testing of UI/UX flows
 
 ### Step 8 — Settings Persistence (Memory-Backed Hardening Track)
 
 Deliverables:
 - [x] `AppSettings` load/save + schema version
 - [x] Cross-platform settings paths (`%APPDATA%` / `~/.config`)
-- [x] Source path persistence: `LastSourcePath` restored on startup; `RecentSources`/`FavouritePaths` populate source ComboBox and save on change (pulled forward from Phase 3 as a Phase 1 UX necessity)
-- [ ] Remaining persisted defaults (sort order, scan options, other UI state)
+- [x] Source path persistence: `LastSourcePath` restored on startup; `RecentSources`/`FavouritePaths` populate source ComboBox and save on change
 
 Acceptance criteria:
 - [x] Missing/corrupt settings file falls back to defaults without crash
@@ -474,16 +484,11 @@ Exit criteria:
 ### Phase 3 — Modern Features (post-local-integration hardening)
 
 Scope:
-- [ ] Filter chain save/load (`.sc2filter`) + preset library UI
-- [ ] Pipeline save/load (`.sc2pipe`) + preset library UI
-- [ ] Windows MTP provider (`MtpFileSystemProvider`) + WPD device picker integration
-- [ ] `DuplicateFilter` and `PathDepthFilter`
-- [x] Bookmarks/favorites for source field (pulled forward to Phase 1 as a UX necessity; editable ComboBox with `RecentSources`/`FavouritePaths` persistence)
 - [ ] Drag-and-drop for source/destination fields; bookmarks for pipeline destination field
+- [ ] Windows MTP provider (`MtpFileSystemProvider`) + WPD device picker integration
 
 Exit criteria:
 - [ ] MTP copy round-trip validated on at least two physical devices
-- [ ] Filter/pipeline preset import/export is stable and versioned
 
 ### Phase 4 — Advanced Pipeline Steps
 
@@ -500,7 +505,6 @@ Exit criteria:
 ### Phase 5 — Polish and Extensibility
 
 Scope:
-- [ ] Session files (`.sc2session`) with full restore
 - [ ] Theming, localization infrastructure, update checks
 - [ ] Multi-source merge workflow
 - [ ] Public plugin SDK documentation
