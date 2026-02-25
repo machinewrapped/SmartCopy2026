@@ -1,9 +1,12 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace SmartCopy.Core.Pipeline;
 
 public enum OverwriteMode
 {
     Skip,
-    IfNewer,
     Always,
+    [Display(Name = "If newer")]
+    IfNewer,
 }
 
