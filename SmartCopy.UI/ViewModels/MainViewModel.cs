@@ -546,14 +546,26 @@ public partial class MainViewModel : ViewModelBase
 
             foreach (var r in results)
             {
-                if (!r.Success)
+                if (r.SourcePath is null)
+                {
+                    continue;
+                }
+                else if (!r.Success)
+                {
                     LogPanel.AddEntry($"Failed: {Path.GetFileName(r.SourcePath)} — {r.Message}", LogLevel.Error);
+                }
                 else if (r.StepType == StepKind.Copy)
+                {
                     LogPanel.AddEntry($"Copied {Path.GetFileName(r.SourcePath)} → {r.DestinationPath} ({FormatBytes(r.OutputBytes)})");
+                }
                 else if (r.StepType == StepKind.Move)
+                {
                     LogPanel.AddEntry($"Moved {Path.GetFileName(r.SourcePath)} → {r.DestinationPath}");
+                }
                 else if (r.StepType == StepKind.Delete)
+                {
                     LogPanel.AddEntry($"Deleted {Path.GetFileName(r.SourcePath)}");
+                }
             }
 
             StatusBar.Progress.Complete();
