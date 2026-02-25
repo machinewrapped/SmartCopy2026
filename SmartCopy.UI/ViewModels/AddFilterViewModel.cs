@@ -20,7 +20,8 @@ public sealed record FilterTypeItem(string TypeKey, string DisplayName, string D
 /// </summary>
 public sealed record PresetItem(FilterPreset Preset, bool IsRecent)
 {
-    public string DisplayName => Preset.IsBuiltIn ? $"★ {Preset.Name}" : Preset.Name;
+//    public string DisplayName => Preset.IsBuiltIn ? $"★ {Preset.Name}" : Preset.Name;
+    public string DisplayName => Preset.Name;
     public bool IsUserDefined => !Preset.IsBuiltIn;
 }
 

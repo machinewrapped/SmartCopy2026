@@ -20,7 +20,8 @@ public sealed record StepTypeItem(StepKind Kind, string DisplayName, string Desc
 /// </summary>
 public sealed record StepPresetItem(StepPreset Preset, bool IsRecent)
 {
-    public string DisplayName => Preset.IsBuiltIn ? $"★ {Preset.Name}" : Preset.Name;
+//    public string DisplayName => Preset.IsBuiltIn ? $"★ {Preset.Name}" : Preset.Name;
+    public string DisplayName => Preset.Name;
     public bool IsUserDefined => !Preset.IsBuiltIn;
 }
 
