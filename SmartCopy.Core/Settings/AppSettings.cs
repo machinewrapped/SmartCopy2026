@@ -38,5 +38,6 @@ public sealed class AppSettings
     public Dictionary<string, List<string>> StepTypeMruPresetIds { get; set; } = [];
 
     public bool UseAbsolutePathsForSelectionSave { get; set; }
+    public bool AutoOpenLogOnRun { get; set; } = true;
 }
 

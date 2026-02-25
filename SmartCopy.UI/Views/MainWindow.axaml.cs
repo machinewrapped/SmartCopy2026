@@ -39,6 +39,7 @@ public partial class MainWindow : Window
     private MainViewModel? _mainVm;
     private WorkflowMenuViewModel? _workflowMenu;
     private MenuItem? _absolutePathsMenuItem;
+    private MenuItem? _autoOpenLogMenuItem;
 
     public MainWindow()
     {
@@ -71,6 +72,7 @@ public partial class MainWindow : Window
 
         RebuildWorkflowsMenu();
         BuildSelectionMenu();
+        BuildOptionsMenu();
     }
 
     private void OnSavedWorkflowsChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -160,12 +162,36 @@ public partial class MainWindow : Window
         }
     }
 
+    private void BuildOptionsMenu()
+    {
+        OptionsMenu.Items.Clear();
+
+        _autoOpenLogMenuItem = new MenuItem
+        {
+            Header = "Auto-open _Log on Run",
+            ToggleType = MenuItemToggleType.CheckBox,
+            IsChecked = _mainVm?.AutoOpenLogOnRun ?? true,
+        };
+        _autoOpenLogMenuItem.Click += (_, _) =>
+        {
+            if (_mainVm is not null)
+                _mainVm.AutoOpenLogOnRun = !_mainVm.AutoOpenLogOnRun;
+        };
+        OptionsMenu.Items.Add(_autoOpenLogMenuItem);
+    }
+
     private void OnMainViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(MainViewModel.UseAbsolutePathsForSelection)
             && _absolutePathsMenuItem is not null)
         {
             _absolutePathsMenuItem.IsChecked = _mainVm?.UseAbsolutePathsForSelection ?? false;
+        }
+
+        if (e.PropertyName == nameof(MainViewModel.AutoOpenLogOnRun)
+            && _autoOpenLogMenuItem is not null)
+        {
+            _autoOpenLogMenuItem.IsChecked = _mainVm?.AutoOpenLogOnRun ?? true;
         }
     }
 
