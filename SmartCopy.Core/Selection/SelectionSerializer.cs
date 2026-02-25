@@ -19,7 +19,7 @@ public sealed class SelectionSerializer
     public Task SaveTxtAsync(string path, SelectionSnapshot snapshot, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var lines = snapshot.RelativePaths.OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
+        var lines = snapshot.Paths.OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
         return File.WriteAllLinesAsync(path, lines, ct);
     }
 
@@ -34,7 +34,7 @@ public sealed class SelectionSerializer
     {
         ct.ThrowIfCancellationRequested();
         var lines = new List<string> { "#EXTM3U" };
-        lines.AddRange(snapshot.RelativePaths
+        lines.AddRange(snapshot.Paths
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .Select(NormalizePath));
         await File.WriteAllLinesAsync(path, lines, ct);
@@ -56,7 +56,7 @@ public sealed class SelectionSerializer
         var payload = new SelectionPayload
         {
             SchemaVersion = 1,
-            RelativePaths = snapshot.RelativePaths
+            Paths = snapshot.Paths
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .Select(NormalizePath)
                 .ToList(),
@@ -70,14 +70,14 @@ public sealed class SelectionSerializer
         ct.ThrowIfCancellationRequested();
         var json = await File.ReadAllTextAsync(path, ct);
         var payload = JsonSerializer.Deserialize<SelectionPayload>(json) ?? new SelectionPayload();
-        return new SelectionSnapshot(payload.RelativePaths.Select(NormalizePath));
+        return new SelectionSnapshot(payload.Paths.Select(NormalizePath));
     }
 
     public async Task SaveM3u8Async(string path, SelectionSnapshot snapshot, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var lines = new List<string> { "#EXTM3U" };
-        lines.AddRange(snapshot.RelativePaths
+        lines.AddRange(snapshot.Paths
             .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
             .Select(NormalizePath));
         await File.WriteAllLinesAsync(path, lines, Encoding.UTF8, ct);
@@ -125,7 +125,7 @@ public sealed class SelectionSerializer
     private sealed class SelectionPayload
     {
         public int SchemaVersion { get; set; } = 1;
-        public List<string> RelativePaths { get; set; } = [];
+        public List<string> Paths { get; set; } = [];
     }
 }
 

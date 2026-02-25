@@ -22,10 +22,17 @@ public sealed class SelectionManager
         foreach (var node in Traverse(roots))
         {
             // Accept snapshots saved with either relative or absolute paths.
-            if (snapshot.Contains(node.RelativePath) || snapshot.Contains(node.FullPath))
+            // Track matched keys using whichever form the snapshot contains so that
+            // the unmatched calculation below works correctly for both cases.
+            if (snapshot.Contains(node.RelativePath))
             {
                 node.CheckState = CheckState.Checked;
                 matchedKeys.Add(node.RelativePath);
+            }
+            else if (snapshot.Contains(node.FullPath))
+            {
+                node.CheckState = CheckState.Checked;
+                matchedKeys.Add(node.FullPath);
             }
             else
             {
@@ -33,7 +40,7 @@ public sealed class SelectionManager
             }
         }
 
-        var unmatched = snapshot.RelativePaths.Where(p => !matchedKeys.Contains(p)).ToList();
+        var unmatched = snapshot.Paths.Where(p => !matchedKeys.Contains(p)).ToList();
         return new SelectionRestoreResult(matchedKeys.Count, unmatched);
     }
 

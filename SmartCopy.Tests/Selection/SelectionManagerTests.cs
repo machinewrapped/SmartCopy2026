@@ -86,6 +86,28 @@ public sealed class SelectionManagerTests
     }
 
     [Fact]
+    public void Restore_WithAbsolutePaths_ReturnsCorrectUnmatched()
+    {
+        // Verify that when a snapshot is captured with absolute paths, Restore does not
+        // falsely report matched nodes as unmatched (the original bug: matchedKeys always
+        // stored relative paths, so absolute-path entries were never found in matchedKeys).
+        var (root, fileA, fileB) = BuildTree();
+        fileA.CheckState = CheckState.Checked;
+        fileB.CheckState = CheckState.Unchecked;
+
+        var manager = new SelectionManager();
+        var snapshot = manager.Capture([root], useAbsolutePaths: true);
+
+        fileA.CheckState = CheckState.Unchecked;
+        var result = manager.Restore([root], snapshot);
+
+        Assert.Equal(CheckState.Checked, fileA.CheckState);
+        Assert.Equal(CheckState.Unchecked, fileB.CheckState);
+        Assert.Equal(1, result.MatchedCount);
+        Assert.False(result.HasUnmatched);
+    }
+
+    [Fact]
     public void SelectAll_SetsAllChecked()
     {
         var (root, fileA, fileB) = BuildTree();

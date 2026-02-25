@@ -24,9 +24,9 @@ public sealed class SelectionSerializerTests
         var m3u = await serializer.LoadM3uAsync(m3uPath, CancellationToken.None);
         var sc2 = await serializer.LoadSc2SelAsync(sc2Path, CancellationToken.None);
 
-        Assert.Equal(snapshot.RelativePaths.Count, txt.RelativePaths.Count);
-        Assert.Equal(snapshot.RelativePaths.Count, m3u.RelativePaths.Count);
-        Assert.Equal(snapshot.RelativePaths.Count, sc2.RelativePaths.Count);
+        Assert.Equal(snapshot.Paths.Count, txt.Paths.Count);
+        Assert.Equal(snapshot.Paths.Count, m3u.Paths.Count);
+        Assert.Equal(snapshot.Paths.Count, sc2.Paths.Count);
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public sealed class SelectionSerializerTests
         await serializer.SaveM3u8Async(m3u8Path, snapshot, CancellationToken.None);
         var loaded = await serializer.LoadM3u8Async(m3u8Path, CancellationToken.None);
 
-        Assert.Equal(snapshot.RelativePaths.Count, loaded.RelativePaths.Count);
+        Assert.Equal(snapshot.Paths.Count, loaded.Paths.Count);
         Assert.True(loaded.Contains("a/b/c.mp3"));
         Assert.True(loaded.Contains("x/y/z.flac"));
     }
@@ -92,7 +92,7 @@ public sealed class SelectionSerializerTests
         var fromM3u8 = await serializer.LoadM3u8Async(m3u8Path);
         var fromSc2  = await serializer.LoadSc2SelAsync(sc2Path);
 
-        foreach (var path in snapshot.RelativePaths)
+        foreach (var path in snapshot.Paths)
         {
             Assert.True(fromTxt.Contains(path),  $"txt missing: {path}");
             Assert.True(fromM3u8.Contains(path), $"m3u8 missing: {path}");

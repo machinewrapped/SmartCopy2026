@@ -230,7 +230,7 @@ public partial class MainViewModel : ViewModelBase
         RefreshIdleStats();
 
         if (result.HasUnmatched)
-            Debug.WriteLine($"[Selection] Restored {result.MatchedCount} of {snapshot.RelativePaths.Count}; "
+            Debug.WriteLine($"[Selection] Restored {result.MatchedCount} of {snapshot.Paths.Count}; "
                 + $"{result.UnmatchedPaths.Count} unmatched: {string.Join(", ", result.UnmatchedPaths)}");
     }
 
