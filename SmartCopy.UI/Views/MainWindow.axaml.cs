@@ -1,9 +1,13 @@
 using System;
+using System.Collections.Specialized;
+using System.ComponentModel;
 using System.IO;
 using System.Text.Json;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Platform;
+using SmartCopy.UI.ViewModels;
+using SmartCopy.UI.ViewModels.Workflows;
 
 namespace SmartCopy.UI.Views;
 
@@ -31,9 +35,71 @@ public partial class MainWindow : Window
 
     private static readonly JsonSerializerOptions s_jsonOptions = new() { WriteIndented = true };
 
+    private MainViewModel? _mainVm;
+    private WorkflowMenuViewModel? _workflowMenu;
+
     public MainWindow()
     {
         InitializeComponent();
+        DataContextChanged += OnMainDataContextChanged;
+    }
+
+    private void OnMainDataContextChanged(object? sender, EventArgs e)
+    {
+        if (_workflowMenu is not null)
+        {
+            _workflowMenu.SavedWorkflows.CollectionChanged -= OnSavedWorkflowsChanged;
+            _workflowMenu.PropertyChanged -= OnWorkflowMenuPropertyChanged;
+        }
+
+        _mainVm = DataContext as MainViewModel;
+        _workflowMenu = _mainVm?.WorkflowMenu;
+
+        if (_workflowMenu is not null)
+        {
+            _workflowMenu.SavedWorkflows.CollectionChanged += OnSavedWorkflowsChanged;
+            _workflowMenu.PropertyChanged += OnWorkflowMenuPropertyChanged;
+        }
+
+        RebuildWorkflowsMenu();
+    }
+
+    private void OnSavedWorkflowsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        => RebuildWorkflowsMenu();
+
+    private void OnWorkflowMenuPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(WorkflowMenuViewModel.CanSave))
+            RebuildWorkflowsMenu();
+    }
+
+    private void RebuildWorkflowsMenu()
+    {
+        WorkflowsMenu.Items.Clear();
+
+        var saveItem = new MenuItem
+        {
+            Header = "_Save Workflow...",
+            IsEnabled = _workflowMenu?.CanSave ?? false,
+        };
+        saveItem.Click += (_, _) => _workflowMenu?.SaveWorkflowCommand.Execute(null);
+        WorkflowsMenu.Items.Add(saveItem);
+
+        var manageItem = new MenuItem { Header = "_Manage Workflows..." };
+        manageItem.Click += (_, _) => _workflowMenu?.ManageWorkflowsCommand.Execute(null);
+        WorkflowsMenu.Items.Add(manageItem);
+
+        if (_workflowMenu?.SavedWorkflows.Count > 0)
+        {
+            WorkflowsMenu.Items.Add(new Separator());
+            foreach (var preset in _workflowMenu.SavedWorkflows)
+            {
+                var name = preset.Name;
+                var item = new MenuItem { Header = name };
+                item.Click += (_, _) => _workflowMenu?.LoadWorkflowCommand.Execute(name);
+                WorkflowsMenu.Items.Add(item);
+            }
+        }
     }
 
     // ── Restore ────────────────────────────────────────────────────────────────

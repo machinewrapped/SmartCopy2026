@@ -177,7 +177,7 @@ and sync safely.*
 2. Validation-first hardening track (prioritised while behaviour is still fresh)
 3. UX polish track (after end-to-end flow is proven)
 
-### Phase 1 status snapshot (as of 2026-02-23)
+### Phase 1 status snapshot (as of 2026-02-25)
 
 | Workstream item | Status | Next action |
 |---|---|---|
@@ -185,7 +185,7 @@ and sync safely.*
 | UX-2 (Step 3): Node selection logic | Complete | Scale/perf coverage alongside Step 9 |
 | UX-3 (Step 4): Filter chain | Complete | Save/Load file-picker deferred to Phase 3 |
 | UX-4 (Step 5): Transform pipeline | Complete (validation pending manual test run) | Maintainer to execute new Step 5 test suites + UI smoke scenarios |
-| UX-5 (Step 6): Sync operations | Started | Full update/mirror semantics + UI entry points |
+| UX-5 (Step 6): Workflow presets and menu | Complete | Manual UI smoke scenario pending |
 | Hardening-1 (Step 2): Memory provider foundation | Complete | Reuse fixture builder pattern |
 | Hardening-2 (Step 7): Selection save/load | In progress | Wire File menu flows + unmatched-path reporting |
 | Hardening-3 (Step 8): Settings persistence | In progress | Schema migration path; remaining persisted defaults |
@@ -362,23 +362,27 @@ Verification — all automated suites passing:
 - [X] `dotnet test` execution
 - [X] Manual UI scenario checks for preview/delete/progress/journal flows
 
-### Step 6 - Workflow Presets and Menu (UX Loop Track)
-Allow users to persist entire workflows - source directory, filters and pipeline steps.
+### Step 6 — Workflow Presets and Menu (UX Loop Track) ✓
 
-Deliverables:
-- [ ] `WorkflowPresetStore` + `WorkflowPreset`
-- [ ] `WorkflowPresetMenuViewModel`
-- [ ] `WorkflowPresetMenuView`
+**Completed 2026-02-25.** Entire workflow (source path + filter chain + pipeline) persists as `.sc2workflow` JSON via a dedicated store, with save/load/rename/delete UX wired into the main menu.
 
-Acceptance criteria:
-- [ ] Entire workflow can be persisted as `.sc2workflow` via preset store-backed commands
-- [ ] Workflow presets load via preset menu integration
-- [ ] Workflow presets can be deleted via preset menu
-- [ ] Unit tests for `WorkflowPresetStore` and `WorkflowPresetMenuViewModel`
+Delivered:
+- [x] `WorkflowPreset`, `WorkflowConfig`, `WorkflowPresetStore` (Core layer)
+- [x] `WorkflowMenuViewModel` — save/load/manage commands, `SavedWorkflows` collection, `CanSave` gate
+- [x] `SaveWorkflowDialogViewModel` + `SaveWorkflowDialog` (name entry, overwrite confirmation)
+- [x] `ManageWorkflowsDialogViewModel` + `ManageWorkflowsDialog` (rename + delete with confirmation)
+- [x] `RenameInputViewModel` + `RenameInputDialog`
+- [x] `MainWindow` Workflows menu wired via code-behind: static Save/Manage items + dynamic loaded-workflow items rebuilt on collection change
+
+Acceptance criteria — all met:
+- [x] Entire workflow can be persisted as `.sc2workflow` via preset store-backed commands
+- [x] Workflow presets load via preset menu integration
+- [x] Workflow presets can be renamed and deleted via Manage Workflows dialog
+- [x] Unit tests for `WorkflowPresetStore` (8 tests) and `WorkflowMenuViewModel` (7 tests)
 
 Verification:
-- [ ] `dotnet build SmartCopy.App/SmartCopy.App.csproj`
-- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj`
+- [x] `dotnet build SmartCopy.App/SmartCopy.App.csproj`
+- [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj` (165/165 passing)
 - [ ] Manual UI scenario checks for workflow menu integration
 
 ### Step 7 — Selection Save/Load (Memory-Backed Hardening Track)

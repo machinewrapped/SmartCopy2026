@@ -1,0 +1,30 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels.Workflows"
+        x:Class="SmartCopy.UI.Views.Workflows.RenameInputDialog"
+        x:DataType="vm:RenameInputViewModel"
+        Title="Rename Workflow"
+        Width="340"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#1e1e1e">
+    <StackPanel Spacing="12" Margin="20">
+
+        <StackPanel Spacing="4">
+            <TextBlock Text="New Name" FontSize="12" Opacity="0.7" />
+            <TextBox Text="{Binding NewName}" Watermark="Enter new name" />
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button Content="Cancel"
+                    Command="{Binding CancelCommand}"
+                    Width="80" />
+            <Button Content="OK"
+                    Command="{Binding OkCommand}"
+                    Width="80"
+                    IsDefault="True" />
+        </StackPanel>
+
+    </StackPanel>
+</Window>

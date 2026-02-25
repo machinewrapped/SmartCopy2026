@@ -1,0 +1,38 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels.Workflows"
+        x:Class="SmartCopy.UI.Views.Workflows.SaveWorkflowDialog"
+        x:DataType="vm:SaveWorkflowDialogViewModel"
+        Title="Save Workflow"
+        Width="400"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#1e1e1e">
+    <StackPanel Spacing="12" Margin="20">
+
+        <StackPanel Spacing="4">
+            <TextBlock Text="Workflow Name" FontSize="12" Opacity="0.7" />
+            <TextBox Text="{Binding WorkflowName}" Watermark="Enter workflow name" />
+        </StackPanel>
+
+        <StackPanel Spacing="4">
+            <TextBlock Text="Or replace existing:" FontSize="12" Opacity="0.7" />
+            <ComboBox ItemsSource="{Binding ExistingNames}"
+                      SelectedItem="{Binding SelectedExistingName}"
+                      PlaceholderText="(select to replace)"
+                      HorizontalAlignment="Stretch" />
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button Content="Cancel"
+                    Command="{Binding CancelCommand}"
+                    Width="80" />
+            <Button Content="OK"
+                    Command="{Binding OkCommand}"
+                    Width="80"
+                    IsDefault="True" />
+        </StackPanel>
+
+    </StackPanel>
+</Window>

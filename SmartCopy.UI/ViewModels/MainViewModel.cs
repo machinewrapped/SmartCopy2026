@@ -12,8 +12,11 @@ using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Pipeline.Validation;
 using SmartCopy.Core.Progress;
 using SmartCopy.Core.Settings;
+using SmartCopy.Core.Workflows;
 using SmartCopy.UI.Services;
+using SmartCopy.UI.ViewModels.Workflows;
 using SmartCopy.UI.Views;
+using SmartCopy.UI.Views.Workflows;
 
 namespace SmartCopy.UI.ViewModels;
 
@@ -31,6 +34,7 @@ public partial class MainViewModel : ViewModelBase
     private readonly AppSettings _settings = new();
     private readonly AppSettingsStore _settingsStore = new();
     private readonly OperationJournal _operationJournal = new();
+    private readonly WorkflowPresetStore _workflowStore = new();
     private CancellationTokenSource? _filterCts;
     private CancellationTokenSource? _runCts;
 
@@ -42,6 +46,7 @@ public partial class MainViewModel : ViewModelBase
     public PipelineViewModel Pipeline { get; }
     public StatusBarViewModel StatusBar { get; } = new();
     public PreviewViewModel Preview { get; } = new();
+    public WorkflowMenuViewModel WorkflowMenu { get; }
 
     public MainViewModel()
     {
@@ -68,7 +73,16 @@ public partial class MainViewModel : ViewModelBase
 
         FileList = new FileListViewModel(_memoryProvider, MockMemoryFileSystemFactory.DefaultFileListPath);
 
-        Pipeline.PipelineChanged += (_, _) => FilterChain.PipelineDestinationPath = Pipeline.FirstDestinationPath;
+        WorkflowMenu = new WorkflowMenuViewModel(_workflowStore);
+        WorkflowMenu.SaveRequested += async (_, _) => await SaveWorkflowAsync();
+        WorkflowMenu.LoadRequested += async (_, name) => await LoadWorkflowAsync(name);
+        WorkflowMenu.ManageRequested += async (_, _) => await ManageWorkflowsAsync();
+
+        Pipeline.PipelineChanged += (_, _) =>
+        {
+            FilterChain.PipelineDestinationPath = Pipeline.FirstDestinationPath;
+            WorkflowMenu.CanSave = Pipeline.Steps.Count > 0;
+        };
         Pipeline.RunRequested += async (_, _) => await RunPipelineAsync();
         Pipeline.PreviewRequested += async (_, _) => await PreviewPipelineAsync();
         FilterChain.PipelineDestinationPath = Pipeline.FirstDestinationPath;
@@ -258,6 +272,7 @@ public partial class MainViewModel : ViewModelBase
         // Phase 1: hardcode /mem/Mirror as the mirror-filter comparison path.
         FilterChain.PipelineDestinationPath = MockMemoryFileSystemFactory.TargetPath;
         await _operationJournal.RotateAsync(_settings.LogRetentionDays);
+        await WorkflowMenu.RefreshAsync();
 
         // Pre-wire the chain before the initial tree load so the first file list load
         // already has a chain to evaluate.
@@ -391,6 +406,94 @@ public partial class MainViewModel : ViewModelBase
         catch (OperationCanceledException)
         {
             StatusBar.Progress.Cancelled();
+        }
+    }
+
+    private async Task SaveWorkflowAsync()
+    {
+        if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop
+            || desktop.MainWindow is not { } mainWindow)
+        {
+            return;
+        }
+
+        var vm = new SaveWorkflowDialogViewModel();
+        foreach (var preset in WorkflowMenu.SavedWorkflows)
+        {
+            vm.ExistingNames.Add(preset.Name);
+        }
+
+        var dialog = new SaveWorkflowDialog { DataContext = vm };
+        var result = await dialog.ShowDialog<bool?>(mainWindow);
+        if (result != true || string.IsNullOrWhiteSpace(vm.WorkflowName))
+        {
+            return;
+        }
+
+        var name = vm.WorkflowName.Trim();
+        var filterChainConfig = FilterChain.BuildLiveChain().ToConfig(name);
+        var pipelineConfig = Pipeline.ToConfig(name);
+        var workflowConfig = new WorkflowConfig(
+            Name: name,
+            Description: null,
+            SourcePath: SourcePath,
+            FilterChain: filterChainConfig,
+            Pipeline: pipelineConfig);
+
+        await _workflowStore.SaveUserPresetAsync(name, workflowConfig);
+        await WorkflowMenu.RefreshAsync();
+    }
+
+    private async Task LoadWorkflowAsync(string name)
+    {
+        var presets = await _workflowStore.GetUserPresetsAsync();
+        var preset = presets.FirstOrDefault(p =>
+            string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (preset is null)
+        {
+            return;
+        }
+
+        // Restore source path
+        SourcePath = preset.Config.SourcePath;
+        await ApplySourcePathCoreAsync(preset.Config.SourcePath);
+
+        // Restore filter chain
+        FilterChain.Filters.Clear();
+        foreach (var filterConfig in preset.Config.FilterChain.Filters)
+        {
+            var filter = FilterFactory.FromConfig(filterConfig);
+            FilterChain.AddFilterFromResult(filter);
+        }
+
+        // Restore pipeline
+        var pipelinePreset = new PipelinePreset
+        {
+            Id = "workflow",
+            Name = preset.Config.Name,
+            IsBuiltIn = false,
+            Config = preset.Config.Pipeline,
+        };
+        Pipeline.LoadPreset(pipelinePreset);
+    }
+
+    private async Task ManageWorkflowsAsync()
+    {
+        if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop
+            || desktop.MainWindow is not { } mainWindow)
+        {
+            return;
+        }
+
+        var vm = new ManageWorkflowsDialogViewModel(_workflowStore);
+        await vm.LoadAsync();
+
+        var dialog = new ManageWorkflowsDialog { DataContext = vm };
+        await dialog.ShowDialog(mainWindow);
+
+        if (vm.HasChanges)
+        {
+            await WorkflowMenu.RefreshAsync();
         }
     }
 
