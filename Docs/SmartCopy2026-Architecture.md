@@ -26,15 +26,25 @@ SmartCopy2026/
 │   │   ├── LocalFileSystemProvider.cs
 │   │   ├── MtpFileSystemProvider.cs    # Windows only (#if Windows); includes retry policy
 │   │   ├── MemoryFileSystemProvider.cs # In-memory implementation for unit/integration tests
-│   │   └── FileSystemNode.cs           # Unified file/folder model
+│   │   ├── FileSystemNode.cs           # Unified file/folder model
+│   │   ├── CheckState.cs               # Enum: Checked, Unchecked, Indeterminate
+│   │   └── FilterResult.cs             # Enum: Included, Excluded
 │   ├── Scanning/
 │   │   ├── DirectoryScanner.cs         # Async recursive scan with progressive loading
 │   │   ├── ScanOptions.cs
+│   │   ├── ScanProgress.cs             # Progress tracking for scans
 │   │   └── DirectoryWatcher.cs         # FileSystemWatcher + 300ms debounce
 │   ├── Filters/
 │   │   ├── IFilter.cs
+│   │   ├── FilterBase.cs
 │   │   ├── FilterChain.cs
 │   │   ├── FilterConfig.cs             # Serialisable per-filter config
+│   │   ├── FilterChainConfig.cs
+│   │   ├── FilterFactory.cs
+│   │   ├── FilterMode.cs
+│   │   ├── FilterPreset.cs
+│   │   ├── FilterPresetCollection.cs
+│   │   ├── FilterPresetStore.cs
 │   │   └── Filters/
 │   │       ├── WildcardFilter.cs
 │   │       ├── ExtensionFilter.cs
@@ -52,9 +62,13 @@ SmartCopy2026/
 │   │   ├── PipelineConfig.cs
 │   │   ├── PipelinePresetStore.cs
 │   │   ├── PipelineStepFactory.cs
+│   │   ├── PipelinePreset.cs
 │   │   ├── StepPreset.cs
 │   │   ├── StepPresetCollection.cs
 │   │   ├── StepPresetStore.cs
+│   │   ├── StepKind.cs
+│   │   ├── StepPathHelper.cs
+│   │   ├── FlattenConflictStrategy.cs
 │   │   ├── UnknownStepTypeException.cs
 │   │   ├── Validation/
 │   │   │   ├── PipelineValidator.cs
@@ -76,29 +90,45 @@ SmartCopy2026/
 │   │   ├── SelectionManager.cs
 │   │   ├── SelectionSerializer.cs      # txt / m3u / json
 │   │   └── SelectionSnapshot.cs
-│   └── Progress/
-│       ├── OperationProgress.cs
-│       └── OperationJournal.cs
+│   ├── Progress/
+│   │   ├── OperationProgress.cs
+│   │   └── OperationJournal.cs
+│   ├── Settings/
+│   │   ├── AppSettings.cs
+│   │   └── AppSettingsStore.cs
+│   ├── Sync/
+│   │   └── SyncWorkflow.cs
+│   └── Workflows/
+│       ├── WorkflowConfig.cs
+│       ├── WorkflowPreset.cs
+│       └── WorkflowPresetStore.cs
 │
 ├── SmartCopy.App/                  # Avalonia application host + DI root
 │   ├── App.axaml / App.axaml.cs
-│   ├── AppServiceProvider.cs
-│   └── Services/
-│       ├── DialogService.cs
-│       ├── NavigationService.cs
-│       └── TrashService.cs            # Platform-specific trash/recycle-bin
+│   └── AppServiceProvider.cs
 │
 ├── SmartCopy.UI/                   # Avalonia Views + ViewModels
+│   ├── Services/                     # Application Services
+│   │   ├── DialogService.cs
+│   │   ├── NavigationService.cs
+│   │   └── TrashService.cs            # Platform-specific trash/recycle-bin
 │   ├── ViewModels/
 │   │   ├── MainViewModel.cs
 │   │   ├── DirectoryTreeViewModel.cs
 │   │   ├── FileListViewModel.cs
 │   │   ├── FilterChainViewModel.cs
 │   │   ├── PipelineViewModel.cs
+│   │   ├── AddFilterViewModel.cs
+│   │   ├── EditFilterDialogViewModel.cs
+│   │   ├── LogPanelViewModel.cs
+│   │   ├── SelectionViewModel.cs
+│   │   ├── StatusBarViewModel.cs
+│   │   ├── PipelineStepDisplay.cs
 │   │   ├── Pipeline/
 │   │   │   ├── AddStepViewModel.cs
 │   │   │   ├── EditStepDialogViewModel.cs
 │   │   │   └── *StepEditorViewModel.cs
+│   │   ├── Workflows/                  # Workflow management UI
 │   │   ├── OperationProgressViewModel.cs
 │   │   └── PreviewViewModel.cs
 │   ├── Views/
@@ -107,10 +137,16 @@ SmartCopy2026/
 │   │   ├── FileListView.axaml
 │   │   ├── FilterChainView.axaml
 │   │   ├── PipelineView.axaml
+│   │   ├── AddFilterFlyout.axaml
+│   │   ├── EditFilterDialog.axaml
+│   │   ├── LogPanelView.axaml
+│   │   ├── SelectionView.axaml
+│   │   ├── StatusBarView.axaml
 │   │   ├── Pipeline/
 │   │   │   ├── AddStepFlyout.axaml
 │   │   │   ├── EditStepDialog.axaml
 │   │   │   └── StepEditors/*.axaml
+│   │   ├── Workflows/
 │   │   ├── OperationProgressView.axaml
 │   │   └── PreviewView.axaml
 │   ├── Controls/
@@ -463,6 +499,19 @@ contains a `plugin.json` manifest and a DLL loaded via `AssemblyLoadContext` for
 - Supports: flac, wav, aiff, ogg → mp3, ogg, aac, opus, flac
 - Kept separate from the main app to preserve its MIT license (FFmpeg is LGPL/GPL)
 - Plugin itself can be MIT; it shells out to the user's own ffmpeg binary
+
+---
+
+### 2.9 Workflows
+
+A **workflow** encapsulates a high-level user operation, coordinating multiple subsystems such as filters, pipelines, and synchronization logic. Workflows simplify complex tasks by providing predefined configurations.
+
+Key components:
+- `WorkflowConfig`: Defines the full state of a workflow, including its name, description, selected source/destination paths, filter chain configuration, and the pipeline steps to execute.
+- `WorkflowPreset`: A saved instance of a `WorkflowConfig`, allowing users to quickly load and execute workflows.
+- `WorkflowPresetStore`: Manages the persistence (CRUD operations) of workflow presets to disk.
+
+**Sync Operations (`SyncWorkflow`)**: Workflows can encapsulate specialized logic, such as orchestrating the sequence of scanning, filtering, and pipeline execution required to synchronize two directories.
 
 ---
 
