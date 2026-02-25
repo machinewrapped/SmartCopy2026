@@ -382,7 +382,9 @@ public partial class MainWindow : Window
             case Key.Enter:
                 combo.IsDropDownOpen = false;
                 if (DataContext is MainViewModel vm)
+                {
                     vm.ApplySourcePathCommand.Execute(null);
+                }
                 e.Handled = true;
                 break;
 
@@ -391,10 +393,9 @@ public partial class MainWindow : Window
                 if (combo.IsDropDownOpen)
                 {
                     combo.IsDropDownOpen = false;
-                    if (DataContext is MainViewModel revertVm)
-                        revertVm.RevertSourcePathCommand.Execute(null);
                 }
-                else if (DataContext is MainViewModel rv)
+
+                if (DataContext is MainViewModel rv)
                 {
                     rv.RevertSourcePathCommand.Execute(null);
                 }
