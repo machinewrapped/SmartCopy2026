@@ -368,10 +368,8 @@ public class OperationPlan
 
 The Preview View shows actions grouped by warning status, sortable by source/dest path.
 
-**Mandatory preview:** Pipelines containing `DeleteStep` or mirror-delete passes always show the
-preview before execution. The user must explicitly confirm. This is not optional — delete operations
-do not have a "just run" path. Copy and move operations can run directly or via preview at the
-user's choice.
+**Destructive preview:** Pipelines containing `DeleteStep` or mirror-delete passes always show the
+preview before execution. The user must explicitly confirm. This can be disabled in user settings.
 
 ### 2.5 Fine-Grained Progress
 
@@ -486,7 +484,8 @@ Each `FileSystemNode` carries two independent pieces of application state:
 - `Included` — passes all enabled filters (or no filters are active)
 - `Excluded` — caught by at least one active filter; carries the name of the first excluding filter
 
-A parent directory dynamically becomes `Excluded` if all its loaded children and files are `Excluded`.
+A directory automatically becomes `Excluded` if all its children and files are `Excluded`, and ceases to be `Excluded` if any of its children or files are `Included`.
+
 The UI models an `IsFilterIncluded` property (true if `Included`) which drives checkbox enabled state and visibility.
 
 A file is **selected** (i.e. will be included in the next operation) if and only if:
@@ -552,22 +551,22 @@ comparison provider (typically the target side).
 
 Current parameters:
 - `CompareMode = NameOnly` — counterpart exists at same relative path
-- `CompareMode = NameAndSize` — counterpart exists and size matches (name comparison remains case-insensitive)
+- `CompareMode = NameAndSize` — counterpart exists and size matches (comparison respects filesystem case-sensitivity)
 
 The include/exclude behavior is governed by the chain-level `FilterMode` (`Only`, `Add`,
-`Exclude`), not by a separate mirror-specific exclusion mode.
+`Exclude`).
 
-Implementation notes (current code path):
+Implementation notes:
 - If `comparisonProvider` is null, mirror matching returns `false`
-- `comparePath` is built with `comparisonProvider.CombinePath(ComparisonPath, node.RelativePath)` — uses the provider's own path conventions to avoid OS `Path.GetFullPath` mangling virtual paths on Windows
+- `comparePath` uses the provider's path conventions to avoid OS `Path.GetFullPath` mangling paths
 - If counterpart does not exist, returns `false`
-- Directories are treated as matched when counterpart exists
+- Directories are treated as matched if and only if counterpart exists and contents are identical
 - For `NameAndSize`, file match additionally checks target node `Size`
 
-**ComparisonPath suggestion from pipeline:** `MainViewModel` pushes
+**Automatic ComparisonPath from pipeline:** 
+Mirror filters have the option to deduce the path from the pipeline. `MainViewModel` pushes
 `PipelineViewModel.FirstDestinationPath` into `FilterChainViewModel.PipelineDestinationPath`.
-When opening `EditFilterDialog` for a mirror filter, the editor is pre-populated with that
-suggested path.
+Filters are updated automatically when the pipeline path changes.
 
 ### 3.4 Wildcard Pattern Matching
 
@@ -639,40 +638,27 @@ Rock/Beatles/Abbey Road/02 Something.flac
 }
 ```
 - Used for crash-recovery autosave and session files
-- Absolute paths stored for recovery (source root may have changed)
 
 **Loading behaviour:**
 - Both relative and absolute paths accepted
 - Case-insensitive filename matching (for cross-platform portability)
-- Unmatched paths are silently skipped (file may have been deleted or moved)
+- Unmatched paths are skipped and logged (file may have been deleted or moved)
 - `#NODE` / `selectedFolders` entries check all their descendants via `CheckState = Checked`
 
-### 3.7 Sync Operations
+### 3.7 Safety and Preview
 
-The predecessor had four sync modes, each expressible as a filter + pipeline combination:
-
-| Mode | Description | Implementation |
-|---|---|---|
-| **Update target** | Copy source files not present (or newer) in target | `MirrorFilter(ExcludeMatched, NameOnly)` + overwrite mode `IfNewer` + `[CopyStep]` |
-| **Mirror target** | Update target + delete files in target not in source | Update pass, then second pass: enumerate target, apply `MirrorFilter` against source with `ExcludeMatched`, `[DeleteStep]` |
-| **Merge** | Copy files differing in either direction (bidirectional) | Two update passes: source→target, then target→source |
-| **Find orphans** | List target files with no match in source (no copying) | Enumerate target root, apply `MirrorFilter(ExcludeMatched)` against source, display result |
-
-**Safety:** Mirror target's delete pass always shows a mandatory preview (see §2.4). The preview
-clearly labels which files will be deleted and from where. The user must confirm before any
-deletions execute.
-
-**Destination resolution:** In the filter + pipeline combinations above, "target" means the
-`DestinationPath` of the `CopyStep` or `MoveStep` in the pipeline. There is no separate global
-target path field — the pipeline step is the authoritative source of the destination. The
-`MirrorFilter`'s comparison path is auto-derived from that same step (see §3.3).
+**Safety:** 
+The user must confirm before any deletions execute.
+Delete pass optionally shows a preview. 
+The preview clearly indicates which files will be deleted. 
 
 Overwrite strategy when a file exists at the destination (applies to copy and sync operations):
 - `Skip` — never overwrite; skip if destination file exists
 - `IfNewer` — overwrite only if source `ModifiedAt` > destination `ModifiedAt`
 - `Always` — always overwrite
 
-This is configured per-pipeline, not globally. The overwrite mode is carried in `TransformContext`.
+This is configured per-step, initialised with a global default value.
+The overwrite mode is carried in `TransformContext`.
 
 ### 3.8 Move Operation Strategy
 
@@ -748,20 +734,15 @@ experienced users.
 - macOS: `NSFileManager.trashItem` via P/Invoke
 - **Timeout:** Wrap all trash operations in a 500ms timeout. If the operation does not complete
   within that window (common on network drives where trash is unsupported or slow), treat trash
-  as unavailable and fall back to the permanent-delete confirmation dialog. Never let a slow
+  as unavailable and offer a dialog option to switch to permanent delete. Never let a slow
   trash call block the UI or the pipeline.
 - Fallback: if trash is unavailable (e.g. network drive with no trash support), warn the user
   and require explicit confirmation for permanent delete
 
 **Overwrite operations:**
-- Default overwrite mode is `IfNewer` (not `Always`)
-- When `Always` is selected, files that would be overwritten are highlighted in the preview
+- Default overwrite mode is `Skip`
+- When `Always` or `IfNewer` is selected, files that would be overwritten are highlighted in the preview
 - The preview shows file size and date comparisons for overwrite targets
-
-**Mirror target safety:**
-- The delete pass in mirror-target sync always shows a mandatory preview
-- The preview clearly separates "files to copy" from "files to delete" with distinct sections
-- A count summary ("This will delete N files (X MB) from the target") is shown prominently
 
 **Operation journal (lightweight):**
 - After each operation completes, write a log file to `%APPDATA%/SmartCopy2026/logs/`
