@@ -158,7 +158,6 @@ public partial class MainViewModel : ViewModelBase
         _settings.ShowFilteredNodesInTree = value;
         _ = _settingsStore.SaveAsync(_settings);
         FilterChain.ShowExcludedNodesInTree = value;
-        DirectoryTree.ShowFilteredNodesInTree = value;
     }
 
     // ── Selection commands ──────────────────────────────────────────────────────
