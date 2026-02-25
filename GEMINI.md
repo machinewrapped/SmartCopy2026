@@ -13,7 +13,7 @@ To cleanly read build errors directly in the console output, force the environme
    dotnet build SmartCopy.UI/SmartCopy.UI.csproj /tl:off /clp:ErrorsOnly | Out-String
    ```
      
-**Rule:** If you are not able to read the console output for a command do not keep trying different approaches, ask the user for help. They can run the command and provide the output to you.
+**Rule:** Always attempt to gather dotnet build output natively using the command above. Do not write temporary files to the workspace. If you are still unable to read the console output, ask the user for help by providing the command you ran and requesting they provide the output.
 
 ## Committing Changes and Temporary Files
 
