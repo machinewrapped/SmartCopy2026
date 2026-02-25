@@ -446,11 +446,18 @@ public partial class MainViewModel : ViewModelBase
 
     private async Task LoadWorkflowAsync(string name)
     {
-        var presets = await _workflowStore.GetUserPresetsAsync();
-        var preset = presets.FirstOrDefault(p =>
+        var preset = WorkflowMenu.SavedWorkflows.FirstOrDefault(p =>
             string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
         if (preset is null)
         {
+            var presets = await _workflowStore.GetUserPresetsAsync();
+            preset = presets.FirstOrDefault(p =>
+            string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (preset is null)
+        {
+            Debug.WriteLine($"Failed to find workflow preset with name '{name}'.");
             return;
         }
 

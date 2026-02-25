@@ -142,8 +142,16 @@ public sealed class WorkflowPresetStore
             return;
         }
 
-        await DeleteUserPresetAsync(oldName, directory, ct);
+        // Save the new configuration. This will either create a new file or overwrite an existing one.
         await SaveUserPresetAsync(newName, existing.Config, directory, ct);
+
+        // If the rename resulted in a new file path, delete the old one.
+        var oldPath = Path.Combine(directory, $"{existing.Id}.sc2workflow");
+        var newPath = Path.Combine(directory, $"{ToSafeId(newName)}.sc2workflow");
+        if (!string.Equals(oldPath, newPath, StringComparison.OrdinalIgnoreCase) && File.Exists(oldPath))
+        {
+            File.Delete(oldPath);
+        }
     }
 
     public static string GetDefaultPresetDirectory()
