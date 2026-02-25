@@ -35,6 +35,11 @@ public partial class ManageWorkflowsDialog : Window
         };
     }
 
+    private void OnTitleBarPointerPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
+    {
+        BeginMoveDrag(e);
+    }
+
     private void OnCloseRequested() => Dispatcher.UIThread.Post(() => Close());
 
     private void OnLoadClick(object? sender, RoutedEventArgs e)

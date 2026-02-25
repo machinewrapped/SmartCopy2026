@@ -6,50 +6,77 @@
         x:DataType="vm:ManageWorkflowsDialogViewModel"
         Title="Manage Workflows"
         Width="460" Height="380"
-        CanResize="False"
+        MinWidth="300" MinHeight="200"
+        CanResize="True"
+        ShowInTaskbar="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
         WindowStartupLocation="CenterOwner"
-        Background="#1e1e1e">
-    <Grid RowDefinitions="*, Auto" Margin="16">
+        Background="Transparent"
+        TransparencyLevelHint="Transparent">
+    
+    <Border Background="#1e1e1e" BorderBrush="#555" BorderThickness="1" CornerRadius="6">
+        <Grid RowDefinitions="Auto, *, Auto">
+            
+            <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="8,4,4,2" Background="Transparent" PointerPressed="OnTitleBarPointerPressed">
+                <TextBlock Grid.Column="0" Text="Manage Workflows" FontWeight="SemiBold" Foreground="#4facfe" VerticalAlignment="Center" Margin="4,2,0,2" IsHitTestVisible="False" />
+                <Button Grid.Column="1"
+                        Content="✕"
+                        Command="{Binding CloseCommand}"
+                        Background="Transparent"
+                        Padding="6,2"
+                        CornerRadius="4"
+                        FontSize="12"
+                        Foreground="#a0a0a0" />
+            </Grid>
 
-        <ListBox Grid.Row="0"
-                 ItemsSource="{Binding Workflows}"
-                 SelectedItem="{Binding SelectedWorkflow}"
-                 Background="#252526"
-                 CornerRadius="4">
-            <ListBox.ItemTemplate>
-                <DataTemplate x:DataType="wf:WorkflowPreset">
-                    <DockPanel Margin="4">
-                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
-                            <Button Content="Load"
-                                    Click="OnLoadClick"
-                                    FontSize="12"
-                                    Padding="8,4" />
-                            <Button Content="Rename"
-                                    Click="OnRenameClick"
-                                    FontSize="12"
-                                    Padding="8,4" />
-                            <Button Content="🗑"
-                                    Click="OnDeleteClick"
-                                    Width="28" Height="28" Padding="0"
-                                    HorizontalContentAlignment="Center"
-                                    VerticalContentAlignment="Center"
-                                    CornerRadius="4" Background="Transparent"
-                                    Foreground="#f44736" FontSize="12"
-                                    ToolTip.Tip="Delete workflow" />
-                        </StackPanel>
-                        <TextBlock Text="{Binding Name}"
-                                   VerticalAlignment="Center"
-                                   TextTrimming="CharacterEllipsis" />
-                    </DockPanel>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
-        </ListBox>
+            <Separator Grid.Row="0" VerticalAlignment="Bottom" Height="1" Background="#3e3e42" Margin="4,0" IsHitTestVisible="False" />
 
-        <Button Grid.Row="1"
-                Content="Close"
-                Command="{Binding CloseCommand}"
-                HorizontalAlignment="Right"
-                Width="80"
-                Margin="0,12,0,0" />
-    </Grid>
+            <ListBox Grid.Row="1"
+                     Margin="12,8,12,0"
+                     ItemsSource="{Binding Workflows}"
+                     SelectedItem="{Binding SelectedWorkflow}"
+                     Background="#252526"
+                     CornerRadius="4">
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="wf:WorkflowPreset">
+                        <DockPanel Margin="4">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
+                                <Button Content="Load"
+                                        Click="OnLoadClick"
+                                        FontSize="12"
+                                        Padding="8,4" />
+                                <Button Content="✎"
+                                        Click="OnRenameClick"
+                                        Width="28" Height="28" Padding="0"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        CornerRadius="4" Background="Transparent"
+                                        Foreground="#a0a0a0" FontSize="13"
+                                        ToolTip.Tip="Rename workflow" />
+                                <Button Content="🗑"
+                                        Click="OnDeleteClick"
+                                        Width="28" Height="28" Padding="0"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        CornerRadius="4" Background="Transparent"
+                                        Foreground="#f44736" FontSize="12"
+                                        ToolTip.Tip="Delete workflow" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding Name}"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" />
+                        </DockPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <Button Grid.Row="2"
+                    Content="Close"
+                    Command="{Binding CloseCommand}"
+                    HorizontalAlignment="Right"
+                    Width="80"
+                    Margin="12" />
+        </Grid>
+    </Border>
 </Window>
