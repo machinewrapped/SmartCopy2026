@@ -496,6 +496,11 @@ public partial class MainViewModel : ViewModelBase
         {
             await WorkflowMenu.RefreshAsync();
         }
+
+        if (!string.IsNullOrEmpty(vm.LoadRequestedWorkflowName))
+        {
+            await LoadWorkflowAsync(vm.LoadRequestedWorkflowName);
+        }
     }
 
     private List<FileSystemNode> CollectSelectedFiles()

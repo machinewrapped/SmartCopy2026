@@ -20,14 +20,22 @@
                 <DataTemplate x:DataType="wf:WorkflowPreset">
                     <DockPanel Margin="4">
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
+                            <Button Content="Load"
+                                    Click="OnLoadClick"
+                                    FontSize="12"
+                                    Padding="8,4" />
                             <Button Content="Rename"
                                     Click="OnRenameClick"
                                     FontSize="12"
                                     Padding="8,4" />
-                            <Button Content="Delete"
+                            <Button Content="🗑"
                                     Click="OnDeleteClick"
-                                    FontSize="12"
-                                    Padding="8,4" />
+                                    Width="28" Height="28" Padding="0"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    CornerRadius="4" Background="Transparent"
+                                    Foreground="#f44736" FontSize="12"
+                                    ToolTip.Tip="Delete workflow" />
                         </StackPanel>
                         <TextBlock Text="{Binding Name}"
                                    VerticalAlignment="Center"

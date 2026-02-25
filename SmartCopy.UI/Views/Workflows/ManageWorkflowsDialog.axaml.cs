@@ -37,6 +37,15 @@ public partial class ManageWorkflowsDialog : Window
 
     private void OnCloseRequested() => Dispatcher.UIThread.Post(() => Close());
 
+    private void OnLoadClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Button { DataContext: WorkflowPreset preset } && _vm is not null)
+        {
+            _vm.LoadWorkflowCommand.Execute(preset);
+            e.Handled = true;
+        }
+    }
+
     private void OnRenameClick(object? sender, RoutedEventArgs e)
     {
         if (sender is Button { DataContext: WorkflowPreset preset } && _vm is not null)

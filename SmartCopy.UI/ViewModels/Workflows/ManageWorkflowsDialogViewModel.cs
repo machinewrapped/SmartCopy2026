@@ -15,6 +15,16 @@ public partial class ManageWorkflowsDialogViewModel : ViewModelBase
     [ObservableProperty]
     private WorkflowPreset? _selectedWorkflow;
 
+    public string? LoadRequestedWorkflowName { get; private set; }
+
+    [RelayCommand]
+    private void LoadWorkflow(WorkflowPreset? workflow)
+    {
+        if (workflow is null) return;
+        LoadRequestedWorkflowName = workflow.Name;
+        CloseRequested?.Invoke();
+    }
+
     public ObservableCollection<WorkflowPreset> Workflows { get; } = [];
 
     public bool HasChanges { get; private set; }
