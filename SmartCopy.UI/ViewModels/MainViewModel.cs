@@ -136,9 +136,10 @@ public partial class MainViewModel : ViewModelBase
 
     partial void OnSelectedSourceBookmarkChanged(string? value)
     {
-        if (value is null) return;
-        SourcePath = value;
-        _ = ApplySourcePathCoreAsync(value);
+        // Only populate the text field — don't apply until the user commits
+        // (Enter key or dropdown close after mouse selection).
+        if (value is not null)
+            SourcePath = value;
     }
 
     partial void OnUseAbsolutePathsForSelectionChanged(bool value)
@@ -158,6 +159,23 @@ public partial class MainViewModel : ViewModelBase
         _settings.ShowFilteredNodesInTree = value;
         _ = _settingsStore.SaveAsync(_settings);
         FilterChain.ShowExcludedNodesInTree = value;
+    }
+
+    // ── Keyboard shortcut commands ────────────────────────────────────────────
+
+    [RelayCommand]
+    private async Task Rescan()
+    {
+        var path = SourcePath.Trim();
+        if (string.IsNullOrWhiteSpace(path)) return;
+        await ApplySourcePathCoreAsync(path);
+    }
+
+    [RelayCommand]
+    private void CancelOperation()
+    {
+        if (StatusBar.Progress.IsActive)
+            StatusBar.Progress.CancelCommand.Execute(null);
     }
 
     // ── Selection commands ──────────────────────────────────────────────────────
@@ -321,9 +339,15 @@ public partial class MainViewModel : ViewModelBase
 
     private void RefreshSourceBookmarks()
     {
+        // Preserve the current text — Clear() nulls SelectedItem which
+        // causes the editable ComboBox to wipe its Text binding.
+        var currentPath = SourcePath;
+
         SourceBookmarks.Clear();
         foreach (var path in _settings.FavouritePaths.Concat(_settings.RecentSources).Distinct())
             SourceBookmarks.Add(path);
+
+        SourcePath = currentPath;
     }
 
     private async void OnChainChanged(object? sender, EventArgs e)

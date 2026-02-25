@@ -7,15 +7,18 @@
         <StackPanel Orientation="Horizontal" Spacing="12">
             <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" FontWeight="SemiBold" />
             <TextBlock Text="|" VerticalAlignment="Center" Opacity="0.5" />
-            <ProgressBar Value="{Binding PercentComplete}" Width="150" Height="14" CornerRadius="7" Foreground="#4facfe" />
+            <ProgressBar Value="{Binding PercentComplete}" Width="150" Height="14" CornerRadius="7" Foreground="#4facfe"
+                         AutomationProperties.Name="Operation progress" />
             <TextBlock Text="{Binding PercentComplete, StringFormat=\{0\}%}" VerticalAlignment="Center" />
             <TextBlock Text="{Binding TimeRemaining}" VerticalAlignment="Center" />
             <Button Content="Pause"
                     Command="{Binding PauseCommand}"
+                    AutomationProperties.Name="Pause operation"
                     CornerRadius="4"
                     Padding="8,2" />
             <Button Content="Cancel"
                     Command="{Binding CancelCommand}"
+                    AutomationProperties.Name="Cancel operation"
                     CornerRadius="4"
                     Padding="8,2" />
         </StackPanel>

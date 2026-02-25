@@ -19,16 +19,18 @@
 
    <DataGrid ItemsSource="{Binding VisibleFiles}" AutoGenerateColumns="False"
              CanUserReorderColumns="True" CanUserResizeColumns="True" CanUserSortColumns="True"
+             AutomationProperties.Name="File list"
              GridLinesVisibility="Horizontal" BorderThickness="0" Background="Transparent">
        <DataGrid.Columns>
            <DataGridTemplateColumn Width="Auto">
                <DataGridTemplateColumn.Header>
-                   <CheckBox IsThreeState="False" Margin="8,0,0,0" />
+                   <CheckBox IsThreeState="False" AutomationProperties.Name="Select all files" Margin="8,0,0,0" />
                </DataGridTemplateColumn.Header>
                <DataGridTemplateColumn.CellTemplate>
                    <DataTemplate>
                        <CheckBox IsChecked="{Binding CheckState, Converter={StaticResource CheckStateConverter}}"
                                  IsEnabled="{Binding IsFilterIncluded}"
+                                 AutomationProperties.Name="Select file"
                                  IsThreeState="False" Margin="8,0,0,0" />
                    </DataTemplate>
                </DataGridTemplateColumn.CellTemplate>

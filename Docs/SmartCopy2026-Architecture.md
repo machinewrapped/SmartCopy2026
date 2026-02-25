@@ -854,6 +854,37 @@ blocking issues exist, ensuring UI and runtime enforce identical rules.
 - `SaveUserPresetAsync(string name, PipelineConfig config)`
 - `DeleteUserPresetAsync(string name)`
 
+### 3.14 Editable ComboBox + ObservableCollection Pitfall (Source Path Selector)
+
+The Source path field is an **editable `ComboBox`** bound to `SourceBookmarks` (items) and
+`SourcePath` (text). Two binding pitfalls must be avoided whenever this pattern is used:
+
+**Pitfall 1 — Do not apply side effects from `SelectedItem` changes.**
+An editable ComboBox fires `SelectedItem` changes on every arrow-key press (including when the
+dropdown is closed). If the ViewModel reacts to `SelectedItem` by triggering an expensive
+operation (directory rescan, API call, etc.), the UI becomes sluggish and the user sees
+intermediate states they never intended to commit.
+
+**Correct pattern:** `OnSelectedSourceBookmarkChanged` should only populate the text field
+(`SourcePath = value`). The actual path application must be deferred to an explicit commit action:
+- **Keyboard:** Enter key fires `ApplySourcePathCommand` (wired via tunnel handler in code-behind)
+- **Mouse:** A `SelectionChanged` handler sets `_applyOnDropDownClose = true` when the dropdown
+  is open (the popup is a separate visual tree so pointer events don't bubble to the ComboBox).
+  `DropDownClosed` checks this flag and defers the apply via `Dispatcher.UIThread.Post`.
+
+**Pitfall 2 — `ObservableCollection.Clear()` wipes the ComboBox `Text` binding.**
+When `SourceBookmarks.Clear()` fires (e.g. during `RefreshSourceBookmarks`), the ComboBox nulls
+its `SelectedItem`, which causes Avalonia to internally wipe the `Text` property. The two-way
+`Text ↔ SourcePath` binding propagates that blank back to the ViewModel, erasing the user's input.
+
+**Correct pattern:** Save `SourcePath` before clearing and restore it after repopulation:
+```csharp
+var currentPath = SourcePath;
+SourceBookmarks.Clear();
+foreach (var path in ...) SourceBookmarks.Add(path);
+SourcePath = currentPath;
+```
+
 ---
 
 ### UI Improvements Over Predecessor

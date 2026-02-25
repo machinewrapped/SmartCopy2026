@@ -45,6 +45,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        WireSourceComboBoxKeyboard();
         DataContextChanged += OnMainDataContextChanged;
     }
 
@@ -330,6 +331,76 @@ public partial class MainWindow : Window
         catch
         {
             // Best-effort — never crash on close just because we couldn't save prefs.
+        }
+    }
+
+    // ── Source ComboBox UX ──────────────────────────────────────────────────────
+    // Keyboard: Tunnel handler fires BEFORE the ComboBox's built-in key handler.
+    // Mouse: SelectionChanged while dropdown is open sets _applyOnDropDownClose;
+    //        DropDownClosed checks it and applies if set.
+
+    private bool _applyOnDropDownClose;
+
+    private void WireSourceComboBoxKeyboard()
+    {
+        SourceComboBox.AddHandler(
+            KeyDownEvent,
+            OnSourceComboBoxKeyDown,
+            Avalonia.Interactivity.RoutingStrategies.Tunnel);
+
+        // If the selection changes while the dropdown is open, the user picked an item.
+        SourceComboBox.SelectionChanged += (_, _) =>
+        {
+            if (SourceComboBox.IsDropDownOpen)
+                _applyOnDropDownClose = true;
+        };
+
+        SourceComboBox.DropDownClosed += OnSourceComboBoxDropDownClosed;
+    }
+
+    private void OnSourceComboBoxDropDownClosed(object? sender, EventArgs e)
+    {
+        if (!_applyOnDropDownClose) return;
+        _applyOnDropDownClose = false;
+
+        // Defer so the SelectedItem → SourcePath binding settles
+        // after the popup disposes.
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (DataContext is MainViewModel vm && !string.IsNullOrWhiteSpace(vm.SourcePath))
+                vm.ApplySourcePathCommand.Execute(null);
+        });
+    }
+
+    private void OnSourceComboBoxKeyDown(object? sender, KeyEventArgs e)
+    {
+        var combo = SourceComboBox;
+
+        switch (e.Key)
+        {
+            // Enter → commit the current text/selection and apply.
+            case Key.Enter:
+                combo.IsDropDownOpen = false;
+                if (DataContext is MainViewModel vm)
+                {
+                    vm.ApplySourcePathCommand.Execute(null);
+                }
+                e.Handled = true;
+                break;
+
+            // Escape → close dropdown if open, otherwise revert path.
+            case Key.Escape:
+                if (combo.IsDropDownOpen)
+                {
+                    combo.IsDropDownOpen = false;
+                }
+
+                if (DataContext is MainViewModel rv)
+                {
+                    rv.RevertSourcePathCommand.Execute(null);
+                }
+                e.Handled = true;
+                break;
         }
     }
 

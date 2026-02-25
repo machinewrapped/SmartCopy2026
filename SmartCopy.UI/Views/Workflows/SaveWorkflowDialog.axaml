@@ -27,7 +27,8 @@
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
             <Button Content="Cancel"
                     Command="{Binding CancelCommand}"
-                    Width="80" />
+                    Width="80"
+                    IsCancel="True" />
             <Button Content="OK"
                     Command="{Binding OkCommand}"
                     Width="80"

@@ -10,10 +10,12 @@
                     Content="Clear"
                     Command="{Binding ClearCommand}"
                     IsVisible="{Binding IsExpanded}"
+                    AutomationProperties.Name="Clear log"
                     Padding="8,2"
                     CornerRadius="4"
                     VerticalAlignment="Center" />
             <ToggleButton IsChecked="{Binding IsExpanded, Mode=TwoWay}"
+                          AutomationProperties.Name="Toggle log panel"
                           VerticalAlignment="Center"
                           Padding="4,2"
                           CornerRadius="4">

@@ -183,6 +183,9 @@ public partial class PipelineViewModel : ViewModelBase
     private int _selectedIncludedFileCount;
 
     public ObservableCollection<PipelineStepViewModel> Steps { get; } = [];
+
+    [ObservableProperty]
+    private PipelineStepViewModel? _selectedStep;
     public ObservableCollection<PipelinePreset> UserPresets { get; } = [];
     public AddStepViewModel AddStep { get; }
 
