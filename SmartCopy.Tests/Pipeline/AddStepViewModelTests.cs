@@ -1,10 +1,9 @@
 using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Settings;
+using SmartCopy.Tests.TestInfrastructure;
+using SmartCopy.UI.ViewModels;
 using SmartCopy.UI.ViewModels.Pipeline;
-using Xunit;
 
 namespace SmartCopy.Tests.Pipeline;
 
@@ -25,86 +24,157 @@ public sealed class AddStepViewModelTests
     }
 
     // -------------------------------------------------------------------------
-    // Menu Building Tests
+    // Level 1 → Level 2 tests (existing behavior)
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task Initialize_BuildsMenuTypeHierarchies()
+    public void NavigateToCategory_ShowsLevel2AndItems()
     {
         var (vm, _, _) = CreateVm();
-        await vm.Initialization;
 
-        Assert.NotEmpty(vm.CopyMenuItems);
-        Assert.NotEmpty(vm.MoveMenuItems);
-        Assert.NotEmpty(vm.DeleteMenuItems);
-        
-        // Path menu is a category containing submenus
-        Assert.NotEmpty(vm.PathMenuItems);
-        Assert.Contains(vm.PathMenuItems, m => m.Header == "Flatten");
-        Assert.Contains(vm.PathMenuItems, m => m.Header == "Rebase");
-        Assert.Contains(vm.PathMenuItems, m => m.Header == "Rename");
-        
-        // Ensure the flatten submenu has items
-        var flattenMenu = vm.PathMenuItems.First(m => m.Header == "Flatten");
-        Assert.NotNull(flattenMenu.Items);
-        Assert.NotEmpty(flattenMenu.Items);
+        vm.NavigateToCategoryCommand.Execute(StepCategory.Path);
+
+        Assert.True(vm.IsLevel2Visible);
+        Assert.Equal(StepCategory.Path, vm.SelectedCategory);
+        Assert.True(vm.StepTypeItems.Count >= 3);
     }
 
     [Fact]
-    public async Task DeleteMenu_ContainsNewAndBuiltInPresets()
+    public void GoBack_ReturnsToLevel1()
     {
         var (vm, _, _) = CreateVm();
-        await vm.Initialization;
+        vm.NavigateToCategoryCommand.Execute(StepCategory.Executable);
 
-        var menu = vm.DeleteMenuItems;
-        
-        // First item is always '+ New...'
-        Assert.Equal("＋ New...", menu[0].Header);
-        
-        // There should be builtin presets in the menu
-        Assert.Contains(menu, m => m.Header.Contains("Delete to Trash"));
-        Assert.Contains(menu, m => m.Header.Contains("Delete permanently"));
+        vm.GoBackCommand.Execute(null);
+
+        Assert.False(vm.IsLevel2Visible);
+        Assert.Null(vm.SelectedCategory);
+        Assert.Empty(vm.StepTypeItems);
+    }
+
+    [Fact]
+    public void Categories_ContainExpectedStepKinds()
+    {
+        var (vm, _, _) = CreateVm();
+
+        vm.NavigateToCategoryCommand.Execute(StepCategory.Path);
+        Assert.Contains(vm.StepTypeItems, item => item.Kind == StepKind.Flatten);
+        Assert.Contains(vm.StepTypeItems, item => item.Kind == StepKind.Rebase);
+        Assert.Contains(vm.StepTypeItems, item => item.Kind == StepKind.Rename);
+
+        vm.NavigateToCategoryCommand.Execute(StepCategory.Content);
+        Assert.Contains(vm.StepTypeItems, item => item.Kind == StepKind.Convert);
+
+        vm.NavigateToCategoryCommand.Execute(StepCategory.Executable);
+        Assert.Contains(vm.StepTypeItems, item => item.Kind == StepKind.Copy);
+        Assert.Contains(vm.StepTypeItems, item => item.Kind == StepKind.Move);
+        Assert.Contains(vm.StepTypeItems, item => item.Kind == StepKind.Delete);
     }
 
     // -------------------------------------------------------------------------
-    // Execution Tests
+    // Level 2 → Level 3 bypass (no presets for type)
     // -------------------------------------------------------------------------
 
     [Fact]
-    public void RequestNewStep_FiresStepTypeSelected()
+    public async Task SelectStepType_ForCopyType_BypassesLevel3AndFiresEvent()
     {
         var (vm, _, _) = CreateVm();
         StepKind? picked = null;
         vm.StepTypeSelected += kind => picked = kind;
+        vm.NavigateToCategoryCommand.Execute(StepCategory.Executable);
 
-        vm.RequestNewStepCommand.Execute(StepKind.Delete);
+        await vm.SelectStepTypeCommand.ExecuteAsync(StepKind.Copy);
+
+        Assert.Equal(StepKind.Copy, picked);
+        Assert.False(vm.IsLevel3Visible);
+        Assert.False(vm.IsLevel2Visible);
+    }
+
+    // -------------------------------------------------------------------------
+    // Level 2 → Level 3 navigation (type has presets)
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task SelectStepType_ForDeleteType_NavigatesToLevel3()
+    {
+        var (vm, _, _) = CreateVm();
+        vm.NavigateToCategoryCommand.Execute(StepCategory.Executable);
+
+        await vm.SelectStepTypeCommand.ExecuteAsync(StepKind.Delete);
+
+        Assert.True(vm.IsLevel3Visible);
+        Assert.True(vm.IsLevel2Visible);
+        Assert.False(vm.IsLevel2VisibleOnly);
+        Assert.True(vm.HasPresets || vm.HasRecentPresets);
+    }
+
+    [Fact]
+    public async Task SelectStepType_ForFlattenType_NavigatesToLevel3()
+    {
+        var (vm, _, _) = CreateVm();
+        vm.NavigateToCategoryCommand.Execute(StepCategory.Path);
+
+        await vm.SelectStepTypeCommand.ExecuteAsync(StepKind.Flatten);
+
+        Assert.True(vm.IsLevel3Visible);
+    }
+
+    // -------------------------------------------------------------------------
+    // Level 3 navigation
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GoBackToLevel2_FromLevel3_ReturnsToLevel2()
+    {
+        var (vm, _, _) = CreateVm();
+        vm.NavigateToCategoryCommand.Execute(StepCategory.Executable);
+        await vm.SelectStepTypeCommand.ExecuteAsync(StepKind.Delete);
+        Assert.True(vm.IsLevel3Visible);
+
+        vm.GoBackToLevel2Command.Execute(null);
+
+        Assert.False(vm.IsLevel3Visible);
+        Assert.True(vm.IsLevel2VisibleOnly);
+        Assert.Null(vm.SelectedStepType);
+    }
+
+    [Fact]
+    public async Task RequestNewStep_FiresStepTypeSelected()
+    {
+        var (vm, _, _) = CreateVm();
+        StepKind? picked = null;
+        vm.StepTypeSelected += kind => picked = kind;
+        vm.NavigateToCategoryCommand.Execute(StepCategory.Executable);
+        await vm.SelectStepTypeCommand.ExecuteAsync(StepKind.Delete);
+
+        vm.RequestNewStepCommand.Execute(null);
 
         Assert.Equal(StepKind.Delete, picked);
+        Assert.False(vm.IsLevel3Visible);
+        Assert.False(vm.IsLevel2Visible);
     }
 
     [Fact]
     public async Task PickPreset_RaisesStepPresetPickedAndUpdatesSettings()
     {
         var (vm, settings, _) = CreateVm();
-        await vm.Initialization;
-        
         StepPreset? pickedPreset = null;
         vm.StepPresetPicked += preset => pickedPreset = preset;
+        vm.NavigateToCategoryCommand.Execute(StepCategory.Executable);
+        await vm.SelectStepTypeCommand.ExecuteAsync(StepKind.Delete);
 
-        // Find a Delete preset menu item (skip '+ New...' and separators)
-        var presetItem = vm.DeleteMenuItems.FirstOrDefault(m => m.CommandParameter is StepPresetItem);
-        Assert.NotNull(presetItem);
-        
-        var stepPresetItem = (StepPresetItem)presetItem.CommandParameter!;
-
-        vm.PickPresetCommand.Execute(stepPresetItem);
+        // Pick the first preset (a built-in)
+        var firstPreset = vm.PresetsForType.First();
+        vm.PickPresetCommand.Execute(firstPreset);
 
         Assert.NotNull(pickedPreset);
-        Assert.Equal(stepPresetItem.Preset.Name, pickedPreset!.Name);
+        Assert.Equal(firstPreset.Preset.Name, pickedPreset!.Name);
+        Assert.False(vm.IsLevel3Visible);
+        Assert.False(vm.IsLevel2Visible);
 
         // MRU should have been updated
         Assert.True(settings.StepTypeMruPresetIds.ContainsKey("Delete"));
-        Assert.Contains(stepPresetItem.Preset.Id, settings.StepTypeMruPresetIds["Delete"]);
+        Assert.Contains(firstPreset.Preset.Id, settings.StepTypeMruPresetIds["Delete"]);
     }
 
     // -------------------------------------------------------------------------
@@ -149,11 +219,29 @@ public sealed class AddStepViewModelTests
         var (vm, _, _) = CreateVm();
         var closed = false;
         vm.CloseRequested += () => closed = true;
+        vm.NavigateToCategoryCommand.Execute(StepCategory.Content);
 
         vm.CloseCommand.Execute(null);
 
         Assert.True(closed);
-        Assert.False(vm.IsSavingPipeline);
-        Assert.Empty(vm.NewPipelineName);
+        Assert.False(vm.IsLevel2Visible);
+        Assert.Null(vm.SelectedCategory);
+        Assert.Empty(vm.StepTypeItems);
+    }
+
+    [Fact]
+    public async Task Close_FromLevel3_ResetsAllState()
+    {
+        var (vm, _, _) = CreateVm();
+        var closed = false;
+        vm.CloseRequested += () => closed = true;
+        vm.NavigateToCategoryCommand.Execute(StepCategory.Executable);
+        await vm.SelectStepTypeCommand.ExecuteAsync(StepKind.Delete);
+
+        vm.CloseCommand.Execute(null);
+
+        Assert.True(closed);
+        Assert.False(vm.IsLevel3Visible);
+        Assert.False(vm.IsLevel2Visible);
     }
 }

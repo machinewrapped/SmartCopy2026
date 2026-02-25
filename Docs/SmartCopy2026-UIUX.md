@@ -182,24 +182,22 @@ Each step in the pipeline strip is a card connected by `→` arrows. Cards follo
 
 `DeleteStep` cards are intentionally quiet for `Trash` mode (single-line summary, no extra badge). When `DeleteMode.Permanent` is active, the card shows an amber warning badge.
 
-### Add Step — Integrated MenuFlyout
+### Add Step — Integrated Dropdown
 
 Clicking `+ Add step` opens a **`Popup`** anchored below the button (light-dismiss on click-outside). This dropdown now integrates loading standard or custom pipeline presets, and saving the current pipeline, directly into the step addition flow.
 
-Instead of a multi-panel drill-down, the Add Step UI now uses native cascading Avalonia `MenuFlyout` elements triggered by clicking `▸` buttons.
-
-**Main Dropdown:**
+**Level 1 — Main Category Selection:**
 ```text
 ┌────────────────────────────────┐
 │  Add Step                    ✕ │
 ├────────────────────────────────┤
-│  Copy ▸                        │
-│  Move ▸                        │
-│  Delete ▸                      │
+│  Copy To                     ▸ │
+│  Move To                     ▸ │
+│  Delete                      ▸ │
 │  ────────────────────────────  │
-│  Path steps ▸                  │
-│  Content steps ▸               │
-│  Selection steps ▸             │
+│  Path steps                  ▸ │
+│  Content steps               ▸ │
+│  Selection steps             ▸ │
 │  ────────────────────────────  │
 │  Load preset ▸                 │
 │  ────────────────────────────  │
@@ -207,9 +205,22 @@ Instead of a multi-panel drill-down, the Add Step UI now uses native cascading A
 └────────────────────────────────┘
 ```
 
-**Step Menu (e.g. Delete ▸):**
+**Level 2 — Step type selection** (example: Path steps):
 ```text
 ┌────────────────────────────────┐
+│  ← Path steps                  │
+├────────────────────────────────┤
+│  Flatten   Remove folders      │
+│  Rebase    Change root path    │
+│  Rename    Change filename     │
+└────────────────────────────────┘
+```
+
+**Level 3 — Preset picker for chosen type** (example: Delete):
+```text
+┌────────────────────────────────┐
+│  ← Delete                      │
+├────────────────────────────────┤
 │  ＋ New...                     │
 ├────────────────────────────────┤
 │  Recently used                 │
@@ -221,21 +232,17 @@ Instead of a multi-panel drill-down, the Add Step UI now uses native cascading A
 └────────────────────────────────┘
 ```
 
-**Category Menu (e.g. Path steps ▸):**
-```text
-┌────────────────────────────────┐
-│  Flatten ▸                     │
-│  Rebase ▸                      │
-│  Rename ▸                      │
-└────────────────────────────────┘
-```
-
-- **"＋ New..."** on any step submenu opens `EditStepDialog` with an empty form for the selected type.
-- **Preset row** — closes the menu, adds the step immediately from the preset config.
+- `←` on Level 2 returns to Level 1; `←` on Level 3 returns to Level 1 (for top-level executable steps) or Level 2 (for categorized steps).
+- If no presets exist for a step type (e.g. Copy, Move, Rename), Level 3 is bypassed and `EditStepDialog` opens directly — same bypass pattern as the filter flyout.
+- **"＋ New..."** on Level 3 opens `EditStepDialog` with an empty form for the selected type.
+- **Preset row** — closes flyout, adds step immediately from preset config.
 - "★" prefix = built-in (read-only); plain rows = user-saved presets.
 - "Recently used" shows the last 5 presets of this type from `AppSettings.StepTypeMruPresetIds`.
 
-This includes optional custom step naming in the same interaction by picking "＋ New...".
+Clicking a category (Level 1) navigates to Level 2.
+Clicking a top-level executable step or a step type from Level 2 that has presets navigates to Level 3.
+Clicking a step type with no presets opens `EditStepDialog` directly.
+This includes optional custom step naming in the same interaction.
 
 **Execution eligibility rule:** A pipeline may contain zero or more executable steps.
 `Run` stays disabled until the pipeline contains at least one executable step and all required fields for configured steps are valid. Adding Copy/Move does not replace existing executable steps. `DeleteStep` remains preview-mandatory and must be the final step when present.
