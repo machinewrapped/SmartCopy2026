@@ -17,6 +17,7 @@ using SmartCopy.Core.Progress;
 using SmartCopy.Core.Selection;
 using SmartCopy.Core.Settings;
 using SmartCopy.Core.Workflows;
+using SmartCopy.UI.Helpers;
 using SmartCopy.UI.Services;
 using SmartCopy.UI.ViewModels.Workflows;
 using SmartCopy.UI.Views;
@@ -556,7 +557,7 @@ public partial class MainViewModel : ViewModelBase
                 }
                 else if (r.StepType == StepKind.Copy)
                 {
-                    LogPanel.AddEntry($"Copied {Path.GetFileName(r.SourcePath)} → {r.DestinationPath} ({FormatBytes(r.OutputBytes)})");
+                    LogPanel.AddEntry($"Copied {Path.GetFileName(r.SourcePath)} → {r.DestinationPath} ({FileSizeFormatter.FormatBytes(r.OutputBytes)})");
                 }
                 else if (r.StepType == StepKind.Move)
                 {
@@ -575,14 +576,6 @@ public partial class MainViewModel : ViewModelBase
             StatusBar.Progress.Cancelled();
         }
     }
-
-    private static string FormatBytes(long bytes) => bytes switch
-    {
-        < 1024 => $"{bytes} B",
-        < 1024 * 1024 => $"{bytes / 1024.0:F1} KB",
-        < 1024L * 1024 * 1024 => $"{bytes / (1024.0 * 1024):F1} MB",
-        _ => $"{bytes / (1024.0 * 1024 * 1024):F2} GB",
-    };
 
     private async Task SaveWorkflowAsync()
     {
