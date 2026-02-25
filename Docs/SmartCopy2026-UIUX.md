@@ -395,6 +395,10 @@ If the pipeline has no executable step (for example, only `Flatten`/`Rename`/`Re
 
 1. **Top Navigation Menu** — Added standardized `File`, `Settings`, `Filters`, `Pipeline`, and `Help` options at the top for faster access.
 2. **Simplified Source Bar** — Target path selection is removed in favor of pipeline step-based targets. Features `Source` dropdown, `★` favorites, and `📁 Browse` button.
+   - The Source path is an **editable ComboBox** showing recent paths and favourites.
+   - **Keyboard:** Arrow keys cycle dropdown items in the text field without applying. **Enter** commits the current text and applies it. **Escape** reverts to the active path.
+   - **Mouse:** Clicking a bookmark in the dropdown applies it on dropdown close.
+   - See Architecture §3.14 for binding pitfalls with this pattern.
 3. **Filter Toggle (`👁 Eye` button)** — Instant contextual toggle to show or hide excluded filtered nodes.
 4. **Source and destination fields accept drag-and-drop** from Explorer/Finder
 5. **Proper tri-state tree checkboxes** — `▣` for indeterminate

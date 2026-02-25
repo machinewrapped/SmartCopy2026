@@ -17,6 +17,7 @@
                 <Button Content="{Binding RunButtonLabel}"
                         Command="{Binding RunPipelineCommand}"
                         ToolTip.Tip="{Binding BlockingValidationMessage}"
+                        AutomationProperties.Name="Run pipeline"
                         Background="#4caf50" Foreground="White" FontWeight="Bold"
                         CornerRadius="4"
                         HorizontalAlignment="Stretch"
@@ -24,6 +25,7 @@
                 <Button Content="👁  Preview"
                         Command="{Binding PreviewPipelineCommand}"
                         ToolTip.Tip="{Binding BlockingValidationMessage}"
+                        AutomationProperties.Name="Preview pipeline"
                         CornerRadius="4"
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Center" />
@@ -43,13 +45,29 @@
                           HorizontalScrollBarVisibility="Auto"
                           VerticalScrollBarVisibility="Disabled">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="0">
-                    <ItemsControl ItemsSource="{Binding Steps}">
-                        <ItemsControl.ItemsPanel>
+                    <ListBox ItemsSource="{Binding Steps}"
+                             SelectedItem="{Binding SelectedStep, Mode=TwoWay}"
+                             Background="Transparent" BorderThickness="0"
+                             KeyDown="OnStepListKeyDown">
+                        <ListBox.Styles>
+                            <!-- Suppress default selection/hover highlight -->
+                            <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+                                <Setter Property="Background" Value="Transparent" />
+                            </Style>
+                            <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                                <Setter Property="Background" Value="Transparent" />
+                            </Style>
+                            <!-- Focus ring on the step card border -->
+                            <Style Selector="ListBoxItem:focus-visible > StackPanel > Border">
+                                <Setter Property="BorderBrush" Value="#4facfe" />
+                            </Style>
+                        </ListBox.Styles>
+                        <ListBox.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" />
                             </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="vm:PipelineStepViewModel">
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <Border BorderBrush="#3e3e42" BorderThickness="1"
@@ -72,6 +90,7 @@
                                                         Content="✎"
                                                         Command="{Binding $parent[UserControl].((vm:PipelineViewModel)DataContext).RequestEditStepCommand}"
                                                         CommandParameter="{Binding}"
+                                                        AutomationProperties.Name="Edit step"
                                                         Width="20" Height="20"
                                                         CornerRadius="3"
                                                         Padding="0"
@@ -85,6 +104,7 @@
                                                         Content="✕"
                                                         Command="{Binding $parent[UserControl].((vm:PipelineViewModel)DataContext).RemoveStepCommand}"
                                                         CommandParameter="{Binding}"
+                                                        AutomationProperties.Name="Remove step"
                                                         Width="20" Height="20"
                                                         CornerRadius="3"
                                                         Padding="0"
@@ -133,8 +153,8 @@
 
                                 </StackPanel>
                             </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
 
                     <Panel>
                         <Button x:Name="AddStepButton"
@@ -143,6 +163,7 @@
                                 Background="Transparent"
                                 Cursor="Hand" Opacity="0.55"
                                 VerticalAlignment="Center"
+                                AutomationProperties.Name="Add step"
                                 Click="OnAddStepButtonClick">
                             <TextBlock Text="+ Add step"
                                        Foreground="#4facfe"

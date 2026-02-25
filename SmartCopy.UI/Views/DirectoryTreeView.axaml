@@ -11,10 +11,13 @@
         <conv:NodeVisibilityConverter x:Key="NodeVisibilityConverter" />
     </UserControl.Resources>
 
-    <TreeView ItemsSource="{Binding RootNodes}"
+    <TreeView x:Name="DirectoryTree"
+              ItemsSource="{Binding RootNodes}"
               SelectedItem="{Binding SelectedNode, Mode=TwoWay}"
+              AutomationProperties.Name="Directory tree"
               Background="Transparent"
-              BorderThickness="0">
+              BorderThickness="0"
+              KeyDown="OnTreeKeyDown">
         <TreeView.Styles>
             <Style Selector="TreeViewItem">
                 <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
@@ -34,6 +37,7 @@
                             Opacity="{Binding FilterResult, Converter={StaticResource FilterResultOpacityConverter}}">
                     <CheckBox IsChecked="{Binding CheckState, Converter={StaticResource CheckStateConverter}}"
                               IsEnabled="{Binding IsFilterIncluded}"
+                              AutomationProperties.Name="Select folder"
                               IsThreeState="False" />
                     <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
                 </StackPanel>

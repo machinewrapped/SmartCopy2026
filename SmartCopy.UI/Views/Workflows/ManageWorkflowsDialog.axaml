@@ -14,6 +14,10 @@
         WindowStartupLocation="CenterOwner"
         Background="Transparent"
         TransparencyLevelHint="Transparent">
+
+    <Window.KeyBindings>
+        <KeyBinding Gesture="Escape" Command="{Binding CloseCommand}" />
+    </Window.KeyBindings>
     
     <Border Background="#1e1e1e" BorderBrush="#555" BorderThickness="1" CornerRadius="6">
         <Grid RowDefinitions="Auto, *, Auto">

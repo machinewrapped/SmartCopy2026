@@ -11,6 +11,7 @@
                 <TextBlock Grid.Column="0" Text="FILTERS" FontWeight="SemiBold" Foreground="#4facfe" VerticalAlignment="Center" />
                 <ToggleButton Grid.Column="1" Content="👁"
                               ToolTip.Tip="Toggle visibility of excluded nodes in the tree"
+                              AutomationProperties.Name="Toggle excluded nodes visibility"
                               IsChecked="{Binding ShowExcludedNodesInTree}"
                               Padding="4" CornerRadius="4" Background="Transparent" />
             </Grid>
@@ -27,9 +28,25 @@
             <ScrollViewer x:Name="FiltersScrollViewer" VerticalScrollBarVisibility="Auto">
                 <StackPanel Orientation="Vertical">
 
-                    <!-- Existing filter cards -->
-                    <ItemsControl x:Name="FiltersItemsControl" ItemsSource="{Binding Filters}">
-                        <ItemsControl.ItemTemplate>
+                    <!-- Filter cards (ListBox for keyboard navigation) -->
+                    <ListBox x:Name="FiltersItemsControl" ItemsSource="{Binding Filters}"
+                             SelectedItem="{Binding SelectedFilter, Mode=TwoWay}"
+                             Background="Transparent" BorderThickness="0"
+                             KeyDown="OnFilterListKeyDown">
+                        <ListBox.Styles>
+                            <!-- Suppress default selection highlight -->
+                            <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+                                <Setter Property="Background" Value="Transparent" />
+                            </Style>
+                            <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                                <Setter Property="Background" Value="Transparent" />
+                            </Style>
+                            <!-- Subtle focus ring on the card border -->
+                            <Style Selector="ListBoxItem:focus-visible > Border">
+                                <Setter Property="BorderBrush" Value="#4facfe" />
+                            </Style>
+                        </ListBox.Styles>
+                        <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="vm:FilterViewModel">
                                 <Border BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="4"
                                         Margin="0,0,0,6" Background="#333333"
@@ -39,6 +56,7 @@
                                         <!-- Left: enabled checkbox -->
                                         <CheckBox Grid.Column="0"
                                                   IsChecked="{Binding IsEnabled}"
+                                                  AutomationProperties.Name="Enable filter"
                                                   VerticalAlignment="Center"
                                                   Margin="0,0,8,0" />
 
@@ -70,6 +88,7 @@
                                                     Background="Transparent"
                                                     Foreground="#a0a0a0"
                                                     FontSize="13"
+                                                    AutomationProperties.Name="Edit filter"
                                                     Command="{Binding $parent[UserControl].((vm:FilterChainViewModel)DataContext).RequestEditFilterCommand}"
                                                     CommandParameter="{Binding}" />
                                             <Button Content="✕"
@@ -80,14 +99,15 @@
                                                     HorizontalContentAlignment="Center"
                                                     VerticalContentAlignment="Center"
                                                     Background="Transparent"
+                                                    AutomationProperties.Name="Remove filter"
                                                     Foreground="{DynamicResource DangerForegroundBrush}" />
                                         </StackPanel>
 
                                     </Grid>
                                 </Border>
                             </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
 
                     <!-- Inline Add button — opens the flyout popup -->
                     <Panel>
@@ -96,6 +116,7 @@
                                 CornerRadius="4" Padding="8,7" Background="Transparent"
                                 Cursor="Hand" Opacity="0.55"
                                 HorizontalAlignment="Stretch"
+                                AutomationProperties.Name="Add filter"
                                 Click="OnAddFilterButtonClick">
                             <TextBlock Text="+ Add filter" Foreground="#4facfe"
                                        FontStyle="Italic" HorizontalAlignment="Center" />

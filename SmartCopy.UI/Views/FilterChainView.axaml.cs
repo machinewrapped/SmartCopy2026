@@ -216,4 +216,24 @@ public partial class FilterChainView : UserControl
             }, DispatcherPriority.Loaded);
         }
     }
+
+    // ---- Keyboard handling for filter list ----
+
+    private void OnFilterListKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (_currentViewModel?.SelectedFilter is not { } selected) return;
+
+        switch (e.Key)
+        {
+            case Key.Delete:
+                _currentViewModel.RemoveFilterCommand.Execute(selected);
+                e.Handled = true;
+                break;
+            case Key.F2:
+            case Key.Enter:
+                _currentViewModel.RequestEditFilterCommand.Execute(selected);
+                e.Handled = true;
+                break;
+        }
+    }
 }

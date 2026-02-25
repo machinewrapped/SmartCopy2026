@@ -1,5 +1,6 @@
 using System.Collections.Specialized;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Threading;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
@@ -125,6 +126,26 @@ public partial class PipelineView : UserControl
             Dispatcher.UIThread.Post(
                 () => StepsScrollViewer?.ScrollToEnd(),
                 DispatcherPriority.Loaded);
+        }
+    }
+
+    // ---- Keyboard handling for step list ----
+
+    private void OnStepListKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (_currentViewModel?.SelectedStep is not { } selected) return;
+
+        switch (e.Key)
+        {
+            case Key.Delete:
+                _currentViewModel.RemoveStepCommand.Execute(selected);
+                e.Handled = true;
+                break;
+            case Key.F2:
+            case Key.Enter:
+                _currentViewModel.RequestEditStepCommand.Execute(selected);
+                e.Handled = true;
+                break;
         }
     }
 }

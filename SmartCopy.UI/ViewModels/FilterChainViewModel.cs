@@ -76,6 +76,9 @@ public partial class FilterChainViewModel : ViewModelBase
 {
     public ObservableCollection<FilterViewModel> Filters { get; } = [];
 
+    [ObservableProperty]
+    private FilterViewModel? _selectedFilter;
+
     /// <summary>
     /// Pushed by MainViewModel whenever the pipeline's first destination path changes.
     /// Used to pre-populate the mirror filter editor suggestion and the filter card description.
