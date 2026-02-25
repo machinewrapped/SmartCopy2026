@@ -36,5 +36,7 @@ public sealed class AppSettings
     /// At most 5 entries per type, most-recently-used first.
     /// </summary>
     public Dictionary<string, List<string>> StepTypeMruPresetIds { get; set; } = [];
+
+    public bool UseAbsolutePathsForSelectionSave { get; set; }
 }
 

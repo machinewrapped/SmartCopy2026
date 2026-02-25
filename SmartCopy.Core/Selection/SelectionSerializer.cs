@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,7 +19,7 @@ public sealed class SelectionSerializer
     public Task SaveTxtAsync(string path, SelectionSnapshot snapshot, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var lines = snapshot.RelativePaths.OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
+        var lines = snapshot.Paths.OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
         return File.WriteAllLinesAsync(path, lines, ct);
     }
 
@@ -33,7 +34,7 @@ public sealed class SelectionSerializer
     {
         ct.ThrowIfCancellationRequested();
         var lines = new List<string> { "#EXTM3U" };
-        lines.AddRange(snapshot.RelativePaths
+        lines.AddRange(snapshot.Paths
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .Select(NormalizePath));
         await File.WriteAllLinesAsync(path, lines, ct);
@@ -55,7 +56,7 @@ public sealed class SelectionSerializer
         var payload = new SelectionPayload
         {
             SchemaVersion = 1,
-            RelativePaths = snapshot.RelativePaths
+            Paths = snapshot.Paths
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .Select(NormalizePath)
                 .ToList(),
@@ -69,7 +70,51 @@ public sealed class SelectionSerializer
         ct.ThrowIfCancellationRequested();
         var json = await File.ReadAllTextAsync(path, ct);
         var payload = JsonSerializer.Deserialize<SelectionPayload>(json) ?? new SelectionPayload();
-        return new SelectionSnapshot(payload.RelativePaths.Select(NormalizePath));
+        return new SelectionSnapshot(payload.Paths.Select(NormalizePath));
+    }
+
+    public async Task SaveM3u8Async(string path, SelectionSnapshot snapshot, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        var lines = new List<string> { "#EXTM3U" };
+        lines.AddRange(snapshot.Paths
+            .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+            .Select(NormalizePath));
+        await File.WriteAllLinesAsync(path, lines, Encoding.UTF8, ct);
+    }
+
+    public async Task<SelectionSnapshot> LoadM3u8Async(string path, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        var lines = await File.ReadAllLinesAsync(path, Encoding.UTF8, ct);
+        return new SelectionSnapshot(lines
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .Where(line => !line.StartsWith('#'))
+            .Select(NormalizePath));
+    }
+
+    /// <summary>Unified saver: routes by extension (.m3u, .m3u8, .sc2sel, else .txt).</summary>
+    public Task SaveAsync(string path, SelectionSnapshot snapshot, CancellationToken ct = default)
+    {
+        return Path.GetExtension(path).ToLowerInvariant() switch
+        {
+            ".m3u"    => SaveM3uAsync(path, snapshot, ct),
+            ".m3u8"   => SaveM3u8Async(path, snapshot, ct),
+            ".sc2sel" => SaveSc2SelAsync(path, snapshot, ct),
+            _         => SaveTxtAsync(path, snapshot, ct),
+        };
+    }
+
+    /// <summary>Unified loader: routes by extension (.m3u, .m3u8, .sc2sel, else .txt).</summary>
+    public Task<SelectionSnapshot> LoadAsync(string path, CancellationToken ct = default)
+    {
+        return Path.GetExtension(path).ToLowerInvariant() switch
+        {
+            ".m3u"    => LoadM3uAsync(path, ct),
+            ".m3u8"   => LoadM3u8Async(path, ct),
+            ".sc2sel" => LoadSc2SelAsync(path, ct),
+            _         => LoadTxtAsync(path, ct),
+        };
     }
 
     private static string NormalizePath(string path)
@@ -80,7 +125,7 @@ public sealed class SelectionSerializer
     private sealed class SelectionPayload
     {
         public int SchemaVersion { get; set; } = 1;
-        public List<string> RelativePaths { get; set; } = [];
+        public List<string> Paths { get; set; } = [];
     }
 }
 

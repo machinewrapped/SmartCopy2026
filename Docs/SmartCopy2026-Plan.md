@@ -187,7 +187,7 @@ and sync safely.*
 | UX-4 (Step 5): Transform pipeline | Complete (validation pending manual test run) | Maintainer to execute new Step 5 test suites + UI smoke scenarios |
 | UX-5 (Step 6): Workflow presets and menu | Complete | Manual UI smoke scenario pending |
 | Hardening-1 (Step 2): Memory provider foundation | Complete | Reuse fixture builder pattern |
-| Hardening-2 (Step 7): Selection save/load | In progress | Wire File menu flows + unmatched-path reporting |
+| Hardening-2 (Step 7): Selection save/load | Complete | Manual UI smoke scenarios pending |
 | Hardening-3 (Step 8): Settings persistence | In progress | Schema migration path; remaining persisted defaults |
 | Polish-1 (Step 9): Shell observability + status | Not started | After UX loop proven |
 | Polish-2 (Step 10): Keyboard + accessibility | Not started | After Step 9 |
@@ -201,15 +201,18 @@ UI/UX checklist:
 - [x] Window size, position, maximised state, and column widths persisted to
       `%LOCALAPPDATA%/SmartCopy2026/window.json`; restored on next open with off-screen safety guard
 - [x] Source field with browse button (no real browsing yet)
+- [x] Bookmarks/favorites for source field; editable ComboBox with `RecentSources`/`FavouritePaths` persistence
 - [x] TreeView with tri-state checkbox behaviour fully working
 - [x] FileListView with all columns (Name/Size/Modified), column resizing, click-to-sort
 - [x] Filter chain area: filter cards with human-readable summary + technical subtitle,
       enable/disable checkbox, edit (pencil) button, remove button, inline "+ Add filter" ghost card,
       Save/Load buttons pinned to bottom of column
+- [X] Filter chain save/load (`.sc2filter`) + preset library UI
 - [x] Pipeline area: horizontal scrollable step chain with → connectors; + Add step flyout
       (Executable / Path / Content step categories); Run and Preview buttons stacked on the right;
       step cards show summary + technical subtitle and edit/remove actions
-- [ ] Status bar: file count, size, filtered count, progress bar, time remaining, current file
+- [X] Pipeline save/load (`.sc2pipe`) + preset library UI
+- [x] Status bar: file count, size, filtered count, progress bar, time remaining, current file
 - [ ] Operation progress overlay: progress bars, pause/cancel buttons, status labels — no real operation
 - [ ] Log panel: collapsible, scrollable, a few placeholder log entries
 - [ ] Full keyboard navigation: Tab order, arrow keys in tree/list, Space to toggle, focus indicators
@@ -385,28 +388,45 @@ Verification:
 - [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj` (165/165 passing)
 - [ ] Manual UI scenario checks for workflow menu integration
 
-### Step 7 — Selection Save/Load (Memory-Backed Hardening Track)
+### Step 7 — Selection management (UX Loop Track / Memory-Backed Hardening Track) ✓
 
-Deliverables:
+**Completed 2026-02-25.** Full selection save/load and bulk selection operations delivered; Selection menu wired via code-behind following the workflow menu pattern.
+
+Delivered:
 - [x] `SelectionSerializer` for `.txt`, `.m3u`, `.sc2sel`
-- [x] `SelectionManager` snapshot/restore for rescans
-- [ ] File menu wiring (save/load/restore)
+- [x] `SelectionSerializer` for `.m3u8` (UTF-8 playlist format)
+- [x] `SelectionRestoreResult` — `MatchedCount`, `UnmatchedPaths`, `HasUnmatched`
+- [x] `SelectionManager.Restore` returns `SelectionRestoreResult`; accepts both relative and absolute-path snapshots
+- [x] `SelectionManager.Capture` — `useAbsolutePaths` opt-in parameter
+- [x] `SelectionManager` bulk ops: `SelectAll`, `ClearAll`, `InvertAll`
+- [x] `SelectionSerializer` unified `LoadAsync`/`SaveAsync` dispatchers (route by extension)
+- [x] `AppSettings.UseAbsolutePathsForSelectionSave` persisted
+- [x] `MainViewModel`: 6 new commands (`SelectAll`, `ClearSelection`, `InvertSelection`, `SaveSelectionAsText`, `SaveSelectionAsPlaylist`, `RestoreSelection`) + `UseAbsolutePathsForSelection` observable property
+- [x] Selection menu wired in `MainWindow.axaml.cs` code-behind with separators, input gestures, and a checkable "Save With Absolute Paths" item
+- [x] Window-level `Ctrl+A` / `Ctrl+Shift+A` / `Ctrl+I` key bindings
+- [x] Bug fix: root nodes no longer collapse when unchecked (`FileSystemNode.CheckState` setter guards on `Parent is not null`)
+- [x] `Traverse` extended to yield `node.Files` in addition to `node.Children`
 
 Acceptance criteria:
+- [x] Save and restore works with non-ASCII characters (as long as they are valid paths)
 - [x] Relative path portability works across machines
-- [ ] Missing/unmatched paths are reported and skipped without aborting load
+- [x] Missing/unmatched paths are reported and skipped without aborting restore
 
 Verification:
-- [x] Round-trip tests for all formats
-- [ ] Regression tests for mixed path separators and case differences
+- [x] Round-trip tests for all formats (including M3U8)
+- [x] Regression tests for mixed path separators and case differences
+- [x] Non-ASCII path round-trip tests across `.txt`, `.m3u8`, `.sc2sel`
+- [x] `Restore_ReturnsMatchedCount`, `Restore_ReturnsUnmatchedPaths`, `Capture_AbsolutePaths_UsesFullPath`, `SelectAll`, `ClearAll`, `InvertAll` unit tests
+- [x] `dotnet build SmartCopy.App/SmartCopy.App.csproj`
+- [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj` (175/175 passing)
+- [X] Manual UI smoke scenarios for save/restore/bulk-selection flows
 
 ### Step 8 — Settings Persistence (Memory-Backed Hardening Track)
 
 Deliverables:
 - [x] `AppSettings` load/save + schema version
 - [x] Cross-platform settings paths (`%APPDATA%` / `~/.config`)
-- [x] Source path persistence: `LastSourcePath` restored on startup; `RecentSources`/`FavouritePaths` populate source ComboBox and save on change (pulled forward from Phase 3 as a Phase 1 UX necessity)
-- [ ] Remaining persisted defaults (sort order, scan options, other UI state)
+- [x] Source path persistence: `LastSourcePath` restored on startup; `RecentSources`/`FavouritePaths` populate source ComboBox and save on change
 
 Acceptance criteria:
 - [x] Missing/corrupt settings file falls back to defaults without crash
@@ -474,16 +494,11 @@ Exit criteria:
 ### Phase 3 — Modern Features (post-local-integration hardening)
 
 Scope:
-- [ ] Filter chain save/load (`.sc2filter`) + preset library UI
-- [ ] Pipeline save/load (`.sc2pipe`) + preset library UI
-- [ ] Windows MTP provider (`MtpFileSystemProvider`) + WPD device picker integration
-- [ ] `DuplicateFilter` and `PathDepthFilter`
-- [x] Bookmarks/favorites for source field (pulled forward to Phase 1 as a UX necessity; editable ComboBox with `RecentSources`/`FavouritePaths` persistence)
 - [ ] Drag-and-drop for source/destination fields; bookmarks for pipeline destination field
+- [ ] Windows MTP provider (`MtpFileSystemProvider`) + WPD device picker integration
 
 Exit criteria:
 - [ ] MTP copy round-trip validated on at least two physical devices
-- [ ] Filter/pipeline preset import/export is stable and versioned
 
 ### Phase 4 — Advanced Pipeline Steps
 
@@ -500,7 +515,6 @@ Exit criteria:
 ### Phase 5 — Polish and Extensibility
 
 Scope:
-- [ ] Session files (`.sc2session`) with full restore
 - [ ] Theming, localization infrastructure, update checks
 - [ ] Multi-source merge workflow
 - [ ] Public plugin SDK documentation
