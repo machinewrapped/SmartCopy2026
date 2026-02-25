@@ -5,7 +5,8 @@
              xmlns:corePipeline="clr-namespace:SmartCopy.Core.Pipeline;assembly=SmartCopy.Core"
              x:Class="SmartCopy.UI.Views.Pipeline.AddStepFlyout"
              x:DataType="vmPipeline:AddStepViewModel"
-             Width="300">
+             Width="300"
+             Focusable="True">
     <Border Background="#1e1e1e" BorderBrush="#555" BorderThickness="1"
             CornerRadius="6" Padding="4">
         <Panel>
@@ -271,7 +272,8 @@
                 </Grid>
                 <Separator Height="1" Background="#3e3e42" Margin="4,2" />
                 
-                <TextBox Margin="4,6"
+                <TextBox x:Name="PipelineNameTextBox"
+                         Margin="4,6"
                          Text="{Binding NewPipelineName}"
                          Watermark="e.g. My Awesome Pipeline" />
                 

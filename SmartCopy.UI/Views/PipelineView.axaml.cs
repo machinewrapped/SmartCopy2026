@@ -45,6 +45,7 @@ public partial class PipelineView : UserControl
     {
         _currentViewModel?.AddStep.GoBackCommand.Execute(null);
         AddStepPopup.IsOpen = true;
+        Dispatcher.UIThread.Post(() => AddStepFlyoutControl.Focus(), DispatcherPriority.Loaded);
     }
 
     private void OnCloseRequestedClosePopup() => Dispatcher.UIThread.Post(() => AddStepPopup.IsOpen = false);

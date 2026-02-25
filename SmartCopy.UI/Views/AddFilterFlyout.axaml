@@ -3,7 +3,8 @@
              xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
              x:Class="SmartCopy.UI.Views.AddFilterFlyout"
              x:DataType="vm:AddFilterViewModel"
-             Width="280">
+             Width="280"
+             Focusable="True">
     <Border Background="#1e1e1e" BorderBrush="#555" BorderThickness="1"
             CornerRadius="6" Padding="4">
         <Panel>

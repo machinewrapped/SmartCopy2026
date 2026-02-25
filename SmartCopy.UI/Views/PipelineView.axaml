@@ -151,6 +151,7 @@
 
                         <Popup x:Name="AddStepPopup"
                                Placement="TopEdgeAlignedLeft"
+                               IsLightDismissEnabled="True"
                                PlacementTarget="{Binding ElementName=AddStepButton}">
                             <pipelineViews:AddStepFlyout x:Name="AddStepFlyoutControl"
                                                          DataContext="{Binding AddStep}" />
