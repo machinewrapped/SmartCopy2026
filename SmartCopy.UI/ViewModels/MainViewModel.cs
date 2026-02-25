@@ -17,6 +17,7 @@ using SmartCopy.Core.Progress;
 using SmartCopy.Core.Selection;
 using SmartCopy.Core.Settings;
 using SmartCopy.Core.Workflows;
+using SmartCopy.UI.Helpers;
 using SmartCopy.UI.Services;
 using SmartCopy.UI.ViewModels.Workflows;
 using SmartCopy.UI.Views;
@@ -37,6 +38,9 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private bool _useAbsolutePathsForSelection;
 
+    [ObservableProperty]
+    private bool _autoOpenLogOnRun = true;
+
     private readonly MemoryFileSystemProvider _memoryProvider;
     private readonly AppSettings _settings = new();
     private readonly AppSettingsStore _settingsStore = new();
@@ -56,6 +60,7 @@ public partial class MainViewModel : ViewModelBase
     public StatusBarViewModel StatusBar { get; } = new();
     public PreviewViewModel Preview { get; } = new();
     public WorkflowMenuViewModel WorkflowMenu { get; }
+    public LogPanelViewModel LogPanel { get; } = new();
 
     public MainViewModel()
     {
@@ -102,7 +107,12 @@ public partial class MainViewModel : ViewModelBase
 
         DirectoryTree.PropertyChanged += async (_, e) =>
         {
-            if (e.PropertyName == nameof(DirectoryTreeViewModel.SelectedNode))
+            if (e.PropertyName == nameof(DirectoryTreeViewModel.IsLoading))
+            {
+                StatusBar.IsScanning = DirectoryTree.IsLoading;
+                StatusBar.ScanStatusText = DirectoryTree.IsLoading ? "Scanning..." : string.Empty;
+            }
+            else if (e.PropertyName == nameof(DirectoryTreeViewModel.SelectedNode))
             {
                 var selectedNode = DirectoryTree.SelectedNode;
                 if (selectedNode?.IsDirectory == true)
@@ -132,6 +142,12 @@ public partial class MainViewModel : ViewModelBase
     partial void OnUseAbsolutePathsForSelectionChanged(bool value)
     {
         _settings.UseAbsolutePathsForSelectionSave = value;
+        _ = _settingsStore.SaveAsync(_settings);
+    }
+
+    partial void OnAutoOpenLogOnRunChanged(bool value)
+    {
+        _settings.AutoOpenLogOnRun = value;
         _ = _settingsStore.SaveAsync(_settings);
     }
 
@@ -381,7 +397,9 @@ public partial class MainViewModel : ViewModelBase
         _settings.LastSourcePath = saved.LastSourcePath;
         _settings.LogRetentionDays = saved.LogRetentionDays;
         _settings.UseAbsolutePathsForSelectionSave = saved.UseAbsolutePathsForSelectionSave;
+        _settings.AutoOpenLogOnRun = saved.AutoOpenLogOnRun;
         UseAbsolutePathsForSelection = saved.UseAbsolutePathsForSelectionSave;
+        AutoOpenLogOnRun = saved.AutoOpenLogOnRun;
 
         if (saved.LastSourcePath is { Length: > 0 })
         {
@@ -424,6 +442,8 @@ public partial class MainViewModel : ViewModelBase
 
         // Apply filters to the freshly loaded tree.
         await ApplyFiltersAsync();
+
+        LogPanel.AddEntry("SmartCopy 2026 ready — memory source loaded");
     }
 
     private async Task PreviewPipelineAsync()
@@ -509,6 +529,9 @@ public partial class MainViewModel : ViewModelBase
         StatusBar.Progress.Begin(_runCts);
         var progress = new Progress<OperationProgress>(StatusBar.Progress.Update);
 
+        if (AutoOpenLogOnRun)
+            LogPanel.IsExpanded = true;
+
         try
         {
             var results = await runner.ExecuteAsync(
@@ -521,6 +544,31 @@ public partial class MainViewModel : ViewModelBase
                 _runCts.Token);
 
             await _operationJournal.WriteAsync(results.Where(r => r.StepType is StepKind.Copy or StepKind.Move or StepKind.Delete));
+
+            foreach (var r in results)
+            {
+                if (r.SourcePath is null)
+                {
+                    continue;
+                }
+                else if (!r.Success)
+                {
+                    LogPanel.AddEntry($"Failed: {Path.GetFileName(r.SourcePath)} — {r.Message}", LogLevel.Error);
+                }
+                else if (r.StepType == StepKind.Copy)
+                {
+                    LogPanel.AddEntry($"Copied {Path.GetFileName(r.SourcePath)} → {r.DestinationPath} ({FileSizeFormatter.FormatBytes(r.OutputBytes)})");
+                }
+                else if (r.StepType == StepKind.Move)
+                {
+                    LogPanel.AddEntry($"Moved {Path.GetFileName(r.SourcePath)} → {r.DestinationPath}");
+                }
+                else if (r.StepType == StepKind.Delete)
+                {
+                    LogPanel.AddEntry($"Deleted {Path.GetFileName(r.SourcePath)}");
+                }
+            }
+
             StatusBar.Progress.Complete();
         }
         catch (OperationCanceledException)

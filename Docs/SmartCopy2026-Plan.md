@@ -189,7 +189,7 @@ and sync safely.*
 | Hardening-1 (Step 2): Memory provider foundation | Complete | Reuse fixture builder pattern |
 | Hardening-2 (Step 7): Selection save/load | Complete | Manual UI smoke scenarios pending |
 | Hardening-3 (Step 8): Settings persistence | Complete | — |
-| Polish-1 (Step 9): Shell observability + status | Not started | After UX loop proven |
+| Polish-1 (Step 9): Shell observability + status | Complete | — |
 | Polish-2 (Step 10): Keyboard + accessibility | Not started | After Step 9 |
 
 ### UI/UX Validation (Phase 1)
@@ -214,7 +214,7 @@ UI/UX checklist:
 - [X] Pipeline save/load (`.sc2pipe`) + preset library UI
 - [x] Status bar: file count, size, filtered count, progress bar, time remaining, current file
 - [ ] Operation progress overlay: progress bars, pause/cancel buttons, status labels — no real operation
-- [ ] Log panel: collapsible, scrollable, a few placeholder log entries
+- [x] Log panel: collapsible, scrollable, a few placeholder log entries
 - [ ] Full keyboard navigation: Tab order, arrow keys in tree/list, Space to toggle, focus indicators
 - [ ] Automation properties on all interactive controls (screen-reader baseline)
 
@@ -439,17 +439,22 @@ Verification:
 ### Step 9 — Shell Observability and Status Feedback (UX Polish Track)
 
 Deliverables:
-- [X] Status bar live counts/size from Architecture `Status Bar Statistics`
-- [ ] Cross-check status-bar values against selected/filter states under `/mem` fixtures
-- [ ] Collapsible log panel with placeholder entries in the shell layout
+- [x] Status bar live counts/size from Architecture `Status Bar Statistics`
+- [x] Cross-check status-bar values against selected/filter states under `/mem` fixtures
+- [x] Collapsible log panel with placeholder entries in the shell layout
+- [x] "Scanning..." indicator in status bar (via `DirectoryTreeViewModel.IsLoading`)
+- [x] "Ready" indicator on right side of status bar when idle
+- [x] Log panel wired: startup entry, pipeline results, expand-on-run
 
 Acceptance criteria:
-- [X] Users can see deterministic selected/file-size/count feedback while changing selection and filters
-- [ ] Log panel does not interfere with core tree/list/filter/pipeline interactions
+- [x] Users can see deterministic selected/file-size/count feedback while changing selection and filters
+- [x] Log panel does not interfere with core tree/list/filter/pipeline interactions
 
 Verification:
-- [ ] UI smoke test: selection/filter changes update status-bar counts correctly
-- [ ] UI smoke test: log panel expand/collapse persists and restores correctly
+- [x] `dotnet build` passes
+- [x] All 183 tests pass (7 new: 4 LogPanelViewModelTests + 3 SelectionViewModelTests)
+- [X] UI smoke test: selection/filter changes update status-bar counts correctly
+- [X] UI smoke test: log panel expand/collapse persists and restores correctly
 
 ### Step 10 — Keyboard Navigation and Accessibility Baseline (UX Polish Track)
 

@@ -12,6 +12,13 @@ public class DirectoryTreeViewModel : ViewModelBase
     private readonly IFileSystemProvider _provider;
     private string _rootPath;
     private FileSystemNode? _selectedNode;
+    private bool _isLoading;
+
+    public bool IsLoading
+    {
+        get => _isLoading;
+        private set => SetProperty(ref _isLoading, value);
+    }
 
     /// <summary>Raised when any node's <see cref="FileSystemNode.CheckState"/> changes.</summary>
     public event EventHandler? SelectionChanged;
@@ -56,16 +63,24 @@ public class DirectoryTreeViewModel : ViewModelBase
             oldRoot.PropertyChanged -= OnRootNodePropertyChanged;
 
         RootNodes.Clear();
+        IsLoading = true;
 
-        var root = await BuildNodeTreeAsync(_rootPath, ct);
-        root.IsExpanded = true;
-        root.PropertyChanged += OnRootNodePropertyChanged;
-        RootNodes.Add(root);
-        SelectedNode = root;
-
-        if (!string.IsNullOrWhiteSpace(initialSelectionPath))
+        try
         {
-            SelectByPath(initialSelectionPath);
+            var root = await BuildNodeTreeAsync(_rootPath, ct);
+            root.IsExpanded = true;
+            root.PropertyChanged += OnRootNodePropertyChanged;
+            RootNodes.Add(root);
+            SelectedNode = root;
+
+            if (!string.IsNullOrWhiteSpace(initialSelectionPath))
+            {
+                SelectByPath(initialSelectionPath);
+            }
+        }
+        finally
+        {
+            IsLoading = false;
         }
     }
 

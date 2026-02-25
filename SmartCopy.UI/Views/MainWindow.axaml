@@ -19,14 +19,14 @@
         <KeyBinding Gesture="Ctrl+I"       Command="{Binding InvertSelectionCommand}"/>
     </Window.KeyBindings>
 
-    <Grid RowDefinitions="Auto, Auto, *, Auto, Auto">
+    <Grid RowDefinitions="Auto, Auto, *, Auto, Auto, Auto">
         <!-- Menu Bar -->
         <Border Grid.Row="0" Background="#2d2d30" BorderBrush="#3e3e42" BorderThickness="0,0,0,1">
             <Menu>
                 <MenuItem Header="_File">
                     <MenuItem Header="_Quit" />
                 </MenuItem>
-                <MenuItem Header="_Options" />
+                <MenuItem Header="_Options" x:Name="OptionsMenu" />
                 <MenuItem Header="_Selection" x:Name="SelectionMenu" />
                 <MenuItem Header="_Workflows" x:Name="WorkflowsMenu" />
                 <MenuItem Header="_Help" />
@@ -87,8 +87,13 @@
         <!-- Pipeline Area -->
         <views:PipelineView Grid.Row="3" DataContext="{Binding Pipeline}" Margin="10,5,10,10" />
 
+        <!-- Log Panel (Row 4) -->
+        <Border Grid.Row="4" Background="#1e1e1e" BorderBrush="#3e3e42" BorderThickness="0,1,0,0">
+            <views:LogPanelView DataContext="{Binding LogPanel}" />
+        </Border>
+
         <!-- Status Bar -->
-        <Border Grid.Row="4" Background="#007acc" BorderBrush="#3e3e42" BorderThickness="0,1,0,0" Padding="12,6">
+        <Border Grid.Row="5" Background="#007acc" BorderBrush="#3e3e42" BorderThickness="0,1,0,0" Padding="12,6">
             <views:StatusBarView DataContext="{Binding StatusBar}" Foreground="White" />
         </Border>
     </Grid>

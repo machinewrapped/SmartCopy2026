@@ -5,9 +5,20 @@
              x:Class="SmartCopy.UI.Views.StatusBarView"
              x:DataType="vm:StatusBarViewModel">
     <DockPanel>
+        <!-- Right side: exactly one of three panels is visible -->
         <Panel DockPanel.Dock="Right" IsVisible="{Binding Progress.IsActive}">
             <views:OperationProgressView DataContext="{Binding Progress}" />
         </Panel>
+        <TextBlock DockPanel.Dock="Right"
+                   Text="{Binding ScanStatusText}"
+                   IsVisible="{Binding IsScanning}"
+                   VerticalAlignment="Center" Margin="0,0,8,0" />
+        <TextBlock DockPanel.Dock="Right"
+                   Text="Ready"
+                   IsVisible="{Binding IsIdle}"
+                   VerticalAlignment="Center" Margin="0,0,8,0"
+                   Opacity="0.7" />
+        <!-- Left side: always visible -->
         <views:SelectionView DataContext="{Binding Selection}" />
     </DockPanel>
 </UserControl>
