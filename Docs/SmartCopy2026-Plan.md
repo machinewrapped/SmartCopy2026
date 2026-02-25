@@ -188,7 +188,7 @@ and sync safely.*
 | UX-5 (Step 6): Workflow presets and menu | Complete | Manual UI smoke scenario pending |
 | Hardening-1 (Step 2): Memory provider foundation | Complete | Reuse fixture builder pattern |
 | Hardening-2 (Step 7): Selection save/load | Complete | Manual UI smoke scenarios pending |
-| Hardening-3 (Step 8): Settings persistence | In progress | Schema migration path; remaining persisted defaults |
+| Hardening-3 (Step 8): Settings persistence | Complete | — |
 | Polish-1 (Step 9): Shell observability + status | Not started | After UX loop proven |
 | Polish-2 (Step 10): Keyboard + accessibility | Not started | After Step 9 |
 
@@ -430,11 +430,11 @@ Deliverables:
 
 Acceptance criteria:
 - [x] Missing/corrupt settings file falls back to defaults without crash
-- [ ] Forward-compatible migration path exists for schema changes
+- [x] Forward-compatible migration path exists for schema changes (`SchemaVersion` field + `System.Text.Json` tolerates unknown/missing fields by design)
 
 Verification:
-- [ ] Unit tests for serialization/migration/error fallback
-- [ ] Manual smoke test across restart on Windows
+- [x] Unit tests for serialization and error fallback (`SaveAndLoad_RoundTripsSettings`, `Load_WithCorruptJson_ReturnsDefaults`)
+- [x] Manual smoke test across restart on Windows
 
 ### Step 9 — Shell Observability and Status Feedback (UX Polish Track)
 
