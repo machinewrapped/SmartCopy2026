@@ -204,7 +204,7 @@ This dropdown integrates loading and saving pipelines along with pipeline operat
 ├────────────────────────────────┤
 │  Move                          │
 │  Move to destination           │
-│                                │
+├────────────────────────────────┤
 │  Copy                          │
 │  Copy to destination           │
 └────────────────────────────────┘

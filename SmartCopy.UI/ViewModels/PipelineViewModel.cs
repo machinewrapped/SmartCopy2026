@@ -502,7 +502,7 @@ public partial class PipelineViewModel : ViewModelBase
         PipelineChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private PipelineConfig ToConfig(string name)
+    internal PipelineConfig ToConfig(string name)
     {
         return new PipelineConfig(
             Name: name,

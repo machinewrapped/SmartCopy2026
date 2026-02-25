@@ -27,3 +27,11 @@ Use one of the following approaches:
    ```
      
 **Rule:** Always use one of these approaches to gather `dotnet build` output natively rather than writing temporary files in the workspace.
+
+## Committing Changes and Temporary Files
+
+When working on tasks, it is common to create temporary files for logs, API responses (e.g. from `gh pr view`), or diagnostics.
+
+**Rule:** 
+1. **Never** commit temporary diagnostic/log files to the repository. Always review `git status` or `git diff` carefully before running `git commit -a` or `git add .`.
+2. **Require User Validation:** Before committing any changes to the repository, you **must** ask for the user's validation and explicit approval. Do not auto-commit changes without prior consent.
