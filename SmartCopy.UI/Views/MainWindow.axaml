@@ -20,7 +20,8 @@
                 <MenuItem Header="_File">
                     <MenuItem Header="_Quit" />
                 </MenuItem>
-                <MenuItem Header="_Settings" />
+                <MenuItem Header="_Options" />
+                <MenuItem Header="_Selection" />
                 <MenuItem Header="_Workflows" />
                 <MenuItem Header="_Help" />
             </Menu>
