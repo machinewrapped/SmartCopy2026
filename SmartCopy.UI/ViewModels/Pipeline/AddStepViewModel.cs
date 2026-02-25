@@ -50,6 +50,7 @@ public partial class AddStepViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsLevel1Visible))]
+    [NotifyPropertyChangedFor(nameof(IsLevel2VisibleOnly))]
     private bool _isLevel2Visible;
 
     [ObservableProperty]
@@ -67,6 +68,7 @@ public partial class AddStepViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsLevel1Visible))]
+    [NotifyPropertyChangedFor(nameof(IsLevel2VisibleOnly))]
     private bool _isLevel3Visible;
 
     [ObservableProperty]
