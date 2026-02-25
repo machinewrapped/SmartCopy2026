@@ -459,22 +459,26 @@ Verification:
 ### Step 10 — Keyboard Navigation and Accessibility Baseline (UX Polish Track)
 
 Deliverables:
-- [ ] Full keyboard baseline (`Tab`, arrows, `Space`, `Ctrl+A`, `Delete`/`Ctrl+D`, `F5`, `Escape`)
-- [ ] `AutomationProperties.Name` on all interactive controls
-- [ ] Focus-visibility pass for tree, list, filter cards, and pipeline step cards
+- [X] Full keyboard baseline (`Tab`, arrows, `Space`, `Ctrl+A`, `Delete`/`Ctrl+D`, `F5`, `Escape`)
+- [X] `AutomationProperties.Name` on all interactive controls
+- [X] Focus-visibility pass for tree, list, filter cards, and pipeline step cards
 
 Acceptance criteria:
-- [ ] Core memory-backed workflow is operable without mouse input
-- [ ] Screen-reader baseline metadata is present on primary interactive controls
+- [X] Core memory-backed workflow is operable without mouse input
+- [X] Screen-reader baseline metadata is present on primary interactive controls
 
 Verification:
-- [ ] Keyboard-only smoke test for scan/selection/filter/pipeline-preview path
+- [X] Keyboard-only smoke test for scan/selection/filter/pipeline-preview path
 
-### Step 11 - usability tweaks (UX Polish Track) 
+### Step 11 - User Options and usability tweaks (UX Polish Track) 
+
+Expand the configuration options available in the Options menu to provide users with more control.
 
 Deliverables:
 - [ ] Option to restore last used workflow on startup
-- [ ] Option to restore last used source path on startup (redundant if workflow option is restored)
+- [ ] Option to restore last used source path on startup (redundant/disabled if last used workflow is restored)
+- [ ] Export presets (collect all presets - workflows, filters, pipelines, pipeline steps) and save to archive file
+- [ ] Import presets (extract from archive file)
 
 ---
 
