@@ -37,16 +37,13 @@ public partial class SaveWorkflowDialog : Window
 
         if (_vm.IsOverwrite)
         {
-            var confirm = new Window
+            var confirmVm = new ConfirmDialogViewModel
             {
                 Title = "Confirm Replace",
-                Width = 360,
-                SizeToContent = SizeToContent.Height,
-                CanResize = false,
-                WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                Background = Avalonia.Media.Brushes.Transparent,
-                Content = BuildConfirmContent(_vm.WorkflowName.Trim())
+                Message = $"Replace existing workflow \"{_vm.WorkflowName.Trim()}\"?",
+                ConfirmText = "Replace"
             };
+            var confirm = new ConfirmDialog { DataContext = confirmVm };
 
             var result = await confirm.ShowDialog<bool?>(this);
             if (result != true) return;
@@ -57,45 +54,4 @@ public partial class SaveWorkflowDialog : Window
 
     private void OnCancel() => Dispatcher.UIThread.Post(() => Close(false));
 
-    private static StackPanel BuildConfirmContent(string name)
-    {
-        var panel = new StackPanel
-        {
-            Spacing = 12,
-            Margin = new Avalonia.Thickness(20),
-        };
-
-        panel.Children.Add(new TextBlock
-        {
-            Text = $"Replace existing workflow \"{name}\"?",
-            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-        });
-
-        var buttonPanel = new StackPanel
-        {
-            Orientation = Avalonia.Layout.Orientation.Horizontal,
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-            Spacing = 8,
-        };
-
-        var cancelBtn = new Button { Content = "Cancel", Width = 80 };
-        var replaceBtn = new Button { Content = "Replace", Width = 80 };
-
-        cancelBtn.Click += (_, _) =>
-        {
-            if (TopLevel.GetTopLevel(cancelBtn) is Window w)
-                w.Close(false);
-        };
-        replaceBtn.Click += (_, _) =>
-        {
-            if (TopLevel.GetTopLevel(replaceBtn) is Window w)
-                w.Close(true);
-        };
-
-        buttonPanel.Children.Add(cancelBtn);
-        buttonPanel.Children.Add(replaceBtn);
-        panel.Children.Add(buttonPanel);
-
-        return panel;
-    }
 }

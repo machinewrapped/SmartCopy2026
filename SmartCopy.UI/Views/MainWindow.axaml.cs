@@ -70,7 +70,12 @@ public partial class MainWindow : Window
     private void OnWorkflowMenuPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(WorkflowMenuViewModel.CanSave))
-            RebuildWorkflowsMenu();
+        {
+            if (WorkflowsMenu.Items is { Count: > 0 } && WorkflowsMenu.Items[0] is MenuItem saveItem)
+            {
+                saveItem.IsEnabled = _workflowMenu?.CanSave ?? false;
+            }
+        }
     }
 
     private void RebuildWorkflowsMenu()

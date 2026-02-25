@@ -65,46 +65,13 @@ public partial class ManageWorkflowsDialog : Window
 
     private async Task<bool> OnDeleteConfirm(string name)
     {
-        var confirm = new Window
+        var vm = new ConfirmDialogViewModel
         {
             Title = "Confirm Delete",
-            Width = 360,
-            SizeToContent = SizeToContent.Height,
-            CanResize = false,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            Background = Avalonia.Media.Brushes.Transparent,
+            Message = $"Delete workflow \"{name}\"?",
+            ConfirmText = "Delete"
         };
-
-        var panel = new StackPanel
-        {
-            Spacing = 12,
-            Margin = new Avalonia.Thickness(20),
-        };
-
-        panel.Children.Add(new TextBlock
-        {
-            Text = $"Delete workflow \"{name}\"?",
-            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-        });
-
-        var buttonPanel = new StackPanel
-        {
-            Orientation = Avalonia.Layout.Orientation.Horizontal,
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-            Spacing = 8,
-        };
-
-        var cancelBtn = new Button { Content = "Cancel", Width = 80 };
-        var deleteBtn = new Button { Content = "Delete", Width = 80 };
-
-        cancelBtn.Click += (_, _) => confirm.Close(false);
-        deleteBtn.Click += (_, _) => confirm.Close(true);
-
-        buttonPanel.Children.Add(cancelBtn);
-        buttonPanel.Children.Add(deleteBtn);
-        panel.Children.Add(buttonPanel);
-        confirm.Content = panel;
-
+        var confirm = new ConfirmDialog { DataContext = vm };
         var result = await confirm.ShowDialog<bool?>(this);
         return result == true;
     }

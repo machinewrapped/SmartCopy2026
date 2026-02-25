@@ -448,12 +448,6 @@ public partial class MainViewModel : ViewModelBase
     {
         var preset = WorkflowMenu.SavedWorkflows.FirstOrDefault(p =>
             string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
-        if (preset is null)
-        {
-            var presets = await _workflowStore.GetUserPresetsAsync();
-            preset = presets.FirstOrDefault(p =>
-            string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
-        }
 
         if (preset is null)
         {
