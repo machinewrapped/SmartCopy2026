@@ -419,7 +419,7 @@ Verification:
 - [x] `Restore_ReturnsMatchedCount`, `Restore_ReturnsUnmatchedPaths`, `Capture_AbsolutePaths_UsesFullPath`, `SelectAll`, `ClearAll`, `InvertAll` unit tests
 - [x] `dotnet build SmartCopy.App/SmartCopy.App.csproj`
 - [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj` (175/175 passing)
-- [ ] Manual UI smoke scenarios for save/restore/bulk-selection flows
+- [X] Manual UI smoke scenarios for save/restore/bulk-selection flows
 
 ### Step 8 — Settings Persistence (Memory-Backed Hardening Track)
 
