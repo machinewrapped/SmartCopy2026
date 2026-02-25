@@ -64,6 +64,7 @@ public partial class FilterChainView : UserControl
         // Reset to Level 1 each time the popup opens.
         _currentViewModel?.AddFilter.GoBackCommand.Execute(null);
         AddFilterPopup.IsOpen = true;
+        Dispatcher.UIThread.Post(() => AddFilterFlyoutControl.Focus(), DispatcherPriority.Loaded);
     }
 
     // ---- Dialog event routing ----

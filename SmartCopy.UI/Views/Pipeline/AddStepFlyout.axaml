@@ -5,12 +5,13 @@
              xmlns:corePipeline="clr-namespace:SmartCopy.Core.Pipeline;assembly=SmartCopy.Core"
              x:Class="SmartCopy.UI.Views.Pipeline.AddStepFlyout"
              x:DataType="vmPipeline:AddStepViewModel"
-             Width="300">
+             Width="300"
+             Focusable="True">
     <Border Background="#1e1e1e" BorderBrush="#555" BorderThickness="1"
             CornerRadius="6" Padding="4">
         <Panel>
             <!-- Level 1: Category selection -->
-            <StackPanel IsVisible="{Binding !IsLevel2Visible}" Spacing="1">
+            <StackPanel IsVisible="{Binding IsLevel1Visible}" Spacing="1">
                 <Grid ColumnDefinitions="*, Auto" Margin="8,4,4,2">
                     <TextBlock Grid.Column="0"
                                Text="Add Step"
@@ -29,14 +30,25 @@
                 </Grid>
                 <Separator Height="1" Background="#3e3e42" Margin="4,0" />
 
-                <Button Content="Executable steps"
+                <Button Content="Load preset"
                         Background="Transparent"
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Left"
                         Padding="8,6"
                         CornerRadius="4"
-                        Command="{Binding NavigateToCategoryCommand}"
-                        CommandParameter="{x:Static vm:StepCategory.Executable}" />
+                        IsVisible="{Binding !HasSteps}"
+                        Command="{Binding BeginLoadPipelineCommand}" />
+
+                <Button Content="Save current pipeline..."
+                        Background="Transparent"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Left"
+                        Padding="8,6"
+                        CornerRadius="4"
+                        IsVisible="{Binding HasSteps}"
+                        Command="{Binding BeginSavePipelineCommand}" />
+
+                <Separator Height="1" Background="#3e3e42" Margin="4,4" />
 
                 <Button Content="Path steps"
                         Background="Transparent"
@@ -49,42 +61,45 @@
 
                 <Separator Height="1" Background="#3e3e42" Margin="4,4" />
 
-                <Button Content="Load preset ▸"
-                        Background="Transparent"
+                <Button Background="Transparent"
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Left"
                         Padding="8,6"
-                        CornerRadius="4">
-                    <Button.Flyout>
-                        <MenuFlyout Placement="RightEdgeAlignedTop">
-                            <MenuItem Header="Standard" ItemsSource="{Binding StandardPresets, FallbackValue={x:Null}}">
-                                <MenuItem.ItemTemplate>
-                                    <DataTemplate x:DataType="corePipeline:PipelinePreset">
-                                        <MenuItem Header="{Binding Name}"
-                                                  Click="OnPipelinePresetMenuItemClick"
-                                                  CommandParameter="{Binding Name}" />
-                                    </DataTemplate>
-                                </MenuItem.ItemTemplate>
-                            </MenuItem>
+                        CornerRadius="4"
+                        Command="{Binding SelectTopLevelStepTypeCommand}"
+                        CommandParameter="{x:Static corePipeline:StepKind.Delete}">
+                    <StackPanel Orientation="Vertical" Spacing="1">
+                        <TextBlock Text="Delete" FontWeight="Medium" />
+                        <TextBlock Text="Delete source file" FontSize="11" Opacity="0.55" />
+                    </StackPanel>
+                </Button>
 
-                            <Separator />
+                <Separator Height="1" Background="#3e3e42" Margin="4,4" />
 
-                            <MenuItem Header="My Pipelines" ItemsSource="{Binding UserPresets, FallbackValue={x:Null}}">
-                                <MenuItem.ItemTemplate>
-                                    <DataTemplate x:DataType="corePipeline:PipelinePreset">
-                                        <MenuItem Header="{Binding Name}"
-                                                  Click="OnPipelinePresetMenuItemClick"
-                                                  CommandParameter="{Binding Name}" />
-                                    </DataTemplate>
-                                </MenuItem.ItemTemplate>
-                            </MenuItem>
+                <Button Background="Transparent"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Left"
+                        Padding="8,6"
+                        CornerRadius="4"
+                        Command="{Binding SelectTopLevelStepTypeCommand}"
+                        CommandParameter="{x:Static corePipeline:StepKind.Move}">
+                    <StackPanel Orientation="Vertical" Spacing="1">
+                        <TextBlock Text="Move" FontWeight="Medium" />
+                        <TextBlock Text="Move to destination" FontSize="11" Opacity="0.55" />
+                    </StackPanel>
+                </Button>
 
-                            <Separator />
-
-                            <MenuItem Header="Save current pipeline..."
-                                      Click="OnSavePipelineMenuItemClick" />
-                        </MenuFlyout>
-                    </Button.Flyout>
+                <Button Background="Transparent"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Left"
+                        Padding="8,6"
+                        CornerRadius="4"
+                        Command="{Binding SelectTopLevelStepTypeCommand}"
+                        CommandParameter="{x:Static corePipeline:StepKind.Copy}">
+                    <StackPanel Orientation="Vertical" Spacing="1">
+                        <TextBlock Text="Copy" FontWeight="Medium" />
+                        <TextBlock Text="Copy to destination" FontSize="11" Opacity="0.55" />
+                    </StackPanel>
                 </Button>
             </StackPanel>
 
@@ -121,8 +136,7 @@
                                     HorizontalContentAlignment="Left"
                                     Padding="8,6"
                                     CornerRadius="4"
-                                    Command="{Binding $parent[UserControl].((vmPipeline:AddStepViewModel)DataContext).SelectStepTypeCommand, FallbackValue={x:Null}}"
-                                    CommandParameter="{Binding Kind}">
+                                    Click="OnSelectStepTypeClick">
                                 <StackPanel Orientation="Vertical" Spacing="1">
                                     <TextBlock Text="{Binding DisplayName}" FontWeight="Medium" />
                                     <TextBlock Text="{Binding Description}" FontSize="11" Opacity="0.55" />
@@ -159,14 +173,14 @@
                 </Grid>
                 <Separator Height="1" Background="#3e3e42" Margin="4,0" />
 
-                <!-- ＋ New... -->
+                <!-- ＋ Configure... -->
                 <Button Background="Transparent"
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Left"
                         Padding="8,6"
                         CornerRadius="4"
                         Command="{Binding RequestNewStepCommand}">
-                    <TextBlock Text="＋ New..." Foreground="#4facfe" />
+                    <TextBlock Text="＋ Configure..." Foreground="#4facfe" />
                 </Button>
                 <Separator Height="1" Background="#3e3e42" Margin="4,0" />
 
@@ -183,8 +197,7 @@
                                             HorizontalContentAlignment="Left"
                                             Padding="8,5"
                                             CornerRadius="4"
-                                            Command="{Binding $parent[UserControl].((vmPipeline:AddStepViewModel)DataContext).PickPresetCommand, FallbackValue={x:Null}}"
-                                            CommandParameter="{Binding}">
+                                            Click="OnPickPresetClick">
                                         <TextBlock Text="{Binding DisplayName}" />
                                     </Button>
                                     <Button Grid.Column="1"
@@ -196,8 +209,7 @@
                                             Foreground="#f44736" FontSize="12"
                                             VerticalAlignment="Center"
                                             ToolTip.Tip="Delete preset"
-                                            Command="{Binding $parent[UserControl].((vmPipeline:AddStepViewModel)DataContext).DeletePresetCommand, FallbackValue={x:Null}}"
-                                            CommandParameter="{Binding}" />
+                                            Click="OnDeletePresetClick" />
                                 </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
@@ -217,8 +229,7 @@
                                             HorizontalContentAlignment="Left"
                                             Padding="8,5"
                                             CornerRadius="4"
-                                            Command="{Binding $parent[UserControl].((vmPipeline:AddStepViewModel)DataContext).PickPresetCommand, FallbackValue={x:Null}}"
-                                            CommandParameter="{Binding}">
+                                            Click="OnPickPresetClick">
                                         <TextBlock Text="{Binding DisplayName}" />
                                     </Button>
                                     <Button Grid.Column="1"
@@ -230,8 +241,96 @@
                                             Foreground="#f44736" FontSize="12"
                                             VerticalAlignment="Center"
                                             ToolTip.Tip="Delete preset"
-                                            Command="{Binding $parent[UserControl].((vmPipeline:AddStepViewModel)DataContext).DeletePresetCommand, FallbackValue={x:Null}}"
-                                            CommandParameter="{Binding}" />
+                                            Click="OnDeletePresetClick" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Level 4: Name input for saving pipeline -->
+            <StackPanel IsVisible="{Binding IsSavingPipeline}" Spacing="1">
+                <Grid ColumnDefinitions="Auto,*" Margin="4,4,4,2">
+                    <Button Grid.Column="0"
+                            Content="←"
+                            Command="{Binding CancelSavePipelineCommand}"
+                            Background="Transparent"
+                            Padding="6,2"
+                            CornerRadius="4"
+                            FontSize="14" />
+                    <TextBlock Grid.Column="1"
+                               Margin="4,2,0,0"
+                               Text="Name this pipeline"
+                               VerticalAlignment="Center"
+                               FontWeight="SemiBold" />
+                </Grid>
+                <Separator Height="1" Background="#3e3e42" Margin="4,2" />
+                
+                <TextBox x:Name="PipelineNameTextBox"
+                         Margin="4,6"
+                         Text="{Binding NewPipelineName}"
+                         Watermark="e.g. My Awesome Pipeline" />
+                
+                <Button Margin="4,0,4,4"
+                        Content="Save"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center"
+                        CornerRadius="4"
+                        Background="#2d2d30"
+                        Command="{Binding ConfirmSavePipelineCommand}" />
+            </StackPanel>
+
+            <!-- Level 5: Load pipeline preset picker -->
+            <StackPanel IsVisible="{Binding IsLoadingPipeline}" Spacing="1">
+                <Grid ColumnDefinitions="Auto,*,Auto" Margin="4,4,4,2">
+                    <Button Grid.Column="0"
+                            Content="←"
+                            Command="{Binding CancelLoadPipelineCommand}"
+                            Background="Transparent"
+                            Padding="6,2"
+                            CornerRadius="4"
+                            FontSize="14" />
+                    <TextBlock Grid.Column="1"
+                               Margin="4,2,0,0"
+                               Text="Load preset"
+                               VerticalAlignment="Center"
+                               FontWeight="SemiBold" />
+                    <Button Grid.Column="2"
+                            Content="✕"
+                            Command="{Binding CloseCommand}"
+                            Background="Transparent"
+                            Padding="6,2"
+                            CornerRadius="4"
+                            FontSize="12"
+                            Foreground="#a0a0a0" />
+                </Grid>
+                <Separator Height="1" Background="#3e3e42" Margin="4,0" />
+
+                <!-- All pipelines -->
+                <StackPanel IsVisible="{Binding UserPresets.Count}">
+                    <ItemsControl ItemsSource="{Binding UserPresets}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="corePipeline:PipelinePreset">
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <Button Grid.Column="0"
+                                            Background="Transparent"
+                                            HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Left"
+                                            Padding="8,5"
+                                            CornerRadius="4"
+                                            Click="OnLoadPresetClick">
+                                        <TextBlock Text="{Binding Name}" />
+                                    </Button>
+                                    <Button Grid.Column="1"
+                                            Content="🗑" Width="28" Height="28" Padding="0"
+                                            HorizontalContentAlignment="Center"
+                                            VerticalContentAlignment="Center"
+                                            CornerRadius="4" Background="Transparent"
+                                            Foreground="#f44736" FontSize="12"
+                                            VerticalAlignment="Center"
+                                            ToolTip.Tip="Delete pipeline"
+                                            Click="OnDeletePipelineClick" />
                                 </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>

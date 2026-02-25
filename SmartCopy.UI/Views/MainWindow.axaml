@@ -21,8 +21,7 @@
                     <MenuItem Header="_Quit" />
                 </MenuItem>
                 <MenuItem Header="_Settings" />
-                <MenuItem Header="F_ilters" />
-                <MenuItem Header="_Pipeline" />
+                <MenuItem Header="_Workflows" />
                 <MenuItem Header="_Help" />
             </Menu>
         </Border>

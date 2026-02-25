@@ -98,7 +98,7 @@ Clicking "+ Add filter" opens a **`Popup`** anchored below the button (light-dis
 ┌────────────────────────────────┐
 │  ← Extension                   │
 ├────────────────────────────────┤
-│  ＋ New...                     │
+│  ＋ Configure...               │
 ├────────────────────────────────┤
 │  Recently used                 │
 │    My music (*.mp3;*.flac)     │
@@ -111,14 +111,14 @@ Clicking "+ Add filter" opens a **`Popup`** anchored below the button (light-dis
 └────────────────────────────────┘
 ```
 
-- **"＋ New..."** — closes flyout, opens `EditFilterDialog` with empty form for selected type
+- **"＋ Configure..."** — closes flyout, opens `EditFilterDialog` with empty form for selected type
 - **Preset row** — closes flyout, adds card immediately, triggers tree/file list update
 - **"←"** — returns to Level 1; "★" = built-in (read-only); plain rows = user-saved presets
 - "Recently used" shows the last 5 presets of this type from `AppSettings.FilterTypeMruPresetIds`
 
 ### EditFilterDialog
 
-A **modal `Window`** (`ShowDialog<bool?>`) opened via "＋ New..." or the edit pencil on any card.
+A **modal `Window`** (`ShowDialog<bool?>`) opened via "＋ Configure..." or the edit pencil on any card.
 The dialog dispatches to a type-specific editor view via `ContentControl` + `DataTemplate`.
 
 ```text
@@ -184,31 +184,40 @@ Each step in the pipeline strip is a card connected by `→` arrows. Cards follo
 
 ### Add Step — Integrated Dropdown
 
-Clicking `+ Add step` opens a **`Popup`** anchored below the button (light-dismiss on click-outside). This dropdown now integrates loading standard or custom pipeline presets, and saving the current pipeline, directly into the step addition flow.
+Clicking `+ Add step` opens a **`Popup`** anchored above the button (light-dismiss on click-outside). 
+This dropdown integrates loading and saving pipelines along with pipeline operations.
 
 **Level 1 — Main Category Selection:**
 ```text
 ┌────────────────────────────────┐
 │  Add Step                    ✕ │
 ├────────────────────────────────┤
-│  Executable steps              │
-│  Path steps                    │
-│  ────────────────────────────  │
-│  Load preset ▸                 │
-│  ────────────────────────────  │
+│  Load preset                   │
 │  Save current pipeline...      │
+├────────────────────────────────┤
+│  Content steps               ▸ │
+│  Path steps                  ▸ │
+│  Selection steps             ▸ │
+├────────────────────────────────┤
+│  Delete                        │
+│  Delete source file            │
+├────────────────────────────────┤
+│  Move                          │
+│  Move to destination           │
+│                                │
+│  Copy                          │
+│  Copy to destination           │
 └────────────────────────────────┘
 ```
 
-**Level 2 — Step type selection** (example: Executable):
+**Level 2 — Step type selection** (example: Path steps):
 ```text
 ┌────────────────────────────────┐
-│  ← Executable steps            │
+│  ← Path steps                  │
 ├────────────────────────────────┤
-│  Copy To   Copy to destination │
-│  Move To   Move to destination │
-│  Delete    Remove source file  │
-│            ⚠ requires preview  │
+│  Flatten   Remove folders      │
+│  Rebase    Change root path    │
+│  Rename    Change filename     │
 └────────────────────────────────┘
 ```
 
@@ -217,7 +226,7 @@ Clicking `+ Add step` opens a **`Popup`** anchored below the button (light-dismi
 ┌────────────────────────────────┐
 │  ← Delete                      │
 ├────────────────────────────────┤
-│  ＋ New...                     │
+│  ＋ Configure...               │
 ├────────────────────────────────┤
 │  Recently used                 │
 │    Delete to Trash             │
@@ -228,14 +237,15 @@ Clicking `+ Add step` opens a **`Popup`** anchored below the button (light-dismi
 └────────────────────────────────┘
 ```
 
-- `←` on Level 2 returns to Level 1; `←` on Level 3 returns to Level 2.
+- `←` on Level 2 returns to Level 1; `←` on Level 3 returns to Level 1 (for top-level executable steps) or Level 2 (for categorized steps).
 - If no presets exist for a step type (e.g. Copy, Move, Rename), Level 3 is bypassed and `EditStepDialog` opens directly — same bypass pattern as the filter flyout.
-- **"＋ New..."** on Level 3 opens `EditStepDialog` with an empty form for the selected type.
+- **"＋ Configure..."** on Level 3 opens `EditStepDialog` with an empty form for the selected type.
 - **Preset row** — closes flyout, adds step immediately from preset config.
 - "★" prefix = built-in (read-only); plain rows = user-saved presets.
 - "Recently used" shows the last 5 presets of this type from `AppSettings.StepTypeMruPresetIds`.
 
-Clicking a step type (Level 2) that has presets navigates to Level 3.
+Clicking a category (Level 1) navigates to Level 2.
+Clicking a top-level executable step or a step type from Level 2 that has presets navigates to Level 3.
 Clicking a step type with no presets opens `EditStepDialog` directly.
 This includes optional custom step naming in the same interaction.
 
@@ -309,7 +319,9 @@ If the entered step name matches the auto-generated name, no custom-name overrid
 
 ### Load Preset / Save Pipeline Integration
 
-The `Load preset ▸` and `Save current pipeline...` options are integrated into the main `+ Add step` menu. Expanding `Load preset ▸` reveals:
+The `Load preset ▸` and `Save current pipeline...` options are integrated into the main `+ Add step` menu. To prevent destructive mistakes, `Load preset ▸` is only visible when the pipeline is empty, while `Save current pipeline...` is only visible when there are steps present.
+
+Expanding `Load preset ▸` reveals:
 
 ```text
 ┌──────────────────────────────────────┐
@@ -327,9 +339,9 @@ The `Load preset ▸` and `Save current pipeline...` options are integrated into
 | Delete to Trash | `[DeleteStep(Trash)]` |
 | Flatten → Copy | `[FlattenStep → CopyStep]` |
 
-**My Pipelines** — user-saved `.sc2pipe` files from `%APPDATA%/SmartCopy2026/pipelines/`.
+**My Pipelines** — user-saved `.sc2pipe` files from `%APPDATA%/SmartCopy2026/pipelines/`. Users can delete custom pipelines directly from this menu by clicking the inline Delete (🗑) icon next to the name.
 
-**Save current pipeline...** — prompts for a name (inline text input in the menu or a small dialog), then writes a `.sc2pipe` file. If a file with that name already exists, confirms overwrite.
+**Save current pipeline...** — transforms the bottom of the flyout into an inline input form prompting for a name. If left blank, it falls back to a timestamped name.
 
 Loading a preset replaces the entire current pipeline. A tooltip-notification at the bottom of the pipeline strip confirms the name of the loaded preset.
 

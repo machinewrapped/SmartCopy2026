@@ -3,7 +3,8 @@
              xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
              x:Class="SmartCopy.UI.Views.AddFilterFlyout"
              x:DataType="vm:AddFilterViewModel"
-             Width="280">
+             Width="280"
+             Focusable="True">
     <Border Background="#1e1e1e" BorderBrush="#555" BorderThickness="1"
             CornerRadius="6" Padding="4">
         <Panel>
@@ -31,8 +32,7 @@
                                     HorizontalContentAlignment="Left"
                                     Padding="8,6"
                                     CornerRadius="4"
-                                    Command="{Binding $parent[UserControl].((vm:AddFilterViewModel)DataContext).SelectFilterTypeCommand, FallbackValue={x:Null}}"
-                                    CommandParameter="{Binding}">
+                                    Click="OnSelectFilterTypeClick">
                                 <StackPanel Orientation="Vertical" Spacing="1">
                                     <TextBlock Text="{Binding DisplayName}" FontWeight="Medium" />
                                     <TextBlock Text="{Binding Description}"
@@ -73,14 +73,14 @@
 
                 <Separator Height="1" Background="#3e3e42" Margin="4,0" />
 
-                <!-- ＋ New... -->
+                <!-- ＋ Configure... -->
                 <Button Background="Transparent"
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Left"
                         Padding="8,6"
                         CornerRadius="4"
                         Command="{Binding RequestNewFilterCommand}">
-                    <TextBlock Text="＋ New..." Foreground="#4facfe" />
+                    <TextBlock Text="＋ Configure..." Foreground="#4facfe" />
                 </Button>
 
                 <Separator Height="1" Background="#3e3e42" Margin="4,0" />
@@ -99,8 +99,7 @@
                                             HorizontalContentAlignment="Left"
                                             Padding="8,5"
                                             CornerRadius="4"
-                                            Command="{Binding $parent[UserControl].((vm:AddFilterViewModel)DataContext).PickPresetCommand, FallbackValue={x:Null}}"
-                                            CommandParameter="{Binding}">
+                                            Click="OnPickPresetClick">
                                         <TextBlock Text="{Binding DisplayName}" />
                                     </Button>
                                     <Button Grid.Column="1"
@@ -113,8 +112,7 @@
                                             Foreground="#f44736" FontSize="12"
                                             VerticalAlignment="Center"
                                             ToolTip.Tip="Delete preset"
-                                            Command="{Binding $parent[UserControl].((vm:AddFilterViewModel)DataContext).DeletePresetCommand, FallbackValue={x:Null}}"
-                                            CommandParameter="{Binding}" />
+                                            Click="OnDeletePresetClick" />
                                 </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
@@ -134,8 +132,7 @@
                                             HorizontalContentAlignment="Left"
                                             Padding="8,5"
                                             CornerRadius="4"
-                                            Command="{Binding $parent[UserControl].((vm:AddFilterViewModel)DataContext).PickPresetCommand, FallbackValue={x:Null}}"
-                                            CommandParameter="{Binding}">
+                                            Click="OnPickPresetClick">
                                         <TextBlock Text="{Binding DisplayName}" />
                                     </Button>
                                     <Button Grid.Column="1"
@@ -148,8 +145,7 @@
                                             Foreground="#f44736" FontSize="12"
                                             VerticalAlignment="Center"
                                             ToolTip.Tip="Delete preset"
-                                            Command="{Binding $parent[UserControl].((vm:AddFilterViewModel)DataContext).DeletePresetCommand, FallbackValue={x:Null}}"
-                                            CommandParameter="{Binding}" />
+                                            Click="OnDeletePresetClick" />
                                 </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>

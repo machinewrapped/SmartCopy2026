@@ -91,7 +91,7 @@
                                                         HorizontalContentAlignment="Center"
                                                         VerticalContentAlignment="Center"
                                                         Background="Transparent"
-                                                        Foreground="#f44336"
+                                                        Foreground="{DynamicResource DangerForegroundBrush}"
                                                         FontSize="10"
                                                         VerticalAlignment="Top"
                                                         Margin="8,0,0,0" />
@@ -151,6 +151,7 @@
 
                         <Popup x:Name="AddStepPopup"
                                Placement="TopEdgeAlignedLeft"
+                               IsLightDismissEnabled="True"
                                PlacementTarget="{Binding ElementName=AddStepButton}">
                             <pipelineViews:AddStepFlyout x:Name="AddStepFlyoutControl"
                                                          DataContext="{Binding AddStep}" />

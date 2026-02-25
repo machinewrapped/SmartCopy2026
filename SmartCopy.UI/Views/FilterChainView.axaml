@@ -80,7 +80,7 @@
                                                     HorizontalContentAlignment="Center"
                                                     VerticalContentAlignment="Center"
                                                     Background="Transparent"
-                                                    Foreground="#f44736" />
+                                                    Foreground="{DynamicResource DangerForegroundBrush}" />
                                         </StackPanel>
 
                                     </Grid>
@@ -104,6 +104,7 @@
                         <!-- Add-filter flyout popup -->
                         <Popup x:Name="AddFilterPopup"
                                Placement="Bottom"
+                               IsLightDismissEnabled="True"
                                PlacementTarget="{Binding ElementName=AddFilterButton}">
                             <views:AddFilterFlyout x:Name="AddFilterFlyoutControl"
                                                    DataContext="{Binding AddFilter}" />

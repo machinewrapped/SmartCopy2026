@@ -5,9 +5,9 @@
              x:Class="SmartCopy.UI.Views.StatusBarView"
              x:DataType="vm:StatusBarViewModel">
     <DockPanel>
-        <views:OperationProgressView DockPanel.Dock="Right"
-                                     DataContext="{Binding Progress}"
-                                     IsVisible="{Binding Progress.IsActive}" />
+        <Panel DockPanel.Dock="Right" IsVisible="{Binding Progress.IsActive}">
+            <views:OperationProgressView DataContext="{Binding Progress}" />
+        </Panel>
         <views:SelectionView DataContext="{Binding Selection}" />
     </DockPanel>
 </UserControl>

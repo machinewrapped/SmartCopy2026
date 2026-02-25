@@ -183,7 +183,6 @@ public partial class PipelineViewModel : ViewModelBase
     private int _selectedIncludedFileCount;
 
     public ObservableCollection<PipelineStepViewModel> Steps { get; } = [];
-    public ObservableCollection<PipelinePreset> StandardPresets { get; } = [];
     public ObservableCollection<PipelinePreset> UserPresets { get; } = [];
     public AddStepViewModel AddStep { get; }
 
@@ -245,6 +244,7 @@ public partial class PipelineViewModel : ViewModelBase
         AddStep.StepPresetPicked += OnStepPresetPicked;
         AddStep.LoadPipelinePresetRequested += OnAddStepLoadPipelinePresetRequested;
         AddStep.SavePipelineRequested += OnAddStepSavePipelineRequested;
+        AddStep.DeletePipelineRequested += OnAddStepDeletePipelineRequested;
 
         Steps.CollectionChanged += OnStepsCollectionChanged;
 
@@ -279,9 +279,22 @@ public partial class PipelineViewModel : ViewModelBase
         LoadPresetCommand.Execute(name);
     }
 
-    private void OnAddStepSavePipelineRequested()
+    private void OnAddStepSavePipelineRequested(string? name)
     {
-        SavePipelineCommand.Execute(null);
+        SavePipelineCommand.Execute(name);
+    }
+
+    private async void OnAddStepDeletePipelineRequested(string name)
+    {
+        try
+        {
+            await _presetStore.DeleteUserPresetAsync(name, _presetDirectory);
+            await RefreshPresetsAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ERROR] Failed to delete pipeline preset '{name}': {ex.Message}");
+        }
     }
 
     public TransformPipeline BuildLivePipeline()
@@ -335,7 +348,7 @@ public partial class PipelineViewModel : ViewModelBase
     [RelayCommand]
     private async Task LoadPresetAsync(string name)
     {
-        var all = await _presetStore.GetAllPresetsAsync(_presetDirectory);
+        var all = await _presetStore.GetUserPresetsAsync(_presetDirectory);
         var preset = all.FirstOrDefault(p =>
             string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
         if (preset is null)
@@ -365,6 +378,7 @@ public partial class PipelineViewModel : ViewModelBase
             _presetDirectory);
 
         await RefreshPresetsAsync();
+        AddStep.RequestClose();
     }
 
     [RelayCommand(CanExecute = nameof(CanRun))]
@@ -437,14 +451,7 @@ public partial class PipelineViewModel : ViewModelBase
 
     private async Task RefreshPresetsAsync()
     {
-        var standards = await PipelinePresetStore.GetStandardPresetsAsync();
         var users = await _presetStore.GetUserPresetsAsync(_presetDirectory);
-
-        StandardPresets.Clear();
-        foreach (var preset in standards)
-        {
-            StandardPresets.Add(preset);
-        }
 
         UserPresets.Clear();
         foreach (var preset in users)
@@ -452,12 +459,13 @@ public partial class PipelineViewModel : ViewModelBase
             UserPresets.Add(preset);
         }
 
-        AddStep.StandardPresets = StandardPresets;
         AddStep.UserPresets = UserPresets;
     }
 
     private void Revalidate()
     {
+        AddStep.HasSteps = Steps.Count > 0;
+
         foreach (var step in Steps)
         {
             step.ValidationMessage = null;
