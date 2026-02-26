@@ -51,7 +51,7 @@ public sealed class SessionStore
             var json = await File.ReadAllTextAsync(path, ct);
             return JsonSerializer.Deserialize<WorkflowConfig>(json, _jsonOptions);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
             Debug.WriteLine($"[SessionStore] Failed to load session: {ex.Message}");
             return null;

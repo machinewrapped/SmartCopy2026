@@ -311,10 +311,6 @@ public partial class MainWindow : Window
             {
                 if (_mainVm is null) return;
                 _mainVm.DefaultOverwriteMode = mode;
-                // Sync the radio-style checked state across all three items.
-                if (_overwriteSkipMenuItem   is not null) _overwriteSkipMenuItem.IsChecked   = mode == "Skip";
-                if (_overwriteAlwaysMenuItem  is not null) _overwriteAlwaysMenuItem.IsChecked  = mode == "Always";
-                if (_overwriteIfNewerMenuItem is not null) _overwriteIfNewerMenuItem.IsChecked = mode == "IfNewer";
             };
             return item;
         }
@@ -322,78 +318,70 @@ public partial class MainWindow : Window
 
     private void OnMainViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(MainViewModel.UseAbsolutePathsForSelection)
-            && _absolutePathsMenuItem is not null)
+        switch (e.PropertyName)
         {
-            _absolutePathsMenuItem.IsChecked = _mainVm?.UseAbsolutePathsForSelection ?? false;
-        }
+            case nameof(MainViewModel.UseAbsolutePathsForSelection):
+                if (_absolutePathsMenuItem is not null)
+                    _absolutePathsMenuItem.IsChecked = _mainVm?.UseAbsolutePathsForSelection ?? false;
+                break;
 
-        if (e.PropertyName == nameof(MainViewModel.AutoOpenLogOnRun)
-            && _autoOpenLogMenuItem is not null)
-        {
-            _autoOpenLogMenuItem.IsChecked = _mainVm?.AutoOpenLogOnRun ?? true;
-        }
+            case nameof(MainViewModel.AutoOpenLogOnRun):
+                if (_autoOpenLogMenuItem is not null)
+                    _autoOpenLogMenuItem.IsChecked = _mainVm?.AutoOpenLogOnRun ?? true;
+                break;
 
-        if (e.PropertyName == nameof(MainViewModel.ShowExcludedNodesByDefault)
-            && _showExcludedNodesMenuItem is not null)
-        {
-            _showExcludedNodesMenuItem.IsChecked = _mainVm?.ShowExcludedNodesByDefault ?? true;
-        }
+            case nameof(MainViewModel.ShowExcludedNodesByDefault):
+                if (_showExcludedNodesMenuItem is not null)
+                    _showExcludedNodesMenuItem.IsChecked = _mainVm?.ShowExcludedNodesByDefault ?? true;
+                break;
 
-        if (e.PropertyName == nameof(MainViewModel.RestoreLastWorkflow))
-        {
-            if (_restoreLastWorkflowMenuItem is not null)
-                _restoreLastWorkflowMenuItem.IsChecked = _mainVm?.RestoreLastWorkflow ?? false;
-            // "Restore source path" is redundant when workflow restore is active.
-            if (_restoreLastSourcePathMenuItem is not null)
-                _restoreLastSourcePathMenuItem.IsEnabled = !(_mainVm?.RestoreLastWorkflow ?? false);
-            // "Save session locally" only makes sense when workflow restore is active.
-            if (_saveSessionLocallyMenuItem is not null)
-                _saveSessionLocallyMenuItem.IsEnabled = _mainVm?.RestoreLastWorkflow ?? false;
-        }
+            case nameof(MainViewModel.RestoreLastWorkflow):
+                if (_restoreLastWorkflowMenuItem is not null)
+                    _restoreLastWorkflowMenuItem.IsChecked = _mainVm?.RestoreLastWorkflow ?? false;
+                // "Restore source path" is redundant when workflow restore is active.
+                if (_restoreLastSourcePathMenuItem is not null)
+                    _restoreLastSourcePathMenuItem.IsEnabled = !(_mainVm?.RestoreLastWorkflow ?? false);
+                // "Save session locally" only makes sense when workflow restore is active.
+                if (_saveSessionLocallyMenuItem is not null)
+                    _saveSessionLocallyMenuItem.IsEnabled = _mainVm?.RestoreLastWorkflow ?? false;
+                break;
 
-        if (e.PropertyName == nameof(MainViewModel.RestoreLastSourcePath)
-            && _restoreLastSourcePathMenuItem is not null)
-        {
-            _restoreLastSourcePathMenuItem.IsChecked = _mainVm?.RestoreLastSourcePath ?? true;
-        }
+            case nameof(MainViewModel.RestoreLastSourcePath):
+                if (_restoreLastSourcePathMenuItem is not null)
+                    _restoreLastSourcePathMenuItem.IsChecked = _mainVm?.RestoreLastSourcePath ?? true;
+                break;
 
-        if (e.PropertyName == nameof(MainViewModel.SaveSessionLocally)
-            && _saveSessionLocallyMenuItem is not null)
-        {
-            _saveSessionLocallyMenuItem.IsChecked = _mainVm?.SaveSessionLocally ?? false;
-        }
+            case nameof(MainViewModel.SaveSessionLocally):
+                if (_saveSessionLocallyMenuItem is not null)
+                    _saveSessionLocallyMenuItem.IsChecked = _mainVm?.SaveSessionLocally ?? false;
+                break;
 
-        if (e.PropertyName == nameof(MainViewModel.DisableDestructivePreview)
-            && _disableDestructivePreviewMenuItem is not null)
-        {
-            _disableDestructivePreviewMenuItem.IsChecked = _mainVm?.DisableDestructivePreview ?? false;
-        }
+            case nameof(MainViewModel.DisableDestructivePreview):
+                if (_disableDestructivePreviewMenuItem is not null)
+                    _disableDestructivePreviewMenuItem.IsChecked = _mainVm?.DisableDestructivePreview ?? false;
+                break;
 
-        if (e.PropertyName == nameof(MainViewModel.DeleteToRecycleBin)
-            && _deleteToRecycleBinMenuItem is not null)
-        {
-            _deleteToRecycleBinMenuItem.IsChecked = _mainVm?.DeleteToRecycleBin ?? true;
-        }
+            case nameof(MainViewModel.DeleteToRecycleBin):
+                if (_deleteToRecycleBinMenuItem is not null)
+                    _deleteToRecycleBinMenuItem.IsChecked = _mainVm?.DeleteToRecycleBin ?? true;
+                break;
 
-        if (e.PropertyName == nameof(MainViewModel.DefaultOverwriteMode))
-        {
-            var mode = _mainVm?.DefaultOverwriteMode ?? "Skip";
-            if (_overwriteSkipMenuItem   is not null) _overwriteSkipMenuItem.IsChecked   = mode == "Skip";
-            if (_overwriteAlwaysMenuItem  is not null) _overwriteAlwaysMenuItem.IsChecked  = mode == "Always";
-            if (_overwriteIfNewerMenuItem is not null) _overwriteIfNewerMenuItem.IsChecked = mode == "IfNewer";
-        }
+            case nameof(MainViewModel.DefaultOverwriteMode):
+                var mode = _mainVm?.DefaultOverwriteMode ?? "Skip";
+                if (_overwriteSkipMenuItem    is not null) _overwriteSkipMenuItem.IsChecked    = mode == "Skip";
+                if (_overwriteAlwaysMenuItem  is not null) _overwriteAlwaysMenuItem.IsChecked  = mode == "Always";
+                if (_overwriteIfNewerMenuItem is not null) _overwriteIfNewerMenuItem.IsChecked = mode == "IfNewer";
+                break;
 
-        if (e.PropertyName == nameof(MainViewModel.FullPreScan)
-            && _fullPreScanMenuItem is not null)
-        {
-            _fullPreScanMenuItem.IsChecked = _mainVm?.FullPreScan ?? false;
-        }
+            case nameof(MainViewModel.FullPreScan):
+                if (_fullPreScanMenuItem is not null)
+                    _fullPreScanMenuItem.IsChecked = _mainVm?.FullPreScan ?? false;
+                break;
 
-        if (e.PropertyName == nameof(MainViewModel.LazyExpandScan)
-            && _lazyExpandScanMenuItem is not null)
-        {
-            _lazyExpandScanMenuItem.IsChecked = _mainVm?.LazyExpandScan ?? false;
+            case nameof(MainViewModel.LazyExpandScan):
+                if (_lazyExpandScanMenuItem is not null)
+                    _lazyExpandScanMenuItem.IsChecked = _mainVm?.LazyExpandScan ?? false;
+                break;
         }
     }
 

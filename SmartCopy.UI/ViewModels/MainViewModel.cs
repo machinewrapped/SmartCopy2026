@@ -177,69 +177,81 @@ public partial class MainViewModel : ViewModelBase
     partial void OnUseAbsolutePathsForSelectionChanged(bool value)
     {
         _settings.UseAbsolutePathsForSelectionSave = value;
-        _ = _settingsStore.SaveAsync(_settings);
+        _ = SaveSettingsAsync();
     }
 
     partial void OnAutoOpenLogOnRunChanged(bool value)
     {
         _settings.AutoOpenLogOnRun = value;
-        _ = _settingsStore.SaveAsync(_settings);
+        _ = SaveSettingsAsync();
     }
 
     partial void OnShowExcludedNodesByDefaultChanged(bool value)
     {
         _settings.ShowFilteredNodesInTree = value;
-        _ = _settingsStore.SaveAsync(_settings);
+        _ = SaveSettingsAsync();
         FilterChain.ShowExcludedNodesInTree = value;
     }
 
     partial void OnRestoreLastWorkflowChanged(bool value)
     {
         _settings.RestoreLastWorkflow = value;
-        _ = _settingsStore.SaveAsync(_settings);
+        _ = SaveSettingsAsync();
     }
 
     partial void OnRestoreLastSourcePathChanged(bool value)
     {
         _settings.RestoreLastSourcePath = value;
-        _ = _settingsStore.SaveAsync(_settings);
+        _ = SaveSettingsAsync();
     }
 
     partial void OnDisableDestructivePreviewChanged(bool value)
     {
         _settings.DisableDestructivePreview = value;
-        _ = _settingsStore.SaveAsync(_settings);
+        _ = SaveSettingsAsync();
     }
 
     partial void OnDeleteToRecycleBinChanged(bool value)
     {
         _settings.DeleteToRecycleBin = value;
         _settings.DefaultDeleteMode = value ? "Trash" : "Permanent";
-        _ = _settingsStore.SaveAsync(_settings);
+        _ = SaveSettingsAsync();
     }
 
     partial void OnSaveSessionLocallyChanged(bool value)
     {
         _settings.SaveSessionLocally = value;
-        _ = _settingsStore.SaveAsync(_settings);
+        _ = SaveSettingsAsync();
     }
 
     partial void OnFullPreScanChanged(bool value)
     {
         _settings.FullPreScan = value;
-        _ = _settingsStore.SaveAsync(_settings);
+        _ = SaveSettingsAsync();
     }
 
     partial void OnLazyExpandScanChanged(bool value)
     {
         _settings.LazyExpandScan = value;
-        _ = _settingsStore.SaveAsync(_settings);
+        _ = SaveSettingsAsync();
     }
 
     partial void OnDefaultOverwriteModeChanged(string value)
     {
         _settings.DefaultOverwriteMode = value;
-        _ = _settingsStore.SaveAsync(_settings);
+        _ = SaveSettingsAsync();
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        try
+        {
+            await _settingsStore.SaveAsync(_settings);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[Settings] Failed to save settings: {ex.Message}");
+        }
     }
 
     // ── Keyboard shortcut commands ────────────────────────────────────────────
@@ -574,17 +586,17 @@ public partial class MainViewModel : ViewModelBase
 
         _settings.SaveSessionLocally = saved.SaveSessionLocally;
 
-        UseAbsolutePathsForSelection = saved.UseAbsolutePathsForSelectionSave;
-        AutoOpenLogOnRun = saved.AutoOpenLogOnRun;
-        ShowExcludedNodesByDefault = saved.ShowFilteredNodesInTree;
-        RestoreLastWorkflow = saved.RestoreLastWorkflow;
-        RestoreLastSourcePath = saved.RestoreLastSourcePath;
-        DisableDestructivePreview = saved.DisableDestructivePreview;
-        DeleteToRecycleBin = saved.DeleteToRecycleBin;
-        SaveSessionLocally = saved.SaveSessionLocally;
-        FullPreScan = saved.FullPreScan;
-        LazyExpandScan = saved.LazyExpandScan;
-        DefaultOverwriteMode = saved.DefaultOverwriteMode;
+        UseAbsolutePathsForSelection = _settings.UseAbsolutePathsForSelectionSave;
+        AutoOpenLogOnRun = _settings.AutoOpenLogOnRun;
+        ShowExcludedNodesByDefault = _settings.ShowFilteredNodesInTree;
+        RestoreLastWorkflow = _settings.RestoreLastWorkflow;
+        RestoreLastSourcePath = _settings.RestoreLastSourcePath;
+        DisableDestructivePreview = _settings.DisableDestructivePreview;
+        DeleteToRecycleBin = _settings.DeleteToRecycleBin;
+        SaveSessionLocally = _settings.SaveSessionLocally;
+        FullPreScan = _settings.FullPreScan;
+        LazyExpandScan = _settings.LazyExpandScan;
+        DefaultOverwriteMode = _settings.DefaultOverwriteMode;
 
         if (saved.RestoreLastSourcePath && !saved.RestoreLastWorkflow
             && saved.LastSourcePath is { Length: > 0 })
@@ -607,7 +619,10 @@ public partial class MainViewModel : ViewModelBase
                 if (session is not null)
                     await ApplyWorkflowConfigAsync(session);
             }
-            catch (Exception ex) { Debug.WriteLine($"Failed to restore session snapshot: {ex}"); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
+            {
+                Debug.WriteLine($"Failed to restore session snapshot: {ex}");
+            }
         }
 
         // Pre-wire the chain before the initial tree load so the first file list load
