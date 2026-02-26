@@ -69,6 +69,7 @@ public partial class MainViewModel : ViewModelBase
     private readonly MemoryFileSystemProvider _memoryProvider;
     private readonly AppSettings _settings = new();
     private readonly AppSettingsStore _settingsStore = new();
+    private readonly SessionStore _sessionStore = new();
     private readonly OperationJournal _operationJournal = new();
     private readonly WorkflowPresetStore _workflowStore = new();
     private readonly SelectionManager _selectionManager = new();
@@ -585,11 +586,16 @@ public partial class MainViewModel : ViewModelBase
         await _operationJournal.RotateAsync(_settings.LogRetentionDays);
         await WorkflowMenu.RefreshAsync();
 
-        // Restore last workflow if the option is enabled and the named preset still exists.
-        if (saved.RestoreLastWorkflow && saved.LastWorkflowName is { Length: > 0 })
+        // Restore last workflow if the option is enabled and a session snapshot exists.
+        if (saved.RestoreLastWorkflow)
         {
-            try { await LoadWorkflowAsync(saved.LastWorkflowName); }
-            catch (Exception ex) { Debug.WriteLine($"Failed to restore last workflow '{saved.LastWorkflowName}': {ex}"); }
+            try
+            {
+                var session = await _sessionStore.LoadAsync();
+                if (session is not null)
+                    await ApplyWorkflowConfigAsync(session);
+            }
+            catch (Exception ex) { Debug.WriteLine($"Failed to restore session snapshot: {ex}"); }
         }
 
         // Pre-wire the chain before the initial tree load so the first file list load
@@ -805,13 +811,22 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
+        await ApplyWorkflowConfigAsync(preset.Config);
+    }
+
+    /// <summary>
+    /// Applies a <see cref="WorkflowConfig"/> to the current session without saving
+    /// or recording any names — just restores source, filters, and pipeline.
+    /// </summary>
+    private async Task ApplyWorkflowConfigAsync(WorkflowConfig config)
+    {
         // Restore source path
-        SourcePath = preset.Config.SourcePath;
-        await ApplySourcePathCoreAsync(preset.Config.SourcePath);
+        SourcePath = config.SourcePath;
+        await ApplySourcePathCoreAsync(config.SourcePath);
 
         // Restore filter chain
         FilterChain.Filters.Clear();
-        foreach (var filterConfig in preset.Config.FilterChain.Filters)
+        foreach (var filterConfig in config.FilterChain.Filters)
         {
             var filter = FilterFactory.FromConfig(filterConfig);
             FilterChain.AddFilterFromResult(filter);
@@ -821,16 +836,36 @@ public partial class MainViewModel : ViewModelBase
         var pipelinePreset = new PipelinePreset
         {
             Id = "workflow",
-            Name = preset.Config.Name,
+            Name = config.Name,
             IsBuiltIn = false,
-            Config = preset.Config.Pipeline,
+            Config = config.Pipeline,
         };
         Pipeline.LoadPreset(pipelinePreset);
+    }
 
-        // Record this as the last-used workflow so RestoreLastWorkflow can resurrect
-        // the correct preset rather than guessing from list order.
-        _settings.LastWorkflowName = name;
-        await _settingsStore.SaveAsync(_settings);
+    /// <summary>
+    /// Captures the full current session state and writes it to the session snapshot
+    /// file so it can be restored on the next startup (when RestoreLastWorkflow is on).
+    /// Called from MainWindow.OnClosing — best-effort, never throws.
+    /// </summary>
+    public async Task SaveSessionSnapshotAsync()
+    {
+        try
+        {
+            var filterChainConfig = FilterChain.BuildLiveChain().ToConfig("__session__");
+            var pipelineConfig = Pipeline.ToConfig("__session__");
+            var config = new WorkflowConfig(
+                Name: "__session__",
+                Description: null,
+                SourcePath: SourcePath,
+                FilterChain: filterChainConfig,
+                Pipeline: pipelineConfig);
+            await _sessionStore.SaveAsync(config);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Failed to save session snapshot: {ex}");
+        }
     }
 
     private async Task ManageWorkflowsAsync()

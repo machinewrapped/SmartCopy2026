@@ -463,6 +463,12 @@ public partial class MainWindow : Window
     protected override void OnClosing(WindowClosingEventArgs e)
     {
         base.OnClosing(e);
+        // Best-effort session snapshot — allows RestoreLastWorkflow to capture
+        // the exact state at exit, even if the user never explicitly saved.
+        if (_mainVm?.RestoreLastWorkflow == true)
+        {
+            _ = _mainVm.SaveSessionSnapshotAsync();
+        }
         TrySaveWindowState();
     }
 

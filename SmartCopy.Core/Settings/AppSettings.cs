@@ -27,8 +27,6 @@ public sealed class AppSettings
     public bool DisableDestructivePreview { get; set; } = false;
     /// <summary>Send deleted files to the recycle bin when the platform supports it.</summary>
     public bool DeleteToRecycleBin { get; set; } = true;
-    /// <summary>Name of the last workflow that was loaded, for use with <see cref="RestoreLastWorkflow"/>.</summary>
-    public string? LastWorkflowName { get; set; }
     public int LogRetentionDays { get; set; } = 30;
     public List<string> RecentSources { get; set; } = [];
     public List<string> RecentTargets { get; set; } = [];
