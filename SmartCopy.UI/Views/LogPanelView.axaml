@@ -32,18 +32,18 @@
             <ItemsControl ItemsSource="{Binding Entries}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:LogEntry">
-                        <TextBlock FontFamily="Consolas, Courier New, monospace"
-                                   FontSize="13"
-                                   TextWrapping="NoWrap"
-                                   Padding="4,1"
-                                   Foreground="{Binding ForegroundColor}">
-                            <TextBlock.Text>
+                        <SelectableTextBlock FontFamily="Consolas, Courier New, monospace"
+                                             FontSize="13"
+                                             TextWrapping="NoWrap"
+                                             Padding="4,1"
+                                             Foreground="{Binding ForegroundColor}">
+                            <SelectableTextBlock.Text>
                                 <MultiBinding StringFormat="{}{0:HH:mm:ss}  {1}">
                                     <Binding Path="Timestamp" />
                                     <Binding Path="Message" />
                                 </MultiBinding>
-                            </TextBlock.Text>
-                        </TextBlock>
+                            </SelectableTextBlock.Text>
+                        </SelectableTextBlock>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
