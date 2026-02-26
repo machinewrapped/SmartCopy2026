@@ -26,7 +26,7 @@ public sealed class MoveStep : ITransformStep
 
     public TransformResult Preview(TransformContext context)
     {
-        var destination = StepPathHelper.BuildDestinationPath(DestinationPath, context.CurrentPath);
+        var destination = StepPathHelper.BuildDestinationPath(DestinationPath, context.PathSegments);
         return new TransformResult(
             Success: true,
             StepType: StepType,
@@ -41,7 +41,7 @@ public sealed class MoveStep : ITransformStep
         ct.ThrowIfCancellationRequested();
         var targetProvider = context.TargetProvider
                              ?? throw new InvalidOperationException("TargetProvider must be set for MoveStep.");
-        var destination = StepPathHelper.BuildDestinationPath(DestinationPath, context.CurrentPath);
+        var destination = StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, context.PathSegments);
 
         var destinationExists = await targetProvider.ExistsAsync(destination, ct);
         if (destinationExists && context.OverwriteMode == OverwriteMode.Skip)

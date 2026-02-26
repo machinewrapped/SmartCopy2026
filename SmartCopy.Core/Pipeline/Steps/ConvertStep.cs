@@ -28,11 +28,11 @@ public sealed class ConvertStep : ITransformStep
 
     public TransformResult Preview(TransformContext context)
     {
-        var convertedPath = BuildConvertedPath(context.CurrentPath);
+        Apply(context);
         return new TransformResult(
             Success: true,
             StepType: StepType,
-            DestinationPath: convertedPath,
+            DestinationPath: context.DisplayPath,
             OutputBytes: context.SourceNode.Size,
             Message: "Convert preview");
     }
@@ -40,35 +40,25 @@ public sealed class ConvertStep : ITransformStep
     public Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        context.CurrentPath = BuildConvertedPath(context.CurrentPath);
-
-        if (!string.IsNullOrWhiteSpace(OutputExtension))
-        {
-            context.CurrentExtension = OutputExtension.Trim().TrimStart('.');
-        }
-
+        Apply(context);
         return Task.FromResult(new TransformResult(
             Success: true,
             StepType: StepType,
-            DestinationPath: context.CurrentPath,
+            DestinationPath: context.DisplayPath,
             OutputBytes: context.SourceNode.Size,
             Message: "Converted"));
     }
 
-    private string BuildConvertedPath(string currentPath)
+    private void Apply(TransformContext context)
     {
-        if (string.IsNullOrWhiteSpace(OutputExtension))
-        {
-            return currentPath;
-        }
+        if (string.IsNullOrWhiteSpace(OutputExtension) || context.PathSegments.Length == 0)
+            return;
 
         var extension = OutputExtension.Trim().TrimStart('.');
-        var directory = Path.GetDirectoryName(currentPath);
-        var fileName = Path.GetFileNameWithoutExtension(currentPath);
-        var convertedName = $"{fileName}.{extension}";
+        var filename = context.PathSegments[^1];
+        var convertedName = $"{Path.GetFileNameWithoutExtension(filename)}.{extension}";
 
-        return string.IsNullOrWhiteSpace(directory)
-            ? convertedName
-            : Path.Combine(directory, convertedName);
+        context.PathSegments = [.. context.PathSegments[..^1], convertedName];
+        context.CurrentExtension = extension;
     }
 }

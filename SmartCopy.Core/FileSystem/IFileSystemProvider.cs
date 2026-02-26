@@ -30,5 +30,17 @@ public interface IFileSystemProvider
     /// using this provider's path conventions. Returns an empty string when the paths are equal.
     /// </summary>
     string GetRelativePath(string basePath, string fullPath);
+
+    /// <summary>
+    /// Splits any path string into ordered, separator-free segments.
+    /// Both provider-native and canonical forward-slash paths are accepted.
+    /// </summary>
+    string[] SplitPath(string path);
+
+    /// <summary>
+    /// Appends <paramref name="segments"/> onto <paramref name="basePath"/>
+    /// using this provider's path conventions.
+    /// </summary>
+    string JoinPath(string basePath, IReadOnlyList<string> segments);
 }
 

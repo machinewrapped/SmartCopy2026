@@ -249,6 +249,20 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
             : full.TrimStart('/');
     }
 
+    public string[] SplitPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return [];
+        return path.Replace('\\', '/').Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+    }
+
+    public string JoinPath(string basePath, IReadOnlyList<string> segments)
+    {
+        if (segments.Count == 0)
+            return Normalize(basePath);
+        return CombinePath(basePath, string.Join("/", segments));
+    }
+
     public void SeedDirectory(string path)
     {
         var normalizedPath = Normalize(path);

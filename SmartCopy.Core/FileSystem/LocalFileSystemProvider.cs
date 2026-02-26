@@ -221,6 +221,22 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         return relative == "." ? string.Empty : relative;
     }
 
+    public string[] SplitPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return [];
+        // Normalise to canonical forward-slash before splitting so mixed-separator paths work
+        var normalised = path.Replace('\\', '/').Trim('/');
+        return normalised.Split('/', StringSplitOptions.RemoveEmptyEntries);
+    }
+
+    public string JoinPath(string basePath, IReadOnlyList<string> segments)
+    {
+        if (segments.Count == 0)
+            return NormalizePath(basePath);
+        return NormalizePath(Path.Combine(basePath, Path.Combine([.. segments])));
+    }
+
     public string NormalizePath(string path)
     {
         if (string.IsNullOrWhiteSpace(path))

@@ -1,4 +1,3 @@
-using System.IO;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
@@ -28,22 +27,30 @@ public sealed class FlattenStep : ITransformStep
 
     public TransformResult Preview(TransformContext context)
     {
-        var flattened = Path.GetFileName(context.CurrentPath);
+        Apply(context);
         return new TransformResult(
             Success: true,
             StepType: StepType,
-            DestinationPath: flattened,
+            DestinationPath: context.DisplayPath,
             Message: "Path flattened");
     }
 
     public Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        context.CurrentPath = Path.GetFileName(context.CurrentPath);
+        Apply(context);
         return Task.FromResult(new TransformResult(
             Success: true,
             StepType: StepType,
-            DestinationPath: context.CurrentPath,
+            DestinationPath: context.DisplayPath,
             Message: "Path flattened"));
+    }
+
+    private static void Apply(TransformContext context)
+    {
+        if (context.PathSegments.Length > 0)
+        {
+            context.PathSegments = [context.PathSegments[^1]];
+        }
     }
 }
