@@ -38,9 +38,29 @@ public partial class MainWindow : Window
 
     private MainViewModel? _mainVm;
     private WorkflowMenuViewModel? _workflowMenu;
+
+    // Selection menu
     private MenuItem? _absolutePathsMenuItem;
+
+    // Options menu — Display
     private MenuItem? _autoOpenLogMenuItem;
     private MenuItem? _showExcludedNodesMenuItem;
+
+    // Options menu — Startup
+    private MenuItem? _restoreLastWorkflowMenuItem;
+    private MenuItem? _restoreLastSourcePathMenuItem;
+    private MenuItem? _saveSessionLocallyMenuItem;
+
+    // Options menu — Pipeline
+    private MenuItem? _disableDestructivePreviewMenuItem;
+    private MenuItem? _deleteToRecycleBinMenuItem;
+    private MenuItem? _overwriteSkipMenuItem;
+    private MenuItem? _overwriteAlwaysMenuItem;
+    private MenuItem? _overwriteIfNewerMenuItem;
+
+    // Options menu — Scan
+    private MenuItem? _fullPreScanMenuItem;
+    private MenuItem? _lazyExpandScanMenuItem;
 
     public MainWindow()
     {
@@ -168,51 +188,200 @@ public partial class MainWindow : Window
     {
         OptionsMenu.Items.Clear();
 
-        _autoOpenLogMenuItem = new MenuItem
-        {
-            Header = "Auto-open _Log on Run",
-            ToggleType = MenuItemToggleType.CheckBox,
-            IsChecked = _mainVm?.AutoOpenLogOnRun ?? true,
-        };
-        _autoOpenLogMenuItem.Click += (_, _) =>
-        {
-            if (_mainVm is not null)
-                _mainVm.AutoOpenLogOnRun = !_mainVm.AutoOpenLogOnRun;
-        };
+        // ── Section: Startup ───────────────────────────────────────────────────
+        OptionsMenu.Items.Add(SectionHeader("Startup"));
+
+        _restoreLastWorkflowMenuItem = Toggle(
+            "Restore Last _Workflow on Startup",
+            _mainVm?.RestoreLastWorkflow ?? false,
+            () => { if (_mainVm is not null) _mainVm.RestoreLastWorkflow = !_mainVm.RestoreLastWorkflow; });
+        OptionsMenu.Items.Add(_restoreLastWorkflowMenuItem);
+
+        _saveSessionLocallyMenuItem = Toggle(
+            "Save Session _Locally (portable)",
+            _mainVm?.SaveSessionLocally ?? false,
+            () => { if (_mainVm is not null) _mainVm.SaveSessionLocally = !_mainVm.SaveSessionLocally; });
+        // Only meaningful when Restore Last Workflow is on.
+        _saveSessionLocallyMenuItem.IsEnabled = _mainVm?.RestoreLastWorkflow ?? false;
+        OptionsMenu.Items.Add(_saveSessionLocallyMenuItem);
+
+        _restoreLastSourcePathMenuItem = Toggle(
+            "Restore Last _Source Path on Startup",
+            _mainVm?.RestoreLastSourcePath ?? true,
+            () => { if (_mainVm is not null) _mainVm.RestoreLastSourcePath = !_mainVm.RestoreLastSourcePath; });
+        // Disable when Restore Workflow is on (redundant)
+        _restoreLastSourcePathMenuItem.IsEnabled = !(_mainVm?.RestoreLastWorkflow ?? false);
+        OptionsMenu.Items.Add(_restoreLastSourcePathMenuItem);
+
+        // ── Section: Display ───────────────────────────────────────────────────
+        OptionsMenu.Items.Add(new Separator());
+        OptionsMenu.Items.Add(SectionHeader("Display"));
+
+        _showExcludedNodesMenuItem = Toggle(
+            "Show _Excluded Nodes in Tree",
+            _mainVm?.ShowExcludedNodesByDefault ?? true,
+            () => { if (_mainVm is not null) _mainVm.ShowExcludedNodesByDefault = !_mainVm.ShowExcludedNodesByDefault; });
+        OptionsMenu.Items.Add(_showExcludedNodesMenuItem);
+
+        _autoOpenLogMenuItem = Toggle(
+            "Auto-open _Log on Run",
+            _mainVm?.AutoOpenLogOnRun ?? true,
+            () => { if (_mainVm is not null) _mainVm.AutoOpenLogOnRun = !_mainVm.AutoOpenLogOnRun; });
         OptionsMenu.Items.Add(_autoOpenLogMenuItem);
 
-        _showExcludedNodesMenuItem = new MenuItem
+        // ── Section: Pipeline ──────────────────────────────────────────────────
+        OptionsMenu.Items.Add(new Separator());
+        OptionsMenu.Items.Add(SectionHeader("Pipeline"));
+
+        _disableDestructivePreviewMenuItem = Toggle(
+            "_Skip Destructive Preview",
+            _mainVm?.DisableDestructivePreview ?? false,
+            () => { if (_mainVm is not null) _mainVm.DisableDestructivePreview = !_mainVm.DisableDestructivePreview; });
+        OptionsMenu.Items.Add(_disableDestructivePreviewMenuItem);
+
+        _deleteToRecycleBinMenuItem = Toggle(
+            "_Delete to Recycle Bin",
+            _mainVm?.DeleteToRecycleBin ?? true,
+            () => { if (_mainVm is not null) _mainVm.DeleteToRecycleBin = !_mainVm.DeleteToRecycleBin; });
+        OptionsMenu.Items.Add(_deleteToRecycleBinMenuItem);
+
+        // Overwrite mode submenu
+        var currentMode = _mainVm?.DefaultOverwriteMode ?? "Skip";
+        _overwriteSkipMenuItem   = OverwriteRadio("_Skip (keep existing)",    "Skip",     currentMode);
+        _overwriteAlwaysMenuItem  = OverwriteRadio("_Always Overwrite",        "Always",   currentMode);
+        _overwriteIfNewerMenuItem = OverwriteRadio("Overwrite _if Newer",      "IfNewer",  currentMode);
+
+        var overwriteSubMenu = new MenuItem { Header = "Default _Overwrite Mode" };
+        overwriteSubMenu.Items.Add(_overwriteSkipMenuItem);
+        overwriteSubMenu.Items.Add(_overwriteAlwaysMenuItem);
+        overwriteSubMenu.Items.Add(_overwriteIfNewerMenuItem);
+        OptionsMenu.Items.Add(overwriteSubMenu);
+
+        // ── Section: Scan ─────────────────────────────────────────────────────
+        OptionsMenu.Items.Add(new Separator());
+        OptionsMenu.Items.Add(SectionHeader("Scan"));
+
+        _fullPreScanMenuItem = Toggle(
+            "_Full Pre-Scan",
+            _mainVm?.FullPreScan ?? false,
+            () => { if (_mainVm is not null) _mainVm.FullPreScan = !_mainVm.FullPreScan; });
+        OptionsMenu.Items.Add(_fullPreScanMenuItem);
+
+        _lazyExpandScanMenuItem = Toggle(
+            "_Lazy Scan (scan on demand)",
+            _mainVm?.LazyExpandScan ?? false,
+            () => { if (_mainVm is not null) _mainVm.LazyExpandScan = !_mainVm.LazyExpandScan; });
+        OptionsMenu.Items.Add(_lazyExpandScanMenuItem);
+
+        return;
+
+        static MenuItem SectionHeader(string text)
         {
-            Header = "Show _Excluded Nodes in Tree",
-            ToggleType = MenuItemToggleType.CheckBox,
-            IsChecked = _mainVm?.ShowExcludedNodesByDefault ?? true,
-        };
-        _showExcludedNodesMenuItem.Click += (_, _) =>
+            var header = new MenuItem
+            {
+                Header = text,
+                IsEnabled = false,
+                FontWeight = Avalonia.Media.FontWeight.Bold,
+                Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#a0a0a0")),
+            };
+            return header;
+        }
+
+        static MenuItem Toggle(string header, bool isChecked, Action onClick)
         {
-            if (_mainVm is not null)
-                _mainVm.ShowExcludedNodesByDefault = !_mainVm.ShowExcludedNodesByDefault;
-        };
-        OptionsMenu.Items.Add(_showExcludedNodesMenuItem);
+            var item = new MenuItem
+            {
+                Header = header,
+                ToggleType = MenuItemToggleType.CheckBox,
+                IsChecked = isChecked,
+            };
+            item.Click += (_, _) => onClick();
+            return item;
+        }
+
+        MenuItem OverwriteRadio(string header, string mode, string currentMode)
+        {
+            var item = new MenuItem
+            {
+                Header = header,
+                ToggleType = MenuItemToggleType.CheckBox,
+                IsChecked = string.Equals(currentMode, mode, StringComparison.OrdinalIgnoreCase),
+            };
+            item.Click += (_, _) =>
+            {
+                if (_mainVm is null) return;
+                _mainVm.DefaultOverwriteMode = mode;
+            };
+            return item;
+        }
     }
 
     private void OnMainViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(MainViewModel.UseAbsolutePathsForSelection)
-            && _absolutePathsMenuItem is not null)
+        switch (e.PropertyName)
         {
-            _absolutePathsMenuItem.IsChecked = _mainVm?.UseAbsolutePathsForSelection ?? false;
-        }
+            case nameof(MainViewModel.UseAbsolutePathsForSelection):
+                if (_absolutePathsMenuItem is not null)
+                    _absolutePathsMenuItem.IsChecked = _mainVm?.UseAbsolutePathsForSelection ?? false;
+                break;
 
-        if (e.PropertyName == nameof(MainViewModel.AutoOpenLogOnRun)
-            && _autoOpenLogMenuItem is not null)
-        {
-            _autoOpenLogMenuItem.IsChecked = _mainVm?.AutoOpenLogOnRun ?? true;
-        }
+            case nameof(MainViewModel.AutoOpenLogOnRun):
+                if (_autoOpenLogMenuItem is not null)
+                    _autoOpenLogMenuItem.IsChecked = _mainVm?.AutoOpenLogOnRun ?? true;
+                break;
 
-        if (e.PropertyName == nameof(MainViewModel.ShowExcludedNodesByDefault)
-            && _showExcludedNodesMenuItem is not null)
-        {
-            _showExcludedNodesMenuItem.IsChecked = _mainVm?.ShowExcludedNodesByDefault ?? true;
+            case nameof(MainViewModel.ShowExcludedNodesByDefault):
+                if (_showExcludedNodesMenuItem is not null)
+                    _showExcludedNodesMenuItem.IsChecked = _mainVm?.ShowExcludedNodesByDefault ?? true;
+                break;
+
+            case nameof(MainViewModel.RestoreLastWorkflow):
+                if (_restoreLastWorkflowMenuItem is not null)
+                    _restoreLastWorkflowMenuItem.IsChecked = _mainVm?.RestoreLastWorkflow ?? false;
+                // "Restore source path" is redundant when workflow restore is active.
+                if (_restoreLastSourcePathMenuItem is not null)
+                    _restoreLastSourcePathMenuItem.IsEnabled = !(_mainVm?.RestoreLastWorkflow ?? false);
+                // "Save session locally" only makes sense when workflow restore is active.
+                if (_saveSessionLocallyMenuItem is not null)
+                    _saveSessionLocallyMenuItem.IsEnabled = _mainVm?.RestoreLastWorkflow ?? false;
+                break;
+
+            case nameof(MainViewModel.RestoreLastSourcePath):
+                if (_restoreLastSourcePathMenuItem is not null)
+                    _restoreLastSourcePathMenuItem.IsChecked = _mainVm?.RestoreLastSourcePath ?? true;
+                break;
+
+            case nameof(MainViewModel.SaveSessionLocally):
+                if (_saveSessionLocallyMenuItem is not null)
+                    _saveSessionLocallyMenuItem.IsChecked = _mainVm?.SaveSessionLocally ?? false;
+                break;
+
+            case nameof(MainViewModel.DisableDestructivePreview):
+                if (_disableDestructivePreviewMenuItem is not null)
+                    _disableDestructivePreviewMenuItem.IsChecked = _mainVm?.DisableDestructivePreview ?? false;
+                break;
+
+            case nameof(MainViewModel.DeleteToRecycleBin):
+                if (_deleteToRecycleBinMenuItem is not null)
+                    _deleteToRecycleBinMenuItem.IsChecked = _mainVm?.DeleteToRecycleBin ?? true;
+                break;
+
+            case nameof(MainViewModel.DefaultOverwriteMode):
+                var mode = _mainVm?.DefaultOverwriteMode ?? "Skip";
+                if (_overwriteSkipMenuItem    is not null) _overwriteSkipMenuItem.IsChecked    = mode == "Skip";
+                if (_overwriteAlwaysMenuItem  is not null) _overwriteAlwaysMenuItem.IsChecked  = mode == "Always";
+                if (_overwriteIfNewerMenuItem is not null) _overwriteIfNewerMenuItem.IsChecked = mode == "IfNewer";
+                break;
+
+            case nameof(MainViewModel.FullPreScan):
+                if (_fullPreScanMenuItem is not null)
+                    _fullPreScanMenuItem.IsChecked = _mainVm?.FullPreScan ?? false;
+                break;
+
+            case nameof(MainViewModel.LazyExpandScan):
+                if (_lazyExpandScanMenuItem is not null)
+                    _lazyExpandScanMenuItem.IsChecked = _mainVm?.LazyExpandScan ?? false;
+                break;
         }
     }
 
@@ -300,6 +469,12 @@ public partial class MainWindow : Window
     protected override void OnClosing(WindowClosingEventArgs e)
     {
         base.OnClosing(e);
+        // Best-effort session snapshot — allows RestoreLastWorkflow to capture
+        // the exact state at exit, even if the user never explicitly saved.
+        if (_mainVm?.RestoreLastWorkflow == true)
+        {
+            _ = _mainVm.SaveSessionSnapshotAsync();
+        }
         TrySaveWindowState();
     }
 

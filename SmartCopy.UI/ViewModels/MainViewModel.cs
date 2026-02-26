@@ -44,9 +44,35 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private bool _showExcludedNodesByDefault = true;
 
+    [ObservableProperty]
+    private bool _restoreLastWorkflow;
+
+    [ObservableProperty]
+    private bool _restoreLastSourcePath = true;
+
+    [ObservableProperty]
+    private bool _disableDestructivePreview;
+
+    [ObservableProperty]
+    private bool _deleteToRecycleBin = true;
+
+    [ObservableProperty]
+    private bool _saveSessionLocally;
+
+    [ObservableProperty]
+    private bool _fullPreScan;
+
+    [ObservableProperty]
+    private bool _lazyExpandScan;
+
+    /// <summary>The default overwrite mode string: "Skip", "Always", or "IfNewer".</summary>
+    [ObservableProperty]
+    private string _defaultOverwriteMode = "Skip";
+
     private readonly MemoryFileSystemProvider _memoryProvider;
     private readonly AppSettings _settings = new();
     private readonly AppSettingsStore _settingsStore = new();
+    private readonly SessionStore _sessionStore = new();
     private readonly OperationJournal _operationJournal = new();
     private readonly WorkflowPresetStore _workflowStore = new();
     private readonly SelectionManager _selectionManager = new();
@@ -151,20 +177,81 @@ public partial class MainViewModel : ViewModelBase
     partial void OnUseAbsolutePathsForSelectionChanged(bool value)
     {
         _settings.UseAbsolutePathsForSelectionSave = value;
-        _ = _settingsStore.SaveAsync(_settings);
+        _ = SaveSettingsAsync();
     }
 
     partial void OnAutoOpenLogOnRunChanged(bool value)
     {
         _settings.AutoOpenLogOnRun = value;
-        _ = _settingsStore.SaveAsync(_settings);
+        _ = SaveSettingsAsync();
     }
 
     partial void OnShowExcludedNodesByDefaultChanged(bool value)
     {
         _settings.ShowFilteredNodesInTree = value;
-        _ = _settingsStore.SaveAsync(_settings);
+        _ = SaveSettingsAsync();
         FilterChain.ShowExcludedNodesInTree = value;
+    }
+
+    partial void OnRestoreLastWorkflowChanged(bool value)
+    {
+        _settings.RestoreLastWorkflow = value;
+        _ = SaveSettingsAsync();
+    }
+
+    partial void OnRestoreLastSourcePathChanged(bool value)
+    {
+        _settings.RestoreLastSourcePath = value;
+        _ = SaveSettingsAsync();
+    }
+
+    partial void OnDisableDestructivePreviewChanged(bool value)
+    {
+        _settings.DisableDestructivePreview = value;
+        _ = SaveSettingsAsync();
+    }
+
+    partial void OnDeleteToRecycleBinChanged(bool value)
+    {
+        _settings.DeleteToRecycleBin = value;
+        _settings.DefaultDeleteMode = value ? "Trash" : "Permanent";
+        _ = SaveSettingsAsync();
+    }
+
+    partial void OnSaveSessionLocallyChanged(bool value)
+    {
+        _settings.SaveSessionLocally = value;
+        _ = SaveSettingsAsync();
+    }
+
+    partial void OnFullPreScanChanged(bool value)
+    {
+        _settings.FullPreScan = value;
+        _ = SaveSettingsAsync();
+    }
+
+    partial void OnLazyExpandScanChanged(bool value)
+    {
+        _settings.LazyExpandScan = value;
+        _ = SaveSettingsAsync();
+    }
+
+    partial void OnDefaultOverwriteModeChanged(string value)
+    {
+        _settings.DefaultOverwriteMode = value;
+        _ = SaveSettingsAsync();
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        try
+        {
+            await _settingsStore.SaveAsync(_settings);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[Settings] Failed to save settings: {ex.Message}");
+        }
     }
 
     // ── Keyboard shortcut commands ────────────────────────────────────────────
@@ -488,11 +575,31 @@ public partial class MainViewModel : ViewModelBase
         _settings.UseAbsolutePathsForSelectionSave = saved.UseAbsolutePathsForSelectionSave;
         _settings.AutoOpenLogOnRun = saved.AutoOpenLogOnRun;
         _settings.ShowFilteredNodesInTree = saved.ShowFilteredNodesInTree;
-        UseAbsolutePathsForSelection = saved.UseAbsolutePathsForSelectionSave;
-        AutoOpenLogOnRun = saved.AutoOpenLogOnRun;
-        ShowExcludedNodesByDefault = saved.ShowFilteredNodesInTree;
+        _settings.RestoreLastWorkflow = saved.RestoreLastWorkflow;
+        _settings.RestoreLastSourcePath = saved.RestoreLastSourcePath;
+        _settings.DisableDestructivePreview = saved.DisableDestructivePreview;
+        _settings.DeleteToRecycleBin = saved.DeleteToRecycleBin;
+        _settings.DefaultDeleteMode = saved.DeleteToRecycleBin ? "Trash" : "Permanent";
+        _settings.FullPreScan = saved.FullPreScan;
+        _settings.LazyExpandScan = saved.LazyExpandScan;
+        _settings.DefaultOverwriteMode = saved.DefaultOverwriteMode;
 
-        if (saved.LastSourcePath is { Length: > 0 })
+        _settings.SaveSessionLocally = saved.SaveSessionLocally;
+
+        UseAbsolutePathsForSelection = _settings.UseAbsolutePathsForSelectionSave;
+        AutoOpenLogOnRun = _settings.AutoOpenLogOnRun;
+        ShowExcludedNodesByDefault = _settings.ShowFilteredNodesInTree;
+        RestoreLastWorkflow = _settings.RestoreLastWorkflow;
+        RestoreLastSourcePath = _settings.RestoreLastSourcePath;
+        DisableDestructivePreview = _settings.DisableDestructivePreview;
+        DeleteToRecycleBin = _settings.DeleteToRecycleBin;
+        SaveSessionLocally = _settings.SaveSessionLocally;
+        FullPreScan = _settings.FullPreScan;
+        LazyExpandScan = _settings.LazyExpandScan;
+        DefaultOverwriteMode = _settings.DefaultOverwriteMode;
+
+        if (saved.RestoreLastSourcePath && !saved.RestoreLastWorkflow
+            && saved.LastSourcePath is { Length: > 0 })
         {
             SourcePath = saved.LastSourcePath;
         }
@@ -502,6 +609,21 @@ public partial class MainViewModel : ViewModelBase
         FilterChain.PipelineDestinationPath = MockMemoryFileSystemFactory.TargetPath;
         await _operationJournal.RotateAsync(_settings.LogRetentionDays);
         await WorkflowMenu.RefreshAsync();
+
+        // Restore last workflow if the option is enabled and a session snapshot exists.
+        if (saved.RestoreLastWorkflow)
+        {
+            try
+            {
+                var session = await _sessionStore.LoadAsync(GetSessionPath());
+                if (session is not null)
+                    await ApplyWorkflowConfigAsync(session);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
+            {
+                Debug.WriteLine($"Failed to restore session snapshot: {ex}");
+            }
+        }
 
         // Pre-wire the chain before the initial tree load so the first file list load
         // already has a chain to evaluate.
@@ -590,7 +712,9 @@ public partial class MainViewModel : ViewModelBase
         }
 
         var pipeline = Pipeline.BuildLivePipeline();
-        if (pipeline.HasDeleteStep)
+
+        // Mandatory preview for destructive pipelines, unless the user has opted out.
+        if (pipeline.HasDeleteStep && !_settings.DisableDestructivePreview)
         {
             await PreviewPipelineAsync();
             return;
@@ -714,13 +838,22 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
+        await ApplyWorkflowConfigAsync(preset.Config);
+    }
+
+    /// <summary>
+    /// Applies a <see cref="WorkflowConfig"/> to the current session without saving
+    /// or recording any names — just restores source, filters, and pipeline.
+    /// </summary>
+    private async Task ApplyWorkflowConfigAsync(WorkflowConfig config)
+    {
         // Restore source path
-        SourcePath = preset.Config.SourcePath;
-        await ApplySourcePathCoreAsync(preset.Config.SourcePath);
+        SourcePath = config.SourcePath;
+        await ApplySourcePathCoreAsync(config.SourcePath);
 
         // Restore filter chain
         FilterChain.Filters.Clear();
-        foreach (var filterConfig in preset.Config.FilterChain.Filters)
+        foreach (var filterConfig in config.FilterChain.Filters)
         {
             var filter = FilterFactory.FromConfig(filterConfig);
             FilterChain.AddFilterFromResult(filter);
@@ -730,12 +863,46 @@ public partial class MainViewModel : ViewModelBase
         var pipelinePreset = new PipelinePreset
         {
             Id = "workflow",
-            Name = preset.Config.Name,
+            Name = config.Name,
             IsBuiltIn = false,
-            Config = preset.Config.Pipeline,
+            Config = config.Pipeline,
         };
         Pipeline.LoadPreset(pipelinePreset);
     }
+
+    /// <summary>
+    /// Captures the full current session state and writes it to the session snapshot
+    /// file so it can be restored on the next startup (when RestoreLastWorkflow is on).
+    /// Called from MainWindow.OnClosing — best-effort, never throws.
+    /// </summary>
+    public async Task SaveSessionSnapshotAsync()
+    {
+        try
+        {
+            var filterChainConfig = FilterChain.BuildLiveChain().ToConfig("__session__");
+            var pipelineConfig = Pipeline.ToConfig("__session__");
+            var config = new WorkflowConfig(
+                Name: "__session__",
+                Description: null,
+                SourcePath: SourcePath,
+                FilterChain: filterChainConfig,
+                Pipeline: pipelineConfig);
+            await _sessionStore.SaveAsync(config, GetSessionPath());
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Failed to save session snapshot: {ex}");
+        }
+    }
+
+    /// <summary>
+    /// Returns the path for session.sc2session: next to the executable when
+    /// <see cref="SaveSessionLocally"/> is on, otherwise the global settings directory.
+    /// </summary>
+    private string GetSessionPath()
+        => _settings.SaveSessionLocally
+            ? Path.Combine(AppContext.BaseDirectory, "session.sc2session")
+            : SessionStore.GetDefaultSessionPath();
 
     private async Task ManageWorkflowsAsync()
     {

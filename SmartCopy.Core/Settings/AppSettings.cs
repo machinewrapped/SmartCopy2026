@@ -18,6 +18,18 @@ public sealed class AppSettings
     public int CopyChunkSizeKb { get; set; } = 256;
     public string DefaultOverwriteMode { get; set; } = "Skip";
     public string DefaultDeleteMode { get; set; } = "Trash";
+
+    /// <summary>Reload the last saved workflow on startup.</summary>
+    public bool RestoreLastWorkflow { get; set; } = false;
+    /// <summary>Restore the last source path on startup (suppressed when <see cref="RestoreLastWorkflow"/> is true).</summary>
+    public bool RestoreLastSourcePath { get; set; } = true;
+    /// <summary>Skip the mandatory preview confirmation for delete/destructive pipelines.</summary>
+    public bool DisableDestructivePreview { get; set; } = false;
+    /// <summary>Send deleted files to the recycle bin when the platform supports it.</summary>
+    public bool DeleteToRecycleBin { get; set; } = true;
+    /// <summary>Write session.sc2session next to the executable instead of in %APPDATA%.
+    /// Lets each portable copy of the app remember its own last-used session.</summary>
+    public bool SaveSessionLocally { get; set; } = false;
     public int LogRetentionDays { get; set; } = 30;
     public List<string> RecentSources { get; set; } = [];
     public List<string> RecentTargets { get; set; } = [];

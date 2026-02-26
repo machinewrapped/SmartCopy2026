@@ -42,5 +42,35 @@ public sealed class AppSettingsStoreTests
         Assert.NotNull(loaded);
         Assert.Equal(1, loaded.SchemaVersion);
     }
+
+    [Fact]
+    public async Task SaveAndLoad_RoundTripsNewOptions()
+    {
+        using var temp = new TempDirectory();
+        var filePath = System.IO.Path.Combine(temp.Path, "settings.json");
+        var store = new AppSettingsStore();
+
+        var settings = new AppSettings
+        {
+            RestoreLastWorkflow     = true,
+            RestoreLastSourcePath   = false,
+            DisableDestructivePreview = true,
+            DeleteToRecycleBin      = false,
+            DefaultOverwriteMode    = "Always",
+            FullPreScan             = true,
+            LazyExpandScan          = true,
+        };
+
+        await store.SaveAsync(settings, filePath, CancellationToken.None);
+        var loaded = await store.LoadAsync(filePath, CancellationToken.None);
+
+        Assert.True(loaded.RestoreLastWorkflow);
+        Assert.False(loaded.RestoreLastSourcePath);
+        Assert.True(loaded.DisableDestructivePreview);
+        Assert.False(loaded.DeleteToRecycleBin);
+        Assert.Equal("Always", loaded.DefaultOverwriteMode);
+        Assert.True(loaded.FullPreScan);
+        Assert.True(loaded.LazyExpandScan);
+    }
 }
 
