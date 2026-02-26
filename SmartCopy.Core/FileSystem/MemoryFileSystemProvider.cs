@@ -230,7 +230,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         return Task.FromResult(_entries.ContainsKey(normalizedPath));
     }
 
-    public string CombinePath(string basePath, string relativePath)
+    private string CombinePath(string basePath, string relativePath)
     {
         if (string.IsNullOrEmpty(relativePath))
             return Normalize(basePath);
@@ -247,6 +247,20 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         return full.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
             ? full[prefix.Length..]
             : full.TrimStart('/');
+    }
+
+    public string[] SplitPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return [];
+        return path.Replace('\\', '/').Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+    }
+
+    public string JoinPath(string basePath, IReadOnlyList<string> segments)
+    {
+        if (segments.Count == 0)
+            return Normalize(basePath);
+        return CombinePath(basePath, string.Join("/", segments));
     }
 
     public void SeedDirectory(string path)
@@ -382,11 +396,12 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
             ? Root
             : path[(path.LastIndexOf('/') + 1)..];
 
+        var relativePath = GetRelativeToRoot(path);
         return new FileSystemNode
         {
             Name = name,
             FullPath = path,
-            RelativePath = GetRelativeToRoot(path),
+            RelativePathSegments = SplitPath(relativePath),
             IsDirectory = entry.IsDirectory,
             Size = entry.IsDirectory ? 0 : entry.Size,
             CreatedAt = entry.CreatedAt,

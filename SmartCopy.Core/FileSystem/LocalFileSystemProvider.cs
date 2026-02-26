@@ -197,7 +197,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         }, ct);
     }
 
-    public string CombinePath(string basePath, string relativePath)
+    private string CombinePath(string basePath, string relativePath)
     {
         if (Path.IsPathFullyQualified(relativePath))
         {
@@ -219,6 +219,22 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         var root = PathHelper.EnsureTrailingSeparator(normalBase);
         var relative = Path.GetRelativePath(root, normalFull);
         return relative == "." ? string.Empty : relative;
+    }
+
+    public string[] SplitPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return [];
+        // Normalise to canonical forward-slash before splitting so mixed-separator paths work
+        var normalised = path.Replace('\\', '/').Trim('/');
+        return normalised.Split('/', StringSplitOptions.RemoveEmptyEntries);
+    }
+
+    public string JoinPath(string basePath, IReadOnlyList<string> segments)
+    {
+        if (segments.Count == 0)
+            return NormalizePath(basePath);
+        return NormalizePath(Path.Combine(basePath, Path.Combine([.. segments])));
     }
 
     public string NormalizePath(string path)
@@ -250,11 +266,12 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     private FileSystemNode CreateDirectoryNode(string directoryPath, FileSystemNode? parent)
     {
         var info = new DirectoryInfo(directoryPath);
+        var relativePath = GetRelativePath(RootPath, info.FullName);
         return new FileSystemNode
         {
             Name = info.Name,
             FullPath = info.FullName,
-            RelativePath = GetRelativePath(RootPath, info.FullName),
+            RelativePathSegments = SplitPath(relativePath),
             IsDirectory = true,
             Size = 0,
             CreatedAt = info.CreationTimeUtc,
@@ -267,11 +284,12 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     private FileSystemNode CreateFileNode(string filePath, FileSystemNode? parent)
     {
         var info = new FileInfo(filePath);
+        var relativePath = GetRelativePath(RootPath, info.FullName);
         return new FileSystemNode
         {
             Name = info.Name,
             FullPath = info.FullName,
-            RelativePath = GetRelativePath(RootPath, info.FullName),
+            RelativePathSegments = SplitPath(relativePath),
             IsDirectory = false,
             Size = info.Length,
             CreatedAt = info.CreationTimeUtc,

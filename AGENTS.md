@@ -26,12 +26,19 @@ dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "FullyQualifiedName~
 dotnet publish SmartCopy.App/SmartCopy.App.csproj -c Release --self-contained true -p:PublishSingleFile=true
 ```
 
+## Documentation Signposting
+
+- **Architecture, Contracts, UI Behavior, and Data Schemas:** `Docs/SmartCopy2026-Architecture.md`
+- **Execution Plan, Delivery Scope, and Checklists:** `Docs/SmartCopy2026-Plan.md`
+
+Agents should offer to update the architecture and/or the plan after resolving a task, especially if it involved changes to the design or architecture of the system.
+
 ## Solution Structure
 
 Four projects in `SmartCopy2026.slnx`:
 
-- **SmartCopy.Core** — Pure business logic, no UI references. Houses `FileSystemNode`, `CheckState`, `FilterResult`, `IFileSystemProvider`, `IFilter`, `FilterChain`, and `TransformPipeline`.
-- **SmartCopy.App** — Avalonia application host. `Program.cs` bootstraps the DI container and Avalonia builder. `App.axaml.cs` wires DI to ViewModels.
+- **SmartCopy.Core** — Pure business logic, no UI references. Houses `IFileSystemProvider`, `FileSystemNode`, `CheckState`, `FilterResult`, `IFilter`, `FilterChain`, and `TransformPipeline`.
+- **SmartCopy.App** — Avalonia application host.
 - **SmartCopy.UI** — MVVM layer. ViewModels inherit `CommunityToolkit.Mvvm.ObservableObject`. Views are `.axaml` files.
 - **SmartCopy.Tests** — xUnit + NSubstitute. Uses `MemoryFileSystemProvider` for fast, hermetic tests.
 
@@ -46,10 +53,6 @@ Every file and folder is a `FileSystemNode` with two independent pieces of mutab
 
 A node is "selected" only when **both** `CheckState == Checked` AND `FilterResult == Included`.
 
-**Tri-state propagation** (already implemented):
-- Downward: setting a parent's `CheckState` recursively sets all descendants. Uses `BatchUpdate` context to fire a single PropertyChanged reset instead of one per node.
-- Upward: after any check change, walks the parent chain recalculating Checked/Unchecked/Indeterminate.
-
 ### MVVM hierarchy
 
 ```
@@ -58,8 +61,9 @@ MainViewModel
 ├── FileListViewModel        — Files: ObservableCollection<FileSystemNode>
 ├── FilterChainViewModel     — Filters: ObservableCollection<FilterViewModel>
 ├── PipelineViewModel        — Steps: ObservableCollection<PipelineStepViewModel>
-├── OperationProgressViewModel
-└── PreviewViewModel
+└── StatusBarViewModel
+└──── SelectionViewModel
+└──── OperationProgressViewModel
 ```
 
 ViewModels use `[ObservableProperty]` source-gen attributes (no runtime reflection).
@@ -68,23 +72,16 @@ ViewModels use `[ObservableProperty]` source-gen attributes (no runtime reflecti
 
 `MainWindow.axaml` is a 5-row grid:
 1. Menu bar
-2. Source/Target path fields
+2. Source path field
 3. Three-column area (FilterChain | splitter | DirectoryTree | splitter | FileList)
 4. PipelineView (step cards with → connectors)
-5. OperationProgressView (only visible when `IsActive = true`)
+5. StatusBarViewModel (live updates)
 
 ### Key abstractions (see Docs/SmartCopy2026-Architecture.md)
 
 - **IFileSystemProvider** — unified interface for local disk, MTP devices, and in-memory (tests). Capabilities are declared via `ProviderCapabilities` flags.
 - **IFilter / FilterChain** — composable filters (Wildcard, Mirror, DateRange, etc.). Each filter returns `Included` or `Excluded` per node.
 - **TransformPipeline** — ordered steps: *path steps* (Flatten, Rebase, Rename), *content steps* (Convert), *executable steps* (Copy, Move, Delete). Generates an `OperationPlan` for preview before execution.
-- **Progressive scanning** — top-level folders appear immediately; children stream in via background priority queue. Tri-state state is preserved across rescans.
-
-### Design constraints
-
-- Pipelines containing a `DeleteStep` **must** generate a preview before execution — no silent deletes.
-- Trash by default; permanent delete is an explicit opt-in.
-- Filesystem watcher uses a 300 ms debounce before triggering rescan.
 
 ## UI Guidelines & Anti-Patterns
 
@@ -94,18 +91,10 @@ ViewModels use `[ObservableProperty]` source-gen attributes (no runtime reflecti
   - In the handler, set `e.Handled = true` to prevent unwanted event bubbling (e.g., stopping a menu item from triggering its own action when a nested button is clicked).
   - Extract the command parameter from the `sender` and execute the command manually by casting the View's `DataContext` to the appropriate ViewModel type.
 
-## Documentation Signposting
-
-- **Architecture, Contracts, UI Behavior, and Data Schemas:** `Docs/SmartCopy2026-Architecture.md`
-- **Execution Plan, Delivery Scope, and Checklists:** `Docs/SmartCopy2026-Plan.md`
-
-Agents should offer to update the architecture and/or the plan after resolving a task, especially if it involved changes to the design or architecture of the system.
-
 ## Implementation Status
 
-We are deep into Phase 1 (Core Workflows, Memory-Backed). Live local filesystem integration is deferred to Phase 2. Current progress follows `Docs/SmartCopy2026-Plan.md §8`:
+We are deep into Phase 1 (Core Workflows, Memory-Backed). 
+Live local filesystem integration is deferred to Phase 2.
 
-- **Complete:** UI baseline shell, Core Models (`FileSystemNode`, `MemoryFileSystemProvider`), Node Selection Logic (tri-state propagation).
-- **Mostly Complete:** Filter Chain (Live UX is wired, full UI implementation near complete).
-- **In Progress:** Transform pipeline (built-in steps implemented, UI wiring pending), Sync operations, Selection save/load, Settings persistence.
-- **Not Started:** Shell observability updates, Accessibility baseline, live filesystem integration (Phase 2).
+Current progress and tasks yet to be completed are recorded in `Docs/SmartCopy2026-Plan.md`:
+

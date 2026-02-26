@@ -12,7 +12,17 @@ public class FileSystemNode : INotifyPropertyChanged
     // Filesystem data (immutable after scan)
     public string Name { get; init; } = string.Empty;
     public string FullPath { get; init; } = string.Empty;
-    public string RelativePath { get; init; } = string.Empty;
+
+    /// <summary>
+    /// The relative path expressed as separator-free segments, set by the source provider at scan time.
+    /// </summary>
+    public string[] RelativePathSegments { get; init; } = [];
+
+    /// <summary>
+    /// The relative path as a canonical forward-slash string, derived from <see cref="RelativePathSegments"/>.
+    /// </summary>
+    public string CanonicalRelativePath => string.Join("/", RelativePathSegments);
+
     public bool IsDirectory { get; init; }
     public long Size { get; init; }
     public DateTime CreatedAt { get; init; }

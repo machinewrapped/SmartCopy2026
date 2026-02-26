@@ -12,7 +12,7 @@ public sealed class SelectionManagerTests
         {
             Name = "root",
             FullPath = "/root",
-            RelativePath = "root",
+            RelativePathSegments = ["root"],
             IsDirectory = true,
         };
 
@@ -20,7 +20,7 @@ public sealed class SelectionManagerTests
         {
             Name = "a.mp3",
             FullPath = "/root/a.mp3",
-            RelativePath = "root/a.mp3",
+            RelativePathSegments = ["root", "a.mp3"],
             IsDirectory = false,
             Parent = root,
             CheckState = CheckState.Checked,
@@ -29,7 +29,7 @@ public sealed class SelectionManagerTests
         {
             Name = "b.mp3",
             FullPath = "/root/b.mp3",
-            RelativePath = "root/b.mp3",
+            RelativePathSegments = ["root", "b.mp3"],
             IsDirectory = false,
             Parent = root,
             CheckState = CheckState.Unchecked,
@@ -52,7 +52,7 @@ public sealed class SelectionManagerTests
     public void Restore_ReturnsMatchedCount()
     {
         var (root, fileA, _) = BuildTree();
-        var snapshot = new SelectionSnapshot([fileA.RelativePath]);
+        var snapshot = new SelectionSnapshot([fileA.CanonicalRelativePath]);
 
         var result = new SelectionManager().Restore([root], snapshot);
 
@@ -82,7 +82,7 @@ public sealed class SelectionManagerTests
         var snapshot = new SelectionManager().Capture([root], useAbsolutePaths: true);
 
         Assert.True(snapshot.Contains(fileA.FullPath));
-        Assert.False(snapshot.Contains(fileA.RelativePath));
+        Assert.False(snapshot.Contains(fileA.CanonicalRelativePath));
     }
 
     [Fact]
@@ -154,7 +154,7 @@ public sealed class SelectionManagerTests
         {
             Name = "root",
             FullPath = "/root",
-            RelativePath = "root",
+            RelativePathSegments = ["root"],
             IsDirectory = true,
         };
 
@@ -162,7 +162,7 @@ public sealed class SelectionManagerTests
         {
             Name = "a.mp3",
             FullPath = "/root/a.mp3",
-            RelativePath = "root/a.mp3",
+            RelativePathSegments = ["root", "a.mp3"],
             IsDirectory = false,
             Parent = root,
         };
@@ -171,7 +171,7 @@ public sealed class SelectionManagerTests
         {
             Name = "b.mp3",
             FullPath = "/root/b.mp3",
-            RelativePath = "root/b.mp3",
+            RelativePathSegments = ["root", "b.mp3"],
             IsDirectory = false,
             Parent = root,
         };

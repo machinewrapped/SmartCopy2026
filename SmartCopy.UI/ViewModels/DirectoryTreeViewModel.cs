@@ -164,7 +164,7 @@ public class DirectoryTreeViewModel : ViewModelBase
         {
             Name = sourceNode.Name,
             FullPath = sourceNode.FullPath,
-            RelativePath = _provider.GetRelativePath(_rootPath, sourceNode.FullPath),
+            RelativePathSegments = _provider.SplitPath(_provider.GetRelativePath(_rootPath, sourceNode.FullPath)),
             IsDirectory = sourceNode.IsDirectory,
             Size = sourceNode.Size,
             CreatedAt = sourceNode.CreatedAt,

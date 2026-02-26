@@ -153,7 +153,7 @@ public sealed class PipelineRunnerTests
             CancellationToken.None);
 
         var copyAction = plan.Actions.Single(a => a.StepSummary == "Copy");
-        Assert.Equal(Path.Combine("/out", "track.mp3"), copyAction.DestinationPath);
+        Assert.Equal("/out/track.mp3", copyAction.DestinationPath);
     }
 
     [Fact]

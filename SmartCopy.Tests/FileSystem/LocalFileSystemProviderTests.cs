@@ -23,7 +23,7 @@ public sealed class LocalFileSystemProviderTests
 
         var node = await provider.GetNodeAsync(System.IO.Path.Combine(temp.Path, "albums", "track1.txt"), CancellationToken.None);
         Assert.Equal(3, node.Size);
-        Assert.Equal(Path.Combine("albums", "track1.txt"), node.RelativePath.Replace('/', Path.DirectorySeparatorChar));
+        Assert.Equal(Path.Combine("albums", "track1.txt"), node.CanonicalRelativePath.Replace('/', Path.DirectorySeparatorChar));
     }
 
     [Fact]

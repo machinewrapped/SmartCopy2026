@@ -29,31 +29,39 @@ public sealed class RenameStep : ITransformStep
 
     public TransformResult Preview(TransformContext context)
     {
-        var renamedPath = BuildRenamedPath(context.CurrentPath);
+        Apply(context);
         return new TransformResult(
             Success: true,
             StepType: StepType,
-            DestinationPath: renamedPath,
+            DestinationPath: context.DisplayPath,
             Message: "Path renamed");
     }
 
     public Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        context.CurrentPath = BuildRenamedPath(context.CurrentPath);
-
+        Apply(context);
         return Task.FromResult(new TransformResult(
             Success: true,
             StepType: StepType,
-            DestinationPath: context.CurrentPath,
+            DestinationPath: context.DisplayPath,
             Message: "Path renamed"));
     }
 
-    private string BuildRenamedPath(string currentPath)
+    private void Apply(TransformContext context)
     {
-        var directory = Path.GetDirectoryName(currentPath) ?? string.Empty;
-        var extension = Path.GetExtension(currentPath);
-        var nameWithoutExtension = Path.GetFileNameWithoutExtension(currentPath);
+        if (context.PathSegments.Length == 0) return;
+
+        var filename = context.PathSegments[^1];
+        var renamed = RenameFilename(filename);
+
+        context.PathSegments = [.. context.PathSegments[..^1], renamed];
+    }
+
+    private string RenameFilename(string filename)
+    {
+        var extension = Path.GetExtension(filename);
+        var nameWithoutExtension = Path.GetFileNameWithoutExtension(filename);
 
         var renamedFileName = Pattern
             .Replace("{name}", nameWithoutExtension, StringComparison.OrdinalIgnoreCase)
@@ -66,8 +74,6 @@ public sealed class RenameStep : ITransformStep
             renamedFileName += extension;
         }
 
-        return string.IsNullOrWhiteSpace(directory)
-            ? renamedFileName
-            : Path.Combine(directory, renamedFileName);
+        return renamedFileName;
     }
 }

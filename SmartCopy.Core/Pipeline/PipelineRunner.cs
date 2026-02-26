@@ -43,14 +43,9 @@ public sealed class PipelineRunner
             {
                 var preview = step.Preview(context);
 
-                // Propagate the transformed path so downstream steps preview against the correct
-                // path, matching what execution produces. This applies to both path steps (e.g.
-                // FlattenStep) and content steps (e.g. ConvertStep, which changes the extension).
+                // Non-executable steps (path and content) update context.PathSegments directly
+                // in their Preview implementations, so downstream steps see the correct state.
                 // Executable steps (Copy, Move, Delete) consume the path — they don't transform it.
-                if (!step.IsExecutable && !string.IsNullOrWhiteSpace(preview.DestinationPath))
-                {
-                    context.CurrentPath = preview.DestinationPath;
-                }
 
                 if (!string.IsNullOrWhiteSpace(preview.DestinationPath))
                 {
@@ -148,12 +143,15 @@ public sealed class PipelineRunner
         DeleteMode deleteMode)
     {
         var extension = Path.GetExtension(node.Name).TrimStart('.');
+        var segments = node.RelativePathSegments.Length > 0
+            ? node.RelativePathSegments
+            : [node.Name];
         return new TransformContext
         {
             SourceNode = node,
             SourceProvider = sourceProvider,
             TargetProvider = targetProvider,
-            CurrentPath = string.IsNullOrWhiteSpace(node.RelativePath) ? node.Name : node.RelativePath,
+            PathSegments = segments,
             CurrentExtension = extension,
             OverwriteMode = overwriteMode,
             DeleteMode = deleteMode,

@@ -42,7 +42,7 @@ public sealed class MirrorFilter : FilterBase
             return false;
         }
 
-        var comparePath = comparisonProvider.CombinePath(ComparisonPath, node.RelativePath);
+        var comparePath = comparisonProvider.JoinPath(ComparisonPath, node.RelativePathSegments);
         var exists = await comparisonProvider.ExistsAsync(comparePath, ct);
         if (!exists)
         {
@@ -61,7 +61,7 @@ public sealed class MirrorFilter : FilterBase
             // by the filter chain infrastructure, so we only need to check direct files here.
             foreach (var file in node.Files)
             {
-                var fileMirrorPath = comparisonProvider.CombinePath(ComparisonPath, file.RelativePath);
+                var fileMirrorPath = comparisonProvider.JoinPath(ComparisonPath, file.RelativePathSegments);
                 if (!await comparisonProvider.ExistsAsync(fileMirrorPath, ct))
                     return false;
 

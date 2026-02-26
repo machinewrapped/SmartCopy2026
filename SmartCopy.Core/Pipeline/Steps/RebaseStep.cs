@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
@@ -7,14 +8,36 @@ namespace SmartCopy.Core.Pipeline.Steps;
 
 public sealed class RebaseStep : ITransformStep
 {
+    private string _stripPrefix = string.Empty;
+    private string _addPrefix = string.Empty;
+    private string[] _stripSegments = [];
+    private string[] _addSegments = [];
+
     public RebaseStep(string stripPrefix, string addPrefix)
     {
         StripPrefix = stripPrefix ?? string.Empty;
         AddPrefix = addPrefix ?? string.Empty;
     }
 
-    public string StripPrefix { get; set; }
-    public string AddPrefix { get; set; }
+    public string StripPrefix
+    {
+        get => _stripPrefix;
+        set
+        {
+            _stripPrefix = value ?? string.Empty;
+            _stripSegments = SplitPrefix(_stripPrefix);
+        }
+    }
+
+    public string AddPrefix
+    {
+        get => _addPrefix;
+        set
+        {
+            _addPrefix = value ?? string.Empty;
+            _addSegments = SplitPrefix(_addPrefix);
+        }
+    }
 
     public StepKind StepType => StepKind.Rebase;
     public bool IsPathStep => true;
@@ -31,59 +54,47 @@ public sealed class RebaseStep : ITransformStep
 
     public TransformResult Preview(TransformContext context)
     {
-        var rebased = BuildRebasedPath(context.CurrentPath);
+        Apply(context);
         return new TransformResult(
             Success: true,
             StepType: StepType,
-            DestinationPath: rebased,
+            DestinationPath: context.DisplayPath,
             Message: "Path rebased");
     }
 
     public Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        context.CurrentPath = BuildRebasedPath(context.CurrentPath);
-
+        Apply(context);
         return Task.FromResult(new TransformResult(
             Success: true,
             StepType: StepType,
-            DestinationPath: context.CurrentPath,
+            DestinationPath: context.DisplayPath,
             Message: "Path rebased"));
     }
 
-    private string BuildRebasedPath(string currentPath)
+    private void Apply(TransformContext context)
     {
-        var path = NormalizePath(currentPath);
-        var stripPrefix = NormalizePath(StripPrefix);
-        var addPrefix = NormalizePath(AddPrefix);
+        var segments = context.PathSegments;
 
-        if (!string.IsNullOrWhiteSpace(stripPrefix))
+        // Strip leading segments that match the strip prefix (case-insensitive)
+        if (_stripSegments.Length > 0
+            && segments.Length >= _stripSegments.Length
+            && segments.Take(_stripSegments.Length)
+                       .SequenceEqual(_stripSegments, StringComparer.OrdinalIgnoreCase))
         {
-            if (path.Equals(stripPrefix, StringComparison.OrdinalIgnoreCase))
-            {
-                path = string.Empty;
-            }
-            else if (path.StartsWith(stripPrefix + "/", StringComparison.OrdinalIgnoreCase))
-            {
-                path = path[(stripPrefix.Length + 1)..];
-            }
+            segments = segments[_stripSegments.Length..];
         }
 
-        if (!string.IsNullOrWhiteSpace(addPrefix))
+        // Prepend add-prefix segments
+        if (_addSegments.Length > 0)
         {
-            path = string.IsNullOrWhiteSpace(path) ? addPrefix : $"{addPrefix}/{path}";
+            segments = [.. _addSegments, .. segments];
         }
 
-        return path.Replace('/', System.IO.Path.DirectorySeparatorChar);
+        context.PathSegments = segments;
     }
 
-    private static string NormalizePath(string path)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return string.Empty;
-        }
-
-        return path.Replace('\\', '/').Trim().Trim('/');
-    }
+    private static string[] SplitPrefix(string prefix)
+        => prefix.Replace('\\', '/').Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
 }
