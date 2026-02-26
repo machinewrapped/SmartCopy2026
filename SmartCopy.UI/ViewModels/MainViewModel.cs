@@ -87,6 +87,12 @@ public partial class MainViewModel : ViewModelBase
             DirectoryTree.ShowFilteredNodesInTree = isVisible;
         };
 
+        DirectoryTree.SetAsSourcePathRequested += async (_, path) =>
+        {
+            SourcePath = path;
+            await ApplySourcePathCoreAsync(path);
+        };
+
         FileList = new FileListViewModel(_memoryProvider, MockMemoryFileSystemFactory.DefaultFileListPath);
 
         WorkflowMenu = new WorkflowMenuViewModel(_workflowStore);

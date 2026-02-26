@@ -1,6 +1,8 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using SmartCopy.Core.FileSystem;
+using SmartCopy.UI.ViewModels;
 
 namespace SmartCopy.UI.Views;
 
@@ -9,6 +11,16 @@ public partial class DirectoryTreeView : UserControl
     public DirectoryTreeView()
     {
         InitializeComponent();
+    }
+
+    private void OnSetAsSourcePathClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem { DataContext: FileSystemNode node }
+            && DataContext is DirectoryTreeViewModel vm)
+        {
+            vm.RequestSetAsSourcePath(node.FullPath);
+            e.Handled = true;
+        }
     }
 
     /// <summary>

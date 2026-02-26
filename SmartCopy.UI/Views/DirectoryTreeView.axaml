@@ -35,6 +35,11 @@
             <TreeDataTemplate ItemsSource="{Binding Children}">
                 <StackPanel Orientation="Horizontal" Spacing="4"
                             Opacity="{Binding FilterResult, Converter={StaticResource FilterResultOpacityConverter}}">
+                    <StackPanel.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Set as Source Path" Click="OnSetAsSourcePathClick" />
+                        </ContextMenu>
+                    </StackPanel.ContextMenu>
                     <CheckBox IsChecked="{Binding CheckState, Converter={StaticResource CheckStateConverter}}"
                               IsEnabled="{Binding IsFilterIncluded}"
                               AutomationProperties.Name="Select folder"
