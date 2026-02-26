@@ -38,9 +38,28 @@ public partial class MainWindow : Window
 
     private MainViewModel? _mainVm;
     private WorkflowMenuViewModel? _workflowMenu;
+
+    // Selection menu
     private MenuItem? _absolutePathsMenuItem;
+
+    // Options menu — Display
     private MenuItem? _autoOpenLogMenuItem;
     private MenuItem? _showExcludedNodesMenuItem;
+
+    // Options menu — Startup
+    private MenuItem? _restoreLastWorkflowMenuItem;
+    private MenuItem? _restoreLastSourcePathMenuItem;
+
+    // Options menu — Pipeline
+    private MenuItem? _disableDestructivePreviewMenuItem;
+    private MenuItem? _deleteToRecycleBinMenuItem;
+    private MenuItem? _overwriteSkipMenuItem;
+    private MenuItem? _overwriteAlwaysMenuItem;
+    private MenuItem? _overwriteIfNewerMenuItem;
+
+    // Options menu — Scan
+    private MenuItem? _fullPreScanMenuItem;
+    private MenuItem? _lazyExpandScanMenuItem;
 
     public MainWindow()
     {
@@ -168,31 +187,128 @@ public partial class MainWindow : Window
     {
         OptionsMenu.Items.Clear();
 
-        _autoOpenLogMenuItem = new MenuItem
-        {
-            Header = "Auto-open _Log on Run",
-            ToggleType = MenuItemToggleType.CheckBox,
-            IsChecked = _mainVm?.AutoOpenLogOnRun ?? true,
-        };
-        _autoOpenLogMenuItem.Click += (_, _) =>
-        {
-            if (_mainVm is not null)
-                _mainVm.AutoOpenLogOnRun = !_mainVm.AutoOpenLogOnRun;
-        };
+        // ── Section: Startup ───────────────────────────────────────────────────
+        OptionsMenu.Items.Add(SectionHeader("Startup"));
+
+        _restoreLastWorkflowMenuItem = Toggle(
+            "Restore Last _Workflow on Startup",
+            _mainVm?.RestoreLastWorkflow ?? false,
+            () => { if (_mainVm is not null) _mainVm.RestoreLastWorkflow = !_mainVm.RestoreLastWorkflow; });
+        OptionsMenu.Items.Add(_restoreLastWorkflowMenuItem);
+
+        _restoreLastSourcePathMenuItem = Toggle(
+            "Restore Last _Source Path on Startup",
+            _mainVm?.RestoreLastSourcePath ?? true,
+            () => { if (_mainVm is not null) _mainVm.RestoreLastSourcePath = !_mainVm.RestoreLastSourcePath; });
+        // Disable when Restore Workflow is on (redundant)
+        _restoreLastSourcePathMenuItem.IsEnabled = !(_mainVm?.RestoreLastWorkflow ?? false);
+        OptionsMenu.Items.Add(_restoreLastSourcePathMenuItem);
+
+        // ── Section: Display ───────────────────────────────────────────────────
+        OptionsMenu.Items.Add(new Separator());
+        OptionsMenu.Items.Add(SectionHeader("Display"));
+
+        _showExcludedNodesMenuItem = Toggle(
+            "Show _Excluded Nodes in Tree",
+            _mainVm?.ShowExcludedNodesByDefault ?? true,
+            () => { if (_mainVm is not null) _mainVm.ShowExcludedNodesByDefault = !_mainVm.ShowExcludedNodesByDefault; });
+        OptionsMenu.Items.Add(_showExcludedNodesMenuItem);
+
+        _autoOpenLogMenuItem = Toggle(
+            "Auto-open _Log on Run",
+            _mainVm?.AutoOpenLogOnRun ?? true,
+            () => { if (_mainVm is not null) _mainVm.AutoOpenLogOnRun = !_mainVm.AutoOpenLogOnRun; });
         OptionsMenu.Items.Add(_autoOpenLogMenuItem);
 
-        _showExcludedNodesMenuItem = new MenuItem
+        // ── Section: Pipeline ──────────────────────────────────────────────────
+        OptionsMenu.Items.Add(new Separator());
+        OptionsMenu.Items.Add(SectionHeader("Pipeline"));
+
+        _disableDestructivePreviewMenuItem = Toggle(
+            "_Skip Destructive Preview",
+            _mainVm?.DisableDestructivePreview ?? false,
+            () => { if (_mainVm is not null) _mainVm.DisableDestructivePreview = !_mainVm.DisableDestructivePreview; });
+        OptionsMenu.Items.Add(_disableDestructivePreviewMenuItem);
+
+        _deleteToRecycleBinMenuItem = Toggle(
+            "_Delete to Recycle Bin",
+            _mainVm?.DeleteToRecycleBin ?? true,
+            () => { if (_mainVm is not null) _mainVm.DeleteToRecycleBin = !_mainVm.DeleteToRecycleBin; });
+        OptionsMenu.Items.Add(_deleteToRecycleBinMenuItem);
+
+        // Overwrite mode submenu
+        var currentMode = _mainVm?.DefaultOverwriteMode ?? "Skip";
+        _overwriteSkipMenuItem   = OverwriteRadio("_Skip (keep existing)",    "Skip",     currentMode);
+        _overwriteAlwaysMenuItem  = OverwriteRadio("_Always Overwrite",        "Always",   currentMode);
+        _overwriteIfNewerMenuItem = OverwriteRadio("Overwrite _if Newer",      "IfNewer",  currentMode);
+
+        var overwriteSubMenu = new MenuItem { Header = "Default _Overwrite Mode" };
+        overwriteSubMenu.Items.Add(_overwriteSkipMenuItem);
+        overwriteSubMenu.Items.Add(_overwriteAlwaysMenuItem);
+        overwriteSubMenu.Items.Add(_overwriteIfNewerMenuItem);
+        OptionsMenu.Items.Add(overwriteSubMenu);
+
+        // ── Section: Scan ─────────────────────────────────────────────────────
+        OptionsMenu.Items.Add(new Separator());
+        OptionsMenu.Items.Add(SectionHeader("Scan"));
+
+        _fullPreScanMenuItem = Toggle(
+            "_Full Pre-Scan",
+            _mainVm?.FullPreScan ?? false,
+            () => { if (_mainVm is not null) _mainVm.FullPreScan = !_mainVm.FullPreScan; });
+        OptionsMenu.Items.Add(_fullPreScanMenuItem);
+
+        _lazyExpandScanMenuItem = Toggle(
+            "_Lazy Scan (scan on demand)",
+            _mainVm?.LazyExpandScan ?? false,
+            () => { if (_mainVm is not null) _mainVm.LazyExpandScan = !_mainVm.LazyExpandScan; });
+        OptionsMenu.Items.Add(_lazyExpandScanMenuItem);
+
+        return;
+
+        static MenuItem SectionHeader(string text)
         {
-            Header = "Show _Excluded Nodes in Tree",
-            ToggleType = MenuItemToggleType.CheckBox,
-            IsChecked = _mainVm?.ShowExcludedNodesByDefault ?? true,
-        };
-        _showExcludedNodesMenuItem.Click += (_, _) =>
+            var header = new MenuItem
+            {
+                Header = text,
+                IsEnabled = false,
+                FontWeight = Avalonia.Media.FontWeight.Bold,
+                Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#a0a0a0")),
+            };
+            return header;
+        }
+
+        static MenuItem Toggle(string header, bool isChecked, Action onClick)
         {
-            if (_mainVm is not null)
-                _mainVm.ShowExcludedNodesByDefault = !_mainVm.ShowExcludedNodesByDefault;
-        };
-        OptionsMenu.Items.Add(_showExcludedNodesMenuItem);
+            var item = new MenuItem
+            {
+                Header = header,
+                ToggleType = MenuItemToggleType.CheckBox,
+                IsChecked = isChecked,
+            };
+            item.Click += (_, _) => onClick();
+            return item;
+        }
+
+        MenuItem OverwriteRadio(string header, string mode, string currentMode)
+        {
+            var item = new MenuItem
+            {
+                Header = header,
+                ToggleType = MenuItemToggleType.CheckBox,
+                IsChecked = string.Equals(currentMode, mode, StringComparison.OrdinalIgnoreCase),
+            };
+            item.Click += (_, _) =>
+            {
+                if (_mainVm is null) return;
+                _mainVm.DefaultOverwriteMode = mode;
+                // Sync the radio-style checked state across all three items.
+                if (_overwriteSkipMenuItem   is not null) _overwriteSkipMenuItem.IsChecked   = mode == "Skip";
+                if (_overwriteAlwaysMenuItem  is not null) _overwriteAlwaysMenuItem.IsChecked  = mode == "Always";
+                if (_overwriteIfNewerMenuItem is not null) _overwriteIfNewerMenuItem.IsChecked = mode == "IfNewer";
+            };
+            return item;
+        }
     }
 
     private void OnMainViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -213,6 +329,53 @@ public partial class MainWindow : Window
             && _showExcludedNodesMenuItem is not null)
         {
             _showExcludedNodesMenuItem.IsChecked = _mainVm?.ShowExcludedNodesByDefault ?? true;
+        }
+
+        if (e.PropertyName == nameof(MainViewModel.RestoreLastWorkflow))
+        {
+            if (_restoreLastWorkflowMenuItem is not null)
+                _restoreLastWorkflowMenuItem.IsChecked = _mainVm?.RestoreLastWorkflow ?? false;
+            // "Restore source path" is redundant when workflow restore is active.
+            if (_restoreLastSourcePathMenuItem is not null)
+                _restoreLastSourcePathMenuItem.IsEnabled = !(_mainVm?.RestoreLastWorkflow ?? false);
+        }
+
+        if (e.PropertyName == nameof(MainViewModel.RestoreLastSourcePath)
+            && _restoreLastSourcePathMenuItem is not null)
+        {
+            _restoreLastSourcePathMenuItem.IsChecked = _mainVm?.RestoreLastSourcePath ?? true;
+        }
+
+        if (e.PropertyName == nameof(MainViewModel.DisableDestructivePreview)
+            && _disableDestructivePreviewMenuItem is not null)
+        {
+            _disableDestructivePreviewMenuItem.IsChecked = _mainVm?.DisableDestructivePreview ?? false;
+        }
+
+        if (e.PropertyName == nameof(MainViewModel.DeleteToRecycleBin)
+            && _deleteToRecycleBinMenuItem is not null)
+        {
+            _deleteToRecycleBinMenuItem.IsChecked = _mainVm?.DeleteToRecycleBin ?? true;
+        }
+
+        if (e.PropertyName == nameof(MainViewModel.DefaultOverwriteMode))
+        {
+            var mode = _mainVm?.DefaultOverwriteMode ?? "Skip";
+            if (_overwriteSkipMenuItem   is not null) _overwriteSkipMenuItem.IsChecked   = mode == "Skip";
+            if (_overwriteAlwaysMenuItem  is not null) _overwriteAlwaysMenuItem.IsChecked  = mode == "Always";
+            if (_overwriteIfNewerMenuItem is not null) _overwriteIfNewerMenuItem.IsChecked = mode == "IfNewer";
+        }
+
+        if (e.PropertyName == nameof(MainViewModel.FullPreScan)
+            && _fullPreScanMenuItem is not null)
+        {
+            _fullPreScanMenuItem.IsChecked = _mainVm?.FullPreScan ?? false;
+        }
+
+        if (e.PropertyName == nameof(MainViewModel.LazyExpandScan)
+            && _lazyExpandScanMenuItem is not null)
+        {
+            _lazyExpandScanMenuItem.IsChecked = _mainVm?.LazyExpandScan ?? false;
         }
     }
 

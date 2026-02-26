@@ -44,6 +44,28 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private bool _showExcludedNodesByDefault = true;
 
+    [ObservableProperty]
+    private bool _restoreLastWorkflow;
+
+    [ObservableProperty]
+    private bool _restoreLastSourcePath = true;
+
+    [ObservableProperty]
+    private bool _disableDestructivePreview;
+
+    [ObservableProperty]
+    private bool _deleteToRecycleBin = true;
+
+    [ObservableProperty]
+    private bool _fullPreScan;
+
+    [ObservableProperty]
+    private bool _lazyExpandScan;
+
+    /// <summary>The default overwrite mode string: "Skip", "Always", or "IfNewer".</summary>
+    [ObservableProperty]
+    private string _defaultOverwriteMode = "Skip";
+
     private readonly MemoryFileSystemProvider _memoryProvider;
     private readonly AppSettings _settings = new();
     private readonly AppSettingsStore _settingsStore = new();
@@ -165,6 +187,49 @@ public partial class MainViewModel : ViewModelBase
         _settings.ShowFilteredNodesInTree = value;
         _ = _settingsStore.SaveAsync(_settings);
         FilterChain.ShowExcludedNodesInTree = value;
+    }
+
+    partial void OnRestoreLastWorkflowChanged(bool value)
+    {
+        _settings.RestoreLastWorkflow = value;
+        _ = _settingsStore.SaveAsync(_settings);
+    }
+
+    partial void OnRestoreLastSourcePathChanged(bool value)
+    {
+        _settings.RestoreLastSourcePath = value;
+        _ = _settingsStore.SaveAsync(_settings);
+    }
+
+    partial void OnDisableDestructivePreviewChanged(bool value)
+    {
+        _settings.DisableDestructivePreview = value;
+        _ = _settingsStore.SaveAsync(_settings);
+    }
+
+    partial void OnDeleteToRecycleBinChanged(bool value)
+    {
+        _settings.DeleteToRecycleBin = value;
+        _settings.DefaultDeleteMode = value ? "Trash" : "Permanent";
+        _ = _settingsStore.SaveAsync(_settings);
+    }
+
+    partial void OnFullPreScanChanged(bool value)
+    {
+        _settings.FullPreScan = value;
+        _ = _settingsStore.SaveAsync(_settings);
+    }
+
+    partial void OnLazyExpandScanChanged(bool value)
+    {
+        _settings.LazyExpandScan = value;
+        _ = _settingsStore.SaveAsync(_settings);
+    }
+
+    partial void OnDefaultOverwriteModeChanged(string value)
+    {
+        _settings.DefaultOverwriteMode = value;
+        _ = _settingsStore.SaveAsync(_settings);
     }
 
     // ── Keyboard shortcut commands ────────────────────────────────────────────
@@ -488,11 +553,28 @@ public partial class MainViewModel : ViewModelBase
         _settings.UseAbsolutePathsForSelectionSave = saved.UseAbsolutePathsForSelectionSave;
         _settings.AutoOpenLogOnRun = saved.AutoOpenLogOnRun;
         _settings.ShowFilteredNodesInTree = saved.ShowFilteredNodesInTree;
+        _settings.RestoreLastWorkflow = saved.RestoreLastWorkflow;
+        _settings.RestoreLastSourcePath = saved.RestoreLastSourcePath;
+        _settings.DisableDestructivePreview = saved.DisableDestructivePreview;
+        _settings.DeleteToRecycleBin = saved.DeleteToRecycleBin;
+        _settings.DefaultDeleteMode = saved.DeleteToRecycleBin ? "Trash" : "Permanent";
+        _settings.FullPreScan = saved.FullPreScan;
+        _settings.LazyExpandScan = saved.LazyExpandScan;
+        _settings.DefaultOverwriteMode = saved.DefaultOverwriteMode;
+
         UseAbsolutePathsForSelection = saved.UseAbsolutePathsForSelectionSave;
         AutoOpenLogOnRun = saved.AutoOpenLogOnRun;
         ShowExcludedNodesByDefault = saved.ShowFilteredNodesInTree;
+        RestoreLastWorkflow = saved.RestoreLastWorkflow;
+        RestoreLastSourcePath = saved.RestoreLastSourcePath;
+        DisableDestructivePreview = saved.DisableDestructivePreview;
+        DeleteToRecycleBin = saved.DeleteToRecycleBin;
+        FullPreScan = saved.FullPreScan;
+        LazyExpandScan = saved.LazyExpandScan;
+        DefaultOverwriteMode = saved.DefaultOverwriteMode;
 
-        if (saved.LastSourcePath is { Length: > 0 })
+        if (saved.RestoreLastSourcePath && !saved.RestoreLastWorkflow
+            && saved.LastSourcePath is { Length: > 0 })
         {
             SourcePath = saved.LastSourcePath;
         }
@@ -502,6 +584,13 @@ public partial class MainViewModel : ViewModelBase
         FilterChain.PipelineDestinationPath = MockMemoryFileSystemFactory.TargetPath;
         await _operationJournal.RotateAsync(_settings.LogRetentionDays);
         await WorkflowMenu.RefreshAsync();
+
+        // Restore last workflow if the option is enabled and the named preset still exists.
+        if (saved.RestoreLastWorkflow && saved.LastWorkflowName is { Length: > 0 })
+        {
+            try { await LoadWorkflowAsync(saved.LastWorkflowName); }
+            catch (Exception ex) { Debug.WriteLine($"Failed to restore last workflow '{saved.LastWorkflowName}': {ex}"); }
+        }
 
         // Pre-wire the chain before the initial tree load so the first file list load
         // already has a chain to evaluate.
@@ -590,7 +679,9 @@ public partial class MainViewModel : ViewModelBase
         }
 
         var pipeline = Pipeline.BuildLivePipeline();
-        if (pipeline.HasDeleteStep)
+
+        // Mandatory preview for destructive pipelines, unless the user has opted out.
+        if (pipeline.HasDeleteStep && !_settings.DisableDestructivePreview)
         {
             await PreviewPipelineAsync();
             return;
@@ -735,6 +826,11 @@ public partial class MainViewModel : ViewModelBase
             Config = preset.Config.Pipeline,
         };
         Pipeline.LoadPreset(pipelinePreset);
+
+        // Record this as the last-used workflow so RestoreLastWorkflow can resurrect
+        // the correct preset rather than guessing from list order.
+        _settings.LastWorkflowName = name;
+        await _settingsStore.SaveAsync(_settings);
     }
 
     private async Task ManageWorkflowsAsync()

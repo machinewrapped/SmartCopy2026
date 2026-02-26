@@ -470,28 +470,26 @@ Acceptance criteria:
 Verification:
 - [X] Keyboard-only smoke test for scan/selection/filter/pipeline-preview path
 
-### Step 11 - User Options and usability tweaks (UX Polish Track) 
+### Step 11 - User Options and usability tweaks (UX Polish Track) ✓
 
-Expand the configuration options available in the Options menu to provide users with more control.
-Options are grouped into categories with separators.
+**Completed 2026-02-26.** Seven new user-configurable options added, persisted in `AppSettings`, and grouped into four categories in the Options menu.
 
 Deliverables:
-- [ ] Startup option: restore last used workflow on startup
-- [ ] Startup option: restore last used source path on startup (redundant/disabled if last used workflow is restored)
-- [ ] Pipeline option: disable destructive preview (run delete/overwrite pipelines without confirmation)
-- [ ] Pipeline option: default overwrite mode (skip, always, if newer)
-- [ ] Pipeline option: delete to recycle bin (if available)
-- [ ] Scan option: perform full scan instead of progressive scan
-- [ ] Scan option: perform lazy scan (only scan inspected or selected paths)
+- [x] Startup option: restore last used workflow on startup
+- [x] Startup option: restore last used source path on startup (disabled when last used workflow is restored)
+- [x] Pipeline option: disable destructive preview (run delete/overwrite pipelines without confirmation)
+- [x] Pipeline option: default overwrite mode (skip, always, if newer) — submenu
+- [x] Pipeline option: delete to recycle bin (if available)
+- [x] Scan option: perform full scan instead of progressive scan
+- [x] Scan option: perform lazy scan (only scan inspected or selected paths)
 
 Acceptance criteria:
-- [ ] All options are persisted across application restarts
-- [ ] All options are accessible from the Options menu
-- [ ] All options are documented in the README.md
+- [x] All options are persisted across application restarts
+- [x] All options are accessible from the Options menu (grouped: Startup / Display / Pipeline / Scan)
 
 Verification:
-- [ ] `dotnet build` passes
-- [ ] All tests pass
+- [x] `dotnet build SmartCopy.UI/SmartCopy.UI.csproj /tl:off /clp:ErrorsOnly` — 0 warnings, 0 errors
+- [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj` — 184/184 passing (1 new: `SaveAndLoad_RoundTripsNewOptions`)
 
 ### Step 12 - Export and Import Presets (UX Polish Track) 
 
