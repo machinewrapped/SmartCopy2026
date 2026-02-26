@@ -96,8 +96,6 @@ SmartCopy2026/
 │   ├── Settings/
 │   │   ├── AppSettings.cs
 │   │   └── AppSettingsStore.cs
-│   ├── Sync/
-│   │   └── SyncWorkflow.cs
 │   └── Workflows/
 │       ├── WorkflowConfig.cs
 │       ├── WorkflowPreset.cs
@@ -525,8 +523,6 @@ Key components:
 - `WorkflowConfig`: Defines the full state of a workflow, including its name, description, selected source/destination paths, filter chain configuration, and the pipeline steps to execute.
 - `WorkflowPreset`: A saved instance of a `WorkflowConfig`, allowing users to quickly load and execute workflows.
 - `WorkflowPresetStore`: Manages the persistence (CRUD operations) of workflow presets to disk.
-
-**Sync Operations (`SyncWorkflow`)**: Workflows can encapsulate specialized logic, such as orchestrating the sequence of scanning, filtering, and pipeline execution required to synchronize two directories.
 
 ---
 
