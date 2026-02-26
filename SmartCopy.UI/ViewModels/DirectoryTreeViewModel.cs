@@ -23,6 +23,12 @@ public class DirectoryTreeViewModel : ViewModelBase
     /// <summary>Raised when any node's <see cref="FileSystemNode.CheckState"/> changes.</summary>
     public event EventHandler? SelectionChanged;
 
+    /// <summary>Raised when the user requests a node's path be set as the source root.</summary>
+    public event EventHandler<string>? SetAsSourcePathRequested;
+
+    public void RequestSetAsSourcePath(string path) =>
+        SetAsSourcePathRequested?.Invoke(this, path);
+
     public ObservableCollection<FileSystemNode> RootNodes { get; } = [];
 
     public DirectoryTreeViewModel(IFileSystemProvider provider, string rootPath)
