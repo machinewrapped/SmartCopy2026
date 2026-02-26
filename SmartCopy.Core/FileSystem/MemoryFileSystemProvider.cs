@@ -401,7 +401,6 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         {
             Name = name,
             FullPath = path,
-            RelativePath = relativePath,
             RelativePathSegments = SplitPath(relativePath),
             IsDirectory = entry.IsDirectory,
             Size = entry.IsDirectory ? 0 : entry.Size,

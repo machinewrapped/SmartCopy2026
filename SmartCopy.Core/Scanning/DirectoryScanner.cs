@@ -97,7 +97,6 @@ public sealed class DirectoryScanner
         {
             Name = source.Name,
             FullPath = source.FullPath,
-            RelativePath = source.RelativePath,
             RelativePathSegments = source.RelativePathSegments,
             IsDirectory = source.IsDirectory,
             Size = source.Size,

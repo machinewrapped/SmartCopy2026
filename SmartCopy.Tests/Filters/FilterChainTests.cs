@@ -35,7 +35,7 @@ public sealed class FilterChainTests
         {
             Name = "root",
             FullPath = "/root",
-            RelativePath = "root",
+            RelativePathSegments = ["root"],
             IsDirectory = true,
         };
         var child = CreateFile("track.wav", 500, parent: root);
@@ -213,7 +213,6 @@ public sealed class FilterChainTests
         {
             Name = "mirrored.flac",
             FullPath = "/source/Alternative/mirrored.flac",
-            RelativePath = "Alternative/mirrored.flac",
             RelativePathSegments = ["Alternative", "mirrored.flac"],
             IsDirectory = false,
             Size = 1000,
@@ -223,7 +222,6 @@ public sealed class FilterChainTests
         {
             Name = "new.flac",
             FullPath = "/source/Alternative/new.flac",
-            RelativePath = "Alternative/new.flac",
             RelativePathSegments = ["Alternative", "new.flac"],
             IsDirectory = false,
             Size = 800,
@@ -254,7 +252,6 @@ public sealed class FilterChainTests
         {
             Name = "song.flac",
             FullPath = "/source/Alternative/song.flac",
-            RelativePath = "Alternative/song.flac",
             RelativePathSegments = ["Alternative", "song.flac"],
             IsDirectory = false,
             Size = 1000,
@@ -276,7 +273,6 @@ public sealed class FilterChainTests
         {
             Name = name,
             FullPath = "/tmp/" + name,
-            RelativePath = name,
             RelativePathSegments = [name],
             IsDirectory = false,
             Size = size,
@@ -289,7 +285,6 @@ public sealed class FilterChainTests
         {
             Name = name,
             FullPath = "/tmp/" + name,
-            RelativePath = name,
             RelativePathSegments = [name],
             IsDirectory = true,
             Parent = parent,

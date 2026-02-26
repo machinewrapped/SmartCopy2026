@@ -66,7 +66,7 @@ public sealed class FileSystemNodeSelectionTests
         {
             Name = name,
             FullPath = fullPath,
-            RelativePath = relativePath,
+            RelativePathSegments = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries),
             IsDirectory = true,
             Parent = parent,
         };
@@ -78,7 +78,7 @@ public sealed class FileSystemNodeSelectionTests
         {
             Name = name,
             FullPath = fullPath,
-            RelativePath = relativePath,
+            RelativePathSegments = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries),
             IsDirectory = false,
             Parent = parent,
         };

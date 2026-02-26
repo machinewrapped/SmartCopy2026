@@ -271,7 +271,6 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         {
             Name = info.Name,
             FullPath = info.FullName,
-            RelativePath = relativePath,
             RelativePathSegments = SplitPath(relativePath),
             IsDirectory = true,
             Size = 0,
@@ -290,7 +289,6 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         {
             Name = info.Name,
             FullPath = info.FullName,
-            RelativePath = relativePath,
             RelativePathSegments = SplitPath(relativePath),
             IsDirectory = false,
             Size = info.Length,

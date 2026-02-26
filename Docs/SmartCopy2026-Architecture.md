@@ -189,10 +189,18 @@ public interface IFileSystemProvider
     Task CreateDirectoryAsync(string path, CancellationToken ct);
     Task<bool> ExistsAsync(string path, CancellationToken ct);
 
-    // Combines a base path with a relative fragment using this provider's own path conventions.
-    // Needed because MemoryFileSystemProvider uses virtual Unix-style paths while
-    // LocalFileSystemProvider uses OS-native paths; callers must not use OS Path.* APIs directly.
-    string CombinePath(string basePath, string relativePath);
+    // Returns the relative portion of fullPath with respect to basePath,
+    // using this provider's own path conventions.
+    string GetRelativePath(string basePath, string fullPath);
+
+    // Splits any path string into ordered, separator-free segments.
+    // Accepts both provider-native and canonical forward-slash paths.
+    // Use this to ingest a string path into the separator-agnostic segment representation.
+    string[] SplitPath(string path);
+
+    // Appends segments onto basePath using this provider's own path conventions.
+    // Use this to egress segments back to a provider-native string path.
+    string JoinPath(string basePath, IReadOnlyList<string> segments);
 }
 
 public record ProviderCapabilities(
@@ -289,7 +297,7 @@ Saved as `.sc2filter` (JSON). See §5 for `FilterChainConfig` schema.
 A **pipeline** is an ordered sequence of `ITransformStep` objects applied to each selected file.
 Steps are categorised:
 
-- **Path steps** — modify `TransformContext.CurrentPath` and/or `CurrentExtension`
+- **Path steps** — modify `TransformContext.PathSegments` (and `CurrentExtension` for `ConvertStep`)
 - **Content steps** — replace `TransformContext.ContentStream`
 - **Executable steps** — perform filesystem side effects (`Copy`, `Move`, `Delete`).
   A pipeline may contain multiple executable steps. Execution is enabled only when at least one
@@ -318,7 +326,8 @@ public class TransformContext
     public FileSystemNode SourceNode { get; init; }
     public IFileSystemProvider SourceProvider { get; init; }
     public IFileSystemProvider? TargetProvider { get; set; }
-    public string CurrentPath { get; set; }         // mutated by path steps
+    public string[] PathSegments { get; set; }      // separator-free; mutated by path steps
+    public string DisplayPath => string.Join("/", PathSegments);  // canonical /‑joined, for logging
     public string CurrentExtension { get; set; }    // mutated by ConvertStep
     public Stream? ContentStream { get; set; }      // mutated by content steps
     public OverwriteMode OverwriteMode { get; init; }  // Skip | IfNewer | Always
@@ -329,11 +338,17 @@ public class TransformContext
 `PipelineRunner` iterates selected nodes, creates a fresh `TransformContext` for each, passes it
 through each step in sequence, and reports `OperationProgress` after each file completes.
 
-**Critical invariant:** `CurrentPath` is initialized from `node.RelativePath`, which must be
-relative to the user's selected source directory (not the filesystem or provider root).
-`DirectoryTreeViewModel.CloneNode` enforces this by recomputing `RelativePath` relative to the
-tree's browsing root. This ensures that `Copy /src → /dest` produces `/dest/<relative-structure>`
-rather than `/dest/<absolute-structure>`.
+**Critical invariant:** `PathSegments` is initialized from `node.RelativePathSegments`, which must
+be relative to the user's selected source directory (not the filesystem or provider root).
+`DirectoryTreeViewModel.CloneNode` enforces this by recomputing the relative path via
+`provider.SplitPath(provider.GetRelativePath(root, fullPath))`. This ensures `Copy /src → /dest`
+produces `/dest/<relative-structure>` rather than `/dest/<absolute-structure>`.
+
+**Path segment convention:** All path steps (`FlattenStep`, `RebaseStep`, `RenameStep`,
+`ConvertStep`) mutate `PathSegments` directly — no string path manipulation, no separator
+assumptions. `StepPathHelper.BuildDestinationPath` has two overloads: one provider-aware (used
+in `ApplyAsync`, calls `provider.JoinPath`) and one canonical-slash (used in `Preview` and for
+display, joins with `/`). Providers are the only layer that know about separator conventions.
 
 Phase 1 implementation notes:
 - `CopyStep` and `MoveStep` carry mutable `DestinationPath`; empty paths are permitted at object
@@ -595,8 +610,7 @@ is preserved. If a filter is removed, previously-filtered nodes reappear with th
 
 ### 3.3 Mirror Filter
 
-Determines whether a source node has a counterpart at `ComparisonPath + RelativePath` in a
-comparison provider (typically the target side).
+Determines whether a source node has a counterpart at `JoinPath(ComparisonPath, node.RelativePathSegments)` in a comparison provider (typically the target side).
 
 Current parameters:
 - `CompareMode = NameOnly` — counterpart exists at same relative path
@@ -680,13 +694,17 @@ Rock/Beatles/Abbey Road/02 Something.flac
 **JSON (`.sc2sel`):**
 ```json
 {
-  "sourceRoot": "/home/user/Music",
-  "savedAt": "2026-02-18T12:00:00Z",
-  "selectedFiles": ["Rock/Beatles/Abbey Road/01 Come Together.flac"],
-  "selectedFolders": ["Jazz/Miles Davis"]
+  "SchemaVersion": 2,
+  "PathParts": [
+    ["Rock", "Beatles", "Abbey Road", "01 Come Together.flac"],
+    ["Jazz", "Miles Davis", "Kind of Blue", "So What.flac"]
+  ]
 }
 ```
 - Used for crash-recovery autosave and session files
+- `PathParts` stores each path as an array of separator-free segments — portable across platforms
+  with no separator normalization needed on load
+- Loaded by joining each segment array with `/`
 
 **Loading behaviour:**
 - Both relative and absolute paths accepted
@@ -965,7 +983,16 @@ public class FileSystemNode : INotifyPropertyChanged
     // Filesystem data (immutable after scan)
     public string Name { get; init; }
     public string FullPath { get; init; }
-    public string RelativePath { get; init; }   // relative to browsing root (set by DirectoryTreeViewModel)
+
+    // Separator-free relative path segments, set by the source provider at scan time.
+    // This is the authoritative cross-provider representation; use it when crossing
+    // provider boundaries (e.g. MirrorFilter, PipelineRunner).
+    public string[] RelativePathSegments { get; init; } = [];
+
+    // Canonical forward-slash relative path, derived from RelativePathSegments.
+    // Read-only computed property — always "/"-joined regardless of OS or provider.
+    public string RelativePath => string.Join("/", RelativePathSegments);
+
     public bool IsDirectory { get; init; }
     public long Size { get; init; }             // 0 for directories
     public DateTime CreatedAt { get; init; }
@@ -985,6 +1012,7 @@ public class FileSystemNode : INotifyPropertyChanged
     // Tree structure
     public FileSystemNode? Parent { get; init; }
     public ObservableCollection<FileSystemNode> Children { get; }
+    public ObservableCollection<FileSystemNode> Files { get; }
 }
 
 public enum CheckState    { Checked, Unchecked, Indeterminate }

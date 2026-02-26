@@ -27,7 +27,7 @@ public sealed class FilterLiveWiringTests
         {
             Name = "music",
             FullPath = "/music",
-            RelativePath = "music",
+            RelativePathSegments = ["music"],
             IsDirectory = true,
         };
 
@@ -68,7 +68,7 @@ public sealed class FilterLiveWiringTests
         {
             Name = "music",
             FullPath = "/music",
-            RelativePath = "music",
+            RelativePathSegments = ["music"],
             IsDirectory = true,
         };
 

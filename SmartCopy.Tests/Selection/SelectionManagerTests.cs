@@ -12,7 +12,7 @@ public sealed class SelectionManagerTests
         {
             Name = "root",
             FullPath = "/root",
-            RelativePath = "root",
+            RelativePathSegments = ["root"],
             IsDirectory = true,
         };
 
@@ -20,7 +20,7 @@ public sealed class SelectionManagerTests
         {
             Name = "a.mp3",
             FullPath = "/root/a.mp3",
-            RelativePath = "root/a.mp3",
+            RelativePathSegments = ["root", "a.mp3"],
             IsDirectory = false,
             Parent = root,
             CheckState = CheckState.Checked,
@@ -29,7 +29,7 @@ public sealed class SelectionManagerTests
         {
             Name = "b.mp3",
             FullPath = "/root/b.mp3",
-            RelativePath = "root/b.mp3",
+            RelativePathSegments = ["root", "b.mp3"],
             IsDirectory = false,
             Parent = root,
             CheckState = CheckState.Unchecked,
@@ -154,7 +154,7 @@ public sealed class SelectionManagerTests
         {
             Name = "root",
             FullPath = "/root",
-            RelativePath = "root",
+            RelativePathSegments = ["root"],
             IsDirectory = true,
         };
 
@@ -162,7 +162,7 @@ public sealed class SelectionManagerTests
         {
             Name = "a.mp3",
             FullPath = "/root/a.mp3",
-            RelativePath = "root/a.mp3",
+            RelativePathSegments = ["root", "a.mp3"],
             IsDirectory = false,
             Parent = root,
         };
@@ -171,7 +171,7 @@ public sealed class SelectionManagerTests
         {
             Name = "b.mp3",
             FullPath = "/root/b.mp3",
-            RelativePath = "root/b.mp3",
+            RelativePathSegments = ["root", "b.mp3"],
             IsDirectory = false,
             Parent = root,
         };

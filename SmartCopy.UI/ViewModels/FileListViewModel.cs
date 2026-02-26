@@ -86,7 +86,7 @@ public class FileListViewModel(IFileSystemProvider provider, string directoryPat
                 {
                     Name = child.Name,
                     FullPath = child.FullPath,
-                    RelativePath = child.RelativePath,
+                    RelativePathSegments = child.RelativePathSegments,
                     IsDirectory = false,
                     Size = child.Size,
                     CreatedAt = child.CreatedAt,

@@ -55,10 +55,10 @@ public sealed class SelectionSerializer
         ct.ThrowIfCancellationRequested();
         var payload = new SelectionPayload
         {
-            SchemaVersion = 1,
-            Paths = snapshot.Paths
-                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-                .Select(NormalizePath)
+            SchemaVersion = 2,
+            PathParts = snapshot.Paths
+                .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+                .Select(p => p.Split('/', StringSplitOptions.RemoveEmptyEntries))
                 .ToList(),
         };
         var json = JsonSerializer.Serialize(payload, JsonOptions);
@@ -70,7 +70,7 @@ public sealed class SelectionSerializer
         ct.ThrowIfCancellationRequested();
         var json = await File.ReadAllTextAsync(path, ct);
         var payload = JsonSerializer.Deserialize<SelectionPayload>(json) ?? new SelectionPayload();
-        return new SelectionSnapshot(payload.Paths.Select(NormalizePath));
+        return new SelectionSnapshot(payload.PathParts.Select(parts => string.Join("/", parts)));
     }
 
     public async Task SaveM3u8Async(string path, SelectionSnapshot snapshot, CancellationToken ct = default)
@@ -124,8 +124,8 @@ public sealed class SelectionSerializer
 
     private sealed class SelectionPayload
     {
-        public int SchemaVersion { get; set; } = 1;
-        public List<string> Paths { get; set; } = [];
+        public int SchemaVersion { get; set; } = 2;
+        public List<string[]> PathParts { get; set; } = [];
     }
 }
 
