@@ -48,7 +48,27 @@
                           Margin="0,0,5,0"
                           HorizontalAlignment="Stretch"
                           CornerRadius="4"
-                          AutomationProperties.Name="Source path" />
+                          AutomationProperties.Name="Source path">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:SourceBookmarkItem">
+                            <Grid ColumnDefinitions="20, *, Auto">
+                                <TextBlock Grid.Column="0" Text="★" IsVisible="{Binding IsBookmark}" Foreground="#EED202" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="{Binding Path}" VerticalAlignment="Center" Margin="4,0,0,0" />
+                                <Button Grid.Column="2"
+                                        Content="🗑"
+                                        Width="28" Height="28" Padding="0"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        CornerRadius="4" Background="Transparent"
+                                        Foreground="#f44736" FontSize="12"
+                                        VerticalAlignment="Center"
+                                        ToolTip.Tip="Delete item"
+                                        Command="{ReflectionBinding $parent[Window].DataContext.RemoveSourceBookmarkCommand}"
+                                        CommandParameter="{Binding}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
                 <Button Grid.Column="2"
                         Content="★"
                         Command="{Binding BookmarkCurrentPathCommand}"

@@ -33,7 +33,7 @@ public partial class MainViewModel : ViewModelBase
     private string _sourcePath = string.Empty;
 
     [ObservableProperty]
-    private string? _selectedSourceBookmark;
+    private SourceBookmarkItem? _selectedSourceBookmark;
 
     [ObservableProperty]
     private bool _useAbsolutePathsForSelection;
@@ -54,7 +54,7 @@ public partial class MainViewModel : ViewModelBase
     private CancellationTokenSource? _filterCts;
     private CancellationTokenSource? _runCts;
 
-    public ObservableCollection<string> SourceBookmarks { get; } = [];
+    public ObservableCollection<SourceBookmarkItem> SourceBookmarks { get; } = [];
 
     public DirectoryTreeViewModel DirectoryTree { get; }
     public FileListViewModel FileList { get; }
@@ -134,12 +134,12 @@ public partial class MainViewModel : ViewModelBase
         InitializeInBackground();
     }
 
-    partial void OnSelectedSourceBookmarkChanged(string? value)
+    partial void OnSelectedSourceBookmarkChanged(SourceBookmarkItem? value)
     {
         // Only populate the text field — don't apply until the user commits
         // (Enter key or dropdown close after mouse selection).
         if (value is not null)
-            SourcePath = value;
+            SourcePath = value.Path;
     }
 
     partial void OnUseAbsolutePathsForSelectionChanged(bool value)
@@ -316,7 +316,7 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private async Task BookmarkCurrentPath()
     {
-        var path = SourcePath.Trim();
+        var path = PathHelper.RemoveTrailingSeparator(SourcePath.Trim());
         if (string.IsNullOrWhiteSpace(path) || _settings.FavouritePaths.Contains(path))
             return;
 
@@ -325,8 +325,32 @@ public partial class MainViewModel : ViewModelBase
         await _settingsStore.SaveAsync(_settings);
     }
 
+    [RelayCommand]
+    private async Task RemoveSourceBookmark(SourceBookmarkItem? item)
+    {
+        if (item is null) return;
+
+        bool removed = false;
+        if (item.IsBookmark)
+        {
+            removed = _settings.FavouritePaths.Remove(item.Path);
+        }
+        else
+        {
+            removed = _settings.RecentSources.Remove(item.Path);
+        }
+
+        if (removed)
+        {
+            RefreshSourceBookmarks();
+            await _settingsStore.SaveAsync(_settings);
+        }
+    }
+
     private void RecordRecentSource(string path)
     {
+        path = PathHelper.RemoveTrailingSeparator(path);
+        
         _settings.RecentSources.Remove(path);
         _settings.RecentSources.Insert(0, path);
         if (_settings.RecentSources.Count > MaxRecentSources)
@@ -341,11 +365,37 @@ public partial class MainViewModel : ViewModelBase
     {
         // Preserve the current text — Clear() nulls SelectedItem which
         // causes the editable ComboBox to wipe its Text binding.
-        var currentPath = SourcePath;
+        var currentPath = PathHelper.RemoveTrailingSeparator(SourcePath);
 
         SourceBookmarks.Clear();
-        foreach (var path in _settings.FavouritePaths.Concat(_settings.RecentSources).Distinct())
-            SourceBookmarks.Add(path);
+        var addedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Clean trailing slashes out of existing entries first
+        var normalizedFavourites = _settings.FavouritePaths
+            .Select(PathHelper.RemoveTrailingSeparator)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        
+        var normalizedRecent = _settings.RecentSources
+            .Select(PathHelper.RemoveTrailingSeparator)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        // Save normalized lists back
+        _settings.FavouritePaths = normalizedFavourites;
+        _settings.RecentSources = normalizedRecent;
+
+        foreach (var path in _settings.FavouritePaths)
+        {
+            if (addedPaths.Add(path))
+                SourceBookmarks.Add(new SourceBookmarkItem(path, true));
+        }
+
+        foreach (var path in _settings.RecentSources)
+        {
+            if (addedPaths.Add(path))
+                SourceBookmarks.Add(new SourceBookmarkItem(path, false));
+        }
 
         SourcePath = currentPath;
     }

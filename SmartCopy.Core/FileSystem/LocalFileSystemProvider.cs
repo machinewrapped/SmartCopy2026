@@ -10,7 +10,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 {
     public LocalFileSystemProvider(string rootPath)
     {
-        RootPath = PathHelper.Normalize(rootPath);
+        RootPath = NormalizePath(rootPath);
     }
 
     public string RootPath { get; }
@@ -198,10 +198,39 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     }
 
     public string CombinePath(string basePath, string relativePath)
-        => PathHelper.CombineForProvider(basePath, relativePath);
+    {
+        if (Path.IsPathFullyQualified(relativePath))
+        {
+            return NormalizePath(relativePath);
+        }
+
+        if (string.IsNullOrWhiteSpace(basePath))
+        {
+            return NormalizePath(relativePath);
+        }
+
+        return NormalizePath(Path.Combine(basePath, relativePath));
+    }
 
     public string GetRelativePath(string basePath, string fullPath)
-        => PathHelper.GetRelativePath(basePath, fullPath);
+    {
+        string normalBase = NormalizePath(basePath);
+        string normalFull = NormalizePath(fullPath);
+        var root = PathHelper.EnsureTrailingSeparator(normalBase);
+        var relative = Path.GetRelativePath(root, normalFull);
+        return relative == "." ? string.Empty : relative;
+    }
+
+    public string NormalizePath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return Path.DirectorySeparatorChar.ToString();
+        }
+
+        var full = Path.GetFullPath(path);
+        return full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    }
 
     private string Resolve(string path)
     {
@@ -212,10 +241,10 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 
         if (Path.IsPathFullyQualified(path))
         {
-            return PathHelper.Normalize(path);
+            return NormalizePath(path);
         }
 
-        return PathHelper.CombineForProvider(RootPath, path);
+        return CombinePath(RootPath, path);
     }
 
     private FileSystemNode CreateDirectoryNode(string directoryPath, FileSystemNode? parent)
@@ -225,7 +254,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         {
             Name = info.Name,
             FullPath = info.FullName,
-            RelativePath = PathHelper.GetRelativePath(RootPath, info.FullName),
+            RelativePath = GetRelativePath(RootPath, info.FullName),
             IsDirectory = true,
             Size = 0,
             CreatedAt = info.CreationTimeUtc,
@@ -242,7 +271,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         {
             Name = info.Name,
             FullPath = info.FullName,
-            RelativePath = PathHelper.GetRelativePath(RootPath, info.FullName),
+            RelativePath = GetRelativePath(RootPath, info.FullName),
             IsDirectory = false,
             Size = info.Length,
             CreatedAt = info.CreationTimeUtc,
