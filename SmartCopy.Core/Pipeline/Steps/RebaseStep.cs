@@ -8,34 +8,34 @@ namespace SmartCopy.Core.Pipeline.Steps;
 
 public sealed class RebaseStep : ITransformStep
 {
-    private string[] _stripSegments;
-    private string[] _addSegments;
+    private string _stripPrefix = string.Empty;
+    private string _addPrefix = string.Empty;
+    private string[] _stripSegments = [];
+    private string[] _addSegments = [];
 
     public RebaseStep(string stripPrefix, string addPrefix)
     {
         StripPrefix = stripPrefix ?? string.Empty;
         AddPrefix = addPrefix ?? string.Empty;
-        _stripSegments = SplitPrefix(StripPrefix);
-        _addSegments = SplitPrefix(AddPrefix);
     }
 
     public string StripPrefix
     {
-        get;
+        get => _stripPrefix;
         set
         {
-            field = value ?? string.Empty;
-            _stripSegments = SplitPrefix(field);
+            _stripPrefix = value ?? string.Empty;
+            _stripSegments = SplitPrefix(_stripPrefix);
         }
     }
 
     public string AddPrefix
     {
-        get;
+        get => _addPrefix;
         set
         {
-            field = value ?? string.Empty;
-            _addSegments = SplitPrefix(field);
+            _addPrefix = value ?? string.Empty;
+            _addSegments = SplitPrefix(_addPrefix);
         }
     }
 
