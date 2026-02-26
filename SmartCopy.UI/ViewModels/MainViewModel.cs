@@ -57,6 +57,9 @@ public partial class MainViewModel : ViewModelBase
     private bool _deleteToRecycleBin = true;
 
     [ObservableProperty]
+    private bool _saveSessionLocally;
+
+    [ObservableProperty]
     private bool _fullPreScan;
 
     [ObservableProperty]
@@ -212,6 +215,12 @@ public partial class MainViewModel : ViewModelBase
     {
         _settings.DeleteToRecycleBin = value;
         _settings.DefaultDeleteMode = value ? "Trash" : "Permanent";
+        _ = _settingsStore.SaveAsync(_settings);
+    }
+
+    partial void OnSaveSessionLocallyChanged(bool value)
+    {
+        _settings.SaveSessionLocally = value;
         _ = _settingsStore.SaveAsync(_settings);
     }
 
@@ -563,6 +572,8 @@ public partial class MainViewModel : ViewModelBase
         _settings.LazyExpandScan = saved.LazyExpandScan;
         _settings.DefaultOverwriteMode = saved.DefaultOverwriteMode;
 
+        _settings.SaveSessionLocally = saved.SaveSessionLocally;
+
         UseAbsolutePathsForSelection = saved.UseAbsolutePathsForSelectionSave;
         AutoOpenLogOnRun = saved.AutoOpenLogOnRun;
         ShowExcludedNodesByDefault = saved.ShowFilteredNodesInTree;
@@ -570,6 +581,7 @@ public partial class MainViewModel : ViewModelBase
         RestoreLastSourcePath = saved.RestoreLastSourcePath;
         DisableDestructivePreview = saved.DisableDestructivePreview;
         DeleteToRecycleBin = saved.DeleteToRecycleBin;
+        SaveSessionLocally = saved.SaveSessionLocally;
         FullPreScan = saved.FullPreScan;
         LazyExpandScan = saved.LazyExpandScan;
         DefaultOverwriteMode = saved.DefaultOverwriteMode;
@@ -591,7 +603,7 @@ public partial class MainViewModel : ViewModelBase
         {
             try
             {
-                var session = await _sessionStore.LoadAsync();
+                var session = await _sessionStore.LoadAsync(GetSessionPath());
                 if (session is not null)
                     await ApplyWorkflowConfigAsync(session);
             }
@@ -860,13 +872,22 @@ public partial class MainViewModel : ViewModelBase
                 SourcePath: SourcePath,
                 FilterChain: filterChainConfig,
                 Pipeline: pipelineConfig);
-            await _sessionStore.SaveAsync(config);
+            await _sessionStore.SaveAsync(config, GetSessionPath());
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"Failed to save session snapshot: {ex}");
         }
     }
+
+    /// <summary>
+    /// Returns the path for session.sc2session: next to the executable when
+    /// <see cref="SaveSessionLocally"/> is on, otherwise the global settings directory.
+    /// </summary>
+    private string GetSessionPath()
+        => _settings.SaveSessionLocally
+            ? Path.Combine(AppContext.BaseDirectory, "session.sc2session")
+            : SessionStore.GetDefaultSessionPath();
 
     private async Task ManageWorkflowsAsync()
     {

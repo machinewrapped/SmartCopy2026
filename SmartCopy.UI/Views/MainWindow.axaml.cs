@@ -49,6 +49,7 @@ public partial class MainWindow : Window
     // Options menu — Startup
     private MenuItem? _restoreLastWorkflowMenuItem;
     private MenuItem? _restoreLastSourcePathMenuItem;
+    private MenuItem? _saveSessionLocallyMenuItem;
 
     // Options menu — Pipeline
     private MenuItem? _disableDestructivePreviewMenuItem;
@@ -196,6 +197,14 @@ public partial class MainWindow : Window
             () => { if (_mainVm is not null) _mainVm.RestoreLastWorkflow = !_mainVm.RestoreLastWorkflow; });
         OptionsMenu.Items.Add(_restoreLastWorkflowMenuItem);
 
+        _saveSessionLocallyMenuItem = Toggle(
+            "Save Session _Locally (portable)",
+            _mainVm?.SaveSessionLocally ?? false,
+            () => { if (_mainVm is not null) _mainVm.SaveSessionLocally = !_mainVm.SaveSessionLocally; });
+        // Only meaningful when Restore Last Workflow is on.
+        _saveSessionLocallyMenuItem.IsEnabled = _mainVm?.RestoreLastWorkflow ?? false;
+        OptionsMenu.Items.Add(_saveSessionLocallyMenuItem);
+
         _restoreLastSourcePathMenuItem = Toggle(
             "Restore Last _Source Path on Startup",
             _mainVm?.RestoreLastSourcePath ?? true,
@@ -338,12 +347,21 @@ public partial class MainWindow : Window
             // "Restore source path" is redundant when workflow restore is active.
             if (_restoreLastSourcePathMenuItem is not null)
                 _restoreLastSourcePathMenuItem.IsEnabled = !(_mainVm?.RestoreLastWorkflow ?? false);
+            // "Save session locally" only makes sense when workflow restore is active.
+            if (_saveSessionLocallyMenuItem is not null)
+                _saveSessionLocallyMenuItem.IsEnabled = _mainVm?.RestoreLastWorkflow ?? false;
         }
 
         if (e.PropertyName == nameof(MainViewModel.RestoreLastSourcePath)
             && _restoreLastSourcePathMenuItem is not null)
         {
             _restoreLastSourcePathMenuItem.IsChecked = _mainVm?.RestoreLastSourcePath ?? true;
+        }
+
+        if (e.PropertyName == nameof(MainViewModel.SaveSessionLocally)
+            && _saveSessionLocallyMenuItem is not null)
+        {
+            _saveSessionLocallyMenuItem.IsChecked = _mainVm?.SaveSessionLocally ?? false;
         }
 
         if (e.PropertyName == nameof(MainViewModel.DisableDestructivePreview)

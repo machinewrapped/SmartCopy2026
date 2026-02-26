@@ -27,6 +27,9 @@ public sealed class AppSettings
     public bool DisableDestructivePreview { get; set; } = false;
     /// <summary>Send deleted files to the recycle bin when the platform supports it.</summary>
     public bool DeleteToRecycleBin { get; set; } = true;
+    /// <summary>Write session.sc2session next to the executable instead of in %APPDATA%.
+    /// Lets each portable copy of the app remember its own last-used session.</summary>
+    public bool SaveSessionLocally { get; set; } = false;
     public int LogRetentionDays { get; set; } = 30;
     public List<string> RecentSources { get; set; } = [];
     public List<string> RecentTargets { get; set; } = [];
