@@ -29,9 +29,9 @@ public sealed class DirectoryScannerTests
         }
 
         Assert.NotEmpty(results);
-        var rockIndex = results.FindIndex(n => n.RelativePath == "root/rock");
-        var jazzIndex = results.FindIndex(n => n.RelativePath == "root/jazz");
-        var deepChildIndex = results.FindIndex(n => n.RelativePath == "root/rock/beatles/song.mp3");
+        var rockIndex = results.FindIndex(n => n.CanonicalRelativePath == "root/rock");
+        var jazzIndex = results.FindIndex(n => n.CanonicalRelativePath == "root/jazz");
+        var deepChildIndex = results.FindIndex(n => n.CanonicalRelativePath == "root/rock/beatles/song.mp3");
 
         Assert.True(rockIndex >= 0, "Expected top-level 'rock' folder to be returned.");
         Assert.True(jazzIndex >= 0, "Expected top-level 'jazz' folder to be returned.");

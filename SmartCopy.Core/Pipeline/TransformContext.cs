@@ -10,7 +10,6 @@ public sealed class TransformContext
 
     /// <summary>
     /// The path being built through the pipeline, expressed as separator-free segments.
-    /// Initialised from the source node's RelativePath via <see cref="IFileSystemProvider.SplitPath"/>.
     /// </summary>
     public required string[] PathSegments { get; set; }
 

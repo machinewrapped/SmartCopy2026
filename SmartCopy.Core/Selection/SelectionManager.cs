@@ -10,7 +10,7 @@ public sealed class SelectionManager
         foreach (var node in Traverse(roots))
         {
             if (node.IsSelected)
-                selected.Add(useAbsolutePaths ? node.FullPath : node.RelativePath);
+                selected.Add(useAbsolutePaths ? node.FullPath : node.CanonicalRelativePath);
         }
 
         return new SelectionSnapshot(selected);
@@ -24,10 +24,10 @@ public sealed class SelectionManager
             // Accept snapshots saved with either relative or absolute paths.
             // Track matched keys using whichever form the snapshot contains so that
             // the unmatched calculation below works correctly for both cases.
-            if (snapshot.Contains(node.RelativePath))
+            if (snapshot.Contains(node.CanonicalRelativePath))
             {
                 node.CheckState = CheckState.Checked;
-                matchedKeys.Add(node.RelativePath);
+                matchedKeys.Add(node.CanonicalRelativePath);
             }
             else if (snapshot.Contains(node.FullPath))
             {

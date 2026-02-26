@@ -21,7 +21,7 @@ public class FileSystemNode : INotifyPropertyChanged
     /// <summary>
     /// The relative path as a canonical forward-slash string, derived from <see cref="RelativePathSegments"/>.
     /// </summary>
-    public string RelativePath => string.Join("/", RelativePathSegments);
+    public string CanonicalRelativePath => string.Join("/", RelativePathSegments);
 
     public bool IsDirectory { get; init; }
     public long Size { get; init; }

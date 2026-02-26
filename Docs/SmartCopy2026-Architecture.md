@@ -991,7 +991,7 @@ public class FileSystemNode : INotifyPropertyChanged
 
     // Canonical forward-slash relative path, derived from RelativePathSegments.
     // Read-only computed property — always "/"-joined regardless of OS or provider.
-    public string RelativePath => string.Join("/", RelativePathSegments);
+    public string CanonicalRelativePath => string.Join("/", RelativePathSegments);
 
     public bool IsDirectory { get; init; }
     public long Size { get; init; }             // 0 for directories

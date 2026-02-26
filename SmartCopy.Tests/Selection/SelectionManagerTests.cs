@@ -52,7 +52,7 @@ public sealed class SelectionManagerTests
     public void Restore_ReturnsMatchedCount()
     {
         var (root, fileA, _) = BuildTree();
-        var snapshot = new SelectionSnapshot([fileA.RelativePath]);
+        var snapshot = new SelectionSnapshot([fileA.CanonicalRelativePath]);
 
         var result = new SelectionManager().Restore([root], snapshot);
 
@@ -82,7 +82,7 @@ public sealed class SelectionManagerTests
         var snapshot = new SelectionManager().Capture([root], useAbsolutePaths: true);
 
         Assert.True(snapshot.Contains(fileA.FullPath));
-        Assert.False(snapshot.Contains(fileA.RelativePath));
+        Assert.False(snapshot.Contains(fileA.CanonicalRelativePath));
     }
 
     [Fact]
