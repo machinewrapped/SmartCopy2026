@@ -224,6 +224,7 @@ public sealed class MirrorFilterTests
             Name = name,
             FullPath = "/source/" + relativePath,
             RelativePath = relativePath,
+            RelativePathSegments = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries),
             IsDirectory = false,
             Size = size,
         };
@@ -234,6 +235,7 @@ public sealed class MirrorFilterTests
             Name = name,
             FullPath = "/source/" + relativePath,
             RelativePath = relativePath,
+            RelativePathSegments = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries),
             IsDirectory = true,
         };
 }

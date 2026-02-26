@@ -230,7 +230,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         return Task.FromResult(_entries.ContainsKey(normalizedPath));
     }
 
-    public string CombinePath(string basePath, string relativePath)
+    private string CombinePath(string basePath, string relativePath)
     {
         if (string.IsNullOrEmpty(relativePath))
             return Normalize(basePath);
@@ -396,11 +396,13 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
             ? Root
             : path[(path.LastIndexOf('/') + 1)..];
 
+        var relativePath = GetRelativeToRoot(path);
         return new FileSystemNode
         {
             Name = name,
             FullPath = path,
-            RelativePath = GetRelativeToRoot(path),
+            RelativePath = relativePath,
+            RelativePathSegments = SplitPath(relativePath),
             IsDirectory = entry.IsDirectory,
             Size = entry.IsDirectory ? 0 : entry.Size,
             CreatedAt = entry.CreatedAt,

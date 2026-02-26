@@ -143,13 +143,15 @@ public sealed class PipelineRunner
         DeleteMode deleteMode)
     {
         var extension = Path.GetExtension(node.Name).TrimStart('.');
-        var rawPath = string.IsNullOrWhiteSpace(node.RelativePath) ? node.Name : node.RelativePath;
+        var segments = node.RelativePathSegments.Length > 0
+            ? node.RelativePathSegments
+            : [node.Name];
         return new TransformContext
         {
             SourceNode = node,
             SourceProvider = sourceProvider,
             TargetProvider = targetProvider,
-            PathSegments = sourceProvider.SplitPath(rawPath),
+            PathSegments = segments,
             CurrentExtension = extension,
             OverwriteMode = overwriteMode,
             DeleteMode = deleteMode,

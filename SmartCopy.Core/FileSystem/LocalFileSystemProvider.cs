@@ -197,7 +197,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         }, ct);
     }
 
-    public string CombinePath(string basePath, string relativePath)
+    private string CombinePath(string basePath, string relativePath)
     {
         if (Path.IsPathFullyQualified(relativePath))
         {
@@ -266,11 +266,13 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     private FileSystemNode CreateDirectoryNode(string directoryPath, FileSystemNode? parent)
     {
         var info = new DirectoryInfo(directoryPath);
+        var relativePath = GetRelativePath(RootPath, info.FullName);
         return new FileSystemNode
         {
             Name = info.Name,
             FullPath = info.FullName,
-            RelativePath = GetRelativePath(RootPath, info.FullName),
+            RelativePath = relativePath,
+            RelativePathSegments = SplitPath(relativePath),
             IsDirectory = true,
             Size = 0,
             CreatedAt = info.CreationTimeUtc,
@@ -283,11 +285,13 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     private FileSystemNode CreateFileNode(string filePath, FileSystemNode? parent)
     {
         var info = new FileInfo(filePath);
+        var relativePath = GetRelativePath(RootPath, info.FullName);
         return new FileSystemNode
         {
             Name = info.Name,
             FullPath = info.FullName,
-            RelativePath = GetRelativePath(RootPath, info.FullName),
+            RelativePath = relativePath,
+            RelativePathSegments = SplitPath(relativePath),
             IsDirectory = false,
             Size = info.Length,
             CreatedAt = info.CreationTimeUtc,

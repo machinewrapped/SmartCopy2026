@@ -21,11 +21,6 @@ public interface IFileSystemProvider
     Task<bool> ExistsAsync(string path, CancellationToken ct);
 
     /// <summary>
-    /// Combines a base path with a relative path fragment using this provider's path conventions.
-    /// </summary>
-    string CombinePath(string basePath, string relativePath);
-
-    /// <summary>
     /// Returns the portion of <paramref name="fullPath"/> that is relative to <paramref name="basePath"/>,
     /// using this provider's path conventions. Returns an empty string when the paths are equal.
     /// </summary>

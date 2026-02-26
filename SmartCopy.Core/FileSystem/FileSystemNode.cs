@@ -13,6 +13,13 @@ public class FileSystemNode : INotifyPropertyChanged
     public string Name { get; init; } = string.Empty;
     public string FullPath { get; init; } = string.Empty;
     public string RelativePath { get; init; } = string.Empty;
+
+    /// <summary>
+    /// The relative path expressed as separator-free segments, set by the source provider at scan time.
+    /// Use this instead of parsing <see cref="RelativePath"/> when crossing provider boundaries.
+    /// </summary>
+    public string[] RelativePathSegments { get; init; } = [];
+
     public bool IsDirectory { get; init; }
     public long Size { get; init; }
     public DateTime CreatedAt { get; init; }
