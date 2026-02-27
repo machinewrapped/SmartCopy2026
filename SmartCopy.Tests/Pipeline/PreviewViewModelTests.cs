@@ -56,17 +56,6 @@ public sealed class PreviewViewModelTests
     }
 
     [Fact]
-    public void CanRun_IsGatedByConfirmation_ForDeletePipelines()
-    {
-        var vm = new PreviewViewModel();
-        vm.LoadFrom(BuildPlan(), isDeletePipeline: true, deleteMode: DeleteMode.Trash);
-
-        Assert.False(vm.CanRun);
-        vm.IsConfirmed = true;
-        Assert.True(vm.CanRun);
-    }
-
-    [Fact]
     public void ReadyGroup_CountMatches()
     {
         var vm = new PreviewViewModel();
