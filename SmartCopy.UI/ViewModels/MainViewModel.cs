@@ -951,7 +951,9 @@ public partial class MainViewModel : ViewModelBase
     {
         var all = new List<FileSystemNode>();
         foreach (var root in DirectoryTree.RootNodes)
+        {
             CollectAllIncludedFilesRecursive(root, all);
+        }
         return all;
     }
 
@@ -960,11 +962,15 @@ public partial class MainViewModel : ViewModelBase
         foreach (var file in node.Files)
         {
             if (file.FilterResult == FilterResult.Included)
+            {
                 output.Add(file);
+            }
         }
 
         foreach (var child in node.Children)
+        {
             CollectAllIncludedFilesRecursive(child, output);
+        }
     }
 
     private static OverwriteMode ParseOverwriteMode(string raw)
