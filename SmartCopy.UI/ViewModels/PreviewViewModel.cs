@@ -41,10 +41,6 @@ public partial class PreviewViewModel : ViewModelBase
     private bool _isDeletePipeline;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanRun))]
-    private bool _isConfirmed;
-
-    [ObservableProperty]
     private long _totalEstimatedOutputBytes;
 
     [ObservableProperty]
@@ -52,7 +48,7 @@ public partial class PreviewViewModel : ViewModelBase
 
     public ObservableCollection<PreviewGroupViewModel> Groups { get; } = [];
 
-    public bool CanRun => !IsDeletePipeline || IsConfirmed;
+    public bool CanRun => true;
 
     public string ConfirmButtonText
     {
@@ -80,7 +76,6 @@ public partial class PreviewViewModel : ViewModelBase
         _currentPlan = plan;
         _deleteMode = deleteMode;
         IsDeletePipeline = isDeletePipeline;
-        IsConfirmed = false;
         TotalActionCount = plan.Actions.Count;
         TotalEstimatedOutputBytes = plan.TotalEstimatedOutputBytes;
 
@@ -119,21 +114,6 @@ public partial class PreviewViewModel : ViewModelBase
             Groups.Add(vm);
         }
 
-        RunCommand.NotifyCanExecuteChanged();
-        OnPropertyChanged(nameof(ConfirmButtonText));
-    }
-
-    partial void OnIsConfirmedChanged(bool value)
-    {
-        _ = value;
-        OnPropertyChanged(nameof(CanRun));
-        RunCommand.NotifyCanExecuteChanged();
-    }
-
-    partial void OnIsDeletePipelineChanged(bool value)
-    {
-        _ = value;
-        OnPropertyChanged(nameof(CanRun));
         RunCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(ConfirmButtonText));
     }
