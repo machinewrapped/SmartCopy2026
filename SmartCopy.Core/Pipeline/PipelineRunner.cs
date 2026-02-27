@@ -57,10 +57,13 @@ public sealed class PipelineRunner
             {
                 foreach (var node in workingSet)
                 {
-                    if (failedNodes.Contains(node)) continue;
+                    if (failedNodes.Contains(node))
+                        continue;
+
                     ct.ThrowIfCancellationRequested();
 
-                    var preview = step.Preview(GetOrCreate(node));
+                    TransformContext context = GetOrCreate(node);
+                    var preview = step.Preview(context);
 
                     if (!string.IsNullOrWhiteSpace(preview.DestinationPath))
                     {
