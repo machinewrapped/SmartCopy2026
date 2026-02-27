@@ -95,7 +95,7 @@ public partial class MainViewModel : ViewModelBase
     {
         var presetStore = new FilterPresetStore();
 
-        _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded();
+        _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: true);
         _memoryProvider.SeedDirectory(MockMemoryFileSystemFactory.TargetPath);
         SourcePath = MockMemoryFileSystemFactory.SourcePath;
 
