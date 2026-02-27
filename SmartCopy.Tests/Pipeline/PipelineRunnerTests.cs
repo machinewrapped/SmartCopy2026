@@ -39,7 +39,7 @@ public sealed class PipelineRunnerTests
         Assert.Single(plan.Actions);
         Assert.Contains("/Mirror", plan.Actions[0].DestinationPath);
 
-        var results = await runner.ExecuteAsync(job, progress: null, CancellationToken.None);
+        var results = await runner.ExecuteAsync(job, progress: null, ct: CancellationToken.None);
 
         Assert.Contains(results, r => r.StepType == StepKind.Copy && r.Success);
         Assert.True(await targetProvider.ExistsAsync("/Mirror/source/song.flac", CancellationToken.None));

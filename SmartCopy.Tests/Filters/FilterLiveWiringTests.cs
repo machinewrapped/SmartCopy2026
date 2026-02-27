@@ -171,4 +171,32 @@ public sealed class FilterLiveWiringTests
         var mp3 = vm.VisibleFiles.First(f => f.Name == "track.mp3");
         Assert.Equal(FilterResult.Included, mp3.FilterResult);
     }
+
+    [Fact]
+    public async Task RemoveNode_RecalculatesParentExclusion()
+    {
+        var fs = new MemoryFileSystemProvider();
+        fs.SeedDirectory("/root");
+        fs.SeedDirectory("/root/child1");
+        fs.SeedSimulatedFile("/root/child1/file1.txt", 100);
+        fs.SeedDirectory("/root/child2");
+        fs.SeedSimulatedFile("/root/child2/track.mp3", 100);
+
+        var vm = new DirectoryTreeViewModel(fs, "/root");
+        await vm.InitializeAsync();
+
+        var chain = new FilterChain([new ExtensionFilter(["mp3"], FilterMode.Only)]);
+        await vm.ApplyFiltersAsync(chain, null);
+
+        var rootNode = vm.RootNodes.First(n => n.Name == "root");
+        
+        // At this point, child2 has the included mp3, so root should be Mixed (or Included if it has no files itself and all children match, but child1 is excluded)
+        Assert.Equal(FilterResult.Mixed, rootNode.FilterResult);
+
+        // Removing the only branch that contains included files should cause the root to become Excluded
+        var removed = vm.RemoveNode("/root/child2");
+        Assert.True(removed);
+        
+        Assert.Equal(FilterResult.Excluded, rootNode.FilterResult);
+    }
 }

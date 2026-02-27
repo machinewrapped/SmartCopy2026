@@ -379,7 +379,7 @@ public partial class MainViewModel : ViewModelBase
                 + $"{result.UnmatchedPaths.Count} unmatched: {string.Join(", ", result.UnmatchedPaths)}");
     }
 
-    private Window? GetMainWindow()
+    private static Window? GetMainWindow()
         => Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime d
             ? d.MainWindow : null;
 
@@ -432,7 +432,7 @@ public partial class MainViewModel : ViewModelBase
     {
         if (item is null) return;
 
-        bool removed = false;
+        bool removed;
         if (item.IsBookmark)
         {
             removed = _settings.FavouritePaths.Remove(item.Path);

@@ -107,7 +107,7 @@ public sealed class PipelineDirectoryTests
                 DeleteMode          = DeleteMode.Trash,
             },
             progress: null,
-            ct);
+            ct: ct);
 
         Assert.Single(results);
         Assert.True(results[0].Success);
@@ -145,7 +145,7 @@ public sealed class PipelineDirectoryTests
         };
 
         await runner.PreviewAsync(job, ct);
-        var results = await runner.ExecuteAsync(job, progress: null, ct);
+        var results = await runner.ExecuteAsync(job, progress: null, ct: ct);
 
         Assert.Single(results);
         Assert.True(results[0].Success);
@@ -181,7 +181,7 @@ public sealed class PipelineDirectoryTests
                 DeleteMode          = DeleteMode.Trash,
             },
             progress: null,
-            ct);
+            ct: ct);
 
         Assert.Single(results);
         Assert.True(results[0].Success);
@@ -220,7 +220,7 @@ public sealed class PipelineDirectoryTests
                 DeleteMode          = DeleteMode.Trash,
             },
             progress: null,
-            ct);
+            ct: ct);
 
         Assert.Single(results);
         Assert.False(results[0].Success);
@@ -259,7 +259,7 @@ public sealed class PipelineDirectoryTests
                 DeleteMode          = DeleteMode.Trash,
             },
             progress: null,
-            ct);
+            ct: ct);
 
         // FlattenStep + MoveStep each produce a result
         Assert.Equal(2, results.Count);
@@ -298,7 +298,7 @@ public sealed class PipelineDirectoryTests
                 DeleteMode          = DeleteMode.Trash,
             },
             progress: null,
-            ct);
+            ct: ct);
 
         // RebaseStep + MoveStep each produce a result
         Assert.Equal(2, results.Count);
@@ -339,7 +339,7 @@ public sealed class PipelineDirectoryTests
                 DeleteMode          = DeleteMode.Trash,
             },
             progress: null,
-            ct);
+            ct: ct);
 
         // One atomic result covering the entire subtree including nested dirs
         Assert.Single(results);
@@ -377,7 +377,7 @@ public sealed class PipelineDirectoryTests
             DeleteMode          = DeleteMode.Permanent,
         };
         await runner.PreviewAsync(job, ct);
-        var results = await runner.ExecuteAsync(job, progress: null, ct);
+        var results = await runner.ExecuteAsync(job, progress: null, ct: ct);
 
         Assert.Single(results);
         Assert.True(results[0].Success);
@@ -417,7 +417,7 @@ public sealed class PipelineDirectoryTests
                 DeleteMode          = DeleteMode.Trash,
             },
             progress: null,
-            ct);
+            ct: ct);
 
         Assert.Single(results);
         Assert.Equal("Directory moved atomically.", results[0].Message);
