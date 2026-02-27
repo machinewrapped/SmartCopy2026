@@ -15,15 +15,13 @@ public sealed class RenameStep : ITransformStep
     }
 
     public string Pattern { get; set; }
-
+    
     public StepKind StepType => StepKind.Rename;
     public bool IsExecutable => false;
 
     public void Validate(StepValidationContext context)
     {
-        if (!context.SourceExists)
-            context.AddBlockingIssue("Step.SourceMissing",
-                "Rename cannot run because the source no longer exists after earlier steps.");
+        context.ValidateSourceExists("Rename");
         if (string.IsNullOrWhiteSpace(Pattern))
             context.AddBlockingIssue("Step.RenamePatternRequired", "Rename requires a non-empty pattern.");
         // Post-condition: source is unchanged.

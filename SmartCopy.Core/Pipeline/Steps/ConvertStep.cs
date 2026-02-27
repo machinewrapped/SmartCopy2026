@@ -20,9 +20,7 @@ public sealed class ConvertStep : ITransformStep
 
     public void Validate(StepValidationContext context)
     {
-        if (!context.SourceExists)
-            context.AddBlockingIssue("Step.SourceMissing",
-                "Convert cannot run because the source no longer exists after earlier steps.");
+        context.ValidateSourceExists("Convert");
         // Post-condition: source is unchanged.
     }
 

@@ -50,6 +50,17 @@ public sealed class StepValidationContext
             Severity: PipelineValidationSeverity.Blocking));
 
     /// <summary>
+    /// Called by a step that requires the source to still exist.
+    /// Adds a <c>Step.SourceMissing</c> blocking issue scoped to the current step if it does not.
+    /// </summary>
+    public void ValidateSourceExists(string stepTypeName)
+    {
+        if (!SourceExists)
+            AddBlockingIssue("Step.SourceMissing",
+                $"{stepTypeName} cannot run because the source no longer exists after earlier steps.");
+    }
+
+    /// <summary>
     /// Called by a step that requires at least one selected/included input file.
     /// Adds a <c>Pipeline.NoSelectedInputs</c> blocking issue if none are available.
     /// </summary>

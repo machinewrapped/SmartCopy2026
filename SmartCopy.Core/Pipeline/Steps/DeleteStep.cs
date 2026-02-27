@@ -20,9 +20,7 @@ public sealed class DeleteStep : ITransformStep
     public void Validate(StepValidationContext context)
     {
         context.ValidateHasSelectedInputs();
-        if (!context.SourceExists)
-            context.AddBlockingIssue("Step.SourceMissing",
-                "Delete cannot run because the source no longer exists after earlier steps.");
+        context.ValidateSourceExists("Delete");
         // Post-condition: delete consumes the source.
         context.SourceExists = false;
     }

@@ -45,9 +45,7 @@ public sealed class RebaseStep : ITransformStep
 
     public void Validate(StepValidationContext context)
     {
-        if (!context.SourceExists)
-            context.AddBlockingIssue("Step.SourceMissing",
-                "Rebase cannot run because the source no longer exists after earlier steps.");
+        context.ValidateSourceExists("Rebase");
         if (string.IsNullOrWhiteSpace(StripPrefix) && string.IsNullOrWhiteSpace(AddPrefix))
             context.AddBlockingIssue("Step.RebaseConfigRequired",
                 "Rebase requires StripPrefix or AddPrefix.");

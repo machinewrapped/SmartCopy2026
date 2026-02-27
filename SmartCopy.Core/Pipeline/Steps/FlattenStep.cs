@@ -19,9 +19,7 @@ public sealed class FlattenStep : ITransformStep
 
     public void Validate(StepValidationContext context)
     {
-        if (!context.SourceExists)
-            context.AddBlockingIssue("Step.SourceMissing",
-                "Flatten cannot run because the source no longer exists after earlier steps.");
+        context.ValidateSourceExists("Flatten");
         // Post-condition: source is unchanged.
     }
 

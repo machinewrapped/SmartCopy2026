@@ -22,9 +22,7 @@ public sealed class CopyStep : ITransformStep
     public void Validate(StepValidationContext context)
     {
         context.ValidateHasSelectedInputs();
-        if (!context.SourceExists)
-            context.AddBlockingIssue("Step.SourceMissing",
-                "Copy cannot run because the source no longer exists after earlier steps.");
+        context.ValidateSourceExists("Copy");
         if (string.IsNullOrWhiteSpace(DestinationPath))
             context.AddBlockingIssue("Step.MissingDestination", "Copy requires a destination path.");
         // Post-condition: source is still present after a copy.

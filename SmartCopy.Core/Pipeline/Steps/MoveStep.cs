@@ -22,9 +22,7 @@ public sealed class MoveStep : ITransformStep
     public void Validate(StepValidationContext context)
     {
         context.ValidateHasSelectedInputs();
-        if (!context.SourceExists)
-            context.AddBlockingIssue("Step.SourceMissing",
-                "Move cannot run because the source no longer exists after earlier steps.");
+        context.ValidateSourceExists("Move");
         if (string.IsNullOrWhiteSpace(DestinationPath))
             context.AddBlockingIssue("Step.MissingDestination", "Move requires a destination path.");
         // Post-condition: move consumes the source.
