@@ -94,6 +94,7 @@
                                                            VerticalAlignment="Center" />
                                                 <Button Grid.Column="2"
                                                         Content="✎"
+                                                        IsVisible="{Binding IsConfigurable}"
                                                         Command="{Binding $parent[UserControl].((vm:PipelineViewModel)DataContext).RequestEditStepCommand}"
                                                         CommandParameter="{Binding}"
                                                         AutomationProperties.Name="Edit step"

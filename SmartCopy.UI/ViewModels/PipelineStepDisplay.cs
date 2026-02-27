@@ -17,6 +17,9 @@ internal static class PipelineStepDisplay
             StepKind.Rename => "Rename files",
             StepKind.Rebase => "Rebase paths",
             StepKind.Convert => "Convert files",
+            StepKind.SelectAll => "Select all",
+            StepKind.InvertSelection => "Invert selection",
+            StepKind.ClearSelection => "Clear selection",
             _ => "Step",
         };
     }
@@ -38,6 +41,9 @@ internal static class PipelineStepDisplay
             RenameStep => "Rename files",
             RebaseStep => "Rebase paths",
             ConvertStep => "Convert files",
+            SelectAllStep => "Select all",
+            InvertSelectionStep => "Invert selection",
+            ClearSelectionStep => "Clear selection",
             _ => step.StepType.ToString(),
         };
     }
@@ -61,6 +67,9 @@ internal static class PipelineStepDisplay
             ConvertStep convertStep => string.IsNullOrWhiteSpace(convertStep.OutputExtension)
                 ? "Output extension: required"
                 : $"Output extension: .{convertStep.OutputExtension}",
+            SelectAllStep => "Mark all files as selected",
+            InvertSelectionStep => "Toggle selection on each file",
+            ClearSelectionStep => "Unmark all files",
             _ => step.StepType.ToString(),
         };
     }

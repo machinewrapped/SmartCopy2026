@@ -8,6 +8,20 @@ public interface ITransformStep
 {
     StepKind StepType { get; }
     bool IsExecutable { get; }
+
+    /// <summary>
+    /// Whether the step has configurable parameters. Steps that return <see langword="false"/>
+    /// are added to the pipeline directly without opening the editor dialog.
+    /// </summary>
+    bool IsConfigurable => true;
+
+    /// <summary>
+    /// Whether this step needs all filter-included nodes as its input, not just the
+    /// currently-selected nodes. True for <c>SelectAll</c> and <c>InvertSelection</c>,
+    /// which must see every filter-included file to operate correctly.
+    /// </summary>
+    bool ProvidesInput => false;
+
     TransformStepConfig Config { get; }
 
     TransformResult Preview(TransformContext context);
