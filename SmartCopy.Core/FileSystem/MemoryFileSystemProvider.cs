@@ -107,7 +107,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
 
             if (AddArtificialDelay)
             {
-                Thread.Sleep(100); // Simulate delay for testing progress reporting
+                await Task.Delay(100, ct); // Simulate delay for testing progress reporting
             }
 
             progress?.Report(read);
@@ -142,7 +142,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
                 throw new FileNotFoundException($"Path does not exist: {normalizedPath}", normalizedPath);
             }
 
-            RemovePathInternal(normalizedPath);
+            await RemovePathInternal(normalizedPath, ct);
         }
         finally
         {
@@ -178,7 +178,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
 
             if (_entries.ContainsKey(normalizedDestinationPath))
             {
-                RemovePathInternal(normalizedDestinationPath);
+                await RemovePathInternal(normalizedDestinationPath, ct);
             }
 
             if (sourceEntry.IsDirectory)
@@ -328,7 +328,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         _entries[path] = MemoryEntry.CreateDirectory();
     }
 
-    private void RemovePathInternal(string normalizedPath)
+    private async Task RemovePathInternal(string normalizedPath, CancellationToken ct)
     {
         var toRemove = _entries.Keys
             .Where(currentPath => currentPath.Equals(normalizedPath, StringComparison.OrdinalIgnoreCase)
@@ -341,8 +341,8 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
 
             if (AddArtificialDelay)
             {
-                 // Simulate delay for testing progress reporting
-                Thread.Sleep(20);
+                // Simulate delay for testing progress reporting
+                await Task.Delay(100, ct); // Simulate delay for testing progress reporting
             }
         }
     }
