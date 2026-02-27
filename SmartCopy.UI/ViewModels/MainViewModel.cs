@@ -711,7 +711,7 @@ public partial class MainViewModel : ViewModelBase
         var selectedFiles = CollectSelectedFiles();
         Pipeline.SetSelectedIncludedFileCount(selectedFiles.Count);
 
-        if (!Pipeline.CanRun || (filterIncludedFiles.Count == 0 && selectedFiles.Count == 0))
+        if (!Pipeline.CanRun || filterIncludedFiles.Count == 0)
             return;
 
         var runner = new PipelineRunner(pipeline);
