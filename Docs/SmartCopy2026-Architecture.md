@@ -310,8 +310,6 @@ and `Copy` requires `SourceExists=true`.
 public interface ITransformStep
 {
     string StepType { get; }
-    bool IsPathStep { get; }
-    bool IsContentStep { get; }
     bool IsExecutable { get; }
     TransformStepConfig Config { get; }
 

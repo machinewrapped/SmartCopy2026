@@ -15,8 +15,6 @@ public sealed class ConvertStep : ITransformStep
     public string OutputExtension { get; set; }
 
     public StepKind StepType => StepKind.Convert;
-    public bool IsPathStep => false;
-    public bool IsContentStep => true;
     public bool IsExecutable => false;
 
     public TransformStepConfig Config => new(
