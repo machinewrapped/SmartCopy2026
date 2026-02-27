@@ -16,9 +16,5 @@
                    ToolTip.Tip="Browse (Phase 2)"
                    Width="36" />
        </Grid>
-
-       <TextBlock Text="Overwrite Mode" FontSize="12" Opacity="0.7" />
-       <ComboBox ItemsSource="{Binding OverwriteModes}"
-                 SelectedItem="{Binding OverwriteMode, Mode=TwoWay}" />
    </StackPanel>
 </UserControl>
