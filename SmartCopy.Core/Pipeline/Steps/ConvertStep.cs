@@ -1,7 +1,10 @@
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
+using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
@@ -16,6 +19,12 @@ public sealed class ConvertStep : ITransformStep
 
     public StepKind StepType => StepKind.Convert;
     public bool IsExecutable => false;
+    public bool RequiresSourceExists => true;
+    public bool RequiresSelectedIncludedInputs => false;
+    public bool? SetsSourceExists => null;
+
+    public IEnumerable<PipelineValidationIssue> Validate(int stepIndex) =>
+        Enumerable.Empty<PipelineValidationIssue>();
 
     public TransformStepConfig Config => new(
         StepType,

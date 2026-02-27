@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
+using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
@@ -19,6 +21,19 @@ public sealed class MoveStep : ITransformStep
     public bool IsPathStep => false;
     public bool IsContentStep => false;
     public bool IsExecutable => true;
+    public bool RequiresSourceExists => true;
+    public bool RequiresSelectedIncludedInputs => true;
+    public bool? SetsSourceExists => false;
+
+    public IEnumerable<PipelineValidationIssue> Validate(int stepIndex)
+    {
+        if (string.IsNullOrWhiteSpace(DestinationPath))
+            yield return new PipelineValidationIssue(
+                StepIndex: stepIndex,
+                Code: "Step.MissingDestination",
+                Message: "Move requires a destination path.",
+                Severity: PipelineValidationSeverity.Blocking);
+    }
 
     public TransformStepConfig Config => new(
         StepType,

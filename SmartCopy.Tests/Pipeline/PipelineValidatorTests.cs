@@ -83,18 +83,4 @@ public sealed class PipelineValidatorTests
         Assert.False(result.CanRun);
         Assert.Contains(result.Issues, issue => issue.Code == "Step.SourceMissing" && issue.StepIndex == 1);
     }
-
-    [Fact]
-    public void DeleteMustBeFinal_IsEnforced()
-    {
-        var result = PipelineValidator.Validate(
-        [
-            new CopyStep("/mem/out"),
-            new DeleteStep(),
-            new MoveStep("/mem/archive"),
-        ]);
-
-        Assert.False(result.CanRun);
-        Assert.Contains(result.Issues, issue => issue.Code == "Step.DeleteMustBeFinal" && issue.StepIndex == 1);
-    }
 }

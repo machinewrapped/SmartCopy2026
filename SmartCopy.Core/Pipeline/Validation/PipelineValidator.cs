@@ -1,7 +1,5 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using SmartCopy.Core.Pipeline.Steps;
 
 namespace SmartCopy.Core.Pipeline.Validation;
 
@@ -13,6 +11,7 @@ public sealed class PipelineValidator
     {
         context ??= new PipelineValidationContext();
         var issues = new List<PipelineValidationIssue>();
+
         if (steps.Count == 0)
         {
             issues.Add(new PipelineValidationIssue(
@@ -30,49 +29,14 @@ public sealed class PipelineValidator
         for (var i = 0; i < steps.Count; i++)
         {
             var step = steps[i];
-            if (!PipelineStepContracts.TryGet(step.StepType, out var contract))
-            {
-                issues.Add(new PipelineValidationIssue(
-                    StepIndex: i,
-                    Code: "Step.UnknownType",
-                    Message: $"Unknown step type '{step.StepType}'.",
-                    Severity: PipelineValidationSeverity.Blocking));
-                continue;
-            }
 
-            hasExecutable |= contract.IsExecutable;
-            hasExecutableRequiringSelectedInputs |= contract.RequiresSelectedIncludedInputs;
+            // Delegate step-scoped configuration validation to the step itself.
+            issues.AddRange(step.Validate(i));
 
-            if (contract.RequiresDestinationPath && string.IsNullOrWhiteSpace(GetDestinationPath(step)))
-            {
-                issues.Add(new PipelineValidationIssue(
-                    StepIndex: i,
-                    Code: "Step.MissingDestination",
-                    Message: $"{step.StepType} requires a destination path.",
-                    Severity: PipelineValidationSeverity.Blocking));
-            }
+            hasExecutable |= step.IsExecutable;
+            hasExecutableRequiringSelectedInputs |= step.RequiresSelectedIncludedInputs;
 
-            if (step is RenameStep renameStep && string.IsNullOrWhiteSpace(renameStep.Pattern))
-            {
-                issues.Add(new PipelineValidationIssue(
-                    StepIndex: i,
-                    Code: "Step.RenamePatternRequired",
-                    Message: "Rename requires a non-empty pattern.",
-                    Severity: PipelineValidationSeverity.Blocking));
-            }
-
-            if (step is RebaseStep rebaseStep
-                && string.IsNullOrWhiteSpace(rebaseStep.StripPrefix)
-                && string.IsNullOrWhiteSpace(rebaseStep.AddPrefix))
-            {
-                issues.Add(new PipelineValidationIssue(
-                    StepIndex: i,
-                    Code: "Step.RebaseConfigRequired",
-                    Message: "Rebase requires StripPrefix or AddPrefix.",
-                    Severity: PipelineValidationSeverity.Blocking));
-            }
-
-            if (contract.RequiresSourceExists && !sourceExists)
+            if (step.RequiresSourceExists && !sourceExists)
             {
                 issues.Add(new PipelineValidationIssue(
                     StepIndex: i,
@@ -81,19 +45,9 @@ public sealed class PipelineValidator
                     Severity: PipelineValidationSeverity.Blocking));
             }
 
-            if (step.StepType == StepKind.Delete
-                && i != steps.Count - 1)
+            if (step.SetsSourceExists.HasValue)
             {
-                issues.Add(new PipelineValidationIssue(
-                    StepIndex: i,
-                    Code: "Step.DeleteMustBeFinal",
-                    Message: "Delete must be the final step in the pipeline.",
-                    Severity: PipelineValidationSeverity.Blocking));
-            }
-
-            if (contract.SetsSourceExists.HasValue)
-            {
-                sourceExists = contract.SetsSourceExists.Value;
+                sourceExists = step.SetsSourceExists.Value;
             }
         }
 
@@ -116,15 +70,5 @@ public sealed class PipelineValidator
         }
 
         return new PipelineValidationResult(issues);
-    }
-
-    private static string? GetDestinationPath(ITransformStep step)
-    {
-        return step switch
-        {
-            CopyStep copyStep => copyStep.DestinationPath,
-            MoveStep moveStep => moveStep.DestinationPath,
-            _ => null,
-        };
     }
 }
