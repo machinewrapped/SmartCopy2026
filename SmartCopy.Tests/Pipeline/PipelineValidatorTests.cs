@@ -83,4 +83,19 @@ public sealed class PipelineValidatorTests
         Assert.False(result.CanRun);
         Assert.Contains(result.Issues, issue => issue.Code == "Step.SourceMissing" && issue.StepIndex == 1);
     }
+
+    [Fact]
+    public void InvertSelection_AfterDelete_ResetsSourceExists()
+    {
+        // InvertSelection re-sets SourceExists=true, so Copy after it should be valid.
+        var result = PipelineValidator.Validate(
+        [
+            new DeleteStep(),
+            new InvertSelectionStep(),
+            new CopyStep("/mem/out"),
+        ]);
+
+        Assert.True(result.CanRun);
+        Assert.Empty(result.Issues);
+    }
 }

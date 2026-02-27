@@ -18,6 +18,9 @@ public static class PipelineStepFactory
                 GetOptionalString(config, "stripPrefix"),
                 GetOptionalString(config, "addPrefix")),
             StepKind.Convert => new ConvertStep(GetOptionalString(config, "outputExtension")),
+            StepKind.SelectAll => new SelectAllStep(),
+            StepKind.InvertSelection => new InvertSelectionStep(),
+            StepKind.ClearSelection => new ClearSelectionStep(),
             _ => throw new UnknownStepTypeException(config.StepType),
         };
     }

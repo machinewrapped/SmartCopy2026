@@ -13,4 +13,7 @@ public enum StepKind
     Move,
     Delete,
     Custom,
+    SelectAll,
+    InvertSelection,
+    ClearSelection,
 }

@@ -66,6 +66,8 @@ public partial class PipelineStepViewModel : ViewModelBase
     // Keep old names for compatibility with tests and any remaining bindings.
     public string Details => Description;
 
+    public bool IsConfigurable => _step.IsConfigurable;
+
     public bool HasDescription => !string.IsNullOrWhiteSpace(Description);
 
     public bool HasDestination => _step is CopyStep or MoveStep;

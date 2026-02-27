@@ -25,7 +25,7 @@ public sealed class StepValidationContext
     public bool SourceExists { get; set; }
 
     /// <summary>Whether at least one selected/included file is present (supplied externally).</summary>
-    public bool HasSelectedIncludedInputs { get; }
+    public bool HasSelectedIncludedInputs { get; set; }
 
     /// <summary>True if any blocking issue has been recorded — subsequent steps should not validate.</summary>
     public bool HasBlockingIssue { get; private set; }

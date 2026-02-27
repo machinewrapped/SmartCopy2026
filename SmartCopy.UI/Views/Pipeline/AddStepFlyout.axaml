@@ -59,6 +59,15 @@
                         Command="{Binding NavigateToCategoryCommand}"
                         CommandParameter="{x:Static vm:StepCategory.Path}" />
 
+                <Button Content="Selection steps"
+                        Background="Transparent"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Left"
+                        Padding="8,6"
+                        CornerRadius="4"
+                        Command="{Binding NavigateToCategoryCommand}"
+                        CommandParameter="{x:Static vm:StepCategory.Selection}" />
+
                 <Separator Height="1" Background="#3e3e42" Margin="4,4" />
 
                 <Button Background="Transparent"

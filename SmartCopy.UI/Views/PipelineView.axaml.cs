@@ -56,12 +56,20 @@ public partial class PipelineView : UserControl
 
     private async void OnAddStepTypeSelected(StepKind kind)
     {
-        if (_currentViewModel is null || this.VisualRoot is not Window parentWindow)
+        if (_currentViewModel is null)
+            return;
+
+        Dispatcher.UIThread.Post(() => AddStepPopup.IsOpen = false);
+
+        var step = StepEditorViewModelFactory.Create(kind).BuildStep();
+        if (!step.IsConfigurable)
         {
+            _currentViewModel.AddStepFromResult(kind, step);
             return;
         }
 
-        Dispatcher.UIThread.Post(() => AddStepPopup.IsOpen = false);
+        if (this.VisualRoot is not Window parentWindow)
+            return;
 
         var vm = EditStepDialogViewModel.ForNew(kind, _currentViewModel.AppSettings);
         var dialog = new EditStepDialog { DataContext = vm };
@@ -85,9 +93,10 @@ public partial class PipelineView : UserControl
     private async void OnEditStepRequested(object? sender, PipelineStepViewModel step)
     {
         if (_currentViewModel is null || this.VisualRoot is not Window parentWindow)
-        {
             return;
-        }
+
+        if (!step.Step.IsConfigurable)
+            return;
 
         var vm = EditStepDialogViewModel.ForEdit(step, _currentViewModel.AppSettings);
         var dialog = new EditStepDialog { DataContext = vm };

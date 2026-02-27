@@ -661,26 +661,19 @@ public partial class MainViewModel : ViewModelBase
 
     private async Task PreviewPipelineAsync()
     {
-        var selectedFiles = CollectSelectedFiles();
-        Pipeline.SetSelectedIncludedFileCount(selectedFiles.Count);
-
-        if (!Pipeline.CanRun)
-        {
-            return;
-        }
-
-        if (selectedFiles.Count == 0)
-        {
-            return;
-        }
-
         var pipeline = Pipeline.BuildLivePipeline();
+        var inputFiles = ResolveInputFiles(pipeline);
+        Pipeline.SetSelectedIncludedFileCount(inputFiles.Count);
+
+        if (!Pipeline.CanRun || inputFiles.Count == 0)
+            return;
+
         var runner = new PipelineRunner(pipeline);
         var overwriteMode = ParseOverwriteMode(_settings.DefaultOverwriteMode);
         var deleteMode = ParseDeleteMode(_settings.DefaultDeleteMode);
 
         var plan = await runner.PreviewAsync(
-            selectedFiles,
+            inputFiles,
             _memoryProvider,
             _memoryProvider,
             overwriteMode,
@@ -696,21 +689,13 @@ public partial class MainViewModel : ViewModelBase
             var confirmRun = await dialog.ShowDialog<bool?>(mainWindow);
             if (confirmRun == true)
             {
-                await ExecutePipelineAsync(runner, selectedFiles, overwriteMode, deleteMode);
+                await ExecutePipelineAsync(runner, inputFiles, overwriteMode, deleteMode);
             }
         }
     }
 
     private async Task RunPipelineAsync()
     {
-        var selectedFiles = CollectSelectedFiles();
-        Pipeline.SetSelectedIncludedFileCount(selectedFiles.Count);
-
-        if (!Pipeline.CanRun)
-        {
-            return;
-        }
-
         var pipeline = Pipeline.BuildLivePipeline();
 
         // Mandatory preview for destructive pipelines, unless the user has opted out.
@@ -720,15 +705,28 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
-        if (selectedFiles.Count == 0)
-        {
+        var inputFiles = ResolveInputFiles(pipeline);
+        Pipeline.SetSelectedIncludedFileCount(inputFiles.Count);
+
+        if (!Pipeline.CanRun || inputFiles.Count == 0)
             return;
-        }
 
         var overwriteMode = ParseOverwriteMode(_settings.DefaultOverwriteMode);
         var deleteMode = ParseDeleteMode(_settings.DefaultDeleteMode);
         var runner = new PipelineRunner(pipeline);
-        await ExecutePipelineAsync(runner, selectedFiles, overwriteMode, deleteMode);
+        await ExecutePipelineAsync(runner, inputFiles, overwriteMode, deleteMode);
+    }
+
+    /// <summary>
+    /// Returns all filter-included nodes if the pipeline contains a step that needs
+    /// to see every file (e.g. SelectAll, InvertSelection); otherwise returns only
+    /// the currently checked+included nodes.
+    /// </summary>
+    private List<FileSystemNode> ResolveInputFiles(TransformPipeline pipeline)
+    {
+        return pipeline.Steps.Any(s => s.ProvidesInput)
+            ? CollectAllIncludedFiles()
+            : CollectSelectedFiles();
     }
 
     private async Task ExecutePipelineAsync(
@@ -932,12 +930,8 @@ public partial class MainViewModel : ViewModelBase
     private List<FileSystemNode> CollectSelectedFiles()
     {
         var selected = new List<FileSystemNode>();
-
         foreach (var root in DirectoryTree.RootNodes)
-        {
             CollectSelectedFilesRecursive(root, selected);
-        }
-
         return selected;
     }
 
@@ -946,15 +940,31 @@ public partial class MainViewModel : ViewModelBase
         foreach (var file in node.Files)
         {
             if (file.IsSelected)
-            {
                 output.Add(file);
-            }
         }
 
         foreach (var child in node.Children)
-        {
             CollectSelectedFilesRecursive(child, output);
+    }
+
+    private List<FileSystemNode> CollectAllIncludedFiles()
+    {
+        var all = new List<FileSystemNode>();
+        foreach (var root in DirectoryTree.RootNodes)
+            CollectAllIncludedFilesRecursive(root, all);
+        return all;
+    }
+
+    private static void CollectAllIncludedFilesRecursive(FileSystemNode node, List<FileSystemNode> output)
+    {
+        foreach (var file in node.Files)
+        {
+            if (file.FilterResult == FilterResult.Included)
+                output.Add(file);
         }
+
+        foreach (var child in node.Children)
+            CollectAllIncludedFilesRecursive(child, output);
     }
 
     private static OverwriteMode ParseOverwriteMode(string raw)

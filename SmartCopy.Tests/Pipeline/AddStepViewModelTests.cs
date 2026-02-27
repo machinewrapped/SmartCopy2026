@@ -69,6 +69,11 @@ public sealed class AddStepViewModelTests
         Assert.Contains(vm.StepTypeItems, item => item.Kind == StepKind.Copy);
         Assert.Contains(vm.StepTypeItems, item => item.Kind == StepKind.Move);
         Assert.Contains(vm.StepTypeItems, item => item.Kind == StepKind.Delete);
+
+        vm.NavigateToCategoryCommand.Execute(StepCategory.Selection);
+        Assert.Contains(vm.StepTypeItems, item => item.Kind == StepKind.SelectAll);
+        Assert.Contains(vm.StepTypeItems, item => item.Kind == StepKind.InvertSelection);
+        Assert.Contains(vm.StepTypeItems, item => item.Kind == StepKind.ClearSelection);
     }
 
     // -------------------------------------------------------------------------
