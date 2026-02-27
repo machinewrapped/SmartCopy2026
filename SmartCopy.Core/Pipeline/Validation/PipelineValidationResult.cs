@@ -12,7 +12,7 @@ public sealed class PipelineValidationResult
 
     public IReadOnlyList<PipelineValidationIssue> Issues { get; }
 
-    public bool CanRun => Issues.All(issue => issue.Severity != PipelineValidationSeverity.Blocking);
+    public bool CanRun => !Issues.Any(issue => issue.Severity == PipelineValidationSeverity.Blocking);
 
     public PipelineValidationIssue? FirstBlockingIssue =>
         Issues.FirstOrDefault(issue => issue.Severity == PipelineValidationSeverity.Blocking);

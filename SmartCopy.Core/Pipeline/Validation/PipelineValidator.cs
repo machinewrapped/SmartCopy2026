@@ -13,22 +13,26 @@ public sealed class PipelineValidator
 
         if (steps.Count == 0)
         {
-            ctx.AddPipelineIssue("Pipeline.Empty", "Pipeline must contain at least one step.");
+            ctx.AddPipelineIssue("Pipeline.Empty", "Pipeline is empty.", PipelineValidationSeverity.Blocking);
             return new PipelineValidationResult(ctx.Issues);
         }
 
-        var hasExecutable = false;
+        if (steps.Any(step => step.IsExecutable) == false)
+        {
+            ctx.AddPipelineIssue("Pipeline.NoExecutableStep", "Pipeline has no executable steps.", PipelineValidationSeverity.Blocking);
+            return new PipelineValidationResult(ctx.Issues);
+        }
 
         for (var i = 0; i < steps.Count; i++)
         {
             ctx.StepIndex = i;
             steps[i].Validate(ctx);
-            hasExecutable |= steps[i].IsExecutable;
-            if (ctx.HasBlockingIssue) break;
-        }
 
-        if (!ctx.HasBlockingIssue && !hasExecutable)
-            ctx.AddPipelineIssue("Pipeline.NoExecutableStep", "Pipeline must contain at least one executable step.");
+            if (ctx.HasBlockingIssue)
+            {
+                break;
+            }
+        }
 
         return new PipelineValidationResult(ctx.Issues);
     }

@@ -28,26 +28,33 @@ public sealed class StepValidationContext
     public bool HasSelectedIncludedInputs { get; }
 
     /// <summary>True if any blocking issue has been recorded — subsequent steps should not validate.</summary>
-    public bool HasBlockingIssue => _issues.Any(i => i.Severity == PipelineValidationSeverity.Blocking);
+    public bool HasBlockingIssue { get; private set; }
 
     /// <summary>Accumulated validation issues across all steps.</summary>
     public IReadOnlyList<PipelineValidationIssue> Issues => _issues;
 
     /// <summary>Adds a blocking issue scoped to the current step.</summary>
-    public void AddBlockingIssue(string code, string message) =>
+    public void AddBlockingIssue(string code, string message)
+    {
+        HasBlockingIssue = true;
         _issues.Add(new PipelineValidationIssue(
             StepIndex: StepIndex,
             Code: code,
             Message: message,
             Severity: PipelineValidationSeverity.Blocking));
+    }
 
-    /// <summary>Adds a blocking issue that is pipeline-scoped (not attributed to a specific step).</summary>
-    public void AddPipelineIssue(string code, string message) =>
+    /// <summary>Adds an issue that is pipeline-scoped (not attributed to a specific step).</summary>
+    public void AddPipelineIssue(string code, string message, PipelineValidationSeverity severity)
+    {
+        HasBlockingIssue = true;
+
         _issues.Add(new PipelineValidationIssue(
             StepIndex: null,
             Code: code,
             Message: message,
-            Severity: PipelineValidationSeverity.Blocking));
+            Severity: severity));
+    }
 
     /// <summary>
     /// Called by a step that requires the source to still exist.
@@ -56,8 +63,9 @@ public sealed class StepValidationContext
     public void ValidateSourceExists(string stepTypeName)
     {
         if (!SourceExists)
-            AddBlockingIssue("Step.SourceMissing",
-                $"{stepTypeName} cannot run because the source no longer exists after earlier steps.");
+        {
+            AddBlockingIssue("Step.SourceMissing", $"{stepTypeName} cannot run because the source no longer exists.");
+        }
     }
 
     /// <summary>
@@ -67,6 +75,8 @@ public sealed class StepValidationContext
     public void ValidateHasSelectedInputs()
     {
         if (!HasSelectedIncludedInputs)
-            AddPipelineIssue("Pipeline.NoSelectedInputs", "At least one file must be selected.");
+        {
+            AddPipelineIssue("Pipeline.NoSelectedInputs", "At least one file must be selected.", PipelineValidationSeverity.Blocking);
+        }
     }
 }
