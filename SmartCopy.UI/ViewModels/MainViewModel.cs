@@ -662,25 +662,27 @@ public partial class MainViewModel : ViewModelBase
     private async Task PreviewPipelineAsync()
     {
         var pipeline = Pipeline.BuildLivePipeline();
-        var inputFiles = ResolveInputFiles(pipeline);
-        Pipeline.SetSelectedIncludedFileCount(inputFiles.Count);
+        var filterIncludedFiles = CollectAllIncludedFiles();
+        var selectedFiles = CollectSelectedFiles();
+        Pipeline.SetSelectedIncludedFileCount(selectedFiles.Count);
 
-        if (!Pipeline.CanRun || inputFiles.Count == 0)
+        if (!Pipeline.CanRun || (filterIncludedFiles.Count == 0 && selectedFiles.Count == 0))
             return;
 
         var runner = new PipelineRunner(pipeline);
-        var overwriteMode = ParseOverwriteMode(_settings.DefaultOverwriteMode);
-        var deleteMode = ParseDeleteMode(_settings.DefaultDeleteMode);
+        var job = new PipelineJob
+        {
+            FilterIncludedFiles = filterIncludedFiles,
+            SelectedFiles       = selectedFiles,
+            SourceProvider      = _memoryProvider,
+            TargetProvider      = _memoryProvider,
+            OverwriteMode       = ParseOverwriteMode(_settings.DefaultOverwriteMode),
+            DeleteMode          = ParseDeleteMode(_settings.DefaultDeleteMode),
+        };
 
-        var plan = await runner.PreviewAsync(
-            inputFiles,
-            _memoryProvider,
-            _memoryProvider,
-            overwriteMode,
-            deleteMode,
-            CancellationToken.None);
+        var plan = await runner.PreviewAsync(job, CancellationToken.None);
 
-        Preview.LoadFrom(plan, pipeline.HasDeleteStep, GetDeleteModeFromPipeline(pipeline, deleteMode));
+        Preview.LoadFrom(plan, pipeline.HasDeleteStep, GetDeleteModeFromPipeline(pipeline, job.DeleteMode));
 
         if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
             && desktop.MainWindow is { } mainWindow)
@@ -689,7 +691,7 @@ public partial class MainViewModel : ViewModelBase
             var confirmRun = await dialog.ShowDialog<bool?>(mainWindow);
             if (confirmRun == true)
             {
-                await ExecutePipelineAsync(runner, inputFiles, overwriteMode, deleteMode);
+                await ExecutePipelineAsync(runner, job);
             }
         }
     }
@@ -705,35 +707,27 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
-        var inputFiles = ResolveInputFiles(pipeline);
-        Pipeline.SetSelectedIncludedFileCount(inputFiles.Count);
+        var filterIncludedFiles = CollectAllIncludedFiles();
+        var selectedFiles = CollectSelectedFiles();
+        Pipeline.SetSelectedIncludedFileCount(selectedFiles.Count);
 
-        if (!Pipeline.CanRun || inputFiles.Count == 0)
+        if (!Pipeline.CanRun || (filterIncludedFiles.Count == 0 && selectedFiles.Count == 0))
             return;
 
-        var overwriteMode = ParseOverwriteMode(_settings.DefaultOverwriteMode);
-        var deleteMode = ParseDeleteMode(_settings.DefaultDeleteMode);
         var runner = new PipelineRunner(pipeline);
-        await ExecutePipelineAsync(runner, inputFiles, overwriteMode, deleteMode);
+        var job = new PipelineJob
+        {
+            FilterIncludedFiles = filterIncludedFiles,
+            SelectedFiles       = selectedFiles,
+            SourceProvider      = _memoryProvider,
+            TargetProvider      = _memoryProvider,
+            OverwriteMode       = ParseOverwriteMode(_settings.DefaultOverwriteMode),
+            DeleteMode          = ParseDeleteMode(_settings.DefaultDeleteMode),
+        };
+        await ExecutePipelineAsync(runner, job);
     }
 
-    /// <summary>
-    /// Returns all filter-included nodes if the pipeline contains a step that needs
-    /// to see every file (e.g. SelectAll, InvertSelection); otherwise returns only
-    /// the currently checked+included nodes.
-    /// </summary>
-    private List<FileSystemNode> ResolveInputFiles(TransformPipeline pipeline)
-    {
-        return pipeline.Steps.Any(s => s.ProvidesInput)
-            ? CollectAllIncludedFiles()
-            : CollectSelectedFiles();
-    }
-
-    private async Task ExecutePipelineAsync(
-        PipelineRunner runner,
-        IReadOnlyList<FileSystemNode> selectedFiles,
-        OverwriteMode overwriteMode,
-        DeleteMode deleteMode)
+    private async Task ExecutePipelineAsync(PipelineRunner runner, PipelineJob job)
     {
         _runCts?.Cancel();
         _runCts?.Dispose();
@@ -747,14 +741,7 @@ public partial class MainViewModel : ViewModelBase
 
         try
         {
-            var results = await runner.ExecuteAsync(
-                selectedFiles,
-                _memoryProvider,
-                _memoryProvider,
-                overwriteMode,
-                deleteMode,
-                progress,
-                _runCts.Token);
+            var results = await runner.ExecuteAsync(job, progress, _runCts.Token);
 
             await _operationJournal.WriteAsync(results.Where(r => r.StepType is StepKind.Copy or StepKind.Move or StepKind.Delete));
 

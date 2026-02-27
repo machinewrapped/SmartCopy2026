@@ -9,6 +9,7 @@ public sealed class ClearSelectionStep : ITransformStep
     public StepKind StepType => StepKind.ClearSelection;
     public bool IsExecutable => false;
     public bool IsConfigurable => false;
+    public bool ProvidesInput => true;
 
     public void Validate(StepValidationContext context)
     {
@@ -17,8 +18,11 @@ public sealed class ClearSelectionStep : ITransformStep
 
     public TransformStepConfig Config => new(StepType, new JsonObject());
 
-    public TransformResult Preview(TransformContext context) =>
-        new(Success: true, StepType: StepType, DestinationPath: context.DisplayPath, Message: "Clear selection");
+    public TransformResult Preview(TransformContext context)
+    {
+        context.SourceNode.CheckState = CheckState.Unchecked;
+        return new(Success: true, StepType: StepType, DestinationPath: null, Message: "Clear selection");
+    }
 
     public Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)
     {

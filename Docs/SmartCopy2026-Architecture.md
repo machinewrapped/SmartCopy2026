@@ -254,6 +254,13 @@ public interface ITransformStep
 {
     string StepType { get; }
     bool IsExecutable { get; }
+
+    /// <summary>
+    /// True for selection steps (SelectAll, InvertSelection, ClearSelection).
+    /// These steps must see every filter-included file, not just the current working set.
+    /// </summary>
+    bool ProvidesInput => false;
+
     TransformStepConfig Config { get; }
 
     TransformResult Preview(TransformContext context);
@@ -262,8 +269,20 @@ public interface ITransformStep
 }
 ```
 
-`PipelineRunner` iterates selected nodes, creates a fresh `TransformContext` for each, passes it
-through each step in sequence, and reports `OperationProgress` after each file completes.
+`PipelineRunner` uses a **step-first** loop and accepts two input lists:
+
+- `filterIncludedFiles` — all nodes with `FilterResult == Included` (the universe for selection steps)
+- `selectedFiles` — nodes with `CheckState == Checked && FilterResult == Included` (the initial working set)
+
+For each step:
+- **Selection steps** (`ProvidesInput = true`, e.g. `SelectAll`, `InvertSelection`, `ClearSelection`): run over `filterIncludedFiles`, mutating each node's `CheckState`. After the step completes, the working set is recomputed as `filterIncludedFiles.Where(n => n.CheckState == Checked)`.
+- **All other steps** (path, content, executable): run over the current working set. A `failedNodes` set tracks per-node failures across steps so a node that fails at step N is skipped for steps N+1 onwards.
+
+A `Dictionary<FileSystemNode, TransformContext>` is maintained across steps so that path mutations (e.g. from `FlattenStep`) are preserved when the same node is processed by a later step.
+
+Selection step `Preview()` methods mutate `CheckState` identically to `ApplyAsync()` and return `DestinationPath: null`, ensuring no spurious entries appear in the `OperationPlan`.
+
+Progress is reported after each node through an executable step. `totalBytes` is derived from `filterIncludedFiles` as a conservative upper bound.
 
 **Destination ownership:** `TargetProvider` in `TransformContext` is populated by `CopyStep` and
 `MoveStep` from their own `Config.DestinationPath` (resolved to an `IFileSystemProvider` at
@@ -285,6 +304,8 @@ be relative to the user's selected source directory (not the filesystem or provi
 | Transcode | `[ConvertStep(mp3, 320k) → CopyStep]` |
 | Archive move | `[FlattenStep → MoveStep]` |
 | Copy then move | `[CopyStep("/mem/Backup") → MoveStep("/mem/Archive")]` |
+| Copy unselected | `[InvertSelectionStep → CopyStep]` |
+| Copy everything | `[SelectAllStep → CopyStep]` |
 
 Pipelines saved as `.sc2pipe` (JSON). The simple presets (Copy, Move, Delete) appear as toolbar
 buttons and internally create single-step pipelines.

@@ -42,16 +42,18 @@ public sealed class SelectionStepsTests
     // -------------------------------------------------------------------------
 
     [Fact]
-    public void SelectAllStep_Preview_ReturnsSuccess()
+    public void SelectAllStep_Preview_SetsCheckedAndReturnsNullDestination()
     {
         var step = new SelectAllStep();
-        var ctx = MakeContext();
+        var ctx = MakeContext(CheckState.Unchecked);
 
         var result = step.Preview(ctx);
 
         Assert.True(result.Success);
         Assert.Equal(StepKind.SelectAll, result.StepType);
         Assert.Equal("Mark as selected", result.Message);
+        Assert.Null(result.DestinationPath);
+        Assert.Equal(CheckState.Checked, ctx.SourceNode.CheckState);
     }
 
     [Fact]
@@ -82,6 +84,20 @@ public sealed class SelectionStepsTests
     // -------------------------------------------------------------------------
 
     [Fact]
+    public void ClearSelectionStep_Preview_SetsUncheckedAndReturnsNullDestination()
+    {
+        var step = new ClearSelectionStep();
+        var ctx = MakeContext(CheckState.Checked);
+
+        var result = step.Preview(ctx);
+
+        Assert.True(result.Success);
+        Assert.Equal(StepKind.ClearSelection, result.StepType);
+        Assert.Null(result.DestinationPath);
+        Assert.Equal(CheckState.Unchecked, ctx.SourceNode.CheckState);
+    }
+
+    [Fact]
     public async Task ClearSelectionStep_ApplyAsync_SetsUnchecked()
     {
         var step = new ClearSelectionStep();
@@ -107,6 +123,20 @@ public sealed class SelectionStepsTests
     // -------------------------------------------------------------------------
     // InvertSelectionStep
     // -------------------------------------------------------------------------
+
+    [Fact]
+    public void InvertSelectionStep_Preview_TogglesCheckedAndReturnsNullDestination()
+    {
+        var step = new InvertSelectionStep();
+        var ctx = MakeContext(CheckState.Unchecked);
+
+        var result = step.Preview(ctx);
+
+        Assert.True(result.Success);
+        Assert.Equal(StepKind.InvertSelection, result.StepType);
+        Assert.Null(result.DestinationPath);
+        Assert.Equal(CheckState.Checked, ctx.SourceNode.CheckState);
+    }
 
     [Fact]
     public async Task InvertSelectionStep_ApplyAsync_TogglesChecked()

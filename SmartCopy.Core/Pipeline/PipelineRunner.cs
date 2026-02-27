@@ -24,44 +24,60 @@ public sealed class PipelineRunner
     }
 
     public async Task<OperationPlan> PreviewAsync(
-        IEnumerable<FileSystemNode> selectedNodes,
-        IFileSystemProvider sourceProvider,
-        IFileSystemProvider? targetProvider,
-        OverwriteMode overwriteMode,
-        DeleteMode deleteMode,
+        PipelineJob job,
         CancellationToken ct = default)
     {
-        var actions = new List<PlannedAction>();
-        var selected = selectedNodes.ToList();
-        _pipeline.Validate(new PipelineValidationContext(selected.Count > 0));
+        _pipeline.Validate(new PipelineValidationContext(job.SelectedFiles.Count > 0));
 
-        foreach (var node in selected)
+        var actions = new List<PlannedAction>();
+        var contexts = new Dictionary<FileSystemNode, TransformContext>();
+        TransformContext GetOrCreate(FileSystemNode node) =>
+            contexts.TryGetValue(node, out var ctx) ? ctx
+            : contexts[node] = CreateContext(node, job);
+
+        var workingSet = job.SelectedFiles.ToList();
+        var failedNodes = new HashSet<FileSystemNode>();
+
+        foreach (var step in _pipeline.Steps)
         {
             ct.ThrowIfCancellationRequested();
-            var context = CreateContext(node, sourceProvider, targetProvider, overwriteMode, deleteMode);
-            foreach (var step in _pipeline.Steps)
+
+            if (step.ProvidesInput)
             {
-                var preview = step.Preview(context);
-
-                // Non-executable steps (path and content) update context.PathSegments directly
-                // in their Preview implementations, so downstream steps see the correct state.
-                // Executable steps (Copy, Move, Delete) consume the path — they don't transform it.
-
-                if (!string.IsNullOrWhiteSpace(preview.DestinationPath))
+                foreach (var node in job.FilterIncludedFiles)
                 {
-                    var warning = await GetWarningAsync(preview.DestinationPath, targetProvider, ct);
-                    actions.Add(new PlannedAction(
-                        StepSummary: step.StepType.ToString(),
-                        SourcePath: node.FullPath,
-                        DestinationPath: preview.DestinationPath!,
-                        InputBytes: node.Size,
-                        EstimatedOutputBytes: preview.OutputBytes == 0 ? node.Size : preview.OutputBytes,
-                        Warning: warning));
+                    ct.ThrowIfCancellationRequested();
+                    step.Preview(GetOrCreate(node));
                 }
-
-                if (!preview.Success)
+                workingSet = job.FilterIncludedFiles
+                    .Where(n => n.CheckState == CheckState.Checked)
+                    .ToList();
+            }
+            else
+            {
+                foreach (var node in workingSet)
                 {
-                    break;
+                    if (failedNodes.Contains(node)) continue;
+                    ct.ThrowIfCancellationRequested();
+
+                    var preview = step.Preview(GetOrCreate(node));
+
+                    if (!string.IsNullOrWhiteSpace(preview.DestinationPath))
+                    {
+                        var warning = await GetWarningAsync(preview.DestinationPath, job.TargetProvider, ct);
+                        actions.Add(new PlannedAction(
+                            StepSummary: step.StepType.ToString(),
+                            SourcePath: node.FullPath,
+                            DestinationPath: preview.DestinationPath!,
+                            InputBytes: node.Size,
+                            EstimatedOutputBytes: preview.OutputBytes == 0 ? node.Size : preview.OutputBytes,
+                            Warning: warning));
+                    }
+
+                    if (!preview.Success)
+                    {
+                        failedNodes.Add(node);
+                    }
                 }
             }
         }
@@ -70,22 +86,17 @@ public sealed class PipelineRunner
         return new OperationPlan
         {
             Actions = actions,
-            TotalInputBytes = selected.Sum(node => node.Size),
-            TotalEstimatedOutputBytes = actions.Sum(action => action.EstimatedOutputBytes),
+            TotalInputBytes = actions.Sum(a => a.InputBytes),
+            TotalEstimatedOutputBytes = actions.Sum(a => a.EstimatedOutputBytes),
         };
     }
 
     public async Task<IReadOnlyList<TransformResult>> ExecuteAsync(
-        IEnumerable<FileSystemNode> selectedNodes,
-        IFileSystemProvider sourceProvider,
-        IFileSystemProvider? targetProvider,
-        OverwriteMode overwriteMode,
-        DeleteMode deleteMode,
+        PipelineJob job,
         IProgress<OperationProgress>? progress = null,
         CancellationToken ct = default)
     {
-        var selected = selectedNodes.ToList();
-        _pipeline.Validate(new PipelineValidationContext(selected.Count > 0));
+        _pipeline.Validate(new PipelineValidationContext(job.SelectedFiles.Count > 0));
 
         if (_pipeline.HasDeleteStep && !_previewCompleted)
         {
@@ -94,53 +105,77 @@ public sealed class PipelineRunner
         }
 
         var results = new List<TransformResult>();
+        var contexts = new Dictionary<FileSystemNode, TransformContext>();
+        TransformContext GetOrCreate(FileSystemNode node) =>
+            contexts.TryGetValue(node, out var ctx) ? ctx
+            : contexts[node] = CreateContext(node, job);
+
+        var workingSet = job.SelectedFiles.ToList();
+        var failedNodes = new HashSet<FileSystemNode>();
+
         var stopwatch = Stopwatch.StartNew();
-        long totalBytes = selected.Sum(node => node.Size);
         long completedBytes = 0;
         int filesCompleted = 0;
 
-        foreach (var node in selected)
+        foreach (var step in _pipeline.Steps)
         {
             ct.ThrowIfCancellationRequested();
 
-            var context = CreateContext(node, sourceProvider, targetProvider, overwriteMode, deleteMode);
-            foreach (var step in _pipeline.Steps)
+            if (step.ProvidesInput)
             {
-                ct.ThrowIfCancellationRequested();
-                var result = await step.ApplyAsync(context, ct);
-                results.Add(result);
-                if (!result.Success)
+                foreach (var node in job.FilterIncludedFiles)
                 {
-                    break;
+                    ct.ThrowIfCancellationRequested();
+                    var result = await step.ApplyAsync(GetOrCreate(node), ct);
+                    results.Add(result);
+                }
+                workingSet = job.FilterIncludedFiles
+                    .Where(n => n.CheckState == CheckState.Checked)
+                    .ToList();
+            }
+            else
+            {
+                long totalBytes = workingSet.Sum(n => n.Size);
+                
+                foreach (var node in workingSet)
+                {
+                    if (failedNodes.Contains(node)) continue;
+                    ct.ThrowIfCancellationRequested();
+
+                    var result = await step.ApplyAsync(GetOrCreate(node), ct);
+                    results.Add(result);
+
+                    if (!result.Success)
+                    {
+                        failedNodes.Add(node);
+                    }
+
+                    if (step.IsExecutable)
+                    {
+                        filesCompleted++;
+                        completedBytes += node.Size;
+                        var elapsed = stopwatch.Elapsed;
+                        var remaining = EstimateRemaining(elapsed, completedBytes, totalBytes);
+
+                        progress?.Report(new OperationProgress(
+                            CurrentFile: node.FullPath,
+                            CurrentFileBytes: node.Size,
+                            CurrentFileTotalBytes: node.Size,
+                            FilesCompleted: filesCompleted,
+                            FilesTotal: workingSet.Count,
+                            TotalBytesCompleted: completedBytes,
+                            TotalBytes: totalBytes,
+                            Elapsed: elapsed,
+                            EstimatedRemaining: remaining));
+                    }
                 }
             }
-
-            filesCompleted++;
-            completedBytes += node.Size;
-            var elapsed = stopwatch.Elapsed;
-            var remaining = EstimateRemaining(elapsed, completedBytes, totalBytes);
-
-            progress?.Report(new OperationProgress(
-                CurrentFile: node.FullPath,
-                CurrentFileBytes: node.Size,
-                CurrentFileTotalBytes: node.Size,
-                FilesCompleted: filesCompleted,
-                FilesTotal: selected.Count,
-                TotalBytesCompleted: completedBytes,
-                TotalBytes: totalBytes,
-                Elapsed: elapsed,
-                EstimatedRemaining: remaining));
         }
 
         return results;
     }
 
-    private static TransformContext CreateContext(
-        FileSystemNode node,
-        IFileSystemProvider sourceProvider,
-        IFileSystemProvider? targetProvider,
-        OverwriteMode overwriteMode,
-        DeleteMode deleteMode)
+    private static TransformContext CreateContext(FileSystemNode node, PipelineJob job)
     {
         var extension = Path.GetExtension(node.Name).TrimStart('.');
         var segments = node.RelativePathSegments.Length > 0
@@ -149,12 +184,12 @@ public sealed class PipelineRunner
         return new TransformContext
         {
             SourceNode = node,
-            SourceProvider = sourceProvider,
-            TargetProvider = targetProvider,
+            SourceProvider = job.SourceProvider,
+            TargetProvider = job.TargetProvider,
             PathSegments = segments,
             CurrentExtension = extension,
-            OverwriteMode = overwriteMode,
-            DeleteMode = deleteMode,
+            OverwriteMode = job.OverwriteMode,
+            DeleteMode = job.DeleteMode,
         };
     }
 

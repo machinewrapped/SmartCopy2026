@@ -1,3 +1,4 @@
+using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Progress;
@@ -16,14 +17,19 @@ public sealed class PipelineIntegrationTests
             .WithFile("/src/song.mp3", "audio"u8));
 
         var node = await provider.GetNodeAsync("/src/song.mp3", CancellationToken.None);
+        node.CheckState = CheckState.Checked;
         var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/dest")]));
 
         await runner.ExecuteAsync(
-            [node],
-            provider,
-            provider,
-            OverwriteMode.Always,
-            DeleteMode.Trash,
+            new PipelineJob
+            {
+                FilterIncludedFiles = [node],
+                SelectedFiles       = [node],
+                SourceProvider      = provider,
+                TargetProvider      = provider,
+                OverwriteMode       = OverwriteMode.Always,
+                DeleteMode          = DeleteMode.Trash,
+            },
             progress: null,
             ct: CancellationToken.None);
 
@@ -39,6 +45,7 @@ public sealed class PipelineIntegrationTests
             .WithFile("/src/deep/song.mp3", "audio"u8));
 
         var node = await provider.GetNodeAsync("/src/deep/song.mp3", CancellationToken.None);
+        node.CheckState = CheckState.Checked;
         var runner = new PipelineRunner(new TransformPipeline(
         [
             new FlattenStep(),
@@ -46,11 +53,15 @@ public sealed class PipelineIntegrationTests
         ]));
 
         await runner.ExecuteAsync(
-            [node],
-            provider,
-            provider,
-            OverwriteMode.Always,
-            DeleteMode.Trash,
+            new PipelineJob
+            {
+                FilterIncludedFiles = [node],
+                SelectedFiles       = [node],
+                SourceProvider      = provider,
+                TargetProvider      = provider,
+                OverwriteMode       = OverwriteMode.Always,
+                DeleteMode          = DeleteMode.Trash,
+            },
             progress: null,
             ct: CancellationToken.None);
 
@@ -64,15 +75,20 @@ public sealed class PipelineIntegrationTests
             .WithDirectory("/src")
             .WithFile("/src/delete.txt", "x"u8));
         var node = await provider.GetNodeAsync("/src/delete.txt", CancellationToken.None);
+        node.CheckState = CheckState.Checked;
         var runner = new PipelineRunner(new TransformPipeline([new DeleteStep()]));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             runner.ExecuteAsync(
-                [node],
-                provider,
-                targetProvider: null,
-                overwriteMode: OverwriteMode.Always,
-                deleteMode: DeleteMode.Permanent,
+                new PipelineJob
+                {
+                    FilterIncludedFiles = [node],
+                    SelectedFiles       = [node],
+                    SourceProvider      = provider,
+                    TargetProvider      = null,
+                    OverwriteMode       = OverwriteMode.Always,
+                    DeleteMode          = DeleteMode.Permanent,
+                },
                 progress: null,
                 ct: CancellationToken.None));
     }
@@ -86,25 +102,34 @@ public sealed class PipelineIntegrationTests
             .WithFile("/src/song.mp3", "new"u8)
             .WithFile("/dest/src/song.mp3", "old"u8));
         var node = await provider.GetNodeAsync("/src/song.mp3", CancellationToken.None);
+        node.CheckState = CheckState.Checked;
         var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/dest")]));
 
         var skipResults = await runner.ExecuteAsync(
-            [node],
-            provider,
-            provider,
-            OverwriteMode.Skip,
-            DeleteMode.Trash,
+            new PipelineJob
+            {
+                FilterIncludedFiles = [node],
+                SelectedFiles       = [node],
+                SourceProvider      = provider,
+                TargetProvider      = provider,
+                OverwriteMode       = OverwriteMode.Skip,
+                DeleteMode          = DeleteMode.Trash,
+            },
             progress: null,
             ct: CancellationToken.None);
 
         Assert.Contains(skipResults, result => result.Message == "Skipped existing destination.");
 
         var alwaysResults = await runner.ExecuteAsync(
-            [node],
-            provider,
-            provider,
-            OverwriteMode.Always,
-            DeleteMode.Trash,
+            new PipelineJob
+            {
+                FilterIncludedFiles = [node],
+                SelectedFiles       = [node],
+                SourceProvider      = provider,
+                TargetProvider      = provider,
+                OverwriteMode       = OverwriteMode.Always,
+                DeleteMode          = DeleteMode.Trash,
+            },
             progress: null,
             ct: CancellationToken.None);
 
@@ -120,6 +145,7 @@ public sealed class PipelineIntegrationTests
             .WithDirectory("/archive")
             .WithFile("/src/song.mp3", "audio"u8));
         var node = await provider.GetNodeAsync("/src/song.mp3", CancellationToken.None);
+        node.CheckState = CheckState.Checked;
         var runner = new PipelineRunner(new TransformPipeline(
         [
             new CopyStep("/backup"),
@@ -127,11 +153,15 @@ public sealed class PipelineIntegrationTests
         ]));
 
         await runner.ExecuteAsync(
-            [node],
-            provider,
-            provider,
-            OverwriteMode.Always,
-            DeleteMode.Trash,
+            new PipelineJob
+            {
+                FilterIncludedFiles = [node],
+                SelectedFiles       = [node],
+                SourceProvider      = provider,
+                TargetProvider      = provider,
+                OverwriteMode       = OverwriteMode.Always,
+                DeleteMode          = DeleteMode.Trash,
+            },
             progress: null,
             ct: CancellationToken.None);
 
@@ -148,13 +178,19 @@ public sealed class PipelineIntegrationTests
             .WithDirectory("/dest")
             .WithFile("/src/song.mp3", "audio"u8));
         var node = await provider.GetNodeAsync("/src/song.mp3", CancellationToken.None);
+        node.CheckState = CheckState.Checked;
         var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/dest")]));
+
         var results = await runner.ExecuteAsync(
-            [node],
-            provider,
-            provider,
-            OverwriteMode.Always,
-            DeleteMode.Trash,
+            new PipelineJob
+            {
+                FilterIncludedFiles = [node],
+                SelectedFiles       = [node],
+                SourceProvider      = provider,
+                TargetProvider      = provider,
+                OverwriteMode       = OverwriteMode.Always,
+                DeleteMode          = DeleteMode.Trash,
+            },
             progress: null,
             ct: CancellationToken.None);
 

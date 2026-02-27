@@ -7,16 +7,11 @@ namespace SmartCopy.UI.ViewModels.Pipeline;
 
 public partial class MoveStepEditorViewModel : StepEditorViewModelBase
 {
-    public IReadOnlyList<OverwriteMode> OverwriteModes { get; } = Enum.GetValues<OverwriteMode>();
-
     public IReadOnlyList<string> DestinationBookmarks { get; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsValid))]
     private string _destinationPath = string.Empty;
-
-    [ObservableProperty]
-    private OverwriteMode _overwriteMode = OverwriteMode.IfNewer;
 
     [ObservableProperty]
     private string? _selectedDestinationBookmark;
