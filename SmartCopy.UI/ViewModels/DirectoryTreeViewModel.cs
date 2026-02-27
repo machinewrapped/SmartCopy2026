@@ -124,9 +124,15 @@ public class DirectoryTreeViewModel : ViewModelBase
         if (node is null) return false;
 
         if (node.Parent is not null)
-            node.Parent.Children.Remove(node);
+        {
+            var parent = node.Parent;
+            parent.Children.Remove(node);
+            FilterChain.RecalculateParentExclusion(parent);
+        }
         else
+        {
             RootNodes.Remove(node);
+        }
 
         return true;
     }
