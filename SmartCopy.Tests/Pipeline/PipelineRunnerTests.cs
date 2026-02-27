@@ -20,10 +20,12 @@ public sealed class PipelineRunnerTests
             target => target.WithDirectory("/Mirror"));
 
         var sourceNode = await sourceProvider.GetNodeAsync("/source/song.flac", CancellationToken.None);
+        sourceNode.CheckState = CheckState.Checked;
         var pipeline = new TransformPipeline([new CopyStep("/Mirror")]);
         var runner = new PipelineRunner(pipeline);
 
         var plan = await runner.PreviewAsync(
+            [sourceNode],
             [sourceNode],
             sourceProvider,
             targetProvider,
@@ -35,6 +37,7 @@ public sealed class PipelineRunnerTests
         Assert.Contains("/Mirror", plan.Actions[0].DestinationPath);
 
         var results = await runner.ExecuteAsync(
+            [sourceNode],
             [sourceNode],
             sourceProvider,
             targetProvider,
@@ -55,10 +58,12 @@ public sealed class PipelineRunnerTests
             .WithFile("/source/delete-me.txt", "x"u8));
 
         var node = await provider.GetNodeAsync("/source/delete-me.txt", CancellationToken.None);
+        node.CheckState = CheckState.Checked;
         var runner = new PipelineRunner(new TransformPipeline([new DeleteStep()]));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             runner.ExecuteAsync(
+                [node],
                 [node],
                 provider,
                 targetProvider: null,
@@ -76,9 +81,11 @@ public sealed class PipelineRunnerTests
             .WithFile("/source/delete-me.txt", "x"u8));
 
         var node = await provider.GetNodeAsync("/source/delete-me.txt", CancellationToken.None);
+        node.CheckState = CheckState.Checked;
         var runner = new PipelineRunner(new TransformPipeline([new DeleteStep()]));
 
         await runner.PreviewAsync(
+            [node],
             [node],
             provider,
             targetProvider: null,
@@ -87,6 +94,7 @@ public sealed class PipelineRunnerTests
             ct: CancellationToken.None);
 
         await runner.ExecuteAsync(
+            [node],
             [node],
             provider,
             targetProvider: null,
@@ -110,6 +118,7 @@ public sealed class PipelineRunnerTests
             target => target.WithDirectory("/out"));
 
         var node = await sourceProvider.GetNodeAsync("/source/deep/folder/track.mp3", CancellationToken.None);
+        node.CheckState = CheckState.Checked;
         var runner = new PipelineRunner(new TransformPipeline(
         [
             new FlattenStep(),
@@ -117,6 +126,7 @@ public sealed class PipelineRunnerTests
         ]));
 
         await runner.ExecuteAsync(
+            [node],
             [node],
             sourceProvider,
             targetProvider,
@@ -138,6 +148,7 @@ public sealed class PipelineRunnerTests
             target => target.WithDirectory("/out"));
 
         var node = await sourceProvider.GetNodeAsync("/source/deep/folder/track.mp3", CancellationToken.None);
+        node.CheckState = CheckState.Checked;
         var runner = new PipelineRunner(new TransformPipeline(
         [
             new FlattenStep(),
@@ -145,6 +156,7 @@ public sealed class PipelineRunnerTests
         ]));
 
         var plan = await runner.PreviewAsync(
+            [node],
             [node],
             sourceProvider,
             targetProvider,
@@ -166,9 +178,11 @@ public sealed class PipelineRunnerTests
             .WithFile("/dest/source/song.mp3", "existing"u8));
 
         var node = await provider.GetNodeAsync("/source/song.mp3", CancellationToken.None);
+        node.CheckState = CheckState.Checked;
         var runner = new PipelineRunner(new TransformPipeline([new MoveStep("/dest")]));
 
         var results = await runner.ExecuteAsync(
+            [node],
             [node],
             provider,
             targetProvider: provider,
@@ -198,6 +212,7 @@ public sealed class PipelineRunnerTests
         var previewError = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             runner.PreviewAsync(
                 [],
+                [],
                 provider,
                 provider,
                 OverwriteMode.Always,
@@ -208,6 +223,7 @@ public sealed class PipelineRunnerTests
 
         var executeError = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             runner.ExecuteAsync(
+                [],
                 [],
                 provider,
                 provider,
