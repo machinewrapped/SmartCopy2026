@@ -95,6 +95,7 @@ public sealed class PipelineRunner
     public async Task<IReadOnlyList<TransformResult>> ExecuteAsync(
         PipelineJob job,
         IProgress<OperationProgress>? progress = null,
+        IProgress<TransformResult>? nodeProgress = null,
         CancellationToken ct = default)
     {
         _pipeline.Validate(new PipelineValidationContext(job.SelectedFiles.Count > 0));
@@ -145,6 +146,7 @@ public sealed class PipelineRunner
 
                     var result = await step.ApplyAsync(GetOrCreate(node), ct);
                     results.Add(result);
+                    nodeProgress?.Report(result);
 
                     if (!result.Success)
                     {

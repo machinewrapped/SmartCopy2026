@@ -15,6 +15,7 @@ public class FileListViewModel(IFileSystemProvider provider, string directoryPat
 
     private FilterChain? _chain;
     private IFileSystemProvider? _comparisonProvider;
+    private FileSystemNode? _currentDirectoryNode;
 
     // The full unfiltered set of file nodes for the current directory.
     private List<FileSystemNode> _files = [];
@@ -67,6 +68,7 @@ public class FileListViewModel(IFileSystemProvider provider, string directoryPat
         var ct = _loadCts.Token;
 
         _directoryPath = directoryNode.FullPath;
+        _currentDirectoryNode = directoryNode;
 
         if (directoryNode.Files.Count == 0)
         {
@@ -110,6 +112,27 @@ public class FileListViewModel(IFileSystemProvider provider, string directoryPat
         RefreshVisibleFiles();
     }
 
+    public void RemoveFile(string fullPath)
+    {
+        var node = _files.FirstOrDefault(f =>
+            string.Equals(f.FullPath, fullPath, StringComparison.OrdinalIgnoreCase));
+        if (node is null) return;
+
+        _files.Remove(node);
+        _currentDirectoryNode?.Files.Remove(node);
+        RefreshVisibleFiles();
+    }
+
+    public void ClearIfUnder(string dirFullPath)
+    {
+        if (_directoryPath.StartsWith(dirFullPath, StringComparison.OrdinalIgnoreCase))
+        {
+            _files.Clear();
+            _currentDirectoryNode = null;
+            RefreshVisibleFiles();
+        }
+    }
+
     private async Task ApplyChainToFilesAsync(CancellationToken ct = default)
     {
         if (_chain is not null && _files.Count > 0)
@@ -119,7 +142,7 @@ public class FileListViewModel(IFileSystemProvider provider, string directoryPat
     private void RefreshVisibleFiles()
     {
         VisibleFiles = _showFilteredFiles
-            ? _files
+            ? [.. _files]
             : [.. _files.Where(f => f.FilterResult == FilterResult.Included)];
     }
 }

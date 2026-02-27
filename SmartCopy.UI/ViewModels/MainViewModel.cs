@@ -735,13 +735,14 @@ public partial class MainViewModel : ViewModelBase
 
         StatusBar.Progress.Begin(_runCts);
         var progress = new Progress<OperationProgress>(StatusBar.Progress.Update);
+        var nodeProgress = new Progress<TransformResult>(OnNodeCompleted);
 
         if (AutoOpenLogOnRun)
             LogPanel.IsExpanded = true;
 
         try
         {
-            var results = await runner.ExecuteAsync(job, progress, _runCts.Token);
+            var results = await runner.ExecuteAsync(job, progress, nodeProgress, _runCts.Token);
 
             await _operationJournal.WriteAsync(results.Where(r => r.StepType is StepKind.Copy or StepKind.Move or StepKind.Delete));
 
@@ -775,6 +776,18 @@ public partial class MainViewModel : ViewModelBase
         {
             StatusBar.Progress.Cancelled();
         }
+    }
+
+    private void OnNodeCompleted(TransformResult result)
+    {
+        if (!result.Success || result.SourcePath is null) return;
+        if (result.StepType is not (StepKind.Move or StepKind.Delete)) return;
+
+        var removedDir = DirectoryTree.RemoveNode(result.SourcePath);
+        if (removedDir)
+            FileList.ClearIfUnder(result.SourcePath);
+        else
+            FileList.RemoveFile(result.SourcePath);
     }
 
     private async Task SaveWorkflowAsync()
