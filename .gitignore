@@ -52,6 +52,7 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# Agents
 .claude/settings.local.json
 kill-dotnet-processes.ps1
-.claude/settings.local.json
