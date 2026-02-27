@@ -3,6 +3,7 @@ using System.IO;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
+using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
@@ -14,9 +15,17 @@ public sealed class RenameStep : ITransformStep
     }
 
     public string Pattern { get; set; }
-
+    
     public StepKind StepType => StepKind.Rename;
     public bool IsExecutable => false;
+
+    public void Validate(StepValidationContext context)
+    {
+        context.ValidateSourceExists("Rename");
+        if (string.IsNullOrWhiteSpace(Pattern))
+            context.AddBlockingIssue("Step.RenamePatternRequired", "Rename requires a non-empty pattern.");
+        // Post-condition: source is unchanged.
+    }
 
     public TransformStepConfig Config => new(
         StepType,

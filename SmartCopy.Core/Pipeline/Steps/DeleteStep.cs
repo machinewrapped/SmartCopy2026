@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
+using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
@@ -14,9 +15,15 @@ public sealed class DeleteStep : ITransformStep
     public DeleteMode Mode { get; set; }
 
     public StepKind StepType => StepKind.Delete;
-    public bool IsPathStep => false;
-    public bool IsContentStep => false;
     public bool IsExecutable => true;
+
+    public void Validate(StepValidationContext context)
+    {
+        context.ValidateHasSelectedInputs();
+        context.ValidateSourceExists("Delete");
+        // Post-condition: delete consumes the source.
+        context.SourceExists = false;
+    }
 
     public TransformStepConfig Config => new(
         StepType,

@@ -2,6 +2,7 @@ using System.IO;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
+using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
@@ -16,6 +17,12 @@ public sealed class ConvertStep : ITransformStep
 
     public StepKind StepType => StepKind.Convert;
     public bool IsExecutable => false;
+
+    public void Validate(StepValidationContext context)
+    {
+        context.ValidateSourceExists("Convert");
+        // Post-condition: source is unchanged.
+    }
 
     public TransformStepConfig Config => new(
         StepType,

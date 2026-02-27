@@ -3,6 +3,7 @@ using System.IO;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
+using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
@@ -16,9 +17,17 @@ public sealed class MoveStep : ITransformStep
     public string DestinationPath { get; set; }
 
     public StepKind StepType => StepKind.Move;
-    public bool IsPathStep => false;
-    public bool IsContentStep => false;
     public bool IsExecutable => true;
+
+    public void Validate(StepValidationContext context)
+    {
+        context.ValidateHasSelectedInputs();
+        context.ValidateSourceExists("Move");
+        if (string.IsNullOrWhiteSpace(DestinationPath))
+            context.AddBlockingIssue("Step.MissingDestination", "Move requires a destination path.");
+        // Post-condition: move consumes the source.
+        context.SourceExists = false;
+    }
 
     public TransformStepConfig Config => new(
         StepType,

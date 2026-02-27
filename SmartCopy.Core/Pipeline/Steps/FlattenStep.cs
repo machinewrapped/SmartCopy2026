@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
+using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
@@ -14,9 +15,13 @@ public sealed class FlattenStep : ITransformStep
     public FlattenConflictStrategy ConflictStrategy { get; set; }
 
     public StepKind StepType => StepKind.Flatten;
-    public bool IsPathStep => true;
-    public bool IsContentStep => false;
     public bool IsExecutable => false;
+
+    public void Validate(StepValidationContext context)
+    {
+        context.ValidateSourceExists("Flatten");
+        // Post-condition: source is unchanged.
+    }
 
     public TransformStepConfig Config => new(
         StepType,
