@@ -24,27 +24,22 @@ public sealed class PipelineRunnerTests
         var pipeline = new TransformPipeline([new CopyStep("/Mirror")]);
         var runner = new PipelineRunner(pipeline);
 
-        var plan = await runner.PreviewAsync(
-            [sourceNode],
-            [sourceNode],
-            sourceProvider,
-            targetProvider,
-            OverwriteMode.IfNewer,
-            DeleteMode.Trash,
-            CancellationToken.None);
+        var job = new PipelineJob
+        {
+            FilterIncludedFiles = [sourceNode],
+            SelectedFiles       = [sourceNode],
+            SourceProvider      = sourceProvider,
+            TargetProvider      = targetProvider,
+            OverwriteMode       = OverwriteMode.IfNewer,
+            DeleteMode          = DeleteMode.Trash,
+        };
+
+        var plan = await runner.PreviewAsync(job, CancellationToken.None);
 
         Assert.Single(plan.Actions);
         Assert.Contains("/Mirror", plan.Actions[0].DestinationPath);
 
-        var results = await runner.ExecuteAsync(
-            [sourceNode],
-            [sourceNode],
-            sourceProvider,
-            targetProvider,
-            OverwriteMode.IfNewer,
-            DeleteMode.Trash,
-            progress: null,
-            CancellationToken.None);
+        var results = await runner.ExecuteAsync(job, progress: null, CancellationToken.None);
 
         Assert.Contains(results, r => r.StepType == StepKind.Copy && r.Success);
         Assert.True(await targetProvider.ExistsAsync("/Mirror/source/song.flac", CancellationToken.None));
@@ -61,16 +56,18 @@ public sealed class PipelineRunnerTests
         node.CheckState = CheckState.Checked;
         var runner = new PipelineRunner(new TransformPipeline([new DeleteStep()]));
 
+        var job = new PipelineJob
+        {
+            FilterIncludedFiles = [node],
+            SelectedFiles       = [node],
+            SourceProvider      = provider,
+            TargetProvider      = null,
+            OverwriteMode       = OverwriteMode.Always,
+            DeleteMode          = DeleteMode.Permanent,
+        };
+
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            runner.ExecuteAsync(
-                [node],
-                [node],
-                provider,
-                targetProvider: null,
-                overwriteMode: OverwriteMode.Always,
-                deleteMode: DeleteMode.Permanent,
-                progress: null,
-                ct: CancellationToken.None));
+            runner.ExecuteAsync(job, progress: null, ct: CancellationToken.None));
     }
 
     [Fact]
@@ -84,24 +81,18 @@ public sealed class PipelineRunnerTests
         node.CheckState = CheckState.Checked;
         var runner = new PipelineRunner(new TransformPipeline([new DeleteStep()]));
 
-        await runner.PreviewAsync(
-            [node],
-            [node],
-            provider,
-            targetProvider: null,
-            overwriteMode: OverwriteMode.Always,
-            deleteMode: DeleteMode.Permanent,
-            ct: CancellationToken.None);
+        var job = new PipelineJob
+        {
+            FilterIncludedFiles = [node],
+            SelectedFiles       = [node],
+            SourceProvider      = provider,
+            TargetProvider      = null,
+            OverwriteMode       = OverwriteMode.Always,
+            DeleteMode          = DeleteMode.Permanent,
+        };
 
-        await runner.ExecuteAsync(
-            [node],
-            [node],
-            provider,
-            targetProvider: null,
-            overwriteMode: OverwriteMode.Always,
-            deleteMode: DeleteMode.Permanent,
-            progress: null,
-            ct: CancellationToken.None);
+        await runner.PreviewAsync(job, ct: CancellationToken.None);
+        await runner.ExecuteAsync(job, progress: null, ct: CancellationToken.None);
 
         Assert.False(await provider.ExistsAsync("/source/delete-me.txt", CancellationToken.None));
     }
@@ -126,12 +117,15 @@ public sealed class PipelineRunnerTests
         ]));
 
         await runner.ExecuteAsync(
-            [node],
-            [node],
-            sourceProvider,
-            targetProvider,
-            OverwriteMode.Always,
-            DeleteMode.Trash,
+            new PipelineJob
+            {
+                FilterIncludedFiles = [node],
+                SelectedFiles       = [node],
+                SourceProvider      = sourceProvider,
+                TargetProvider      = targetProvider,
+                OverwriteMode       = OverwriteMode.Always,
+                DeleteMode          = DeleteMode.Trash,
+            },
             progress: null,
             ct: CancellationToken.None);
 
@@ -156,12 +150,15 @@ public sealed class PipelineRunnerTests
         ]));
 
         var plan = await runner.PreviewAsync(
-            [node],
-            [node],
-            sourceProvider,
-            targetProvider,
-            OverwriteMode.Always,
-            DeleteMode.Trash,
+            new PipelineJob
+            {
+                FilterIncludedFiles = [node],
+                SelectedFiles       = [node],
+                SourceProvider      = sourceProvider,
+                TargetProvider      = targetProvider,
+                OverwriteMode       = OverwriteMode.Always,
+                DeleteMode          = DeleteMode.Trash,
+            },
             CancellationToken.None);
 
         var copyAction = plan.Actions.Single(a => a.StepSummary == "Copy");
@@ -182,12 +179,15 @@ public sealed class PipelineRunnerTests
         var runner = new PipelineRunner(new TransformPipeline([new MoveStep("/dest")]));
 
         var results = await runner.ExecuteAsync(
-            [node],
-            [node],
-            provider,
-            targetProvider: provider,
-            overwriteMode: OverwriteMode.Skip,
-            deleteMode: DeleteMode.Trash,
+            new PipelineJob
+            {
+                FilterIncludedFiles = [node],
+                SelectedFiles       = [node],
+                SourceProvider      = provider,
+                TargetProvider      = provider,
+                OverwriteMode       = OverwriteMode.Skip,
+                DeleteMode          = DeleteMode.Trash,
+            },
             progress: null,
             ct: CancellationToken.None);
 
@@ -209,28 +209,23 @@ public sealed class PipelineRunnerTests
             .WithDirectory("/dest"));
         var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/dest")]));
 
+        var emptyJob = new PipelineJob
+        {
+            FilterIncludedFiles = [],
+            SelectedFiles       = [],
+            SourceProvider      = provider,
+            TargetProvider      = provider,
+            OverwriteMode       = OverwriteMode.Always,
+            DeleteMode          = DeleteMode.Trash,
+        };
+
         var previewError = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            runner.PreviewAsync(
-                [],
-                [],
-                provider,
-                provider,
-                OverwriteMode.Always,
-                DeleteMode.Trash,
-                CancellationToken.None));
+            runner.PreviewAsync(emptyJob, CancellationToken.None));
 
         Assert.Contains("At least one file must be selected", previewError.Message);
 
         var executeError = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            runner.ExecuteAsync(
-                [],
-                [],
-                provider,
-                provider,
-                OverwriteMode.Always,
-                DeleteMode.Trash,
-                progress: null,
-                ct: CancellationToken.None));
+            runner.ExecuteAsync(emptyJob, progress: null, ct: CancellationToken.None));
 
         Assert.Contains("At least one file must be selected", executeError.Message);
     }

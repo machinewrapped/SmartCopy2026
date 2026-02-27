@@ -63,12 +63,15 @@ public sealed class PipelineRunnerSelectionTests
         ]));
 
         await runner.ExecuteAsync(
-            filterIncluded,
-            selected,
-            provider,
-            provider,
-            OverwriteMode.Always,
-            DeleteMode.Trash,
+            new PipelineJob
+            {
+                FilterIncludedFiles = filterIncluded,
+                SelectedFiles       = selected,
+                SourceProvider      = provider,
+                TargetProvider      = provider,
+                OverwriteMode       = OverwriteMode.Always,
+                DeleteMode          = DeleteMode.Trash,
+            },
             progress: null,
             ct: CancellationToken.None);
 
@@ -114,12 +117,15 @@ public sealed class PipelineRunnerSelectionTests
         ]));
 
         await runner.ExecuteAsync(
-            filterIncluded,
-            selected,
-            provider,
-            provider,
-            OverwriteMode.Always,
-            DeleteMode.Trash,
+            new PipelineJob
+            {
+                FilterIncludedFiles = filterIncluded,
+                SelectedFiles       = selected,
+                SourceProvider      = provider,
+                TargetProvider      = provider,
+                OverwriteMode       = OverwriteMode.Always,
+                DeleteMode          = DeleteMode.Trash,
+            },
             progress: null,
             ct: CancellationToken.None);
 
@@ -163,12 +169,15 @@ public sealed class PipelineRunnerSelectionTests
         ]));
 
         await runner.ExecuteAsync(
-            filterIncluded,
-            selected,
-            provider,
-            provider,
-            OverwriteMode.Always,
-            DeleteMode.Trash,
+            new PipelineJob
+            {
+                FilterIncludedFiles = filterIncluded,
+                SelectedFiles       = selected,
+                SourceProvider      = provider,
+                TargetProvider      = provider,
+                OverwriteMode       = OverwriteMode.Always,
+                DeleteMode          = DeleteMode.Trash,
+            },
             progress: null,
             ct: CancellationToken.None);
 
@@ -209,12 +218,15 @@ public sealed class PipelineRunnerSelectionTests
         ]));
 
         var plan = await runner.PreviewAsync(
-            filterIncluded,
-            selected,
-            sourceProvider,
-            targetProvider,
-            OverwriteMode.Always,
-            DeleteMode.Trash,
+            new PipelineJob
+            {
+                FilterIncludedFiles = filterIncluded,
+                SelectedFiles       = selected,
+                SourceProvider      = sourceProvider,
+                TargetProvider      = targetProvider,
+                OverwriteMode       = OverwriteMode.Always,
+                DeleteMode          = DeleteMode.Trash,
+            },
             ct);
 
         // Exactly 3 copy actions — one per filter-included file

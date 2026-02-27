@@ -24,23 +24,18 @@ public sealed class PipelineRunner
     }
 
     public async Task<OperationPlan> PreviewAsync(
-        IReadOnlyList<FileSystemNode> filterIncludedFiles,
-        IReadOnlyList<FileSystemNode> selectedFiles,
-        IFileSystemProvider sourceProvider,
-        IFileSystemProvider? targetProvider,
-        OverwriteMode overwriteMode,
-        DeleteMode deleteMode,
+        PipelineJob job,
         CancellationToken ct = default)
     {
-        _pipeline.Validate(new PipelineValidationContext(selectedFiles.Count > 0));
+        _pipeline.Validate(new PipelineValidationContext(job.SelectedFiles.Count > 0));
 
         var actions = new List<PlannedAction>();
         var contexts = new Dictionary<FileSystemNode, TransformContext>();
         TransformContext GetOrCreate(FileSystemNode node) =>
             contexts.TryGetValue(node, out var ctx) ? ctx
-            : contexts[node] = CreateContext(node, sourceProvider, targetProvider, overwriteMode, deleteMode);
+            : contexts[node] = CreateContext(node, job);
 
-        var workingSet = selectedFiles.ToList();
+        var workingSet = job.SelectedFiles.ToList();
         var failedNodes = new HashSet<FileSystemNode>();
 
         foreach (var step in _pipeline.Steps)
@@ -49,12 +44,12 @@ public sealed class PipelineRunner
 
             if (step.ProvidesInput)
             {
-                foreach (var node in filterIncludedFiles)
+                foreach (var node in job.FilterIncludedFiles)
                 {
                     ct.ThrowIfCancellationRequested();
                     step.Preview(GetOrCreate(node));
                 }
-                workingSet = filterIncludedFiles
+                workingSet = job.FilterIncludedFiles
                     .Where(n => n.CheckState == CheckState.Checked)
                     .ToList();
             }
@@ -69,7 +64,7 @@ public sealed class PipelineRunner
 
                     if (!string.IsNullOrWhiteSpace(preview.DestinationPath))
                     {
-                        var warning = await GetWarningAsync(preview.DestinationPath, targetProvider, ct);
+                        var warning = await GetWarningAsync(preview.DestinationPath, job.TargetProvider, ct);
                         actions.Add(new PlannedAction(
                             StepSummary: step.StepType.ToString(),
                             SourcePath: node.FullPath,
@@ -97,16 +92,11 @@ public sealed class PipelineRunner
     }
 
     public async Task<IReadOnlyList<TransformResult>> ExecuteAsync(
-        IReadOnlyList<FileSystemNode> filterIncludedFiles,
-        IReadOnlyList<FileSystemNode> selectedFiles,
-        IFileSystemProvider sourceProvider,
-        IFileSystemProvider? targetProvider,
-        OverwriteMode overwriteMode,
-        DeleteMode deleteMode,
+        PipelineJob job,
         IProgress<OperationProgress>? progress = null,
         CancellationToken ct = default)
     {
-        _pipeline.Validate(new PipelineValidationContext(selectedFiles.Count > 0));
+        _pipeline.Validate(new PipelineValidationContext(job.SelectedFiles.Count > 0));
 
         if (_pipeline.HasDeleteStep && !_previewCompleted)
         {
@@ -118,13 +108,13 @@ public sealed class PipelineRunner
         var contexts = new Dictionary<FileSystemNode, TransformContext>();
         TransformContext GetOrCreate(FileSystemNode node) =>
             contexts.TryGetValue(node, out var ctx) ? ctx
-            : contexts[node] = CreateContext(node, sourceProvider, targetProvider, overwriteMode, deleteMode);
+            : contexts[node] = CreateContext(node, job);
 
-        var workingSet = selectedFiles.ToList();
+        var workingSet = job.SelectedFiles.ToList();
         var failedNodes = new HashSet<FileSystemNode>();
 
         var stopwatch = Stopwatch.StartNew();
-        long totalBytes = filterIncludedFiles.Sum(n => n.Size);
+        long totalBytes = job.FilterIncludedFiles.Sum(n => n.Size);
         long completedBytes = 0;
         int filesCompleted = 0;
 
@@ -134,13 +124,13 @@ public sealed class PipelineRunner
 
             if (step.ProvidesInput)
             {
-                foreach (var node in filterIncludedFiles)
+                foreach (var node in job.FilterIncludedFiles)
                 {
                     ct.ThrowIfCancellationRequested();
                     var result = await step.ApplyAsync(GetOrCreate(node), ct);
                     results.Add(result);
                 }
-                workingSet = filterIncludedFiles
+                workingSet = job.FilterIncludedFiles
                     .Where(n => n.CheckState == CheckState.Checked)
                     .ToList();
             }
@@ -184,12 +174,7 @@ public sealed class PipelineRunner
         return results;
     }
 
-    private static TransformContext CreateContext(
-        FileSystemNode node,
-        IFileSystemProvider sourceProvider,
-        IFileSystemProvider? targetProvider,
-        OverwriteMode overwriteMode,
-        DeleteMode deleteMode)
+    private static TransformContext CreateContext(FileSystemNode node, PipelineJob job)
     {
         var extension = Path.GetExtension(node.Name).TrimStart('.');
         var segments = node.RelativePathSegments.Length > 0
@@ -198,12 +183,12 @@ public sealed class PipelineRunner
         return new TransformContext
         {
             SourceNode = node,
-            SourceProvider = sourceProvider,
-            TargetProvider = targetProvider,
+            SourceProvider = job.SourceProvider,
+            TargetProvider = job.TargetProvider,
             PathSegments = segments,
             CurrentExtension = extension,
-            OverwriteMode = overwriteMode,
-            DeleteMode = deleteMode,
+            OverwriteMode = job.OverwriteMode,
+            DeleteMode = job.DeleteMode,
         };
     }
 
