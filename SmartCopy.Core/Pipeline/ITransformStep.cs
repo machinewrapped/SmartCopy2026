@@ -10,16 +10,16 @@ public interface ITransformStep
     bool IsExecutable { get; }
     TransformStepConfig Config { get; }
 
+    TransformResult Preview(TransformContext context);
+    Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct);
+
     /// <summary>
-    /// Validates this step within the current pipeline state. The step should:
+    /// Validates this step within the pipeline.
     /// <list type="bullet">
-    ///   <item>Read preconditions from <paramref name="context"/> (e.g. <see cref="StepValidationContext.SourceExists"/>).</item>
-    ///   <item>Call <see cref="StepValidationContext.AddBlockingIssue"/> for any configuration or precondition failures.</item>
-    ///   <item>Update post-conditions on <paramref name="context"/> (e.g. set <see cref="StepValidationContext.SourceExists"/> to <c>false</c> if the step consumes the source).</item>
+    ///   <item>Validate preconditions from <paramref name="context"/>.</item>
+    ///   <item>Update postconditions on <paramref name="context"/>.</item>
     /// </list>
     /// </summary>
     void Validate(StepValidationContext context);
 
-    TransformResult Preview(TransformContext context);
-    Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct);
 }
