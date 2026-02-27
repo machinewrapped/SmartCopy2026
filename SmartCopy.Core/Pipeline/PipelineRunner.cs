@@ -114,7 +114,6 @@ public sealed class PipelineRunner
         var failedNodes = new HashSet<FileSystemNode>();
 
         var stopwatch = Stopwatch.StartNew();
-        long totalBytes = job.FilterIncludedFiles.Sum(n => n.Size);
         long completedBytes = 0;
         int filesCompleted = 0;
 
@@ -136,6 +135,8 @@ public sealed class PipelineRunner
             }
             else
             {
+                long totalBytes = workingSet.Sum(n => n.Size);
+                
                 foreach (var node in workingSet)
                 {
                     if (failedNodes.Contains(node)) continue;
