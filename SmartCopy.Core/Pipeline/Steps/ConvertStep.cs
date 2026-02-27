@@ -33,6 +33,8 @@ public sealed class ConvertStep : ITransformStep
 
     public TransformResult Preview(TransformContext context)
     {
+        if (context.SourceNode.IsDirectory)
+            return new TransformResult(Success: true, StepType: StepType, DestinationPath: null);
         Apply(context);
         return new TransformResult(
             Success: true,
@@ -45,6 +47,8 @@ public sealed class ConvertStep : ITransformStep
     public Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
+        if (context.SourceNode.IsDirectory)
+            return Task.FromResult(new TransformResult(Success: true, StepType: StepType, DestinationPath: null));
         Apply(context);
         return Task.FromResult(new TransformResult(
             Success: true,

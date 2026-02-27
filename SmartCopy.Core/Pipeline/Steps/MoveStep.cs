@@ -52,6 +52,23 @@ public sealed class MoveStep : ITransformStep
                              ?? throw new InvalidOperationException("TargetProvider must be set for MoveStep.");
         var destination = StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, context.PathSegments);
 
+        if (context.SourceNode.IsDirectory)
+        {
+            if (!ReferenceEquals(targetProvider, context.SourceProvider) || !targetProvider.Capabilities.CanAtomicMove)
+                return new TransformResult(Success: false, StepType: StepType,
+                    Message: "Cannot atomically move directory across providers.",
+                    SourcePath: context.SourceNode.FullPath);
+
+            await context.SourceProvider.MoveAsync(context.SourceNode.FullPath, destination, ct);
+            return new TransformResult(
+                Success: true,
+                StepType: StepType,
+                DestinationPath: destination,
+                OutputBytes: context.SourceNode.Size,
+                Message: "Directory moved atomically.",
+                SourcePath: context.SourceNode.FullPath);
+        }
+
         var destinationExists = await targetProvider.ExistsAsync(destination, ct);
         if (destinationExists && context.OverwriteMode == OverwriteMode.Skip)
         {

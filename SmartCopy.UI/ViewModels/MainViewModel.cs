@@ -918,20 +918,23 @@ public partial class MainViewModel : ViewModelBase
     {
         var selected = new List<FileSystemNode>();
         foreach (var root in DirectoryTree.RootNodes)
-            CollectSelectedFilesRecursive(root, selected);
+            CollectSelectedNodesRecursive(root, selected);
         return selected;
     }
 
-    private static void CollectSelectedFilesRecursive(FileSystemNode node, List<FileSystemNode> output)
+    private static void CollectSelectedNodesRecursive(FileSystemNode node, List<FileSystemNode> output)
     {
-        foreach (var file in node.Files)
+        if (node.IsDirectory && node.IsSelected)
         {
-            if (file.IsSelected)
-                output.Add(file);
+            output.Add(node); // atomic — all descendants selected and filter-included
+            return;           // do NOT recurse into children
         }
 
+        foreach (var file in node.Files)
+            if (file.IsSelected) output.Add(file);
+
         foreach (var child in node.Children)
-            CollectSelectedFilesRecursive(child, output);
+            CollectSelectedNodesRecursive(child, output);
     }
 
     private List<FileSystemNode> CollectAllIncludedFiles()

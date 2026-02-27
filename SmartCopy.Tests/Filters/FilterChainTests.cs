@@ -165,7 +165,7 @@ public sealed class FilterChainTests
         await new FilterChain([new ExtensionFilter(["mp3"], FilterMode.Only)])
             .ApplyToTreeAsync([dir]);
 
-        Assert.Equal(FilterResult.Included, dir.FilterResult);
+        Assert.Equal(FilterResult.Mixed, dir.FilterResult);
         Assert.Null(dir.ExcludedByFilter);
         Assert.Equal(FilterResult.Included, mp3.FilterResult);
         Assert.Equal(FilterResult.Excluded, txt.FilterResult);
@@ -233,8 +233,8 @@ public sealed class FilterChainTests
         var chain = new FilterChain([new MirrorFilter("/mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude)]);
         await chain.ApplyToTreeAsync([alt], comparisonProvider: fs);
 
-        // Directory has a non-mirrored file → must stay Included
-        Assert.Equal(FilterResult.Included, alt.FilterResult);
+        // Directory has a non-mirrored file → must stay visible (Mixed: some included, some excluded)
+        Assert.Equal(FilterResult.Mixed, alt.FilterResult);
         Assert.Null(alt.ExcludedByFilter);
         Assert.Equal(FilterResult.Excluded, mirrored.FilterResult);
         Assert.Equal(FilterResult.Included, newFile.FilterResult);

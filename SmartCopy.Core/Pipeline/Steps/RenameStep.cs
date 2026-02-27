@@ -37,6 +37,8 @@ public sealed class RenameStep : ITransformStep
     public TransformResult Preview(TransformContext context)
     {
         Apply(context);
+        if (context.SourceNode.IsDirectory)
+            return new TransformResult(Success: true, StepType: StepType, DestinationPath: null);
         return new TransformResult(
             Success: true,
             StepType: StepType,
@@ -48,6 +50,8 @@ public sealed class RenameStep : ITransformStep
     {
         ct.ThrowIfCancellationRequested();
         Apply(context);
+        if (context.SourceNode.IsDirectory)
+            return Task.FromResult(new TransformResult(Success: true, StepType: StepType, DestinationPath: null));
         return Task.FromResult(new TransformResult(
             Success: true,
             StepType: StepType,

@@ -51,9 +51,9 @@ public sealed class DeleteStep : ITransformStep
             StepType: StepType,
             DestinationPath: context.SourceNode.FullPath,
             OutputBytes: context.SourceNode.Size,
-            Message: Mode == DeleteMode.Trash
-                ? "Deleted (trash mode requested)."
-                : "Deleted permanently.",
+            Message: context.SourceNode.IsDirectory
+                ? (Mode == DeleteMode.Trash ? "Directory deleted (trash)." : "Directory deleted permanently.")
+                : (Mode == DeleteMode.Trash ? "Deleted (trash mode requested)." : "Deleted permanently."),
             SourcePath: context.SourceNode.FullPath);
     }
 }

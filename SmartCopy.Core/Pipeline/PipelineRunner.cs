@@ -64,13 +64,14 @@ public sealed class PipelineRunner
 
                     if (!string.IsNullOrWhiteSpace(preview.DestinationPath))
                     {
+                        var nodeBytes = GetNodeBytes(node);
                         var warning = await GetWarningAsync(preview.DestinationPath, job.TargetProvider, ct);
                         actions.Add(new PlannedAction(
                             StepSummary: step.StepType.ToString(),
                             SourcePath: node.FullPath,
                             DestinationPath: preview.DestinationPath!,
-                            InputBytes: node.Size,
-                            EstimatedOutputBytes: preview.OutputBytes == 0 ? node.Size : preview.OutputBytes,
+                            InputBytes: nodeBytes,
+                            EstimatedOutputBytes: preview.OutputBytes == 0 ? nodeBytes : preview.OutputBytes,
                             Warning: warning));
                     }
 
@@ -135,8 +136,8 @@ public sealed class PipelineRunner
             }
             else
             {
-                long totalBytes = workingSet.Sum(n => n.Size);
-                
+                long totalBytes = workingSet.Sum(GetNodeBytes);
+
                 foreach (var node in workingSet)
                 {
                     if (failedNodes.Contains(node)) continue;
@@ -152,15 +153,16 @@ public sealed class PipelineRunner
 
                     if (step.IsExecutable)
                     {
+                        var nodeBytes = GetNodeBytes(node);
                         filesCompleted++;
-                        completedBytes += node.Size;
+                        completedBytes += nodeBytes;
                         var elapsed = stopwatch.Elapsed;
                         var remaining = EstimateRemaining(elapsed, completedBytes, totalBytes);
 
                         progress?.Report(new OperationProgress(
                             CurrentFile: node.FullPath,
-                            CurrentFileBytes: node.Size,
-                            CurrentFileTotalBytes: node.Size,
+                            CurrentFileBytes: nodeBytes,
+                            CurrentFileTotalBytes: nodeBytes,
                             FilesCompleted: filesCompleted,
                             FilesTotal: workingSet.Count,
                             TotalBytesCompleted: completedBytes,
@@ -174,6 +176,11 @@ public sealed class PipelineRunner
 
         return results;
     }
+
+    private static long GetNodeBytes(FileSystemNode node) =>
+        node.IsDirectory
+            ? node.Files.Sum(f => f.Size) + node.Children.Sum(c => GetNodeBytes(c))
+            : node.Size;
 
     private static TransformContext CreateContext(FileSystemNode node, PipelineJob job)
     {

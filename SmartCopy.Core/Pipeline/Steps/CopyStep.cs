@@ -34,6 +34,8 @@ public sealed class CopyStep : ITransformStep
 
     public TransformResult Preview(TransformContext context)
     {
+        if (context.SourceNode.IsDirectory)
+            return new TransformResult(Success: true, StepType: StepType, DestinationPath: null);
         var destination = StepPathHelper.BuildDestinationPath(DestinationPath, context.PathSegments);
         return new TransformResult(
             Success: true,
@@ -47,6 +49,8 @@ public sealed class CopyStep : ITransformStep
     public async Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
+        if (context.SourceNode.IsDirectory)
+            return new TransformResult(Success: true, StepType: StepType, DestinationPath: null);
         var targetProvider = context.TargetProvider
                              ?? throw new InvalidOperationException("TargetProvider must be set for CopyStep.");
 

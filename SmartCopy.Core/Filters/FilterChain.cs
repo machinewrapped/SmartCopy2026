@@ -107,21 +107,20 @@ public sealed class FilterChain
         if (!node.IsDirectory || (node.Children.Count == 0 && node.Files.Count == 0))
             return;
 
-        bool hasIncluded = node.Children.Any(c => c.FilterResult == FilterResult.Included) ||
-                           node.Files.Any(f => f.FilterResult == FilterResult.Included);
+        bool allIncluded =
+            node.Files.All(f => f.FilterResult == FilterResult.Included) &&
+            node.Children.All(c => c.FilterResult == FilterResult.Included); // Mixed child → not allIncluded
+
+        bool anyIncluded =
+            node.Files.Any(f => f.FilterResult != FilterResult.Excluded) ||
+            node.Children.Any(c => c.FilterResult != FilterResult.Excluded);
 
         using (node.BeginBatchUpdate())
         {
-            if (hasIncluded)
-            {
-                node.FilterResult = FilterResult.Included;
-                node.ExcludedByFilter = null;
-            }
-            else
-            {
-                node.FilterResult = FilterResult.Excluded;
-                node.ExcludedByFilter = AllChildrenExcluded;
-            }
+            node.FilterResult = allIncluded ? FilterResult.Included
+                              : anyIncluded ? FilterResult.Mixed
+                              : FilterResult.Excluded;
+            node.ExcludedByFilter = anyIncluded ? null : AllChildrenExcluded;
         }
     }
 
