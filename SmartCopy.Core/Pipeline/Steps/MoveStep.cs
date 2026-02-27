@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Text.Json.Nodes;
 using System.Threading;
@@ -18,21 +17,18 @@ public sealed class MoveStep : ITransformStep
     public string DestinationPath { get; set; }
 
     public StepKind StepType => StepKind.Move;
-    public bool IsPathStep => false;
-    public bool IsContentStep => false;
     public bool IsExecutable => true;
-    public bool RequiresSourceExists => true;
-    public bool RequiresSelectedIncludedInputs => true;
-    public bool? SetsSourceExists => false;
 
-    public IEnumerable<PipelineValidationIssue> Validate(int stepIndex)
+    public void Validate(StepValidationContext context)
     {
+        context.ValidateHasSelectedInputs();
+        if (!context.SourceExists)
+            context.AddBlockingIssue("Step.SourceMissing",
+                "Move cannot run because the source no longer exists after earlier steps.");
         if (string.IsNullOrWhiteSpace(DestinationPath))
-            yield return new PipelineValidationIssue(
-                StepIndex: stepIndex,
-                Code: "Step.MissingDestination",
-                Message: "Move requires a destination path.",
-                Severity: PipelineValidationSeverity.Blocking);
+            context.AddBlockingIssue("Step.MissingDestination", "Move requires a destination path.");
+        // Post-condition: move consumes the source.
+        context.SourceExists = false;
     }
 
     public TransformStepConfig Config => new(

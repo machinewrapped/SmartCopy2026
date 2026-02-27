@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading;
@@ -42,21 +41,17 @@ public sealed class RebaseStep : ITransformStep
     }
 
     public StepKind StepType => StepKind.Rebase;
-    public bool IsPathStep => true;
-    public bool IsContentStep => false;
     public bool IsExecutable => false;
-    public bool RequiresSourceExists => true;
-    public bool RequiresSelectedIncludedInputs => false;
-    public bool? SetsSourceExists => null;
 
-    public IEnumerable<PipelineValidationIssue> Validate(int stepIndex)
+    public void Validate(StepValidationContext context)
     {
+        if (!context.SourceExists)
+            context.AddBlockingIssue("Step.SourceMissing",
+                "Rebase cannot run because the source no longer exists after earlier steps.");
         if (string.IsNullOrWhiteSpace(StripPrefix) && string.IsNullOrWhiteSpace(AddPrefix))
-            yield return new PipelineValidationIssue(
-                StepIndex: stepIndex,
-                Code: "Step.RebaseConfigRequired",
-                Message: "Rebase requires StripPrefix or AddPrefix.",
-                Severity: PipelineValidationSeverity.Blocking);
+            context.AddBlockingIssue("Step.RebaseConfigRequired",
+                "Rebase requires StripPrefix or AddPrefix.");
+        // Post-condition: source is unchanged.
     }
 
     public TransformStepConfig Config => new(

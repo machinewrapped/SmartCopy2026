@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using SmartCopy.Core.Pipeline.Validation;
@@ -11,22 +10,16 @@ public interface ITransformStep
     bool IsExecutable { get; }
     TransformStepConfig Config { get; }
 
-    /// <summary>Whether this step requires the source to still exist before it runs.</summary>
-    bool RequiresSourceExists { get; }
-
-    /// <summary>Whether this step requires at least one selected/included input file.</summary>
-    bool RequiresSelectedIncludedInputs { get; }
-
     /// <summary>
-    /// How this step affects source availability for subsequent steps.
-    /// <c>true</c> = source remains, <c>false</c> = source is consumed/destroyed, <c>null</c> = no effect.
+    /// Validates this step within the current pipeline state. The step should:
+    /// <list type="bullet">
+    ///   <item>Read preconditions from <paramref name="context"/> (e.g. <see cref="StepValidationContext.SourceExists"/>).</item>
+    ///   <item>Call <see cref="StepValidationContext.AddBlockingIssue"/> for any configuration or precondition failures.</item>
+    ///   <item>Update post-conditions on <paramref name="context"/> (e.g. set <see cref="StepValidationContext.SourceExists"/> to <c>false</c> if the step consumes the source).</item>
+    /// </list>
     /// </summary>
-    bool? SetsSourceExists { get; }
-
-    /// <summary>Returns step-scoped validation issues (e.g. missing configuration).</summary>
-    IEnumerable<PipelineValidationIssue> Validate(int stepIndex);
+    void Validate(StepValidationContext context);
 
     TransformResult Preview(TransformContext context);
     Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct);
 }
-

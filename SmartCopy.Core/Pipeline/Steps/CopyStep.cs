@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Text.Json.Nodes;
 using System.Threading;
@@ -19,18 +18,16 @@ public sealed class CopyStep : ITransformStep
 
     public StepKind StepType => StepKind.Copy;
     public bool IsExecutable => true;
-    public bool RequiresSourceExists => true;
-    public bool RequiresSelectedIncludedInputs => true;
-    public bool? SetsSourceExists => true;
 
-    public IEnumerable<PipelineValidationIssue> Validate(int stepIndex)
+    public void Validate(StepValidationContext context)
     {
+        context.ValidateHasSelectedInputs();
+        if (!context.SourceExists)
+            context.AddBlockingIssue("Step.SourceMissing",
+                "Copy cannot run because the source no longer exists after earlier steps.");
         if (string.IsNullOrWhiteSpace(DestinationPath))
-            yield return new PipelineValidationIssue(
-                StepIndex: stepIndex,
-                Code: "Step.MissingDestination",
-                Message: "Copy requires a destination path.",
-                Severity: PipelineValidationSeverity.Blocking);
+            context.AddBlockingIssue("Step.MissingDestination", "Copy requires a destination path.");
+        // Post-condition: source is still present after a copy.
     }
 
     public TransformStepConfig Config => new(

@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
@@ -19,12 +17,14 @@ public sealed class ConvertStep : ITransformStep
 
     public StepKind StepType => StepKind.Convert;
     public bool IsExecutable => false;
-    public bool RequiresSourceExists => true;
-    public bool RequiresSelectedIncludedInputs => false;
-    public bool? SetsSourceExists => null;
 
-    public IEnumerable<PipelineValidationIssue> Validate(int stepIndex) =>
-        Enumerable.Empty<PipelineValidationIssue>();
+    public void Validate(StepValidationContext context)
+    {
+        if (!context.SourceExists)
+            context.AddBlockingIssue("Step.SourceMissing",
+                "Convert cannot run because the source no longer exists after earlier steps.");
+        // Post-condition: source is unchanged.
+    }
 
     public TransformStepConfig Config => new(
         StepType,

@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,15 +15,15 @@ public sealed class FlattenStep : ITransformStep
     public FlattenConflictStrategy ConflictStrategy { get; set; }
 
     public StepKind StepType => StepKind.Flatten;
-    public bool IsPathStep => true;
-    public bool IsContentStep => false;
     public bool IsExecutable => false;
-    public bool RequiresSourceExists => true;
-    public bool RequiresSelectedIncludedInputs => false;
-    public bool? SetsSourceExists => null;
 
-    public IEnumerable<PipelineValidationIssue> Validate(int stepIndex) =>
-        Enumerable.Empty<PipelineValidationIssue>();
+    public void Validate(StepValidationContext context)
+    {
+        if (!context.SourceExists)
+            context.AddBlockingIssue("Step.SourceMissing",
+                "Flatten cannot run because the source no longer exists after earlier steps.");
+        // Post-condition: source is unchanged.
+    }
 
     public TransformStepConfig Config => new(
         StepType,

@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 
 namespace SmartCopy.Core.Pipeline.Validation;
 
@@ -10,65 +9,27 @@ public sealed class PipelineValidator
         PipelineValidationContext? context = null)
     {
         context ??= new PipelineValidationContext();
-        var issues = new List<PipelineValidationIssue>();
+        var ctx = new StepValidationContext(context.HasSelectedIncludedInputs);
 
         if (steps.Count == 0)
         {
-            issues.Add(new PipelineValidationIssue(
-                StepIndex: null,
-                Code: "Pipeline.Empty",
-                Message: "Pipeline must contain at least one step.",
-                Severity: PipelineValidationSeverity.Blocking));
-            return new PipelineValidationResult(issues);
+            ctx.AddPipelineIssue("Pipeline.Empty", "Pipeline must contain at least one step.");
+            return new PipelineValidationResult(ctx.Issues);
         }
 
         var hasExecutable = false;
-        var hasExecutableRequiringSelectedInputs = false;
-        var sourceExists = true;
 
         for (var i = 0; i < steps.Count; i++)
         {
-            var step = steps[i];
-
-            // Delegate step-scoped configuration validation to the step itself.
-            issues.AddRange(step.Validate(i));
-
-            hasExecutable |= step.IsExecutable;
-            hasExecutableRequiringSelectedInputs |= step.RequiresSelectedIncludedInputs;
-
-            if (step.RequiresSourceExists && !sourceExists)
-            {
-                issues.Add(new PipelineValidationIssue(
-                    StepIndex: i,
-                    Code: "Step.SourceMissing",
-                    Message: $"{step.StepType} cannot run because the source no longer exists after earlier steps.",
-                    Severity: PipelineValidationSeverity.Blocking));
-            }
-
-            if (step.SetsSourceExists.HasValue)
-            {
-                sourceExists = step.SetsSourceExists.Value;
-            }
+            ctx.StepIndex = i;
+            steps[i].Validate(ctx);
+            hasExecutable |= steps[i].IsExecutable;
+            if (ctx.HasBlockingIssue) break;
         }
 
-        if (hasExecutableRequiringSelectedInputs && !context.HasSelectedIncludedInputs)
-        {
-            issues.Add(new PipelineValidationIssue(
-                StepIndex: null,
-                Code: "Pipeline.NoSelectedInputs",
-                Message: "At least one file must be selected.",
-                Severity: PipelineValidationSeverity.Blocking));
-        }
+        if (!ctx.HasBlockingIssue && !hasExecutable)
+            ctx.AddPipelineIssue("Pipeline.NoExecutableStep", "Pipeline must contain at least one executable step.");
 
-        if (!hasExecutable)
-        {
-            issues.Add(new PipelineValidationIssue(
-                StepIndex: null,
-                Code: "Pipeline.NoExecutableStep",
-                Message: "Pipeline must contain at least one executable step.",
-                Severity: PipelineValidationSeverity.Blocking));
-        }
-
-        return new PipelineValidationResult(issues);
+        return new PipelineValidationResult(ctx.Issues);
     }
 }

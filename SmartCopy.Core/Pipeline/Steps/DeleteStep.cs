@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,15 +15,17 @@ public sealed class DeleteStep : ITransformStep
     public DeleteMode Mode { get; set; }
 
     public StepKind StepType => StepKind.Delete;
-    public bool IsPathStep => false;
-    public bool IsContentStep => false;
     public bool IsExecutable => true;
-    public bool RequiresSourceExists => true;
-    public bool RequiresSelectedIncludedInputs => true;
-    public bool? SetsSourceExists => false;
 
-    public IEnumerable<PipelineValidationIssue> Validate(int stepIndex) =>
-        Enumerable.Empty<PipelineValidationIssue>();
+    public void Validate(StepValidationContext context)
+    {
+        context.ValidateHasSelectedInputs();
+        if (!context.SourceExists)
+            context.AddBlockingIssue("Step.SourceMissing",
+                "Delete cannot run because the source no longer exists after earlier steps.");
+        // Post-condition: delete consumes the source.
+        context.SourceExists = false;
+    }
 
     public TransformStepConfig Config => new(
         StepType,

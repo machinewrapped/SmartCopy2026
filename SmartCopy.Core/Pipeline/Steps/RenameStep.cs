@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Text.Json.Nodes;
 using System.Threading;
@@ -19,18 +18,15 @@ public sealed class RenameStep : ITransformStep
 
     public StepKind StepType => StepKind.Rename;
     public bool IsExecutable => false;
-    public bool RequiresSourceExists => true;
-    public bool RequiresSelectedIncludedInputs => false;
-    public bool? SetsSourceExists => null;
 
-    public IEnumerable<PipelineValidationIssue> Validate(int stepIndex)
+    public void Validate(StepValidationContext context)
     {
+        if (!context.SourceExists)
+            context.AddBlockingIssue("Step.SourceMissing",
+                "Rename cannot run because the source no longer exists after earlier steps.");
         if (string.IsNullOrWhiteSpace(Pattern))
-            yield return new PipelineValidationIssue(
-                StepIndex: stepIndex,
-                Code: "Step.RenamePatternRequired",
-                Message: "Rename requires a non-empty pattern.",
-                Severity: PipelineValidationSeverity.Blocking);
+            context.AddBlockingIssue("Step.RenamePatternRequired", "Rename requires a non-empty pattern.");
+        // Post-condition: source is unchanged.
     }
 
     public TransformStepConfig Config => new(
