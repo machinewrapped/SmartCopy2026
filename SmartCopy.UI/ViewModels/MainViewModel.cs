@@ -65,9 +65,11 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private bool _lazyExpandScan;
 
-    /// <summary>The default overwrite mode string: "Skip", "Always", or "IfNewer".</summary>
     [ObservableProperty]
     private string _defaultOverwriteMode = "Skip";
+
+    [ObservableProperty]
+    private bool _addArtificialDelay = false;
 
     private readonly MemoryFileSystemProvider _memoryProvider;
     private readonly AppSettings _settings = new();
@@ -239,6 +241,13 @@ public partial class MainViewModel : ViewModelBase
     partial void OnDefaultOverwriteModeChanged(string value)
     {
         _settings.DefaultOverwriteMode = value;
+        _ = SaveSettingsAsync();
+    }
+
+    partial void OnAddArtificialDelayChanged(bool value)
+    {
+        _memoryProvider.AddArtificialDelay = value;
+        _settings.AddArtificialDelay = value;
         _ = SaveSettingsAsync();
     }
 

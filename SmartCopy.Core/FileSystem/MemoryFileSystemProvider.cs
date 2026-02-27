@@ -14,11 +14,13 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
     private readonly ConcurrentDictionary<string, MemoryEntry> _entries = new(StringComparer.OrdinalIgnoreCase);
     // SemaphoreSlim(1,1) provides async-compatible exclusive locking for all mutation operations.
     private readonly SemaphoreSlim _mutationSemaphore = new(1, 1);
-    private readonly bool _artificialDelay;
+    
+    // Add artificial delay to simulate real I/O for testing progress reporting.
+    public bool AddArtificialDelay { get; set; }
 
-    public MemoryFileSystemProvider(bool artificialDelay = false)
+    public MemoryFileSystemProvider(bool addArtificialDelay = false)
     {
-        _artificialDelay = artificialDelay;
+        AddArtificialDelay = addArtificialDelay;
         _entries[Root] = MemoryEntry.CreateDirectory();
     }
 
@@ -103,7 +105,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
 
             await output.WriteAsync(buffer.AsMemory(0, read), ct);
 
-            if (_artificialDelay)
+            if (AddArtificialDelay)
             {
                 Thread.Sleep(100); // Simulate delay for testing progress reporting
             }
@@ -337,9 +339,10 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         {
             _entries.TryRemove(key, out _);
 
-            if (_artificialDelay)
+            if (AddArtificialDelay)
             {
-                Thread.Sleep(100); // Simulate delay for testing progress reporting
+                 // Simulate delay for testing progress reporting
+                Thread.Sleep(20);
             }
         }
     }
