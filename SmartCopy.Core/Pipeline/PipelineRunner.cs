@@ -66,19 +66,17 @@ public sealed class PipelineRunner
 
                     await foreach (TransformResult preview in step.PreviewAsync(context, ct))
                     {
-                        if (!string.IsNullOrWhiteSpace(preview.DestinationPath))
+                        if (preview.Success)
                         {
-                            var inputBytes = preview.OutputBytes;
                             actions.Add(new PlannedAction(
                                 StepSummary: step.StepType.ToString(),
                                 SourcePath: preview.SourcePath ?? node.FullPath,
                                 DestinationPath: preview.DestinationPath!,
-                                InputBytes: inputBytes,
-                                EstimatedOutputBytes: preview.OutputBytes == 0 ? inputBytes : preview.OutputBytes,
+                                InputBytes: preview.InputBytes,
+                                EstimatedOutputBytes: preview.OutputBytes,
                                 Warning: preview.Warning));
                         }
-
-                        if (!preview.Success)
+                        else
                         {
                             failedNodes.Add(node);
                         }

@@ -50,6 +50,7 @@ public sealed class MoveStep : ITransformStep
             Success: true,
             StepType: StepType,
             DestinationPath: destination,
+            InputBytes: context.SourceNode.Size,
             OutputBytes: context.SourceNode.Size,
             Message: "Move preview",
             SourcePath: context.SourceNode.FullPath,
@@ -75,6 +76,7 @@ public sealed class MoveStep : ITransformStep
                 Success: true,
                 StepType: StepType,
                 DestinationPath: destination,
+                InputBytes: context.SourceNode.Size,
                 OutputBytes: context.SourceNode.Size,
                 Message: "Directory moved atomically.",
                 SourcePath: context.SourceNode.FullPath);
@@ -87,6 +89,7 @@ public sealed class MoveStep : ITransformStep
                 Success: true,
                 StepType: StepType,
                 DestinationPath: destination,
+                InputBytes: context.SourceNode.Size,
                 OutputBytes: 0,
                 Message: "Skipped existing destination.",
                 SourcePath: context.SourceNode.FullPath);
@@ -99,6 +102,7 @@ public sealed class MoveStep : ITransformStep
                 Success: true,
                 StepType: StepType,
                 DestinationPath: destination,
+                InputBytes: context.SourceNode.Size,
                 OutputBytes: context.SourceNode.Size,
                 Message: "Moved atomically.",
                 SourcePath: context.SourceNode.FullPath);

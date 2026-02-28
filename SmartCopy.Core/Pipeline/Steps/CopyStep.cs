@@ -52,6 +52,7 @@ public sealed class CopyStep : ITransformStep
             Success: true,
             StepType: StepType,
             DestinationPath: destination,
+            InputBytes: context.SourceNode.Size,
             OutputBytes: context.SourceNode.Size,
             Message: "Copy preview",
             SourcePath: context.SourceNode.FullPath,
@@ -75,6 +76,7 @@ public sealed class CopyStep : ITransformStep
                 Success: true,
                 StepType: StepType,
                 DestinationPath: destination,
+                InputBytes: context.SourceNode.Size,
                 OutputBytes: 0,
                 Message: "Skipped existing destination.",
                 SourcePath: context.SourceNode.FullPath);
@@ -88,6 +90,7 @@ public sealed class CopyStep : ITransformStep
             Success: true,
             StepType: StepType,
             DestinationPath: destination,
+            InputBytes: context.SourceNode.Size,
             OutputBytes: context.SourceNode.Size,
             Message: "Copied",
             SourcePath: context.SourceNode.FullPath);

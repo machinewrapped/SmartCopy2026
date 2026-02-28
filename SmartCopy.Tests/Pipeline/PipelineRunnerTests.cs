@@ -129,11 +129,11 @@ public sealed class PipelineRunnerTests
         var plan = await runner.PreviewAsync(job, CancellationToken.None);
 
         Assert.Equal(5, plan.Actions.Count);
-        Assert.Contains(plan.Actions, a => a.DestinationPath == "/source");
-        Assert.Contains(plan.Actions, a => a.DestinationPath == "/source/f1.txt");
-        Assert.Contains(plan.Actions, a => a.DestinationPath == "/source/f2.txt");
-        Assert.Contains(plan.Actions, a => a.DestinationPath == "/source/sub");
-        Assert.Contains(plan.Actions, a => a.DestinationPath == "/source/sub/f3.txt");
+        Assert.Contains(plan.Actions, a => a.SourcePath == "/source");
+        Assert.Contains(plan.Actions, a => a.SourcePath == "/source/f1.txt");
+        Assert.Contains(plan.Actions, a => a.SourcePath == "/source/f2.txt");
+        Assert.Contains(plan.Actions, a => a.SourcePath == "/source/sub");
+        Assert.Contains(plan.Actions, a => a.SourcePath == "/source/sub/f3.txt");
     }
 
     [Fact]

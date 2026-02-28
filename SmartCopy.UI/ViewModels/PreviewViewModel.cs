@@ -44,6 +44,9 @@ public partial class PreviewViewModel : ViewModelBase
     private bool _isDeletePipeline;
 
     [ObservableProperty]
+    private long _totalEstimatedInputBytes;
+
+    [ObservableProperty]
     private long _totalEstimatedOutputBytes;
 
     [ObservableProperty]
@@ -80,6 +83,7 @@ public partial class PreviewViewModel : ViewModelBase
         _deleteMode = deleteMode;
         IsDeletePipeline = isDeletePipeline;
         TotalActionCount = plan.Actions.Count;
+        TotalEstimatedInputBytes = plan.TotalInputBytes;
         TotalEstimatedOutputBytes = plan.TotalEstimatedOutputBytes;
 
         Groups.Clear();
@@ -146,6 +150,7 @@ public partial class PreviewViewModel : ViewModelBase
         sb.AppendLine($"**Generated:** {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
         sb.AppendLine();
         sb.AppendLine($"**Total Actions:** {TotalActionCount}");
+        sb.AppendLine($"**Total Input Size:** {TotalEstimatedInputBytes} bytes");
         sb.AppendLine($"**Estimated Output Size:** {TotalEstimatedOutputBytes} bytes");
         sb.AppendLine();
 

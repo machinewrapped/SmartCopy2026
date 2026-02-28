@@ -35,37 +35,25 @@ public sealed class DeleteStep : ITransformStep
         yield return new TransformResult(
             Success: true,
             StepType: StepType,
-            DestinationPath: context.SourceNode.FullPath,
-            OutputBytes: context.SourceNode.Size,
-            Message: "Delete preview",
             SourcePath: context.SourceNode.FullPath,
+            InputBytes: context.SourceNode.Size,
+            OutputBytes: 0,
+            Message: "Delete preview",
             Warning: PlanWarning.SourceWillBeRemoved);
 
         if (context.SourceNode.IsDirectory)
         {
-            foreach (var child in GetSelectedDescendants(context.SourceNode))
+            foreach (var child in context.SourceNode.GetSelectedDescendants())
             {
                 yield return new TransformResult(
                     Success: true,
                     StepType: StepType,
-                    DestinationPath: child.FullPath,
-                    OutputBytes: child.Size,
-                    Message: "Delete preview",
                     SourcePath: child.FullPath,
+                    InputBytes: child.Size,
+                    OutputBytes: 0,
+                    Message: "Delete preview",
                     Warning: PlanWarning.SourceWillBeRemoved);
             }
-        }
-    }
-
-    private static IEnumerable<FileSystemNode> GetSelectedDescendants(FileSystemNode node)
-    {
-        foreach (var file in node.Files)
-            if (file.IsSelected) yield return file;
-        foreach (var child in node.Children)
-        {
-            if (child.IsSelected) yield return child;
-            foreach (var desc in GetSelectedDescendants(child))
-                yield return desc;
         }
     }
 
@@ -77,7 +65,8 @@ public sealed class DeleteStep : ITransformStep
             Success: true,
             StepType: StepType,
             DestinationPath: context.SourceNode.FullPath,
-            OutputBytes: context.SourceNode.Size,
+            InputBytes: context.SourceNode.Size,
+            OutputBytes: 0,
             Message: context.SourceNode.IsDirectory
                 ? (Mode == DeleteMode.Trash ? "Directory deleted (trash)." : "Directory deleted permanently.")
                 : (Mode == DeleteMode.Trash ? "Deleted (trash mode requested)." : "Deleted permanently."),
