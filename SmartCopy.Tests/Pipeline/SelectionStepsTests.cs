@@ -42,12 +42,14 @@ public sealed class SelectionStepsTests
     // -------------------------------------------------------------------------
 
     [Fact]
-    public void SelectAllStep_Preview_SetsCheckedAndReturnsNullDestination()
+    public async Task SelectAllStep_Preview_SetsCheckedAndReturnsNullDestination()
     {
         var step = new SelectAllStep();
         var ctx = MakeContext(CheckState.Unchecked);
 
-        var result = step.Preview(ctx);
+        var results = new List<TransformResult>();
+        await foreach (var r in step.PreviewAsync(ctx, CancellationToken.None)) results.Add(r);
+        var result = results.Single();
 
         Assert.True(result.Success);
         Assert.Equal(StepKind.SelectAll, result.StepType);
@@ -84,12 +86,14 @@ public sealed class SelectionStepsTests
     // -------------------------------------------------------------------------
 
     [Fact]
-    public void ClearSelectionStep_Preview_SetsUncheckedAndReturnsNullDestination()
+    public async Task ClearSelectionStep_Preview_SetsUncheckedAndReturnsNullDestination()
     {
         var step = new ClearSelectionStep();
         var ctx = MakeContext(CheckState.Checked);
 
-        var result = step.Preview(ctx);
+        var results = new List<TransformResult>();
+        await foreach (var r in step.PreviewAsync(ctx, CancellationToken.None)) results.Add(r);
+        var result = results.Single();
 
         Assert.True(result.Success);
         Assert.Equal(StepKind.ClearSelection, result.StepType);
@@ -125,12 +129,14 @@ public sealed class SelectionStepsTests
     // -------------------------------------------------------------------------
 
     [Fact]
-    public void InvertSelectionStep_Preview_TogglesCheckedAndReturnsNullDestination()
+    public async Task InvertSelectionStep_Preview_TogglesCheckedAndReturnsNullDestination()
     {
         var step = new InvertSelectionStep();
         var ctx = MakeContext(CheckState.Unchecked);
 
-        var result = step.Preview(ctx);
+        var results = new List<TransformResult>();
+        await foreach (var r in step.PreviewAsync(ctx, CancellationToken.None)) results.Add(r);
+        var result = results.Single();
 
         Assert.True(result.Success);
         Assert.Equal(StepKind.InvertSelection, result.StepType);

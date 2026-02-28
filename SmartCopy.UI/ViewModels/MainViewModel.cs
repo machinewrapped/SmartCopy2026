@@ -65,9 +65,11 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private bool _lazyExpandScan;
 
-    /// <summary>The default overwrite mode string: "Skip", "Always", or "IfNewer".</summary>
     [ObservableProperty]
     private string _defaultOverwriteMode = "Skip";
+
+    [ObservableProperty]
+    private bool _addArtificialDelay = false;
 
     private readonly MemoryFileSystemProvider _memoryProvider;
     private readonly AppSettings _settings = new();
@@ -95,7 +97,7 @@ public partial class MainViewModel : ViewModelBase
     {
         var presetStore = new FilterPresetStore();
 
-        _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded();
+        _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: true);
         _memoryProvider.SeedDirectory(MockMemoryFileSystemFactory.TargetPath);
         SourcePath = MockMemoryFileSystemFactory.SourcePath;
 
@@ -242,6 +244,13 @@ public partial class MainViewModel : ViewModelBase
         _ = SaveSettingsAsync();
     }
 
+    partial void OnAddArtificialDelayChanged(bool value)
+    {
+        _memoryProvider.AddArtificialDelay = value;
+        _settings.AddArtificialDelay = value;
+        _ = SaveSettingsAsync();
+    }
+
     private async Task SaveSettingsAsync()
     {
         try
@@ -370,7 +379,7 @@ public partial class MainViewModel : ViewModelBase
                 + $"{result.UnmatchedPaths.Count} unmatched: {string.Join(", ", result.UnmatchedPaths)}");
     }
 
-    private Window? GetMainWindow()
+    private static Window? GetMainWindow()
         => Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime d
             ? d.MainWindow : null;
 
@@ -423,7 +432,7 @@ public partial class MainViewModel : ViewModelBase
     {
         if (item is null) return;
 
-        bool removed = false;
+        bool removed;
         if (item.IsBookmark)
         {
             removed = _settings.FavouritePaths.Remove(item.Path);
@@ -662,8 +671,8 @@ public partial class MainViewModel : ViewModelBase
     private async Task PreviewPipelineAsync()
     {
         var pipeline = Pipeline.BuildLivePipeline();
-        var filterIncludedFiles = CollectAllIncludedFiles();
-        var selectedFiles = CollectSelectedFiles();
+        var filterIncludedFiles = DirectoryTree.CollectAllIncludedFiles();
+        var selectedFiles = DirectoryTree.CollectSelectedFiles();
         Pipeline.SetSelectedIncludedFileCount(selectedFiles.Count);
 
         if (!Pipeline.CanRun || (filterIncludedFiles.Count == 0 && selectedFiles.Count == 0))
@@ -707,11 +716,11 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
-        var filterIncludedFiles = CollectAllIncludedFiles();
-        var selectedFiles = CollectSelectedFiles();
+        var filterIncludedFiles = DirectoryTree.CollectAllIncludedFiles();
+        var selectedFiles = DirectoryTree.CollectSelectedFiles();
         Pipeline.SetSelectedIncludedFileCount(selectedFiles.Count);
 
-        if (!Pipeline.CanRun || (filterIncludedFiles.Count == 0 && selectedFiles.Count == 0))
+        if (!Pipeline.CanRun || filterIncludedFiles.Count == 0)
             return;
 
         var runner = new PipelineRunner(pipeline);
@@ -735,13 +744,14 @@ public partial class MainViewModel : ViewModelBase
 
         StatusBar.Progress.Begin(_runCts);
         var progress = new Progress<OperationProgress>(StatusBar.Progress.Update);
+        var nodeProgress = new Progress<TransformResult>(OnNodeCompleted);
 
         if (AutoOpenLogOnRun)
             LogPanel.IsExpanded = true;
 
         try
         {
-            var results = await runner.ExecuteAsync(job, progress, _runCts.Token);
+            var results = await runner.ExecuteAsync(job, progress, nodeProgress, _runCts.Token);
 
             await _operationJournal.WriteAsync(results.Where(r => r.StepType is StepKind.Copy or StepKind.Move or StepKind.Delete));
 
@@ -775,6 +785,18 @@ public partial class MainViewModel : ViewModelBase
         {
             StatusBar.Progress.Cancelled();
         }
+    }
+
+    private void OnNodeCompleted(TransformResult result)
+    {
+        if (!result.Success || result.SourcePath is null) return;
+        if (result.StepType is not (StepKind.Move or StepKind.Delete)) return;
+
+        var removedDir = DirectoryTree.RemoveNode(result.SourcePath);
+        if (removedDir)
+            FileList.ClearIfUnder(result.SourcePath);
+        else
+            FileList.RemoveFile(result.SourcePath);
     }
 
     private async Task SaveWorkflowAsync()
@@ -911,52 +933,6 @@ public partial class MainViewModel : ViewModelBase
         if (!string.IsNullOrEmpty(vm.LoadRequestedWorkflowName))
         {
             await LoadWorkflowAsync(vm.LoadRequestedWorkflowName);
-        }
-    }
-
-    private List<FileSystemNode> CollectSelectedFiles()
-    {
-        var selected = new List<FileSystemNode>();
-        foreach (var root in DirectoryTree.RootNodes)
-            CollectSelectedFilesRecursive(root, selected);
-        return selected;
-    }
-
-    private static void CollectSelectedFilesRecursive(FileSystemNode node, List<FileSystemNode> output)
-    {
-        foreach (var file in node.Files)
-        {
-            if (file.IsSelected)
-                output.Add(file);
-        }
-
-        foreach (var child in node.Children)
-            CollectSelectedFilesRecursive(child, output);
-    }
-
-    private List<FileSystemNode> CollectAllIncludedFiles()
-    {
-        var all = new List<FileSystemNode>();
-        foreach (var root in DirectoryTree.RootNodes)
-        {
-            CollectAllIncludedFilesRecursive(root, all);
-        }
-        return all;
-    }
-
-    private static void CollectAllIncludedFilesRecursive(FileSystemNode node, List<FileSystemNode> output)
-    {
-        foreach (var file in node.Files)
-        {
-            if (file.FilterResult == FilterResult.Included)
-            {
-                output.Add(file);
-            }
-        }
-
-        foreach (var child in node.Children)
-        {
-            CollectAllIncludedFilesRecursive(child, output);
         }
     }
 

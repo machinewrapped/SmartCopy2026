@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
+using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
@@ -17,6 +19,8 @@ public sealed class DeleteStep : ITransformStep
     public StepKind StepType => StepKind.Delete;
     public bool IsExecutable => true;
 
+    public TransformStepConfig Config => new(StepType, new JsonObject { ["deleteMode"] = Mode.ToString() });
+
     public void Validate(StepValidationContext context)
     {
         context.ValidateHasSelectedInputs();
@@ -25,21 +29,32 @@ public sealed class DeleteStep : ITransformStep
         context.SourceExists = false;
     }
 
-    public TransformStepConfig Config => new(
-        StepType,
-        new JsonObject
-        {
-            ["deleteMode"] = Mode.ToString(),
-        });
-
-    public TransformResult Preview(TransformContext context)
+    public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
-        return new TransformResult(
+        await Task.Yield();
+        yield return new TransformResult(
             Success: true,
             StepType: StepType,
-            DestinationPath: context.SourceNode.FullPath,
+            SourcePath: context.SourceNode.FullPath,
+            InputBytes: context.SourceNode.Size,
+            OutputBytes: 0,
             Message: "Delete preview",
-            SourcePath: context.SourceNode.FullPath);
+            Warning: PlanWarning.SourceWillBeRemoved);
+
+        if (context.SourceNode.IsDirectory)
+        {
+            foreach (var child in context.SourceNode.GetSelectedDescendants())
+            {
+                yield return new TransformResult(
+                    Success: true,
+                    StepType: StepType,
+                    SourcePath: child.FullPath,
+                    InputBytes: child.Size,
+                    OutputBytes: 0,
+                    Message: "Delete preview",
+                    Warning: PlanWarning.SourceWillBeRemoved);
+            }
+        }
     }
 
     public async Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)
@@ -50,10 +65,11 @@ public sealed class DeleteStep : ITransformStep
             Success: true,
             StepType: StepType,
             DestinationPath: context.SourceNode.FullPath,
-            OutputBytes: context.SourceNode.Size,
-            Message: Mode == DeleteMode.Trash
-                ? "Deleted (trash mode requested)."
-                : "Deleted permanently.",
+            InputBytes: context.SourceNode.Size,
+            OutputBytes: 0,
+            Message: context.SourceNode.IsDirectory
+                ? (Mode == DeleteMode.Trash ? "Directory deleted (trash)." : "Directory deleted permanently.")
+                : (Mode == DeleteMode.Trash ? "Deleted (trash mode requested)." : "Deleted permanently."),
             SourcePath: context.SourceNode.FullPath);
     }
 }

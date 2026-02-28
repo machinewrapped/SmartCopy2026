@@ -65,7 +65,6 @@ Before redesigning, preserve these patterns:
 | Hard-coded operation types | Composable transform pipeline |
 | Binary (checked/unchecked) only | Tri-state checkboxes with proper propagation |
 | No safety net for destructive ops | Trash/recycle-bin by default, mandatory preview for deletes |
-| Full pre-scan blocks interaction | Progressive scan: top-level first, stream children in background |
 
 ---
 
@@ -311,10 +310,10 @@ Verification — all automated suites passing:
 - [x] Built-in standard presets:
   Copy only, Move only, Delete to Trash, Flatten -> Copy
 - [x] Step model expansion:
-  `RenameStep`, `RebaseStep`, `ConvertStep`, `FlattenConflictStrategy`; `DeleteStep` mode-aware;
+  `RenameStep`, `RebaseStep`, `FlattenConflictStrategy`; `DeleteStep` mode-aware;
   mutable destination paths on `CopyStep`/`MoveStep`
 - [x] Step editor VM hierarchy:
-  `StepEditorViewModelBase`, Copy/Move/Delete/Flatten/Rename/Rebase/Convert editors +
+  `StepEditorViewModelBase`, Copy/Move/Delete/Flatten/Rename/Rebase editors +
   `StepEditorViewModelFactory`
 - [x] Add Step flyout (two-level category -> type):
   `AddStepViewModel`, `Views/Pipeline/AddStepFlyout.axaml`

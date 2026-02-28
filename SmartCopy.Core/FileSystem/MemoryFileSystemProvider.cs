@@ -14,9 +14,13 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
     private readonly ConcurrentDictionary<string, MemoryEntry> _entries = new(StringComparer.OrdinalIgnoreCase);
     // SemaphoreSlim(1,1) provides async-compatible exclusive locking for all mutation operations.
     private readonly SemaphoreSlim _mutationSemaphore = new(1, 1);
+    
+    // Add artificial delay to simulate real I/O for testing progress reporting.
+    public bool AddArtificialDelay { get; set; }
 
-    public MemoryFileSystemProvider()
+    public MemoryFileSystemProvider(bool addArtificialDelay = false)
     {
+        AddArtificialDelay = addArtificialDelay;
         _entries[Root] = MemoryEntry.CreateDirectory();
     }
 
@@ -100,6 +104,12 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
             }
 
             await output.WriteAsync(buffer.AsMemory(0, read), ct);
+
+            if (AddArtificialDelay)
+            {
+                await Task.Delay(100, ct); // Simulate delay for testing progress reporting
+            }
+
             progress?.Report(read);
         }
 
@@ -132,7 +142,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
                 throw new FileNotFoundException($"Path does not exist: {normalizedPath}", normalizedPath);
             }
 
-            RemovePathInternal(normalizedPath);
+            await RemovePathInternal(normalizedPath, ct);
         }
         finally
         {
@@ -168,7 +178,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
 
             if (_entries.ContainsKey(normalizedDestinationPath))
             {
-                RemovePathInternal(normalizedDestinationPath);
+                await RemovePathInternal(normalizedDestinationPath, ct);
             }
 
             if (sourceEntry.IsDirectory)
@@ -318,7 +328,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         _entries[path] = MemoryEntry.CreateDirectory();
     }
 
-    private void RemovePathInternal(string normalizedPath)
+    private async Task RemovePathInternal(string normalizedPath, CancellationToken ct)
     {
         var toRemove = _entries.Keys
             .Where(currentPath => currentPath.Equals(normalizedPath, StringComparison.OrdinalIgnoreCase)
@@ -328,6 +338,12 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         foreach (var key in toRemove)
         {
             _entries.TryRemove(key, out _);
+
+            if (AddArtificialDelay)
+            {
+                // Simulate delay for testing progress reporting
+                await Task.Delay(100, ct); // Simulate delay for testing progress reporting
+            }
         }
     }
 

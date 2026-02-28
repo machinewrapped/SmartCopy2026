@@ -28,6 +28,9 @@ public partial class PreviewGroupViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isReadyGroup;
 
+    [ObservableProperty]
+    private bool _isExpanded;
+
     public ObservableCollection<PreviewItemViewModel> Actions { get; } = [];
 
     public int Count => Actions.Count;
@@ -39,6 +42,9 @@ public partial class PreviewViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _isDeletePipeline;
+
+    [ObservableProperty]
+    private long _totalEstimatedInputBytes;
 
     [ObservableProperty]
     private long _totalEstimatedOutputBytes;
@@ -77,6 +83,7 @@ public partial class PreviewViewModel : ViewModelBase
         _deleteMode = deleteMode;
         IsDeletePipeline = isDeletePipeline;
         TotalActionCount = plan.Actions.Count;
+        TotalEstimatedInputBytes = plan.TotalInputBytes;
         TotalEstimatedOutputBytes = plan.TotalEstimatedOutputBytes;
 
         Groups.Clear();
@@ -88,16 +95,19 @@ public partial class PreviewViewModel : ViewModelBase
         {
             var title = group.Key switch
             {
-                PlanWarning.DestinationExists => $"Destination Exists ({group.Count()})",
+                PlanWarning.DestinationOverwritten => $"Destination Overwritten ({group.Count()})",
+                PlanWarning.SourceWillBeRemoved => $"Will be removed ({group.Count()})",
                 PlanWarning.NameConflict => $"Name Conflict ({group.Count()})",
                 PlanWarning.PermissionIssue => $"Permission Issue ({group.Count()})",
                 _ => $"Ready ({group.Count()})",
             };
 
+            var isReady = !group.Key.HasValue;
             var vm = new PreviewGroupViewModel
             {
                 Title = title,
-                IsReadyGroup = !group.Key.HasValue,
+                IsReadyGroup = isReady,
+                IsExpanded = isReady || group.Key == PlanWarning.SourceWillBeRemoved
             };
 
             foreach (var action in group)
@@ -140,6 +150,7 @@ public partial class PreviewViewModel : ViewModelBase
         sb.AppendLine($"**Generated:** {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
         sb.AppendLine();
         sb.AppendLine($"**Total Actions:** {TotalActionCount}");
+        sb.AppendLine($"**Total Input Size:** {TotalEstimatedInputBytes} bytes");
         sb.AppendLine($"**Estimated Output Size:** {TotalEstimatedOutputBytes} bytes");
         sb.AppendLine();
 
@@ -151,7 +162,8 @@ public partial class PreviewViewModel : ViewModelBase
         {
             var title = group.Key switch
             {
-                PlanWarning.DestinationExists => $"Destination Exists ({group.Count()})",
+                PlanWarning.DestinationOverwritten => $"Destination Overwritten ({group.Count()})",
+                PlanWarning.SourceWillBeRemoved => $"Will be removed ({group.Count()})",
                 PlanWarning.NameConflict => $"Name Conflict ({group.Count()})",
                 PlanWarning.PermissionIssue => $"Permission Issue ({group.Count()})",
                 _ => $"Ready ({group.Count()})",

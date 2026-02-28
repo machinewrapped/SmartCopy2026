@@ -17,7 +17,6 @@ public static class PipelineStepFactory
             StepKind.Rebase => new RebaseStep(
                 GetOptionalString(config, "stripPrefix"),
                 GetOptionalString(config, "addPrefix")),
-            StepKind.Convert => new ConvertStep(GetOptionalString(config, "outputExtension")),
             StepKind.SelectAll => new SelectAllStep(),
             StepKind.InvertSelection => new InvertSelectionStep(),
             StepKind.ClearSelection => new ClearSelectionStep(),

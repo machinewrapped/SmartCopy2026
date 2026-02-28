@@ -62,6 +62,9 @@ public partial class MainWindow : Window
     private MenuItem? _fullPreScanMenuItem;
     private MenuItem? _lazyExpandScanMenuItem;
 
+    // Options menu — Debug
+    private MenuItem? _artificialDelayMenuItem;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -272,6 +275,18 @@ public partial class MainWindow : Window
             _mainVm?.LazyExpandScan ?? false,
             () => { if (_mainVm is not null) _mainVm.LazyExpandScan = !_mainVm.LazyExpandScan; });
         OptionsMenu.Items.Add(_lazyExpandScanMenuItem);
+
+        // ── Section: Debug  ───────────────────────────────────────────────────
+        OptionsMenu.Items.Add(new Separator());
+        OptionsMenu.Items.Add(SectionHeader("Debug"));
+
+        _artificialDelayMenuItem = new MenuItem
+        {
+            Header = "Add Artificial Delays to Mock Provider",
+            ToggleType = MenuItemToggleType.CheckBox,
+            IsChecked = _mainVm?.AddArtificialDelay ?? false,
+        };
+        OptionsMenu.Items.Add(_artificialDelayMenuItem);
 
         return;
 

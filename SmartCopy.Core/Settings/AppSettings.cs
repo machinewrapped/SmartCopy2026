@@ -30,6 +30,13 @@ public sealed class AppSettings
     /// <summary>Write session.sc2session next to the executable instead of in %APPDATA%.
     /// Lets each portable copy of the app remember its own last-used session.</summary>
     public bool SaveSessionLocally { get; set; } = false;
+
+    /// <summary>
+    /// When enabled, the app will add artificial delay to the MemoryFileSystemProvider to simulate real I/O.
+    /// Disabled for tests so that they run fast.
+    /// </summary>
+    public bool AddArtificialDelay { get; set; } = false;
+
     public int LogRetentionDays { get; set; } = 30;
     public List<string> RecentSources { get; set; } = [];
     public List<string> RecentTargets { get; set; } = [];

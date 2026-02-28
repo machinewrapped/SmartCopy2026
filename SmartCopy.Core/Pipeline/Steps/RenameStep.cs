@@ -19,6 +19,8 @@ public sealed class RenameStep : ITransformStep
     public StepKind StepType => StepKind.Rename;
     public bool IsExecutable => false;
 
+    public TransformStepConfig Config => new(StepType, new JsonObject { ["pattern"] = Pattern });
+
     public void Validate(StepValidationContext context)
     {
         context.ValidateSourceExists("Rename");
@@ -27,17 +29,17 @@ public sealed class RenameStep : ITransformStep
         // Post-condition: source is unchanged.
     }
 
-    public TransformStepConfig Config => new(
-        StepType,
-        new JsonObject
-        {
-            ["pattern"] = Pattern,
-        });
-
-    public TransformResult Preview(TransformContext context)
+    public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
+        await Task.Yield();
         Apply(context);
-        return new TransformResult(
+        if (context.SourceNode.IsDirectory)
+        {
+            yield return new TransformResult(Success: true, StepType: StepType, DestinationPath: null);
+            yield break;
+        }
+        
+        yield return new TransformResult(
             Success: true,
             StepType: StepType,
             DestinationPath: context.DisplayPath,
@@ -48,6 +50,8 @@ public sealed class RenameStep : ITransformStep
     {
         ct.ThrowIfCancellationRequested();
         Apply(context);
+        if (context.SourceNode.IsDirectory)
+            return Task.FromResult(new TransformResult(Success: true, StepType: StepType, DestinationPath: null));
         return Task.FromResult(new TransformResult(
             Success: true,
             StepType: StepType,

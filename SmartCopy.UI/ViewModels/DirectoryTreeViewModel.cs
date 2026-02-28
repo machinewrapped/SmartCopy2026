@@ -113,6 +113,30 @@ public class DirectoryTreeViewModel : ViewModelBase
         return true;
     }
 
+    /// <summary>
+    /// Removes the directory node at <paramref name="fullPath"/> from the tree.
+    /// Returns <c>true</c> if a node was found and removed; <c>false</c> if not found
+    /// (e.g. the path belongs to a file, which lives in FileListViewModel).
+    /// </summary>
+    public bool RemoveNode(string fullPath)
+    {
+        var node = FindByPath(fullPath);
+        if (node is null) return false;
+
+        if (node.Parent is not null)
+        {
+            var parent = node.Parent;
+            parent.Children.Remove(node);
+            FilterChain.RecalculateParentExclusion(parent);
+        }
+        else
+        {
+            RootNodes.Remove(node);
+        }
+
+        return true;
+    }
+
     private void OnRootNodePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         // null property name = batch reset; CheckState or IsSelected = individual change
@@ -199,4 +223,49 @@ public class DirectoryTreeViewModel : ViewModelBase
         return null;
     }
 
+    public IReadOnlyList<FileSystemNode> CollectSelectedFiles()
+    {
+        var selected = new List<FileSystemNode>();
+        foreach (var root in RootNodes)
+        {
+            CollectSelectedNodesRecursive(root, selected);
+        }
+        return selected;
+    }
+
+    public IReadOnlyList<FileSystemNode> CollectAllIncludedFiles()
+    {
+        var all = new List<FileSystemNode>();
+        foreach (var root in RootNodes)
+        {
+            CollectAllIncludedFilesRecursive(root, all);
+        }
+        return all;
+    }
+
+    private static void CollectSelectedNodesRecursive(FileSystemNode node, List<FileSystemNode> output)
+    {
+        if (node.IsDirectory && node.IsSelected)
+        {
+            output.Add(node); // atomic — all descendants selected and filter-included
+            return;           // do NOT recurse into children
+        }
+
+        output.AddRange(node.Files.Where(f => f.IsSelected)); // individual file selection#
+
+        foreach (var child in node.Children)
+        {
+            CollectSelectedNodesRecursive(child, output);
+        }
+    }
+
+    private static void CollectAllIncludedFilesRecursive(FileSystemNode node, List<FileSystemNode> output)
+    {
+        output.AddRange(node.Files.Where(f => f.FilterResult == FilterResult.Included));
+
+        foreach (var child in node.Children)
+        {
+            CollectAllIncludedFilesRecursive(child, output);
+        }
+    }
 }
