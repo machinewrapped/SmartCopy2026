@@ -22,7 +22,10 @@ public sealed class ClearSelectionStep : ITransformStep
     {
         await Task.Yield();
         context.SourceNode.CheckState = CheckState.Unchecked;
-        yield return new TransformResult(Success: true, StepType: StepType, DestinationPath: null, Message: "Clear selection");
+        yield return new TransformResult(
+            IsSuccess: true,
+            SourcePath: context.SourceNode.FullPath,
+            SourcePathResult: SourcePathResult.None);
     }
 
     public Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)
@@ -30,9 +33,8 @@ public sealed class ClearSelectionStep : ITransformStep
         ct.ThrowIfCancellationRequested();
         context.SourceNode.CheckState = CheckState.Unchecked;
         return Task.FromResult(new TransformResult(
-            Success: true,
-            StepType: StepType,
-            DestinationPath: context.DisplayPath,
-            Message: "Clear selection"));
+            IsSuccess: true,
+            SourcePath: context.SourceNode.FullPath,
+            SourcePathResult: SourcePathResult.None));
     }
 }

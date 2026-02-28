@@ -25,7 +25,10 @@ public sealed class SelectAllStep : ITransformStep
     {
         await Task.Yield();
         context.SourceNode.CheckState = CheckState.Checked;
-        yield return new TransformResult(Success: true, StepType: StepType, DestinationPath: null, Message: "Mark as selected");
+        yield return new TransformResult(
+            IsSuccess: true,
+            SourcePath: context.SourceNode.FullPath,
+            SourcePathResult: SourcePathResult.None);
     }
 
     public Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)
@@ -33,9 +36,8 @@ public sealed class SelectAllStep : ITransformStep
         ct.ThrowIfCancellationRequested();
         context.SourceNode.CheckState = CheckState.Checked;
         return Task.FromResult(new TransformResult(
-            Success: true,
-            StepType: StepType,
-            DestinationPath: context.DisplayPath,
-            Message: "Mark as selected"));
+            IsSuccess: true,
+            SourcePath: context.SourceNode.FullPath,
+            SourcePathResult: SourcePathResult.None));
     }
 }

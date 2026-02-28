@@ -42,7 +42,7 @@ public sealed class PipelineRunnerTests
 
         var results = await runner.ExecuteAsync(job, progress: null, ct: CancellationToken.None);
 
-        Assert.Contains(results, r => r.StepType == StepKind.Copy && r.Success);
+        Assert.Contains(results, r => r.SourcePathResult == SourcePathResult.Copied && r.IsSuccess);
         Assert.True(await targetProvider.ExistsAsync("/Mirror/source/song.flac", CancellationToken.None));
     }
 
@@ -200,7 +200,7 @@ public sealed class PipelineRunnerTests
             },
             CancellationToken.None);
 
-        var copyAction = plan.Actions.Single(a => a.StepSummary == "Copy");
+        var copyAction = plan.Actions.Single(a => a.SourcePathResult == SourcePathResult.Copied);
         Assert.Equal("/out/track.mp3", copyAction.DestinationPath);
     }
 
@@ -230,7 +230,7 @@ public sealed class PipelineRunnerTests
             progress: null,
             ct: CancellationToken.None);
 
-        Assert.Contains(results, r => r.Message == "Skipped existing destination.");
+        Assert.Contains(results, r => r.SourcePathResult == SourcePathResult.None);
         // Source must not have been deleted.
         Assert.True(await provider.ExistsAsync("/source/song.mp3", CancellationToken.None));
         // Destination must remain unchanged.

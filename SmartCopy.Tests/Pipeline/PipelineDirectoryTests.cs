@@ -110,8 +110,8 @@ public sealed class PipelineDirectoryTests
             ct: ct);
 
         Assert.Single(results);
-        Assert.True(results[0].Success);
-        Assert.Equal("Directory moved atomically.", results[0].Message);
+        Assert.True(results[0].IsSuccess);
+        Assert.Equal(SourcePathResult.Moved, results[0].SourcePathResult);
         Assert.False(await provider.ExistsAsync("/src/music", ct));
         Assert.True(await provider.ExistsAsync("/dest/src/music", ct));
         Assert.True(await provider.ExistsAsync("/dest/src/music/a.flac", ct));
@@ -148,7 +148,7 @@ public sealed class PipelineDirectoryTests
         var results = await runner.ExecuteAsync(job, progress: null, ct: ct);
 
         Assert.Single(results);
-        Assert.True(results[0].Success);
+        Assert.True(results[0].IsSuccess);
         Assert.False(await provider.ExistsAsync("/src/music", ct));
         Assert.False(await provider.ExistsAsync("/src/music/a.flac", ct));
     }
@@ -184,7 +184,7 @@ public sealed class PipelineDirectoryTests
             ct: ct);
 
         Assert.Single(results);
-        Assert.True(results[0].Success);
+        Assert.True(results[0].IsSuccess);
         // mp3 was moved
         Assert.False(await provider.ExistsAsync("/src/music/a.mp3", ct));
         Assert.True(await provider.ExistsAsync("/dest/src/music/a.mp3", ct));
@@ -223,8 +223,7 @@ public sealed class PipelineDirectoryTests
             ct: ct);
 
         Assert.Single(results);
-        Assert.False(results[0].Success);
-        Assert.Contains("Cannot atomically move directory across providers", results[0].Message);
+        Assert.False(results[0].IsSuccess);
         Assert.True(await sourceProvider.ExistsAsync("/src/music", ct)); // source untouched
     }
 
@@ -263,8 +262,8 @@ public sealed class PipelineDirectoryTests
 
         // FlattenStep + MoveStep each produce a result
         Assert.Equal(2, results.Count);
-        var moveResult = results.Single(r => r.StepType == StepKind.Move);
-        Assert.True(moveResult.Success);
+        var moveResult = results.Single(r => r.SourcePathResult == SourcePathResult.Moved);
+        Assert.True(moveResult.IsSuccess);
         // Flattened: ["src","music","rock"] → ["rock"] → destination /dest/rock
         Assert.True(await provider.ExistsAsync("/dest/rock", ct));
         Assert.True(await provider.ExistsAsync("/dest/rock/a.flac", ct));
@@ -302,8 +301,8 @@ public sealed class PipelineDirectoryTests
 
         // RebaseStep + MoveStep each produce a result
         Assert.Equal(2, results.Count);
-        var moveResult = results.Single(r => r.StepType == StepKind.Move);
-        Assert.True(moveResult.Success);
+        var moveResult = results.Single(r => r.SourcePathResult == SourcePathResult.Moved);
+        Assert.True(moveResult.IsSuccess);
         // strip "src", add "archive" → ["archive","music"] → /dest/archive/music
         Assert.True(await provider.ExistsAsync("/dest/archive/music", ct));
         Assert.True(await provider.ExistsAsync("/dest/archive/music/a.flac", ct));
@@ -343,7 +342,7 @@ public sealed class PipelineDirectoryTests
 
         // One atomic result covering the entire subtree including nested dirs
         Assert.Single(results);
-        Assert.Equal("Directory moved atomically.", results[0].Message);
+        Assert.Equal(SourcePathResult.Moved, results[0].SourcePathResult);
         Assert.False(await provider.ExistsAsync("/src/music", ct));
         Assert.True(await provider.ExistsAsync("/dest/src/music/rock/a.flac", ct));
         Assert.True(await provider.ExistsAsync("/dest/src/music/rock/b.flac", ct));
@@ -380,10 +379,56 @@ public sealed class PipelineDirectoryTests
         var results = await runner.ExecuteAsync(job, progress: null, ct: ct);
 
         Assert.Single(results);
-        Assert.True(results[0].Success);
+        Assert.True(results[0].IsSuccess);
         Assert.False(await provider.ExistsAsync("/src/music/rock", ct));       // rock subdir gone
         Assert.True(await provider.ExistsAsync("/src/music/excluded.txt", ct)); // excluded file stays
         Assert.True(await provider.ExistsAsync("/src/music", ct));              // parent still exists
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // CollectSelectedNodes: dir node represents subtree (not individual children)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Copy: preview reports correct file count for directory nodes
+    // ─────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Copy_Preview_ExpandsDirectoryToPerFileActions()
+    {
+        var (sourceProvider, targetProvider) = MemoryFileSystemFixtures.CreatePair(
+            src => src
+                .WithSimulatedFile("/src/music/a.flac", 1000)
+                .WithSimulatedFile("/src/music/b.flac", 2000),
+            tgt => tgt
+                .WithDirectory("/dest")
+                .WithSimulatedFile("/dest/src/music/a.flac", 1000)); // a.flac already exists at dest
+        var ct = CancellationToken.None;
+        var dirNode = await sourceProvider.GetNodeAsync("/src/music", ct);
+        dirNode.FilterResult = FilterResult.Included;
+        dirNode.CheckState = CheckState.Checked;
+
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/dest")]));
+        var plan = await runner.PreviewAsync(
+            new PipelineJob
+            {
+                FilterIncludedFiles = [dirNode],
+                SelectedFiles       = [dirNode],
+                SourceProvider      = sourceProvider,
+                TargetProvider      = targetProvider,
+                OverwriteMode       = OverwriteMode.Always,
+                DeleteMode          = DeleteMode.Trash,
+            }, ct);
+
+        // One action per file, not one per directory
+        Assert.Equal(2, plan.Actions.Count);
+        Assert.Equal(2, plan.TotalFilesAffected);
+
+        // a.flac already exists → Overwritten; b.flac is new → Created
+        var aAction = plan.Actions.Single(a => a.SourcePath.EndsWith("a.flac"));
+        var bAction = plan.Actions.Single(a => a.SourcePath.EndsWith("b.flac"));
+        Assert.Equal(DestinationPathResult.Overwritten, aAction.DestinationPathResult);
+        Assert.Equal(DestinationPathResult.Created, bAction.DestinationPathResult);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -420,6 +465,6 @@ public sealed class PipelineDirectoryTests
             ct: ct);
 
         Assert.Single(results);
-        Assert.Equal("Directory moved atomically.", results[0].Message);
+        Assert.Equal(SourcePathResult.Moved, results[0].SourcePathResult);
     }
 }

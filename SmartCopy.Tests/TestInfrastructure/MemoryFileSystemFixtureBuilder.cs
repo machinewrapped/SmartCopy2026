@@ -32,7 +32,11 @@ public sealed class MemoryFileSystemFixtureBuilder
         return this;
     }
 
-    public MemoryFileSystemProvider Build() => _provider;
+    public MemoryFileSystemProvider Build()
+    {
+        _provider.BuildNodeTree();
+        return _provider;
+    }
 }
 
 public static class MemoryFileSystemFixtures

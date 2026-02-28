@@ -32,38 +32,59 @@ public sealed class CopyStep : ITransformStep
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
-        if (context.SourceNode.IsDirectory)
-        {
-            yield return new TransformResult(Success: true, StepType: StepType, DestinationPath: null);
-        }
-
-        var targetProvider = context.TargetProvider 
+        var targetProvider = context.TargetProvider
                              ?? throw new InvalidOperationException("TargetProvider must be set for CopyStep.");
 
-        var destination = StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, context.PathSegments);
-        
-        PlanWarning? warning = null;
-        if (await targetProvider.ExistsAsync(destination, ct))
+        if (context.SourceNode.IsDirectory)
         {
-            warning = PlanWarning.DestinationOverwritten;
+            var dirSegmentCount = context.SourceNode.RelativePathSegments.Length;
+            foreach (var file in context.SourceNode.GetSelectedDescendants().Where(n => !n.IsDirectory))
+            {
+                string[] fileSegments = [..context.PathSegments, ..file.RelativePathSegments[dirSegmentCount..]];
+                var destination = StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, fileSegments);
+                var destResult = await targetProvider.ExistsAsync(destination, ct)
+                    ? DestinationPathResult.Overwritten
+                    : DestinationPathResult.Created;
+
+                yield return new TransformResult(
+                    IsSuccess: true,
+                    SourcePath: file.CanonicalRelativePath,
+                    SourcePathResult: SourcePathResult.Copied,
+                    DestinationPath: destination,
+                    DestinationPathResult: destResult,
+                    NumberOfFilesAffected: 1,
+                    InputBytes: file.Size,
+                    OutputBytes: file.Size);
+            }
+            yield break;
         }
 
+        var dest = StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, context.PathSegments);
+        var result = await targetProvider.ExistsAsync(dest, ct)
+            ? DestinationPathResult.Overwritten
+            : DestinationPathResult.Created;
+
         yield return new TransformResult(
-            Success: true,
-            StepType: StepType,
-            DestinationPath: destination,
+            IsSuccess: true,
+            SourcePath: context.SourceNode.CanonicalRelativePath,
+            SourcePathResult: SourcePathResult.Copied,
+            DestinationPath: dest,
+            DestinationPathResult: result,
+            NumberOfFilesAffected: 1,
             InputBytes: context.SourceNode.Size,
-            OutputBytes: context.SourceNode.Size,
-            Message: "Copy preview",
-            SourcePath: context.SourceNode.FullPath,
-            Warning: warning);
+            OutputBytes: context.SourceNode.Size);
     }
 
     public async Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         if (context.SourceNode.IsDirectory)
-            return new TransformResult(Success: true, StepType: StepType, DestinationPath: null);
+        {
+            return new TransformResult(
+                IsSuccess: true,
+                SourcePath: context.SourceNode.FullPath,
+                SourcePathResult: SourcePathResult.None);
+        }
 
         var targetProvider = context.TargetProvider
                              ?? throw new InvalidOperationException("TargetProvider must be set for CopyStep.");
@@ -73,13 +94,11 @@ public sealed class CopyStep : ITransformStep
         if (destinationExists && context.OverwriteMode == OverwriteMode.Skip)
         {
             return new TransformResult(
-                Success: true,
-                StepType: StepType,
+                IsSuccess: true,
+                SourcePath: context.SourceNode.FullPath,
+                SourcePathResult: SourcePathResult.None,
                 DestinationPath: destination,
-                InputBytes: context.SourceNode.Size,
-                OutputBytes: 0,
-                Message: "Skipped existing destination.",
-                SourcePath: context.SourceNode.FullPath);
+                InputBytes: context.SourceNode.Size);
         }
 
         await using var sourceStream = context.ContentStream
@@ -87,12 +106,13 @@ public sealed class CopyStep : ITransformStep
         await targetProvider.WriteAsync(destination, sourceStream, progress: null, ct);
 
         return new TransformResult(
-            Success: true,
-            StepType: StepType,
+            IsSuccess: true,
+            SourcePath: context.SourceNode.FullPath,
+            SourcePathResult: SourcePathResult.Copied,
             DestinationPath: destination,
+            DestinationPathResult: destinationExists ? DestinationPathResult.Overwritten : DestinationPathResult.Created,
+            NumberOfFilesAffected: 1,
             InputBytes: context.SourceNode.Size,
-            OutputBytes: context.SourceNode.Size,
-            Message: "Copied",
-            SourcePath: context.SourceNode.FullPath);
+            OutputBytes: context.SourceNode.Size);
     }
 }

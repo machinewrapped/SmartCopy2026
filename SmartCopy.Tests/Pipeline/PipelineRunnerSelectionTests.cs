@@ -231,6 +231,6 @@ public sealed class PipelineRunnerSelectionTests
 
         // Exactly 3 copy actions — one per filter-included file
         Assert.Equal(3, plan.Actions.Count);
-        Assert.All(plan.Actions, a => Assert.Equal("Copy", a.StepSummary));
+        Assert.All(plan.Actions, a => Assert.Equal(SourcePathResult.Copied, a.SourcePathResult));
     }
 }

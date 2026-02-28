@@ -3,26 +3,21 @@ using System.Linq;
 
 namespace SmartCopy.Core.Pipeline;
 
-public enum PlanWarning
-{
-    DestinationOverwritten,
-    SourceWillBeRemoved,
-    NameConflict,
-    PermissionIssue,
-}
-
 public readonly record struct PlannedAction(
-    string StepSummary,
     string SourcePath,
-    string DestinationPath,
+    SourcePathResult SourcePathResult,
+    string? DestinationPath,
+    DestinationPathResult DestinationPathResult,
+    int NumberOfFilesAffected,
+    int NumberOfFoldersAffected,
     long InputBytes,
-    long EstimatedOutputBytes,
-    PlanWarning? Warning);
+    long OutputBytes);
 
 public sealed class OperationPlan
 {
     public required IReadOnlyList<PlannedAction> Actions { get; init; }
     public required long TotalInputBytes { get; init; }
     public required long TotalEstimatedOutputBytes { get; init; }
-    public int WarningCount => Actions.Count(action => action.Warning.HasValue);
+    public int TotalFilesAffected   => Actions.Sum(a => a.NumberOfFilesAffected);
+    public int TotalFoldersAffected => Actions.Sum(a => a.NumberOfFoldersAffected);
 }

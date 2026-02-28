@@ -14,6 +14,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
     private readonly ConcurrentDictionary<string, MemoryEntry> _entries = new(StringComparer.OrdinalIgnoreCase);
     // SemaphoreSlim(1,1) provides async-compatible exclusive locking for all mutation operations.
     private readonly SemaphoreSlim _mutationSemaphore = new(1, 1);
+    private Dictionary<string, FileSystemNode>? _nodeCache;
     
     // Add artificial delay to simulate real I/O for testing progress reporting.
     public bool AddArtificialDelay { get; set; }
@@ -55,12 +56,55 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         ct.ThrowIfCancellationRequested();
         var normalizedPath = Normalize(path);
 
+        if (_nodeCache != null && _nodeCache.TryGetValue(normalizedPath, out var cached))
+            return Task.FromResult(cached);
+
         if (!_entries.TryGetValue(normalizedPath, out var entry))
         {
             throw new FileNotFoundException($"Path does not exist: {normalizedPath}", normalizedPath);
         }
 
         return Task.FromResult(ToNode(normalizedPath, entry, parent: null));
+    }
+
+    /// <summary>
+    /// Builds a fully-linked <see cref="FileSystemNode"/> tree from the current entries and caches it
+    /// so that subsequent <see cref="GetNodeAsync"/> calls return nodes with populated
+    /// <see cref="FileSystemNode.Children"/> and <see cref="FileSystemNode.Files"/> collections.
+    /// Call this after all seeding is complete (e.g., from a fixture builder's Build step).
+    /// </summary>
+    public void BuildNodeTree()
+    {
+        var cache = new Dictionary<string, FileSystemNode>(StringComparer.OrdinalIgnoreCase);
+        BuildSubtree(Root, _entries[Root], parent: null, cache);
+        _nodeCache = cache;
+    }
+
+    private FileSystemNode BuildSubtree(string path, MemoryEntry entry, FileSystemNode? parent,
+        Dictionary<string, FileSystemNode> cache)
+    {
+        var node = ToNode(path, entry, parent);
+        cache[path] = node;
+
+        if (!entry.IsDirectory)
+            return node;
+
+        var directChildren = _entries
+            .Where(kv => GetParentPath(kv.Key).Equals(path, StringComparison.OrdinalIgnoreCase)
+                         && !kv.Key.Equals(path, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(kv => kv.Value.IsDirectory ? 0 : 1)
+            .ThenBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (childPath, childEntry) in directChildren)
+        {
+            var childNode = BuildSubtree(childPath, childEntry, parent: node, cache);
+            if (childEntry.IsDirectory)
+                node.Children.Add(childNode);
+            else
+                node.Files.Add(childNode);
+        }
+
+        return node;
     }
 
     public Task<Stream> OpenReadAsync(string path, CancellationToken ct)
