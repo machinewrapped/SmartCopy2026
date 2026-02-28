@@ -255,15 +255,9 @@ public interface ITransformStep
     string StepType { get; }
     bool IsExecutable { get; }
 
-    /// <summary>
-    /// True for selection steps (SelectAll, InvertSelection, ClearSelection).
-    /// These steps must see every filter-included file, not just the current working set.
-    /// </summary>
-    bool ProvidesInput => false;
-
     TransformStepConfig Config { get; }
 
-    TransformResult Preview(TransformContext context);
+    IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, CancellationToken ct);
     Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct);
     void Validate(StepValidationContext context);
 }

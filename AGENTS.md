@@ -26,14 +26,14 @@ dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "FullyQualifiedName~
 dotnet publish SmartCopy.App/SmartCopy.App.csproj -c Release --self-contained true -p:PublishSingleFile=true
 ```
 
-## Implementation Status
+## Documentation
+
+### Implementation Status
 Current progress and tasks to be completed are recorded in `Docs/SmartCopy2026-Plan.md`. 
 
 It is focussed on planning and tracking deliverables. Refer to it when you need to get up to speed, update it when progress is made.
 
-## Documentation Signposting
-
-## System Architecture
+### System Architecture
 Canonical architecture reference lives in: `Docs/SmartCopy2026-Architecture.md#1-architecture-design`
 
 When architecture or contract details change, update the architecture reference, then update the plan.
@@ -46,49 +46,20 @@ Canonical algorithm/invariant reference (selection state, tri-state propagation,
 
 This document should be updated when changes are made that affect design and implementation.
 
----
-
-## UI Design
+### UI Design
 
 Canonical UI and interaction designs can be found in `Docs/SmartCopy2026-UIUX.md`. 
 
 Refer to this document for UI consistency and keep it updated when manual testing leads to requests for UI/UX changes.
 
-
 ## Solution Structure
 
 Four projects in `SmartCopy2026.slnx`:
 
-- **SmartCopy.Core** — Pure business logic, no UI references. Houses `IFileSystemProvider`, `FileSystemNode`, `CheckState`, `FilterResult`, `IFilter`, `FilterChain`, and `TransformPipeline`.
+- **SmartCopy.Core** — Pure business logic, no UI references.
 - **SmartCopy.App** — Avalonia application host.
-- **SmartCopy.UI** — MVVM layer. ViewModels inherit `CommunityToolkit.Mvvm.ObservableObject`. Views are `.axaml` files.
+- **SmartCopy.UI** — MVVM layer.
 - **SmartCopy.Tests** — xUnit + NSubstitute. Uses `MemoryFileSystemProvider` for fast, hermetic tests.
-
-## Architecture
-
-### Core model: FileSystemNode
-
-Every file and folder is a `FileSystemNode` with two independent pieces of mutable state:
-
-- `CheckState` — `Checked | Unchecked | Indeterminate` (user selection)
-- `FilterResult` — `Included | Excluded` (computed by FilterChain)
-
-A node is "selected" only when **both** `CheckState == Checked` AND `FilterResult == Included`.
-
-### MVVM hierarchy
-
-```
-MainViewModel
-├── DirectoryTreeViewModel   — RootNodes: ObservableCollection<FileSystemNode>
-├── FileListViewModel        — Files: ObservableCollection<FileSystemNode>
-├── FilterChainViewModel     — Filters: ObservableCollection<FilterViewModel>
-├── PipelineViewModel        — Steps: ObservableCollection<PipelineStepViewModel>
-└── StatusBarViewModel
-└──── SelectionViewModel
-└──── OperationProgressViewModel
-```
-
-ViewModels use `[ObservableProperty]` source-gen attributes (no runtime reflection).
 
 ### UI Layout
 
