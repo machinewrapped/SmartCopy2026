@@ -22,16 +22,19 @@ public partial class PreviewItemViewModel : ViewModelBase
 
     public bool HasDestination => !string.IsNullOrEmpty(DestinationPath);
 
-    public string ActionText => (SourcePathResult, DestinationPathResult) switch
-    {
-        (SourcePathResult.Copied, DestinationPathResult.Overwritten) => "Copy (overwrite)",
-        (SourcePathResult.Copied, _)                                 => "Copy",
-        (SourcePathResult.Moved,  DestinationPathResult.Overwritten) => "Move (overwrite)",
-        (SourcePathResult.Moved,  _)                                 => "Move",
-        (SourcePathResult.Trashed, _)                                => "Trash",
-        (SourcePathResult.Deleted, _)                                => "Delete",
-        _                                                            => string.Empty,
-    };
+    public string ActionText => GetActionText(SourcePathResult, DestinationPathResult);
+
+    internal static string GetActionText(SourcePathResult source, DestinationPathResult destination) =>
+        (source, destination) switch
+        {
+            (SourcePathResult.Copied, DestinationPathResult.Overwritten) => "Copy (overwrite)",
+            (SourcePathResult.Copied, _)                                 => "Copy",
+            (SourcePathResult.Moved,  DestinationPathResult.Overwritten) => "Move (overwrite)",
+            (SourcePathResult.Moved,  _)                                 => "Move",
+            (SourcePathResult.Trashed, _)                                => "Trash",
+            (SourcePathResult.Deleted, _)                                => "Delete",
+            _                                                            => string.Empty,
+        };
 }
 
 public partial class PreviewGroupViewModel : ViewModelBase
@@ -240,16 +243,7 @@ public partial class PreviewViewModel : ViewModelBase
 
             foreach (var action in group)
             {
-                var actionText = (action.SourcePathResult, action.DestinationPathResult) switch
-                {
-                    (SourcePathResult.Copied, DestinationPathResult.Overwritten) => "Copy (overwrite)",
-                    (SourcePathResult.Copied, _)                                 => "Copy",
-                    (SourcePathResult.Moved,  DestinationPathResult.Overwritten) => "Move (overwrite)",
-                    (SourcePathResult.Moved,  _)                                 => "Move",
-                    (SourcePathResult.Trashed, _)                                => "Trash",
-                    (SourcePathResult.Deleted, _)                                => "Delete",
-                    _                                                            => string.Empty,
-                };
+                var actionText = PreviewItemViewModel.GetActionText(action.SourcePathResult, action.DestinationPathResult);
                 sb.AppendLine($"| `{action.SourcePath}` | `{action.DestinationPath}` | {actionText} |");
             }
             sb.AppendLine();

@@ -142,7 +142,7 @@ public sealed class PipelineRunner
             else
             {
                 long totalBytes = workingSet.Sum(GetNodeBytes);
-                int totalFiles = workingSet.Sum(CountAllFiles);
+                int totalFiles = workingSet.Sum(n => n.CountAllFiles());
 
                 foreach (var node in workingSet)
                 {
@@ -190,11 +190,6 @@ public sealed class PipelineRunner
         node.IsDirectory
             ? node.Files.Sum(f => f.Size) + node.Children.Sum(c => GetNodeBytes(c))
             : node.Size;
-
-    private static int CountAllFiles(FileSystemNode node) =>
-        node.IsDirectory
-            ? node.Files.Count + node.Children.Sum(CountAllFiles)
-            : 1;
 
     private static TransformContext CreateContext(FileSystemNode node, PipelineJob job)
     {

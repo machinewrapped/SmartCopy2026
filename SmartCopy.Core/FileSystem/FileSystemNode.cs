@@ -154,9 +154,15 @@ public class FileSystemNode : INotifyPropertyChanged
 
     internal int CountSelectedFiles() =>
         (IsSelected && !IsDirectory ? 1 : 0) + (IsDirectory ? Children.Sum(c => c.CountSelectedFiles()) + Files.Count(f => f.IsSelected) : 0);
-    
+
     internal int CountSelectedFolders() =>
         (IsSelected && IsDirectory ? 1 : 0) + (IsDirectory ? Children.Sum(c => c.CountSelectedFolders()) : 0);
+
+    internal int CountAllFiles() =>
+        IsDirectory ? Files.Count + Children.Sum(c => c.CountAllFiles()) : 1;
+
+    internal int CountAllFolders() =>
+        IsDirectory ? 1 + Children.Sum(c => c.CountAllFolders()) : 0;
 
     private void EndBatchUpdate()
     {

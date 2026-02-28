@@ -57,8 +57,8 @@ public sealed class OperationJournal
         {
             ct.ThrowIfCancellationRequested();
             var action = MapAction(result);
-            var source = result.SourcePath;
-            var destination = result.DestinationPath ?? string.Empty;
+            var source = SanitizeField(result.SourcePath);
+            var destination = SanitizeField(result.DestinationPath ?? string.Empty);
             var status = result.IsSuccess ? "ok" : "failed";
 
             await writer.WriteLineAsync(
@@ -82,6 +82,9 @@ public sealed class OperationJournal
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         return Path.Combine(home, ".config", "SmartCopy2026", "logs");
     }
+
+    private static string SanitizeField(string value) =>
+        value.Replace('\t', ' ').Replace('\r', ' ').Replace('\n', ' ');
 
     private static string MapAction(TransformResult result) => result.SourcePathResult switch
     {

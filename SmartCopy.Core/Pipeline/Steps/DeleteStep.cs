@@ -65,18 +65,8 @@ public sealed class DeleteStep : ITransformStep
             IsSuccess: true,
             SourcePath: context.SourceNode.FullPath,
             SourcePathResult: Mode == DeleteMode.Trash ? SourcePathResult.Trashed : SourcePathResult.Deleted,
-            NumberOfFilesAffected: CountAllFiles(context.SourceNode),
-            NumberOfFoldersAffected: CountAllFolders(context.SourceNode),
+            NumberOfFilesAffected: context.SourceNode.CountAllFiles(),
+            NumberOfFoldersAffected: context.SourceNode.CountAllFolders(),
             InputBytes: context.SourceNode.Size);
     }
-
-    private static int CountAllFiles(FileSystemNode node) =>
-        node.IsDirectory
-            ? node.Files.Count + node.Children.Sum(CountAllFiles)
-            : 1;
-
-    private static int CountAllFolders(FileSystemNode node) =>
-        node.IsDirectory
-            ? 1 + node.Children.Sum(CountAllFolders)
-            : 0;
 }
