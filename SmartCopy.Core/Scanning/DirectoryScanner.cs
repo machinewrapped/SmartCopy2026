@@ -21,37 +21,13 @@ public sealed class DirectoryScanner
         var rootNode = CloneForTree(await _provider.GetNodeAsync(rootPath, ct), parent: null, rootPath);
         yield return rootNode;
 
+        // visited guards against circular symbolic links re-enqueueing an already-processed path.
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { rootNode.FullPath };
+        var queue = new Queue<(FileSystemNode Node, int Depth)>();
+        queue.Enqueue((rootNode, 0));
+
         var directoriesScanned = 0;
         var nodesDiscovered = 0;
-
-        var topLevelChildren = await _provider.GetChildrenAsync(rootNode.FullPath, ct);
-        directoriesScanned++;
-        progress?.Report(new ScanProgress(nodesDiscovered, directoriesScanned, rootNode.FullPath));
-
-        var queue = new Queue<(FileSystemNode Node, int Depth)>();
-        foreach (var child in topLevelChildren)
-        {
-            ct.ThrowIfCancellationRequested();
-            if (!ShouldIncludeNode(child, options))
-            {
-                continue;
-            }
-
-            var rootedChild = CloneForTree(child, rootNode, rootPath);
-            if (rootedChild.IsDirectory)
-                rootNode.Children.Add(rootedChild);
-            else
-                rootNode.Files.Add(rootedChild);
-
-            nodesDiscovered++;
-            progress?.Report(new ScanProgress(nodesDiscovered, directoriesScanned, rootedChild.FullPath));
-            yield return rootedChild;
-
-            if (rootedChild.IsDirectory && !options.LazyExpand)
-            {
-                queue.Enqueue((rootedChild, 1));
-            }
-        }
 
         while (queue.Count > 0)
         {
@@ -75,20 +51,23 @@ public sealed class DirectoryScanner
                     continue;
                 }
 
-                var childWithParent = CloneForTree(child, currentDirectory, rootPath);
-                if (childWithParent.IsDirectory)
-                    currentDirectory.Children.Add(childWithParent);
+                var cloned = CloneForTree(child, currentDirectory, rootPath);
+                if (cloned.IsDirectory)
+                {
+                    currentDirectory.Children.Add(cloned);
+                    if (!options.LazyExpand && visited.Add(cloned.FullPath))
+                    {
+                        queue.Enqueue((cloned, depth + 1));
+                    }
+                }
                 else
-                    currentDirectory.Files.Add(childWithParent);
+                {
+                    currentDirectory.Files.Add(cloned);
+                }
 
                 nodesDiscovered++;
-                progress?.Report(new ScanProgress(nodesDiscovered, directoriesScanned, childWithParent.FullPath));
-                yield return childWithParent;
-
-                if (childWithParent.IsDirectory)
-                {
-                    queue.Enqueue((childWithParent, depth + 1));
-                }
+                progress?.Report(new ScanProgress(nodesDiscovered, directoriesScanned, cloned.FullPath));
+                yield return cloned;
             }
         }
     }
