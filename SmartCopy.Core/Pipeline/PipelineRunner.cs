@@ -47,7 +47,7 @@ public sealed class PipelineRunner
                 foreach (var node in job.FilterIncludedFiles)
                 {
                     ct.ThrowIfCancellationRequested();
-                    step.Preview(GetOrCreate(node));
+                    await foreach (var _ in step.PreviewAsync(GetOrCreate(node), ct)) { }
                 }
                 workingSet = job.FilterIncludedFiles
                     .Where(n => n.CheckState == CheckState.Checked)
@@ -63,24 +63,23 @@ public sealed class PipelineRunner
                     ct.ThrowIfCancellationRequested();
 
                     TransformContext context = GetOrCreate(node);
-                    var preview = step.Preview(context);
 
-                    if (!string.IsNullOrWhiteSpace(preview.DestinationPath))
+                    await foreach (TransformResult preview in step.PreviewAsync(context, ct))
                     {
-                        var nodeBytes = GetNodeBytes(node);
-                        var warning = await GetWarningAsync(preview.DestinationPath, job.TargetProvider, ct);
-                        actions.Add(new PlannedAction(
-                            StepSummary: step.StepType.ToString(),
-                            SourcePath: node.FullPath,
-                            DestinationPath: preview.DestinationPath!,
-                            InputBytes: nodeBytes,
-                            EstimatedOutputBytes: preview.OutputBytes == 0 ? nodeBytes : preview.OutputBytes,
-                            Warning: warning));
-                    }
-
-                    if (!preview.Success)
-                    {
-                        failedNodes.Add(node);
+                        if (preview.Success)
+                        {
+                            actions.Add(new PlannedAction(
+                                StepSummary: step.StepType.ToString(),
+                                SourcePath: preview.SourcePath ?? node.FullPath,
+                                DestinationPath: preview.DestinationPath!,
+                                InputBytes: preview.InputBytes,
+                                EstimatedOutputBytes: preview.OutputBytes,
+                                Warning: preview.Warning));
+                        }
+                        else
+                        {
+                            failedNodes.Add(node);
+                        }
                     }
                 }
             }
@@ -203,20 +202,6 @@ public sealed class PipelineRunner
             OverwriteMode = job.OverwriteMode,
             DeleteMode = job.DeleteMode,
         };
-    }
-
-    private static async Task<PlanWarning?> GetWarningAsync(
-        string destinationPath,
-        IFileSystemProvider? targetProvider,
-        CancellationToken ct)
-    {
-        if (targetProvider is null)
-        {
-            return null;
-        }
-
-        var exists = await targetProvider.ExistsAsync(destinationPath, ct);
-        return exists ? PlanWarning.DestinationExists : null;
     }
 
     private static TimeSpan EstimateRemaining(TimeSpan elapsed, long completed, long total)

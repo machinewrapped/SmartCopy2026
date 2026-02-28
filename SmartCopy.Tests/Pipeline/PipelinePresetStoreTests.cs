@@ -85,7 +85,6 @@ public sealed class PipelinePresetStoreTests
             new FlattenStep(FlattenConflictStrategy.Skip),
             new RenameStep("{name}_new"),
             new RebaseStep("source", "target"),
-            new ConvertStep("mp3"),
         };
 
         foreach (var step in input)

@@ -41,6 +41,11 @@ public partial class PreviewView : Window
         };
     }
 
+    private void OnTitleBarPointerPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
+    {
+        BeginMoveDrag(e);
+    }
+
     private void OnRunRequested()
     {
         Avalonia.Threading.Dispatcher.UIThread.Post(() => Close(true));

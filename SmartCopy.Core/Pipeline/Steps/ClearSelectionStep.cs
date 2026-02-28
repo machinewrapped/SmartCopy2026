@@ -11,17 +11,18 @@ public sealed class ClearSelectionStep : ITransformStep
     public bool IsConfigurable => false;
     public bool ProvidesInput => true;
 
+    public TransformStepConfig Config => new(StepType, new JsonObject());
+
     public void Validate(StepValidationContext context)
     {
         // No preconditions or postconditions.
     }
 
-    public TransformStepConfig Config => new(StepType, new JsonObject());
-
-    public TransformResult Preview(TransformContext context)
+    public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
+        await Task.Yield();
         context.SourceNode.CheckState = CheckState.Unchecked;
-        return new(Success: true, StepType: StepType, DestinationPath: null, Message: "Clear selection");
+        yield return new TransformResult(Success: true, StepType: StepType, DestinationPath: null, Message: "Clear selection");
     }
 
     public Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)

@@ -5,7 +5,8 @@ namespace SmartCopy.Core.Pipeline;
 
 public enum PlanWarning
 {
-    DestinationExists,
+    DestinationOverwritten,
+    SourceWillBeRemoved,
     NameConflict,
     PermissionIssue,
 }

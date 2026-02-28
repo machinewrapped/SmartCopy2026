@@ -12,7 +12,7 @@ public sealed class PreviewViewModelTests
             Actions =
             [
                 new PlannedAction("Copy", "/a", "/out/a", 10, 10, null),
-                new PlannedAction("Copy", "/b", "/out/b", 10, 10, PlanWarning.DestinationExists),
+                new PlannedAction("Copy", "/b", "/out/b", 10, 10, PlanWarning.DestinationOverwritten),
                 new PlannedAction("Move", "/c", "/out/c", 10, 10, PlanWarning.NameConflict),
             ],
             TotalInputBytes = 30,
@@ -29,7 +29,7 @@ public sealed class PreviewViewModelTests
 
         Assert.Equal(3, vm.Groups.Count);
         Assert.Contains(vm.Groups, g => g.Title.StartsWith("Ready"));
-        Assert.Contains(vm.Groups, g => g.Title.StartsWith("Destination Exists"));
+        Assert.Contains(vm.Groups, g => g.Title.StartsWith("Destination Overwritten"));
         Assert.Contains(vm.Groups, g => g.Title.StartsWith("Name Conflict"));
     }
 

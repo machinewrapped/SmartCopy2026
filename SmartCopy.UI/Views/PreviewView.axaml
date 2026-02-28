@@ -7,62 +7,90 @@
         Width="900"
         Height="560"
         WindowStartupLocation="CenterOwner"
-        Background="#1e1e1e">
-    <Grid RowDefinitions="Auto,*,Auto" Margin="16">
-        <Border Grid.Row="0"
-                IsVisible="{Binding IsDeletePipeline}"
-                Background="#3a2f1b"
-                CornerRadius="4"
-                Padding="8"
-                Margin="0,0,0,10">
-            <TextBlock Text="Delete confirmation is required before running."
-                       Foreground="#f0ad4e" />
-        </Border>
+        ShowInTaskbar="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent">
 
-        <ScrollViewer Grid.Row="1"
-                      VerticalScrollBarVisibility="Auto">
-            <ItemsControl ItemsSource="{Binding Groups}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:PreviewGroupViewModel">
-                        <Expander Header="{Binding Title}"
-                                  IsExpanded="{Binding IsReadyGroup}"
-                                  HorizontalAlignment="Stretch"
-                                  HorizontalContentAlignment="Stretch"
-                                  Margin="0,0,0,8">
-                            <ItemsControl ItemsSource="{Binding Actions}"
-                                          HorizontalAlignment="Stretch">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:PreviewItemViewModel">
-                                        <Grid ColumnDefinitions="2*,2*,Auto" Margin="0,2,0,2">
-                                            <TextBlock Grid.Column="0" Text="{Binding SourcePath}" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
-                                            <TextBlock Grid.Column="1" Text="{Binding DestinationPath}" Opacity="0.85" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
-                                            <TextBlock Grid.Column="2" Text="{Binding Action}" Opacity="0.75" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </Expander>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
+    <Window.KeyBindings>
+        <KeyBinding Gesture="Escape" Command="{Binding CancelCommand}" />
+    </Window.KeyBindings>
 
-        <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,Auto" Margin="0,10,0,0" HorizontalAlignment="Right">
-            <Button Grid.Column="0"
-                    Content="Close"
-                    Width="90"
-                    Margin="0,0,8,0"
-                    Command="{Binding CancelCommand}"
-                    IsCancel="True" />
-            <Button Grid.Column="1"
-                    Content="Save Report..."
-                    Width="110"
-                    Margin="0,0,8,0"
-                    Command="{Binding SaveReportCommand}" />
-            <Button Grid.Column="2"
-                    Content="{Binding ConfirmButtonText}"
-                    Width="200"
-                    Command="{Binding RunCommand}" />
+    <Border Background="#1e1e1e" BorderBrush="#555" BorderThickness="1" CornerRadius="6">
+        <Grid RowDefinitions="Auto, *, Auto">
+            
+            <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="8,4,4,2" Background="Transparent" PointerPressed="OnTitleBarPointerPressed">
+                <TextBlock Grid.Column="0" Text="{Binding TotalActionCount, StringFormat=Preview (\{0\} actions)}" FontWeight="SemiBold" Foreground="#4facfe" VerticalAlignment="Center" Margin="4,2,0,2" IsHitTestVisible="False" />
+                <Button Grid.Column="1"
+                        Content="✕"
+                        Command="{Binding CancelCommand}"
+                        Background="Transparent"
+                        Padding="6,2"
+                        CornerRadius="4"
+                        FontSize="12"
+                        Foreground="#a0a0a0" />
+            </Grid>
+
+            <Separator Grid.Row="0" VerticalAlignment="Bottom" Height="1" Background="#3e3e42" Margin="4,0" IsHitTestVisible="False" />
+
+            <Grid Grid.Row="1" RowDefinitions="Auto,*" Margin="16,16,16,0">
+                <Border Grid.Row="0"
+                        IsVisible="{Binding IsDeletePipeline}"
+                        Background="#3a2f1b"
+                        CornerRadius="4"
+                        Padding="8"
+                        Margin="0,0,0,10">
+                    <TextBlock Text="Delete confirmation is required before running."
+                               Foreground="#f0ad4e" />
+                </Border>
+
+                <ScrollViewer Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Groups}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PreviewGroupViewModel">
+                                <Expander Header="{Binding Title}"
+                                          IsExpanded="{Binding IsExpanded}"
+                                          HorizontalAlignment="Stretch"
+                                          HorizontalContentAlignment="Stretch"
+                                          Margin="0,0,0,8">
+                                    <ItemsControl ItemsSource="{Binding Actions}"
+                                                  HorizontalAlignment="Stretch">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:PreviewItemViewModel">
+                                                <Grid ColumnDefinitions="2*,2*,Auto" Margin="0,2,0,2">
+                                                    <TextBlock Grid.Column="0" Text="{Binding SourcePath}" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding DestinationPath}" Opacity="0.85" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                                                    <TextBlock Grid.Column="2" Text="{Binding Action}" Opacity="0.75" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Expander>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+
+            <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,Auto" Margin="16,10,16,16" HorizontalAlignment="Right">
+                <Button Grid.Column="0"
+                        Content="Close"
+                        Width="90"
+                        Margin="0,0,8,0"
+                        Command="{Binding CancelCommand}"
+                        IsCancel="True" />
+                <Button Grid.Column="1"
+                        Content="Save Report..."
+                        Width="110"
+                        Margin="0,0,8,0"
+                        Command="{Binding SaveReportCommand}" />
+                <Button Grid.Column="2"
+                        Content="{Binding ConfirmButtonText}"
+                        Width="200"
+                        Command="{Binding RunCommand}" />
+            </Grid>
         </Grid>
-    </Grid>
+    </Border>
 </Window>

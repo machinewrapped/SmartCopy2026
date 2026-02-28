@@ -17,25 +17,25 @@ public sealed class FlattenStep : ITransformStep
     public StepKind StepType => StepKind.Flatten;
     public bool IsExecutable => false;
 
+    public TransformStepConfig Config => new(StepType, new JsonObject { ["conflictStrategy"] = ConflictStrategy.ToString() });
+
     public void Validate(StepValidationContext context)
     {
         context.ValidateSourceExists("Flatten");
         // Post-condition: source is unchanged.
     }
 
-    public TransformStepConfig Config => new(
-        StepType,
-        new JsonObject
-        {
-            ["conflictStrategy"] = ConflictStrategy.ToString(),
-        });
-
-    public TransformResult Preview(TransformContext context)
+    public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
+        await Task.Yield();
         Apply(context);
         if (context.SourceNode.IsDirectory)
-            return new TransformResult(Success: true, StepType: StepType, DestinationPath: null);
-        return new TransformResult(
+        {
+            yield return new TransformResult(Success: true, StepType: StepType, DestinationPath: null);
+            yield break;
+        }
+
+        yield return new TransformResult(
             Success: true,
             StepType: StepType,
             DestinationPath: context.DisplayPath,

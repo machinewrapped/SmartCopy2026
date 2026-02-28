@@ -136,6 +136,22 @@ public class FileSystemNode : INotifyPropertyChanged
         return new BatchUpdateScope(this);
     }
 
+    public IEnumerable<FileSystemNode> GetSelectedDescendants()
+    {
+        foreach (var file in Files)
+            if (file.IsSelected)
+                yield return file;
+
+        foreach (var child in Children)
+        {
+            if (child.IsSelected)
+                yield return child;
+
+            foreach (var desc in child.GetSelectedDescendants())
+                yield return desc;
+        }
+    }
+
     private void EndBatchUpdate()
     {
         _batchUpdateDepth--;

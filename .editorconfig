@@ -5,3 +5,15 @@ root = true
 # Disable IDE0290: Use primary constructor
 dotnet_diagnostic.IDE0290.severity = none
 csharp_style_prefer_primary_constructors = false:none
+
+#Disable IDE0017: Object or collection initialization can be simplified
+dotnet_diagnostic.IDE0017.severity = none
+
+# Disable IDE0301: Collection initialization can be simplified
+dotnet_diagnostic.IDE0301.severity = none
+
+# Disable IDE0305: Collection initialization can be simplified
+dotnet_diagnostic.IDE0305.severity = none
+
+# Disable IDE0028: Collection initialization can be simplified
+dotnet_diagnostic.IDE0028.severity = none

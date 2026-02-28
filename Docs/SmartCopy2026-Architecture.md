@@ -301,11 +301,11 @@ be relative to the user's selected source directory (not the filesystem or provi
 |---|---|
 | Simple copy | `[CopyStep]` |
 | Flatten copy | `[FlattenStep → CopyStep]` |
-| Transcode | `[ConvertStep(mp3, 320k) → CopyStep]` |
 | Archive move | `[FlattenStep → MoveStep]` |
 | Copy then move | `[CopyStep("/mem/Backup") → MoveStep("/mem/Archive")]` |
 | Copy unselected | `[InvertSelectionStep → CopyStep]` |
 | Copy everything | `[SelectAllStep → CopyStep]` |
+| Transcode | `[ConvertStep(mp3, 320k) → CopyStep]` |
 
 Pipelines saved as `.sc2pipe` (JSON). The simple presets (Copy, Move, Delete) appear as toolbar
 buttons and internally create single-step pipelines.

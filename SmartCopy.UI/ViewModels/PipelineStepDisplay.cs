@@ -40,7 +40,6 @@ internal static class PipelineStepDisplay
             FlattenStep => "Flatten folders",
             RenameStep => "Rename files",
             RebaseStep => "Rebase paths",
-            ConvertStep => "Convert files",
             SelectAllStep => "Select all",
             InvertSelectionStep => "Invert selection",
             ClearSelectionStep => "Clear selection",
@@ -64,9 +63,6 @@ internal static class PipelineStepDisplay
             FlattenStep flattenStep => $"Conflict strategy: {flattenStep.ConflictStrategy}",
             RenameStep renameStep => $"Pattern: {renameStep.Pattern}",
             RebaseStep rebaseStep => $"Strip: '{rebaseStep.StripPrefix}'  Add: '{rebaseStep.AddPrefix}'",
-            ConvertStep convertStep => string.IsNullOrWhiteSpace(convertStep.OutputExtension)
-                ? "Output extension: required"
-                : $"Output extension: .{convertStep.OutputExtension}",
             SelectAllStep => "Mark all files as selected",
             InvertSelectionStep => "Toggle selection on each file",
             ClearSelectionStep => "Unmark all files",

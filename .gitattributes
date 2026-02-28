@@ -1,8 +1,30 @@
-# Normalise all text files to LF in repo and working copies.
-# This overrides the global core.autocrlf=true on Windows and keeps
-# line endings consistent across Windows/Linux/macOS contributors.
-* text=auto eol=lf
+# Auto detect text files and perform LF normalization
+* text=auto
 
-# Ensure batch files keep CRLF, which Windows requires for execution.
-*.bat text eol=crlf
-*.cmd text eol=crlf
+# C# files
+*.cs text diff=csharp
+*.csproj text merge=union
+*.sln text eol=crlf merge=union
+
+# Web files
+*.html text
+*.css text
+*.js text
+
+# XAML and App files
+*.xaml text
+*.axaml text
+*.config text
+*.xml text
+*.json text
+
+# Text files
+*.txt text
+*.md text
+
+# Image files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
