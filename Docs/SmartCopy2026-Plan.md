@@ -1,24 +1,19 @@
 # SmartCopy2026 — Design & Implementation Plan (Revised)
 
 **Prepared:** 2026-02-18
-**Revised:** 2026-02-22 (Phase 1 is now strictly memory-first UX/architecture; local filesystem integration moved to standalone Phase 2; architecture reference split into `Docs/SmartCopy2026-Architecture.md`)
 **Author:** Simon Booth
 **License:** MIT
 **Predecessor:** SmartCopy 2015 (GPL v3, .NET 4.8 WinForms, SourceForge)
 
-This document is the execution plan for the SmartCopy2026 rewrite: sequencing, delivery scope,
-acceptance criteria, and verification.
+This document is the execution plan for the SmartCopyTool rewrite: sequencing, delivery scope, acceptance criteria, and verification.
 
-Implementation-oriented architecture, contracts, algorithms, UI behavior, and data schemas now
-live in `Docs/SmartCopy2026-Architecture.md`.
+Implementation-oriented architecture, contracts, algorithms, UI behavior, and data schemas now can be found in `Docs/SmartCopy2026-Architecture.md`.
 
 ---
 
 ## Table of Contents
 
 Reference:
-- [Architecture Reference (separate document)](SmartCopy2026-Architecture.md)
-
 1. [What the Predecessor Got Right](#1-what-the-predecessor-got-right)
 2. [What to Fix and Improve](#2-what-to-fix-and-improve)
 3. [Technology Stack](#3-technology-stack)
@@ -120,46 +115,9 @@ installed, `global.json` can pin the SDK version. Self-contained publish (`--sel
 
 ---
 
-## 4. Architecture Design
+## 8. Phase 1 — Core Workflows (COMPLETE)
 
-Canonical architecture reference lives in:
-- `Docs/SmartCopy2026-Architecture.md#1-architecture-design`
-
-This plan keeps only execution sequencing and acceptance criteria. When architecture or contract details change, update the architecture reference first, then update impacted plan steps.
-
----
-
-## 5. Key Technical Designs
-
-Detailed technical contracts (providers, filters, pipeline, preview/progress, scanner/watcher, plugin interface) now live in:
-- `Docs/SmartCopy2026-Architecture.md#2-key-technical-designs`
-
-Do not duplicate full class/interface signatures here unless a step requires an explicit temporary delta.
-
----
-
-## 6. Algorithms and Implementation Notes
-
-Canonical algorithm/invariant reference (selection state, tri-state propagation, mirror matching, wildcard matching, sync semantics, safety defaults) now lives in:
-- `Docs/SmartCopy2026-Architecture.md#3-algorithms-and-implementation-notes`
-
-Step acceptance criteria may reference algorithm sections (for example `Safety Defaults for Destructive Operations`) but normative algorithm text is maintained in the architecture reference.
-
----
-
-## 7. UI Design
-
-Canonical UI behavior and interaction specs now live in:
-- `Docs/SmartCopy2026-UIUX.md`
-
-Plan-level rule: keep UI implementation tasks and verification in Phase steps; keep stable interaction specs in architecture.
-
----
-
-## 8. Phase 1 — Core Workflows
-
-*Goal: ship a reliable cross-platform v1 that can scan, select, filter, preview, copy/move/delete,
-and sync safely.*
+*Goal: ship a v1 prototype that can scan, select, filter, preview, copy/move/delete to validate architecture and UX.*
 
 ### Phase 1 sequencing principle
 
@@ -176,20 +134,20 @@ and sync safely.*
 2. Validation-first hardening track (prioritised while behaviour is still fresh)
 3. UX polish track (after end-to-end flow is proven)
 
-### Phase 1 status snapshot (as of 2026-02-25)
+### Phase 1 status (complete as of 2026-02-28)
 
 | Workstream item | Status | Next action |
 |---|---|---|
 | UX-1 (Step 1): Baseline shell | Complete | Baseline for regression checks |
-| UX-2 (Step 3): Node selection logic | Complete | Scale/perf coverage alongside Step 9 |
-| UX-3 (Step 4): Filter chain | Complete | Save/Load file-picker deferred to Phase 3 |
-| UX-4 (Step 5): Transform pipeline | Complete (validation pending manual test run) | Maintainer to execute new Step 5 test suites + UI smoke scenarios |
-| UX-5 (Step 6): Workflow presets and menu | Complete | Manual UI smoke scenario pending |
-| Hardening-1 (Step 2): Memory provider foundation | Complete | Reuse fixture builder pattern |
-| Hardening-2 (Step 7): Selection save/load | Complete | Manual UI smoke scenarios pending |
+| UX-2 (Step 3): Node selection logic | Complete |
+| UX-3 (Step 4): Filter chain | Complete |
+| UX-4 (Step 5): Transform pipeline | Complete |
+| UX-5 (Step 6): Workflow presets and menu | Complete |
+| Hardening-1 (Step 2): Memory provider foundation | Complete |
+| Hardening-2 (Step 7): Selection save/load | Complete |
 | Hardening-3 (Step 8): Settings persistence | Complete | — |
 | Polish-1 (Step 9): Shell observability + status | Complete | — |
-| Polish-2 (Step 10): Keyboard + accessibility | Not started | After Step 9 |
+| Polish-2 (Step 10): Keyboard + accessibility | Complete |
 
 ### UI/UX Validation (Phase 1)
 
@@ -489,22 +447,6 @@ Acceptance criteria:
 Verification:
 - [x] `dotnet build SmartCopy.UI/SmartCopy.UI.csproj /tl:off /clp:ErrorsOnly` — 0 warnings, 0 errors
 - [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj` — 184/184 passing (1 new: `SaveAndLoad_RoundTripsNewOptions`)
-
-### Step 12 - Export and Import Presets (UX Polish Track) 
-
-Support exporting and importing presets for migration and sharing.
-
-Deliverables:
-- [ ] Export presets (collect workflow, filter, pipeline and pipeline step presets and write to archive)
-- [ ] Import presets (extract from archive)
-
-Acceptance criteria:
-- [ ] Exported presets can be imported and restored
-- [ ] Unit tests for export and import
-
-Verification:
-- [ ] `dotnet build` passes
-- [ ] All tests pass
 
 ---
 

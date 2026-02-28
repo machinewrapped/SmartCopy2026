@@ -10,7 +10,7 @@ algorithms and data models.
 1. [Architecture Design](#1-architecture-design)
 2. [Key Technical Designs](#2-key-technical-designs)
 3. [Algorithms and Implementation Notes](#3-algorithms-and-implementation-notes)
-4. [UI Design](#4-ui-design)
+4. [MVVM Hierarchy](#4-mvvm-hierarchy)
 
 ---
 
@@ -376,6 +376,7 @@ Each `FileSystemNode` carries two independent pieces of application state:
 **`FilterResult`** — filter chain output:
 - `Included` — passes all enabled filters (or no filters are active)
 - `Excluded` — caught by at least one active filter; carries the name of the first excluding filter
+- `Mixed` - a folder which contains some included children and some that are excluded
 
 A directory automatically becomes `Excluded` if all its children and files are `Excluded`, and ceases to be `Excluded` if any of its children or files are `Included`.
 
@@ -579,38 +580,20 @@ The ComboBox nulls its `SelectedItem` (e.g. during `RefreshSourceBookmarks`), wh
 
 **Correct pattern:** Save contents before clearing and restore it after repopulation:
 
----
+# 4. MVVM Hierarchy
 
-### UI Improvements Over Predecessor
+### MVVM hierarchy
 
-1. **Source and destination fields accept drag-and-drop** from Explorer/Finder
-2. **Proper tri-state tree checkboxes** — `▣` for indeterminate
-3. **Filter chain is visual** — each filter is a card; drag to reorder; toggle without removing
-4. **Pipeline is visual** — steps shown as an arrow chain; presets as buttons
-   and cards use human-readable summary + technical subtitle formatting
-5. **Three-column layout** — Filters | Folders | Files in a single resizable row; all three columns
-   have draggable splitters; column widths are persisted across sessions
-6. **Filter cards are human-friendly** — each card shows a readable summary ("Only .mp3 and .flac
-   files") above a dimmed technical subtitle; enable/disable via checkbox; edit via pencil icon
-7. **Preview** — shows exactly what will happen before running
-8. **Device picker** — MTP devices appear in the destination path picker on Copy/Move pipeline
-   steps alongside local paths (the 📁 Browse button becomes a "Local folder... / Phone (MTP)..."
-   split flyout when MTP devices are available)
-9. **Keyboard-first** — every action reachable via keyboard; focus indicators on all controls
+```
+MainViewModel
+├── DirectoryTreeViewModel   — RootNodes: ObservableCollection<FileSystemNode>
+├── FileListViewModel        — Files: ObservableCollection<FileSystemNode>
+├── FilterChainViewModel     — Filters: ObservableCollection<FilterViewModel>
+├── PipelineViewModel        — Steps: ObservableCollection<PipelineStepViewModel>
+└── StatusBarViewModel
+└──── SelectionViewModel
+└──── OperationProgressViewModel
+```
 
-### Keyboard Navigation (Phase 1 baseline)
+ViewModels use `[ObservableProperty]` source-gen attributes (no runtime reflection).
 
-All critical actions must be keyboard-accessible from the initial shell:
-- **Tab** cycles between the source field, tree, file list, filter chain, pipeline steps
-  and action buttons
-- **Arrow keys** navigate the tree and file list
-- **Space** toggles checkbox on the focused tree node or file list row
-- **Enter** expands/collapses a tree node
-- **Ctrl+A** selects all visible nodes in the current panel
-- **Delete** or **Ctrl+D** removes a selected filter card or pipeline step
-- **Ctrl+Shift+P** opens the pipeline preset menu
-- **F5** triggers a rescan
-- **Escape** cancels a running operation (with confirmation) or closes a modal
-
-Screen-reader labels and focus states are part of the UI shell, not a polish item. Avalonia
-supports `AutomationProperties.Name` — use it from the start.

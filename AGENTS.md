@@ -26,12 +26,34 @@ dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "FullyQualifiedName~
 dotnet publish SmartCopy.App/SmartCopy.App.csproj -c Release --self-contained true -p:PublishSingleFile=true
 ```
 
+## Implementation Status
+Current progress and tasks to be completed are recorded in `Docs/SmartCopy2026-Plan.md`. 
+
+It is focussed on planning and tracking deliverables. Refer to it when you need to get up to speed, update it when progress is made.
+
 ## Documentation Signposting
 
-- **Architecture, Contracts, UI Behavior, and Data Schemas:** `Docs/SmartCopy2026-Architecture.md`
-- **Execution Plan, Delivery Scope, and Checklists:** `Docs/SmartCopy2026-Plan.md`
+## System Architecture
+Canonical architecture reference lives in: `Docs/SmartCopy2026-Architecture.md#1-architecture-design`
 
-Agents should offer to update the architecture and/or the plan after resolving a task, especially if it involved changes to the design or architecture of the system.
+When architecture or contract details change, update the architecture reference, then update the plan.
+
+Detailed technical contracts (providers, filters, pipeline, preview/progress, scanner/watcher, plugin interface) live in:
+- `Docs/SmartCopy2026-Architecture.md#2-key-technical-designs`
+
+Canonical algorithm/invariant reference (selection state, tri-state propagation, mirror matching, wildcard matching, safety defaults) lives in:
+- `Docs/SmartCopy2026-Architecture.md#3-algorithms-and-implementation-notes`
+
+This document should be updated when changes are made that affect design and implementation.
+
+---
+
+## UI Design
+
+Canonical UI and interaction designs can be found in `Docs/SmartCopy2026-UIUX.md`. 
+
+Refer to this document for UI consistency and keep it updated when manual testing leads to requests for UI/UX changes.
+
 
 ## Solution Structure
 
@@ -90,11 +112,4 @@ ViewModels use `[ObservableProperty]` source-gen attributes (no runtime reflecti
 - **Instead, use Code-Behind Events**: For nested list items, menus, or flyouts where you need to access a parent ViewModel's command, use a `Click` (or similar) event handler in the `.axaml.cs` code-behind.
   - In the handler, set `e.Handled = true` to prevent unwanted event bubbling (e.g., stopping a menu item from triggering its own action when a nested button is clicked).
   - Extract the command parameter from the `sender` and execute the command manually by casting the View's `DataContext` to the appropriate ViewModel type.
-
-## Implementation Status
-
-We are deep into Phase 1 (Core Workflows, Memory-Backed). 
-Live local filesystem integration is deferred to Phase 2.
-
-Current progress and tasks yet to be completed are recorded in `Docs/SmartCopy2026-Plan.md`:
 

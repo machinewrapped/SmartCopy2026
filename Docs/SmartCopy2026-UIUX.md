@@ -5,16 +5,33 @@
 
 ## Table of Contents
 
-1. [Main Window Layout](#1-main-window-layout)
-2. [Filter UX Flow](#2-filter-ux-flow)
-3. [Pipeline UX Flow](#3-pipeline-ux-flow)
-4. [UI Improvements Over Predecessor](#4-ui-improvements-over-predecessor)
+1. [UI Improvements Over Predecessor](#4-ui-improvements-over-predecessor)
+2. [Main Window Layout](#2-main-window-layout)
+3. [Filter UX Flow](#3-filter-ux-flow)
+4. [Pipeline UX Flow](#4-pipeline-ux-flow)
 5. [Keyboard Navigation](#5-keyboard-navigation)
 6. [UI Shell Scope](#6-ui-shell-scope)
 
 ---
 
-## 1. Main Window Layout
+## 1. UI Improvements Over Predecessor
+
+1. **Source and destination fields accept drag-and-drop** from Explorer/Finder
+2. **Proper tri-state tree checkboxes** — `▣` for indeterminate
+3. **Filter chain is visual** — each filter is a card; drag to reorder; toggle without removing
+4. **Pipeline is visual** — steps shown as an arrow chain; presets as buttons
+   and cards use human-readable summary + technical subtitle formatting
+5. **Three-column layout** — Filters | Folders | Files in a single resizable row; all three columns
+   have draggable splitters; column widths are persisted across sessions
+6. **Filter cards are human-friendly** — each card shows a readable summary ("Only .mp3 and .flac
+   files") above a dimmed technical subtitle; enable/disable via checkbox; edit via pencil icon
+7. **Preview** — shows exactly what will happen before running
+8. **Device picker** — MTP devices appear in the destination path picker on Copy/Move pipeline
+   steps alongside local paths (the 📁 Browse button becomes a "Local folder... / Phone (MTP)..."
+   split flyout when MTP devices are available)
+9. **Keyboard-first** — every action reachable via keyboard; focus indicators on all controls
+
+## 2. Main Window Layout
 
 The main content area uses a **3-column layout** — Filters | Folders | Files — all at the same height and separated by draggable `GridSplitter`s. This places the filter controls in direct visual proximity to the tree and file list they affect, making the data-flow left-to-right and immediately legible to new users. The design now features a top menu and specific interactive elements reflecting the latest implementation.
 
@@ -73,7 +90,7 @@ The main content area uses a **3-column layout** — Filters | Folders | Files �
 
 ---
 
-## 2. Filter UX Flow
+## 3. Filter UX Flow
 
 ### Add Filter — Two-Level Drill-Down
 
@@ -156,7 +173,7 @@ The dialog dispatches to a type-specific editor view via `ContentControl` + `Dat
 
 ---
 
-## 3. Pipeline UX Flow
+## 4. Pipeline UX Flow
 
 ### Pipeline Step Card Anatomy
 
@@ -388,30 +405,6 @@ For `DeleteMode.Permanent`, the header and confirm button intensify:
 ```
 
 If the pipeline has no executable step (for example, only `Flatten`/`Rename`/`Rebase`), the main run button is disabled until an executable step is added.
-
----
-
-## 4. UI Improvements Over Predecessor
-
-1. **Top Navigation Menu** — Added standardized `File`, `Settings`, `Filters`, `Pipeline`, and `Help` options at the top for faster access.
-2. **Simplified Source Bar** — Target path selection is removed in favor of pipeline step-based targets. Features `Source` dropdown, `★` favorites, and `📁 Browse` button.
-   - The Source path is an **editable ComboBox** showing recent paths and favourites.
-   - **Keyboard:** Arrow keys cycle dropdown items in the text field without applying. **Enter** commits the current text and applies it. **Escape** reverts to the active path.
-   - **Mouse:** Clicking a bookmark in the dropdown applies it on dropdown close.
-   - See Architecture §3.14 for binding pitfalls with this pattern.
-3. **Filter Toggle (`👁 Eye` button)** — Instant contextual toggle to show or hide excluded filtered nodes.
-4. **Source and destination fields accept drag-and-drop** from Explorer/Finder
-5. **Proper tri-state tree checkboxes** — `▣` for indeterminate
-6. **Filter chain is visual** — each filter is a card; drag to reorder; toggle without removing
-7. **Pipeline is visual** — steps shown as an arrow chain; presets are integrated smoothly into the `+ Add step` menu. Cards use human-readable summary + technical subtitle formatting
-8. **Three-column layout** — Filters | Folders | Files in a single resizable row; all three columns have draggable splitters; column widths are persisted across sessions
-9. **Filter cards are human-friendly** — each card shows a readable summary ("Only Audio files") above a dimmed technical subtitle; enable/disable via checkbox; edit via pencil icon
-10. **Status bar** — Split into two always-present zones. `SelectionView` (left) shows the live count, total size, and filtered-out count of checked files, updating instantly on every check/filter change. `OperationProgressView` (right) appears only during an active operation and shows progress percentage, ETA, and Pause/Cancel controls.
-11. **Preview** — shows exactly what will happen before running
-12. **Device picker** — MTP devices appear in the destination path picker on Copy/Move pipeline steps alongside local paths, if the platform supports the protocol.
-13. **Log panel** — collapsible panel at the bottom showing timestamped operation log
-14. **Keyboard-first** — every action reachable via keyboard; focus indicators on all controls
-15. **Window state persistence** — size, position, maximised state, and all column widths saved to `%LOCALAPPDATA%/SmartCopy2026/window.json`; off-screen position safety check on restore
 
 ---
 
