@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using SmartCopy.Core.Pipeline.Validation;
@@ -24,7 +25,7 @@ public interface ITransformStep
 
     TransformStepConfig Config { get; }
 
-    IEnumerable<TransformResult> Preview(TransformContext context);
+    IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, CancellationToken ct);
     Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct);
 
     /// <summary>

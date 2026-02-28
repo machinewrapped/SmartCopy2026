@@ -15,7 +15,6 @@ public static class StepEditorViewModelFactory
             StepKind.Flatten => new FlattenStepEditorViewModel(),
             StepKind.Rename => new RenameStepEditorViewModel(),
             StepKind.Rebase => new RebaseStepEditorViewModel(),
-            StepKind.Convert => new ConvertStepEditorViewModel(),
             StepKind.SelectAll => new SelectAllStepEditorViewModel(),
             StepKind.InvertSelection => new InvertSelectionStepEditorViewModel(),
             StepKind.ClearSelection => new ClearSelectionStepEditorViewModel(),

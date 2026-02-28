@@ -34,15 +34,17 @@ public sealed class DeleteStep : ITransformStep
             ["deleteMode"] = Mode.ToString(),
         });
 
-    public IEnumerable<TransformResult> Preview(TransformContext context)
+    public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
+        await Task.Yield();
         yield return new TransformResult(
             Success: true,
             StepType: StepType,
             DestinationPath: context.SourceNode.FullPath,
             OutputBytes: context.SourceNode.Size,
             Message: "Delete preview",
-            SourcePath: context.SourceNode.FullPath);
+            SourcePath: context.SourceNode.FullPath,
+            Warning: PlanWarning.SourceWillBeRemoved);
 
         if (context.SourceNode.IsDirectory)
         {
@@ -54,7 +56,8 @@ public sealed class DeleteStep : ITransformStep
                     DestinationPath: child.FullPath,
                     OutputBytes: child.Size,
                     Message: "Delete preview",
-                    SourcePath: child.FullPath);
+                    SourcePath: child.FullPath,
+                    Warning: PlanWarning.SourceWillBeRemoved);
             }
         }
     }

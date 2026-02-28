@@ -40,9 +40,6 @@
                     <DataTemplate DataType="vmPipeline:RebaseStepEditorViewModel">
                         <editorViews:RebaseStepEditor />
                     </DataTemplate>
-                    <DataTemplate DataType="vmPipeline:ConvertStepEditorViewModel">
-                        <editorViews:ConvertStepEditor />
-                    </DataTemplate>
                 </ContentControl.DataTemplates>
             </ContentControl>
         </Border>

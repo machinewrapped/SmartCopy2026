@@ -33,16 +33,28 @@ public sealed class MoveStep : ITransformStep
         StepType,
         new JsonObject { ["destinationPath"] = DestinationPath });
 
-    public IEnumerable<TransformResult> Preview(TransformContext context)
+    public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
-        var destination = StepPathHelper.BuildDestinationPath(DestinationPath, context.PathSegments);
-        return [new TransformResult(
+        var targetProvider = context.TargetProvider;
+        var destination = StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, context.PathSegments);
+        
+        PlanWarning? warning = null;
+        if (targetProvider is not null)
+        {
+            if (await targetProvider.ExistsAsync(destination, ct))
+            {
+                warning = PlanWarning.DestinationOverwritten;
+            }
+        }
+
+        yield return new TransformResult(
             Success: true,
             StepType: StepType,
             DestinationPath: destination,
             OutputBytes: context.SourceNode.Size,
             Message: "Move preview",
-            SourcePath: context.SourceNode.FullPath)];
+            SourcePath: context.SourceNode.FullPath,
+            Warning: warning);
     }
 
     public async Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)

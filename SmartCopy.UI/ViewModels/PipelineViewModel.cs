@@ -546,7 +546,6 @@ public partial class PipelineViewModel : ViewModelBase
             StepKind.Flatten => new FlattenStep(),
             StepKind.Rebase => new RebaseStep("", ""),
             StepKind.Rename => new RenameStep("{name}"),
-            StepKind.Convert => new ConvertStep("mp3"),
             StepKind.Copy => new CopyStep(""),
             StepKind.Move => new MoveStep(""),
             StepKind.Delete => new DeleteStep(DeleteMode.Trash),

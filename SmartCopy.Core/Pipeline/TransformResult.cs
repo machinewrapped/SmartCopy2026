@@ -6,4 +6,5 @@ public readonly record struct TransformResult(
     string? DestinationPath = null,
     long OutputBytes = 0,
     string? Message = null,
-    string? SourcePath = null);
+    string? SourcePath = null,
+    PlanWarning? Warning = null);

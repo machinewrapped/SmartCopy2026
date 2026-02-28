@@ -21,12 +21,13 @@ public sealed class InvertSelectionStep : ITransformStep
 
     public TransformStepConfig Config => new(StepType, new JsonObject());
 
-    public IEnumerable<TransformResult> Preview(TransformContext context)
+    public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
+        await Task.Yield();
         context.SourceNode.CheckState = context.SourceNode.CheckState == CheckState.Checked
             ? CheckState.Unchecked
             : CheckState.Checked;
-        return [new(Success: true, StepType: StepType, DestinationPath: null, Message: "Invert selection")];
+        yield return new TransformResult(Success: true, StepType: StepType, DestinationPath: null, Message: "Invert selection");
     }
 
     public Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)

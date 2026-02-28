@@ -91,7 +91,8 @@ public partial class PreviewViewModel : ViewModelBase
         {
             var title = group.Key switch
             {
-                PlanWarning.DestinationExists => IsDeletePipeline ? $"Will be removed ({group.Count()})" : $"Destination Exists ({group.Count()})",
+                PlanWarning.DestinationOverwritten => $"Destination Overwritten ({group.Count()})",
+                PlanWarning.SourceWillBeRemoved => $"Will be removed ({group.Count()})",
                 PlanWarning.NameConflict => $"Name Conflict ({group.Count()})",
                 PlanWarning.PermissionIssue => $"Permission Issue ({group.Count()})",
                 _ => $"Ready ({group.Count()})",
@@ -102,7 +103,7 @@ public partial class PreviewViewModel : ViewModelBase
             {
                 Title = title,
                 IsReadyGroup = isReady,
-                IsExpanded = isReady || (IsDeletePipeline && group.Key == PlanWarning.DestinationExists)
+                IsExpanded = isReady || group.Key == PlanWarning.SourceWillBeRemoved
             };
 
             foreach (var action in group)
@@ -156,7 +157,8 @@ public partial class PreviewViewModel : ViewModelBase
         {
             var title = group.Key switch
             {
-                PlanWarning.DestinationExists => IsDeletePipeline ? $"Will be removed ({group.Count()})" : $"Destination Exists ({group.Count()})",
+                PlanWarning.DestinationOverwritten => $"Destination Overwritten ({group.Count()})",
+                PlanWarning.SourceWillBeRemoved => $"Will be removed ({group.Count()})",
                 PlanWarning.NameConflict => $"Name Conflict ({group.Count()})",
                 PlanWarning.PermissionIssue => $"Permission Issue ({group.Count()})",
                 _ => $"Ready ({group.Count()})",
