@@ -32,18 +32,18 @@ public sealed class CopyStep : ITransformStep
         StepType,
         new JsonObject { ["destinationPath"] = DestinationPath });
 
-    public TransformResult Preview(TransformContext context)
+    public IEnumerable<TransformResult> Preview(TransformContext context)
     {
         if (context.SourceNode.IsDirectory)
-            return new TransformResult(Success: true, StepType: StepType, DestinationPath: null);
+            return [new TransformResult(Success: true, StepType: StepType, DestinationPath: null)];
         var destination = StepPathHelper.BuildDestinationPath(DestinationPath, context.PathSegments);
-        return new TransformResult(
+        return [new TransformResult(
             Success: true,
             StepType: StepType,
             DestinationPath: destination,
             OutputBytes: context.SourceNode.Size,
             Message: "Copy preview",
-            SourcePath: context.SourceNode.FullPath);
+            SourcePath: context.SourceNode.FullPath)];
     }
 
     public async Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)

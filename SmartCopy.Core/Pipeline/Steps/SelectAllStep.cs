@@ -21,10 +21,10 @@ public sealed class SelectAllStep : ITransformStep
 
     public TransformStepConfig Config => new(StepType, new JsonObject());
 
-    public TransformResult Preview(TransformContext context)
+    public IEnumerable<TransformResult> Preview(TransformContext context)
     {
         context.SourceNode.CheckState = CheckState.Checked;
-        return new(Success: true, StepType: StepType, DestinationPath: null, Message: "Mark as selected");
+        return [new(Success: true, StepType: StepType, DestinationPath: null, Message: "Mark as selected")];
     }
 
     public Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)

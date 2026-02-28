@@ -31,17 +31,17 @@ public sealed class ConvertStep : ITransformStep
             ["outputExtension"] = OutputExtension,
         });
 
-    public TransformResult Preview(TransformContext context)
+    public IEnumerable<TransformResult> Preview(TransformContext context)
     {
         if (context.SourceNode.IsDirectory)
-            return new TransformResult(Success: true, StepType: StepType, DestinationPath: null);
+            return [new TransformResult(Success: true, StepType: StepType, DestinationPath: null)];
         Apply(context);
-        return new TransformResult(
+        return [new TransformResult(
             Success: true,
             StepType: StepType,
             DestinationPath: context.DisplayPath,
             OutputBytes: context.SourceNode.Size,
-            Message: "Convert preview");
+            Message: "Convert preview")];
     }
 
     public Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)

@@ -34,16 +34,16 @@ public sealed class RenameStep : ITransformStep
             ["pattern"] = Pattern,
         });
 
-    public TransformResult Preview(TransformContext context)
+    public IEnumerable<TransformResult> Preview(TransformContext context)
     {
         Apply(context);
         if (context.SourceNode.IsDirectory)
-            return new TransformResult(Success: true, StepType: StepType, DestinationPath: null);
-        return new TransformResult(
+            return [new TransformResult(Success: true, StepType: StepType, DestinationPath: null)];
+        return [new TransformResult(
             Success: true,
             StepType: StepType,
             DestinationPath: context.DisplayPath,
-            Message: "Path renamed");
+            Message: "Path renamed")];
     }
 
     public Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)

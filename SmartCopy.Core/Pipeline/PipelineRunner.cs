@@ -63,24 +63,27 @@ public sealed class PipelineRunner
                     ct.ThrowIfCancellationRequested();
 
                     TransformContext context = GetOrCreate(node);
-                    var preview = step.Preview(context);
+                    var previews = step.Preview(context);
 
-                    if (!string.IsNullOrWhiteSpace(preview.DestinationPath))
+                    foreach (var preview in previews)
                     {
-                        var nodeBytes = GetNodeBytes(node);
-                        var warning = await GetWarningAsync(preview.DestinationPath, job.TargetProvider, ct);
-                        actions.Add(new PlannedAction(
-                            StepSummary: step.StepType.ToString(),
-                            SourcePath: node.FullPath,
-                            DestinationPath: preview.DestinationPath!,
-                            InputBytes: nodeBytes,
-                            EstimatedOutputBytes: preview.OutputBytes == 0 ? nodeBytes : preview.OutputBytes,
-                            Warning: warning));
-                    }
+                        if (!string.IsNullOrWhiteSpace(preview.DestinationPath))
+                        {
+                            var inputBytes = preview.OutputBytes;
+                            var warning = await GetWarningAsync(preview.DestinationPath, job.TargetProvider, ct);
+                            actions.Add(new PlannedAction(
+                                StepSummary: step.StepType.ToString(),
+                                SourcePath: preview.SourcePath ?? node.FullPath,
+                                DestinationPath: preview.DestinationPath!,
+                                InputBytes: inputBytes,
+                                EstimatedOutputBytes: preview.OutputBytes == 0 ? inputBytes : preview.OutputBytes,
+                                Warning: warning));
+                        }
 
-                    if (!preview.Success)
-                    {
-                        failedNodes.Add(node);
+                        if (!preview.Success)
+                        {
+                            failedNodes.Add(node);
+                        }
                     }
                 }
             }

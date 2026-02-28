@@ -671,8 +671,8 @@ public partial class MainViewModel : ViewModelBase
     private async Task PreviewPipelineAsync()
     {
         var pipeline = Pipeline.BuildLivePipeline();
-        var filterIncludedFiles = CollectAllIncludedFiles();
-        var selectedFiles = CollectSelectedFiles();
+        var filterIncludedFiles = DirectoryTree.CollectAllIncludedFiles();
+        var selectedFiles = DirectoryTree.CollectSelectedFiles();
         Pipeline.SetSelectedIncludedFileCount(selectedFiles.Count);
 
         if (!Pipeline.CanRun || (filterIncludedFiles.Count == 0 && selectedFiles.Count == 0))
@@ -716,8 +716,8 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
-        var filterIncludedFiles = CollectAllIncludedFiles();
-        var selectedFiles = CollectSelectedFiles();
+        var filterIncludedFiles = DirectoryTree.CollectAllIncludedFiles();
+        var selectedFiles = DirectoryTree.CollectSelectedFiles();
         Pipeline.SetSelectedIncludedFileCount(selectedFiles.Count);
 
         if (!Pipeline.CanRun || filterIncludedFiles.Count == 0)
@@ -933,55 +933,6 @@ public partial class MainViewModel : ViewModelBase
         if (!string.IsNullOrEmpty(vm.LoadRequestedWorkflowName))
         {
             await LoadWorkflowAsync(vm.LoadRequestedWorkflowName);
-        }
-    }
-
-    private List<FileSystemNode> CollectSelectedFiles()
-    {
-        var selected = new List<FileSystemNode>();
-        foreach (var root in DirectoryTree.RootNodes)
-            CollectSelectedNodesRecursive(root, selected);
-        return selected;
-    }
-
-    private static void CollectSelectedNodesRecursive(FileSystemNode node, List<FileSystemNode> output)
-    {
-        if (node.IsDirectory && node.IsSelected)
-        {
-            output.Add(node); // atomic — all descendants selected and filter-included
-            return;           // do NOT recurse into children
-        }
-
-        foreach (var file in node.Files)
-            if (file.IsSelected) output.Add(file);
-
-        foreach (var child in node.Children)
-            CollectSelectedNodesRecursive(child, output);
-    }
-
-    private List<FileSystemNode> CollectAllIncludedFiles()
-    {
-        var all = new List<FileSystemNode>();
-        foreach (var root in DirectoryTree.RootNodes)
-        {
-            CollectAllIncludedFilesRecursive(root, all);
-        }
-        return all;
-    }
-
-    private static void CollectAllIncludedFilesRecursive(FileSystemNode node, List<FileSystemNode> output)
-    {
-        foreach (var file in node.Files)
-        {
-            if (file.FilterResult == FilterResult.Included)
-            {
-                output.Add(file);
-            }
-        }
-
-        foreach (var child in node.Children)
-        {
-            CollectAllIncludedFilesRecursive(child, output);
         }
     }
 

@@ -5,6 +5,7 @@ using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Tests.TestInfrastructure;
+using SmartCopy.UI.ViewModels;
 
 namespace SmartCopy.Tests.Pipeline;
 
@@ -95,6 +96,44 @@ public sealed class PipelineRunnerTests
         await runner.ExecuteAsync(job, progress: null, ct: CancellationToken.None);
 
         Assert.False(await provider.ExistsAsync("/source/delete-me.txt", CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task DeletePipeline_PreviewReportsAllSelectedDescendants()
+    {
+        var provider = MemoryFileSystemFixtures.Create(fixture => fixture
+            .WithDirectory("/source")
+            .WithFile("/source/f1.txt", "x"u8)
+            .WithFile("/source/f2.txt", "y"u8)
+            .WithDirectory("/source/sub")
+            .WithFile("/source/sub/f3.txt", "z"u8));
+
+        DirectoryTreeViewModel treeViewModel = new(provider, "/source");
+        await treeViewModel.InitializeAsync(ct: CancellationToken.None);
+
+        var rootNode = treeViewModel.RootNodes.First(n => n.Name == "source");
+        rootNode.CheckState = CheckState.Checked;
+
+        var runner = new PipelineRunner(new TransformPipeline([new DeleteStep()]));
+
+        var job = new PipelineJob
+        {
+            FilterIncludedFiles = treeViewModel.CollectAllIncludedFiles(),
+            SelectedFiles       = treeViewModel.CollectSelectedFiles(),
+            SourceProvider      = provider,
+            TargetProvider      = null,
+            OverwriteMode       = OverwriteMode.Always,
+            DeleteMode          = DeleteMode.Permanent,
+        };
+
+        var plan = await runner.PreviewAsync(job, CancellationToken.None);
+
+        Assert.Equal(5, plan.Actions.Count);
+        Assert.Contains(plan.Actions, a => a.DestinationPath == "/source");
+        Assert.Contains(plan.Actions, a => a.DestinationPath == "/source/f1.txt");
+        Assert.Contains(plan.Actions, a => a.DestinationPath == "/source/f2.txt");
+        Assert.Contains(plan.Actions, a => a.DestinationPath == "/source/sub");
+        Assert.Contains(plan.Actions, a => a.DestinationPath == "/source/sub/f3.txt");
     }
 
     [Fact]

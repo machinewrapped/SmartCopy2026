@@ -18,10 +18,10 @@ public sealed class ClearSelectionStep : ITransformStep
 
     public TransformStepConfig Config => new(StepType, new JsonObject());
 
-    public TransformResult Preview(TransformContext context)
+    public IEnumerable<TransformResult> Preview(TransformContext context)
     {
         context.SourceNode.CheckState = CheckState.Unchecked;
-        return new(Success: true, StepType: StepType, DestinationPath: null, Message: "Clear selection");
+        return [new(Success: true, StepType: StepType, DestinationPath: null, Message: "Clear selection")];
     }
 
     public Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)

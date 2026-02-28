@@ -30,16 +30,16 @@ public sealed class FlattenStep : ITransformStep
             ["conflictStrategy"] = ConflictStrategy.ToString(),
         });
 
-    public TransformResult Preview(TransformContext context)
+    public IEnumerable<TransformResult> Preview(TransformContext context)
     {
         Apply(context);
         if (context.SourceNode.IsDirectory)
-            return new TransformResult(Success: true, StepType: StepType, DestinationPath: null);
-        return new TransformResult(
+            return [new TransformResult(Success: true, StepType: StepType, DestinationPath: null)];
+        return [new TransformResult(
             Success: true,
             StepType: StepType,
             DestinationPath: context.DisplayPath,
-            Message: "Path flattened");
+            Message: "Path flattened")];
     }
 
     public Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)

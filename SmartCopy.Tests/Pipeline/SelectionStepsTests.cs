@@ -47,7 +47,7 @@ public sealed class SelectionStepsTests
         var step = new SelectAllStep();
         var ctx = MakeContext(CheckState.Unchecked);
 
-        var result = step.Preview(ctx);
+        var result = step.Preview(ctx).Single();
 
         Assert.True(result.Success);
         Assert.Equal(StepKind.SelectAll, result.StepType);
@@ -89,7 +89,7 @@ public sealed class SelectionStepsTests
         var step = new ClearSelectionStep();
         var ctx = MakeContext(CheckState.Checked);
 
-        var result = step.Preview(ctx);
+        var result = step.Preview(ctx).Single();
 
         Assert.True(result.Success);
         Assert.Equal(StepKind.ClearSelection, result.StepType);
@@ -130,7 +130,7 @@ public sealed class SelectionStepsTests
         var step = new InvertSelectionStep();
         var ctx = MakeContext(CheckState.Unchecked);
 
-        var result = step.Preview(ctx);
+        var result = step.Preview(ctx).Single();
 
         Assert.True(result.Success);
         Assert.Equal(StepKind.InvertSelection, result.StepType);

@@ -223,4 +223,49 @@ public class DirectoryTreeViewModel : ViewModelBase
         return null;
     }
 
+    public IReadOnlyList<FileSystemNode> CollectSelectedFiles()
+    {
+        var selected = new List<FileSystemNode>();
+        foreach (var root in RootNodes)
+        {
+            CollectSelectedNodesRecursive(root, selected);
+        }
+        return selected;
+    }
+
+    public IReadOnlyList<FileSystemNode> CollectAllIncludedFiles()
+    {
+        var all = new List<FileSystemNode>();
+        foreach (var root in RootNodes)
+        {
+            CollectAllIncludedFilesRecursive(root, all);
+        }
+        return all;
+    }
+
+    private static void CollectSelectedNodesRecursive(FileSystemNode node, List<FileSystemNode> output)
+    {
+        if (node.IsDirectory && node.IsSelected)
+        {
+            output.Add(node); // atomic — all descendants selected and filter-included
+            return;           // do NOT recurse into children
+        }
+
+        output.AddRange(node.Files.Where(f => f.IsSelected)); // individual file selection#
+
+        foreach (var child in node.Children)
+        {
+            CollectSelectedNodesRecursive(child, output);
+        }
+    }
+
+    private static void CollectAllIncludedFilesRecursive(FileSystemNode node, List<FileSystemNode> output)
+    {
+        output.AddRange(node.Files.Where(f => f.FilterResult == FilterResult.Included));
+
+        foreach (var child in node.Children)
+        {
+            CollectAllIncludedFilesRecursive(child, output);
+        }
+    }
 }

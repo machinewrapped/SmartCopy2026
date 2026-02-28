@@ -24,7 +24,7 @@ public interface ITransformStep
 
     TransformStepConfig Config { get; }
 
-    TransformResult Preview(TransformContext context);
+    IEnumerable<TransformResult> Preview(TransformContext context);
     Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct);
 
     /// <summary>
