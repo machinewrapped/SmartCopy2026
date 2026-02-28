@@ -28,6 +28,9 @@ public partial class PreviewGroupViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isReadyGroup;
 
+    [ObservableProperty]
+    private bool _isExpanded;
+
     public ObservableCollection<PreviewItemViewModel> Actions { get; } = [];
 
     public int Count => Actions.Count;
@@ -88,16 +91,18 @@ public partial class PreviewViewModel : ViewModelBase
         {
             var title = group.Key switch
             {
-                PlanWarning.DestinationExists => $"Destination Exists ({group.Count()})",
+                PlanWarning.DestinationExists => IsDeletePipeline ? $"Will be removed ({group.Count()})" : $"Destination Exists ({group.Count()})",
                 PlanWarning.NameConflict => $"Name Conflict ({group.Count()})",
                 PlanWarning.PermissionIssue => $"Permission Issue ({group.Count()})",
                 _ => $"Ready ({group.Count()})",
             };
 
+            var isReady = !group.Key.HasValue;
             var vm = new PreviewGroupViewModel
             {
                 Title = title,
-                IsReadyGroup = !group.Key.HasValue,
+                IsReadyGroup = isReady,
+                IsExpanded = isReady || (IsDeletePipeline && group.Key == PlanWarning.DestinationExists)
             };
 
             foreach (var action in group)
@@ -151,7 +156,7 @@ public partial class PreviewViewModel : ViewModelBase
         {
             var title = group.Key switch
             {
-                PlanWarning.DestinationExists => $"Destination Exists ({group.Count()})",
+                PlanWarning.DestinationExists => IsDeletePipeline ? $"Will be removed ({group.Count()})" : $"Destination Exists ({group.Count()})",
                 PlanWarning.NameConflict => $"Name Conflict ({group.Count()})",
                 PlanWarning.PermissionIssue => $"Permission Issue ({group.Count()})",
                 _ => $"Ready ({group.Count()})",
