@@ -8,42 +8,26 @@ namespace SmartCopy.Core.Scanning;
 
 public sealed class DirectoryScanner
 {
+    private readonly IFileSystemProvider _provider;
+
+    public DirectoryScanner(IFileSystemProvider provider) => _provider = provider;
+
     public async IAsyncEnumerable<FileSystemNode> ScanAsync(
-        IFileSystemProvider provider,
         string rootPath,
         ScanOptions options,
         IProgress<ScanProgress>? progress = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        var rootNode = await provider.GetNodeAsync(rootPath, ct);
+        var rootNode = CloneForTree(await _provider.GetNodeAsync(rootPath, ct), parent: null, rootPath);
+        yield return rootNode;
+
+        // visited guards against circular symbolic links re-enqueueing an already-processed path.
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { rootNode.FullPath };
+        var queue = new Queue<(FileSystemNode Node, int Depth)>();
+        queue.Enqueue((rootNode, 0));
 
         var directoriesScanned = 0;
         var nodesDiscovered = 0;
-
-        var topLevelChildren = await provider.GetChildrenAsync(rootNode.FullPath, ct);
-        directoriesScanned++;
-        progress?.Report(new ScanProgress(nodesDiscovered, directoriesScanned, rootNode.FullPath));
-
-        var queue = new Queue<(FileSystemNode Node, int Depth)>();
-        foreach (var child in topLevelChildren)
-        {
-            ct.ThrowIfCancellationRequested();
-            if (!ShouldIncludeNode(child, options))
-            {
-                continue;
-            }
-
-            var rootedChild = CloneForTree(child, rootNode);
-            rootNode.Children.Add(rootedChild);
-            nodesDiscovered++;
-            progress?.Report(new ScanProgress(nodesDiscovered, directoriesScanned, rootedChild.FullPath));
-            yield return rootedChild;
-
-            if (rootedChild.IsDirectory && !options.LazyExpand)
-            {
-                queue.Enqueue((rootedChild, 1));
-            }
-        }
 
         while (queue.Count > 0)
         {
@@ -55,7 +39,7 @@ public sealed class DirectoryScanner
                 continue;
             }
 
-            var children = await provider.GetChildrenAsync(currentDirectory.FullPath, ct);
+            var children = await _provider.GetChildrenAsync(currentDirectory.FullPath, ct);
             directoriesScanned++;
             progress?.Report(new ScanProgress(nodesDiscovered, directoriesScanned, currentDirectory.FullPath));
 
@@ -67,16 +51,23 @@ public sealed class DirectoryScanner
                     continue;
                 }
 
-                var childWithParent = CloneForTree(child, currentDirectory);
-                currentDirectory.Children.Add(childWithParent);
-                nodesDiscovered++;
-                progress?.Report(new ScanProgress(nodesDiscovered, directoriesScanned, childWithParent.FullPath));
-                yield return childWithParent;
-
-                if (childWithParent.IsDirectory)
+                var cloned = CloneForTree(child, currentDirectory, rootPath);
+                if (cloned.IsDirectory)
                 {
-                    queue.Enqueue((childWithParent, depth + 1));
+                    currentDirectory.Children.Add(cloned);
+                    if (!options.LazyExpand && visited.Add(cloned.FullPath))
+                    {
+                        queue.Enqueue((cloned, depth + 1));
+                    }
                 }
+                else
+                {
+                    currentDirectory.Files.Add(cloned);
+                }
+
+                nodesDiscovered++;
+                progress?.Report(new ScanProgress(nodesDiscovered, directoriesScanned, cloned.FullPath));
+                yield return cloned;
             }
         }
     }
@@ -91,13 +82,13 @@ public sealed class DirectoryScanner
         return (node.Attributes & FileAttributes.Hidden) == 0;
     }
 
-    private static FileSystemNode CloneForTree(FileSystemNode source, FileSystemNode parent)
+    private FileSystemNode CloneForTree(FileSystemNode source, FileSystemNode? parent, string rootPath)
     {
         return new FileSystemNode
         {
             Name = source.Name,
             FullPath = source.FullPath,
-            RelativePathSegments = source.RelativePathSegments,
+            RelativePathSegments = _provider.SplitPath(_provider.GetRelativePath(rootPath, source.FullPath)),
             IsDirectory = source.IsDirectory,
             Size = source.Size,
             CreatedAt = source.CreatedAt,
@@ -111,4 +102,3 @@ public sealed class DirectoryScanner
         };
     }
 }
-

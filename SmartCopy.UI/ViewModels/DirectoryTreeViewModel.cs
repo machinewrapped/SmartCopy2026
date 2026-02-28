@@ -4,12 +4,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
+using SmartCopy.Core.Scanning;
 
 namespace SmartCopy.UI.ViewModels;
 
 public class DirectoryTreeViewModel : ViewModelBase
 {
-    private readonly IFileSystemProvider _provider;
+    private readonly DirectoryScanner _scanner;
     private string _rootPath;
     private FileSystemNode? _selectedNode;
     private bool _isLoading;
@@ -33,8 +34,8 @@ public class DirectoryTreeViewModel : ViewModelBase
 
     public DirectoryTreeViewModel(IFileSystemProvider provider, string rootPath)
     {
-        _provider = provider;
         _rootPath = rootPath;
+        _scanner = new DirectoryScanner(provider);
     }
 
     public FileSystemNode? SelectedNode
@@ -71,18 +72,27 @@ public class DirectoryTreeViewModel : ViewModelBase
         RootNodes.Clear();
         IsLoading = true;
 
+        FileSystemNode? root = null;
         try
         {
-            var root = await BuildNodeTreeAsync(_rootPath, ct);
-            root.IsExpanded = true;
-            root.PropertyChanged += OnRootNodePropertyChanged;
-            RootNodes.Add(root);
-            SelectedNode = root;
+            var scanOptions = new ScanOptions { LazyExpand = false, IncludeHidden = true };
+            await foreach (var node in _scanner.ScanAsync(_rootPath, scanOptions, ct: ct))
+            {
+                if (root is null)
+                {
+                    root = node;
+                    root.IsExpanded = true;
+                    root.PropertyChanged += OnRootNodePropertyChanged;
+                    RootNodes.Add(root);
+                }
+                // subsequent nodes are already wired into the tree by the scanner
+            }
+
+            if (root is not null)
+                SelectedNode = root;
 
             if (!string.IsNullOrWhiteSpace(initialSelectionPath))
-            {
                 SelectByPath(initialSelectionPath);
-            }
         }
         finally
         {
@@ -144,63 +154,6 @@ public class DirectoryTreeViewModel : ViewModelBase
         {
             SelectionChanged?.Invoke(this, EventArgs.Empty);
         }
-    }
-
-    private async Task<FileSystemNode> BuildNodeTreeAsync(string path, CancellationToken ct)
-    {
-        var sourceRoot = await _provider.GetNodeAsync(path, ct);
-        var root = CloneNode(sourceRoot, parent: null);
-
-        var stack = new Stack<FileSystemNode>();
-        stack.Push(root);
-
-        while (stack.Count > 0)
-        {
-            ct.ThrowIfCancellationRequested();
-            var current = stack.Pop();
-            if (!current.IsDirectory)
-            {
-                continue;
-            }
-
-            var children = await _provider.GetChildrenAsync(current.FullPath, ct);
-            foreach (var child in children)
-            {
-                var clonedChild = CloneNode(child, current);
-                if (child.IsDirectory)
-                {
-                    current.Children.Add(clonedChild);
-                    stack.Push(clonedChild);
-                }
-                else
-                {
-                    current.Files.Add(clonedChild);
-                }
-            }
-        }
-
-        return root;
-    }
-
-    private FileSystemNode CloneNode(FileSystemNode sourceNode, FileSystemNode? parent)
-    {
-        return new FileSystemNode
-        {
-            Name = sourceNode.Name,
-            FullPath = sourceNode.FullPath,
-            RelativePathSegments = _provider.SplitPath(_provider.GetRelativePath(_rootPath, sourceNode.FullPath)),
-            IsDirectory = sourceNode.IsDirectory,
-            Size = sourceNode.Size,
-            CreatedAt = sourceNode.CreatedAt,
-            ModifiedAt = sourceNode.ModifiedAt,
-            Attributes = sourceNode.Attributes,
-            Parent = parent,
-            CheckState = sourceNode.CheckState,
-            FilterResult = sourceNode.FilterResult,
-            ExcludedByFilter = sourceNode.ExcludedByFilter,
-            Notes = sourceNode.Notes,
-            IsExpanded = sourceNode.IsExpanded,
-        };
     }
 
     private FileSystemNode? FindByPath(string fullPath)
