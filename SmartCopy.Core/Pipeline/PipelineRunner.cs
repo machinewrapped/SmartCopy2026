@@ -62,8 +62,9 @@ public sealed class PipelineRunner
 
                     ct.ThrowIfCancellationRequested();
 
-                    var context = GetOrCreate(node);
-                    await foreach (var preview in step.PreviewAsync(context, ct))
+                    TransformContext context = GetOrCreate(node);
+
+                    await foreach (TransformResult preview in step.PreviewAsync(context, ct))
                     {
                         if (!string.IsNullOrWhiteSpace(preview.DestinationPath))
                         {
