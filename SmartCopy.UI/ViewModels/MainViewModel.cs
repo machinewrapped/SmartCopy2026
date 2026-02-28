@@ -753,27 +753,23 @@ public partial class MainViewModel : ViewModelBase
         {
             var results = await runner.ExecuteAsync(job, progress, nodeProgress, _runCts.Token);
 
-            await _operationJournal.WriteAsync(results.Where(r => r.StepType is StepKind.Copy or StepKind.Move or StepKind.Delete));
+            await _operationJournal.WriteAsync(results.Where(r => r.SourcePathResult != SourcePathResult.None));
 
             foreach (var r in results)
             {
-                if (r.SourcePath is null)
+                if (!r.IsSuccess)
                 {
-                    continue;
+                    LogPanel.AddEntry($"Failed: {Path.GetFileName(r.SourcePath)}", LogLevel.Error);
                 }
-                else if (!r.Success)
-                {
-                    LogPanel.AddEntry($"Failed: {Path.GetFileName(r.SourcePath)} — {r.Message}", LogLevel.Error);
-                }
-                else if (r.StepType == StepKind.Copy)
+                else if (r.SourcePathResult == SourcePathResult.Copied)
                 {
                     LogPanel.AddEntry($"Copied {Path.GetFileName(r.SourcePath)} → {r.DestinationPath} ({FileSizeFormatter.FormatBytes(r.OutputBytes)})");
                 }
-                else if (r.StepType == StepKind.Move)
+                else if (r.SourcePathResult == SourcePathResult.Moved)
                 {
                     LogPanel.AddEntry($"Moved {Path.GetFileName(r.SourcePath)} → {r.DestinationPath}");
                 }
-                else if (r.StepType == StepKind.Delete)
+                else if (r.SourcePathResult is SourcePathResult.Trashed or SourcePathResult.Deleted)
                 {
                     LogPanel.AddEntry($"Deleted {Path.GetFileName(r.SourcePath)}");
                 }
@@ -789,8 +785,8 @@ public partial class MainViewModel : ViewModelBase
 
     private void OnNodeCompleted(TransformResult result)
     {
-        if (!result.Success || result.SourcePath is null) return;
-        if (result.StepType is not (StepKind.Move or StepKind.Delete)) return;
+        if (!result.IsSuccess) return;
+        if (result.SourcePathResult is not (SourcePathResult.Moved or SourcePathResult.Trashed or SourcePathResult.Deleted)) return;
 
         var removedDir = DirectoryTree.RemoveNode(result.SourcePath);
         if (removedDir)

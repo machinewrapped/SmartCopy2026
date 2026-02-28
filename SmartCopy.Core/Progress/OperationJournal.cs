@@ -57,13 +57,12 @@ public sealed class OperationJournal
         {
             ct.ThrowIfCancellationRequested();
             var action = MapAction(result);
-            var source = result.SourcePath ?? string.Empty;
+            var source = result.SourcePath;
             var destination = result.DestinationPath ?? string.Empty;
-            var status = result.Success ? "ok" : "failed";
-            var message = result.Message ?? string.Empty;
+            var status = result.IsSuccess ? "ok" : "failed";
 
             await writer.WriteLineAsync(
-                $"{DateTime.UtcNow:O}\t{status}\t{action}\t{source}\t{destination}\t{result.OutputBytes}\t{message}");
+                $"{DateTime.UtcNow:O}\t{status}\t{action}\t{source}\t{destination}\t{result.OutputBytes}");
         }
 
         await writer.FlushAsync(ct);
@@ -84,14 +83,12 @@ public sealed class OperationJournal
         return Path.Combine(home, ".config", "SmartCopy2026", "logs");
     }
 
-    private static string MapAction(TransformResult result)
+    private static string MapAction(TransformResult result) => result.SourcePathResult switch
     {
-        if (!string.IsNullOrWhiteSpace(result.Message)
-            && result.Message.Contains("Skipped", StringComparison.OrdinalIgnoreCase))
-        {
-            return "skipped";
-        }
-
-        return result.StepType.ToString().ToLowerInvariant();
-    }
+        SourcePathResult.Copied  => "copy",
+        SourcePathResult.Moved   => "move",
+        SourcePathResult.Trashed => "trash",
+        SourcePathResult.Deleted => "delete",
+        _                        => "skipped",
+    };
 }

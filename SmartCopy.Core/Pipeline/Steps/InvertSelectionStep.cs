@@ -27,7 +27,10 @@ public sealed class InvertSelectionStep : ITransformStep
         context.SourceNode.CheckState = context.SourceNode.CheckState == CheckState.Checked
             ? CheckState.Unchecked
             : CheckState.Checked;
-        yield return new TransformResult(Success: true, StepType: StepType, DestinationPath: null, Message: "Invert selection");
+        yield return new TransformResult(
+            IsSuccess: true,
+            SourcePath: context.SourceNode.FullPath,
+            SourcePathResult: SourcePathResult.None);
     }
 
     public Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)
@@ -37,9 +40,8 @@ public sealed class InvertSelectionStep : ITransformStep
             ? CheckState.Unchecked
             : CheckState.Checked;
         return Task.FromResult(new TransformResult(
-            Success: true,
-            StepType: StepType,
-            DestinationPath: context.DisplayPath,
-            Message: "Invert selection"));
+            IsSuccess: true,
+            SourcePath: context.SourceNode.FullPath,
+            SourcePathResult: SourcePathResult.None));
     }
 }

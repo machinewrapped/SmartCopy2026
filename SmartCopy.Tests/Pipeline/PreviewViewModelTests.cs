@@ -11,9 +11,42 @@ public sealed class PreviewViewModelTests
         {
             Actions =
             [
-                new PlannedAction("Copy", "/a", "/out/a", 10, 10, null),
-                new PlannedAction("Copy", "/b", "/out/b", 10, 10, PlanWarning.DestinationOverwritten),
-                new PlannedAction("Move", "/c", "/out/c", 10, 10, PlanWarning.NameConflict),
+                new PlannedAction(
+                    SourcePath: "/a",
+                    SourcePathResult: SourcePathResult.Copied,
+                    DestinationPath: "/out/a",
+                    DestinationPathResult: DestinationPathResult.Created,
+                    NumberOfFilesAffected: 1,
+                    NumberOfFoldersAffected: 0,
+                    InputBytes: 10,
+                    OutputBytes: 10),
+                new PlannedAction(
+                    SourcePath: "/b",
+                    SourcePathResult: SourcePathResult.Copied,
+                    DestinationPath: "/out/b",
+                    DestinationPathResult: DestinationPathResult.Overwritten,
+                    NumberOfFilesAffected: 1,
+                    NumberOfFoldersAffected: 0,
+                    InputBytes: 10,
+                    OutputBytes: 10),
+                new PlannedAction(
+                    SourcePath: "/c",
+                    SourcePathResult: SourcePathResult.Moved,
+                    DestinationPath: "/out/c",
+                    DestinationPathResult: DestinationPathResult.Created,
+                    NumberOfFilesAffected: 1,
+                    NumberOfFoldersAffected: 0,
+                    InputBytes: 10,
+                    OutputBytes: 10),
+                new PlannedAction(
+                    SourcePath: "/d",
+                    SourcePathResult: SourcePathResult.Deleted,
+                    DestinationPath: null,
+                    DestinationPathResult: DestinationPathResult.None,
+                    NumberOfFilesAffected: 1,
+                    NumberOfFoldersAffected: 0,
+                    InputBytes: 10,
+                    OutputBytes: 10),
             ],
             TotalInputBytes = 30,
             TotalEstimatedOutputBytes = 30,
@@ -27,10 +60,11 @@ public sealed class PreviewViewModelTests
 
         vm.LoadFrom(BuildPlan(), isDeletePipeline: false, deleteMode: DeleteMode.Trash);
 
-        Assert.Equal(3, vm.Groups.Count);
-        Assert.Contains(vm.Groups, g => g.Title.StartsWith("Ready"));
-        Assert.Contains(vm.Groups, g => g.Title.StartsWith("Destination Overwritten"));
-        Assert.Contains(vm.Groups, g => g.Title.StartsWith("Name Conflict"));
+        Assert.Equal(4, vm.Groups.Count);
+        Assert.Contains(vm.Groups, g => g.Title.StartsWith("Will delete"));
+        Assert.Contains(vm.Groups, g => g.Title.StartsWith("Will overwrite"));
+        Assert.Contains(vm.Groups, g => g.Title.StartsWith("Will copy"));
+        Assert.Contains(vm.Groups, g => g.Title.StartsWith("Will move"));
     }
 
     [Fact]
@@ -40,7 +74,7 @@ public sealed class PreviewViewModelTests
 
         vm.LoadFrom(BuildPlan(), isDeletePipeline: false, deleteMode: DeleteMode.Trash);
 
-        Assert.Equal(3, vm.TotalActionCount);
+        Assert.Equal(4, vm.TotalActionCount);
         Assert.Equal(30, vm.TotalEstimatedOutputBytes);
     }
 
@@ -52,16 +86,16 @@ public sealed class PreviewViewModelTests
         vm.LoadFrom(BuildPlan(), isDeletePipeline: true, deleteMode: DeleteMode.Permanent);
 
         Assert.True(vm.IsDeletePipeline);
-        Assert.Contains("Permanently Delete", vm.ConfirmButtonText);
+        Assert.Contains("⚠ Run", vm.ConfirmButtonText);
     }
 
     [Fact]
-    public void ReadyGroup_CountMatches()
+    public void CopyGroup_CountMatches()
     {
         var vm = new PreviewViewModel();
         vm.LoadFrom(BuildPlan(), isDeletePipeline: false, deleteMode: DeleteMode.Trash);
 
-        var readyGroup = Assert.Single(vm.Groups, g => g.IsReadyGroup);
-        Assert.Equal(1, readyGroup.Count);
+        var copyGroup = Assert.Single(vm.Groups, g => g.Title.StartsWith("Will copy"));
+        Assert.Equal(1, copyGroup.Count);
     }
 }

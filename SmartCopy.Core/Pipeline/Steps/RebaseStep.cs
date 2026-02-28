@@ -59,30 +59,20 @@ public sealed class RebaseStep : ITransformStep
     {
         await Task.Yield();
         Apply(context);
-        if (context.SourceNode.IsDirectory)
-        {
-            yield return new TransformResult(Success: true, StepType: StepType, DestinationPath: null);
-            yield break;
-        }
-
         yield return new TransformResult(
-            Success: true,
-            StepType: StepType,
-            DestinationPath: context.DisplayPath,
-            Message: "Path rebased");
+            IsSuccess: true,
+            SourcePath: context.SourceNode.FullPath,
+            SourcePathResult: SourcePathResult.None);
     }
 
     public Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         Apply(context);
-        if (context.SourceNode.IsDirectory)
-            return Task.FromResult(new TransformResult(Success: true, StepType: StepType, DestinationPath: null));
         return Task.FromResult(new TransformResult(
-            Success: true,
-            StepType: StepType,
-            DestinationPath: context.DisplayPath,
-            Message: "Path rebased"));
+            IsSuccess: true,
+            SourcePath: context.SourceNode.FullPath,
+            SourcePathResult: SourcePathResult.None));
     }
 
     private void Apply(TransformContext context)

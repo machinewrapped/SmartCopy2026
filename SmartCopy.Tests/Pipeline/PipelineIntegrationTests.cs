@@ -118,7 +118,7 @@ public sealed class PipelineIntegrationTests
             progress: null,
             ct: CancellationToken.None);
 
-        Assert.Contains(skipResults, result => result.Message == "Skipped existing destination.");
+        Assert.Contains(skipResults, result => result.SourcePathResult == SourcePathResult.None);
 
         var alwaysResults = await runner.ExecuteAsync(
             new PipelineJob
@@ -133,7 +133,7 @@ public sealed class PipelineIntegrationTests
             progress: null,
             ct: CancellationToken.None);
 
-        Assert.Contains(alwaysResults, result => result.Message == "Copied");
+        Assert.Contains(alwaysResults, result => result.SourcePathResult == SourcePathResult.Copied);
     }
 
     [Fact]
@@ -201,7 +201,7 @@ public sealed class PipelineIntegrationTests
         Assert.True(File.Exists(path));
         var line = Assert.Single(await File.ReadAllLinesAsync(path));
         var columns = line.Split('\t');
-        Assert.True(columns.Length >= 7);
+        Assert.True(columns.Length >= 6);
         Assert.Equal("ok", columns[1]);
         Assert.Equal("copy", columns[2]);
         Assert.Equal("/src/song.mp3", columns[3]);

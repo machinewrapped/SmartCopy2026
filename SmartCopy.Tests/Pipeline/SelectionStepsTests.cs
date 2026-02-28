@@ -51,9 +51,8 @@ public sealed class SelectionStepsTests
         await foreach (var r in step.PreviewAsync(ctx, CancellationToken.None)) results.Add(r);
         var result = results.Single();
 
-        Assert.True(result.Success);
-        Assert.Equal(StepKind.SelectAll, result.StepType);
-        Assert.Equal("Mark as selected", result.Message);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(SourcePathResult.None, result.SourcePathResult);
         Assert.Null(result.DestinationPath);
         Assert.Equal(CheckState.Checked, ctx.SourceNode.CheckState);
     }
@@ -66,7 +65,7 @@ public sealed class SelectionStepsTests
 
         var result = await step.ApplyAsync(ctx, CancellationToken.None);
 
-        Assert.True(result.Success);
+        Assert.True(result.IsSuccess);
         Assert.Equal(CheckState.Checked, ctx.SourceNode.CheckState);
     }
 
@@ -95,8 +94,8 @@ public sealed class SelectionStepsTests
         await foreach (var r in step.PreviewAsync(ctx, CancellationToken.None)) results.Add(r);
         var result = results.Single();
 
-        Assert.True(result.Success);
-        Assert.Equal(StepKind.ClearSelection, result.StepType);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(SourcePathResult.None, result.SourcePathResult);
         Assert.Null(result.DestinationPath);
         Assert.Equal(CheckState.Unchecked, ctx.SourceNode.CheckState);
     }
@@ -109,7 +108,7 @@ public sealed class SelectionStepsTests
 
         var result = await step.ApplyAsync(ctx, CancellationToken.None);
 
-        Assert.True(result.Success);
+        Assert.True(result.IsSuccess);
         Assert.Equal(CheckState.Unchecked, ctx.SourceNode.CheckState);
     }
 
@@ -138,8 +137,8 @@ public sealed class SelectionStepsTests
         await foreach (var r in step.PreviewAsync(ctx, CancellationToken.None)) results.Add(r);
         var result = results.Single();
 
-        Assert.True(result.Success);
-        Assert.Equal(StepKind.InvertSelection, result.StepType);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(SourcePathResult.None, result.SourcePathResult);
         Assert.Null(result.DestinationPath);
         Assert.Equal(CheckState.Checked, ctx.SourceNode.CheckState);
     }

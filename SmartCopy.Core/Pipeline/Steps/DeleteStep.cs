@@ -32,27 +32,27 @@ public sealed class DeleteStep : ITransformStep
     public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
         await Task.Yield();
+        var pathResult = Mode == DeleteMode.Trash ? SourcePathResult.Trashed : SourcePathResult.Deleted;
+
         yield return new TransformResult(
-            Success: true,
-            StepType: StepType,
+            IsSuccess: true,
             SourcePath: context.SourceNode.FullPath,
-            InputBytes: context.SourceNode.Size,
-            OutputBytes: 0,
-            Message: "Delete preview",
-            Warning: PlanWarning.SourceWillBeRemoved);
+            SourcePathResult: pathResult,
+            NumberOfFilesAffected: context.SourceNode.IsDirectory ? 0 : 1,
+            NumberOfFoldersAffected: context.SourceNode.IsDirectory ? 1 : 0,
+            InputBytes: context.SourceNode.Size);
 
         if (context.SourceNode.IsDirectory)
         {
             foreach (var child in context.SourceNode.GetSelectedDescendants())
             {
                 yield return new TransformResult(
-                    Success: true,
-                    StepType: StepType,
+                    IsSuccess: true,
                     SourcePath: child.FullPath,
-                    InputBytes: child.Size,
-                    OutputBytes: 0,
-                    Message: "Delete preview",
-                    Warning: PlanWarning.SourceWillBeRemoved);
+                    SourcePathResult: pathResult,
+                    NumberOfFilesAffected: child.IsDirectory ? 0 : 1,
+                    NumberOfFoldersAffected: child.IsDirectory ? 1 : 0,
+                    InputBytes: child.Size);
             }
         }
     }
@@ -62,14 +62,21 @@ public sealed class DeleteStep : ITransformStep
         ct.ThrowIfCancellationRequested();
         await context.SourceProvider.DeleteAsync(context.SourceNode.FullPath, ct);
         return new TransformResult(
-            Success: true,
-            StepType: StepType,
-            DestinationPath: context.SourceNode.FullPath,
-            InputBytes: context.SourceNode.Size,
-            OutputBytes: 0,
-            Message: context.SourceNode.IsDirectory
-                ? (Mode == DeleteMode.Trash ? "Directory deleted (trash)." : "Directory deleted permanently.")
-                : (Mode == DeleteMode.Trash ? "Deleted (trash mode requested)." : "Deleted permanently."),
-            SourcePath: context.SourceNode.FullPath);
+            IsSuccess: true,
+            SourcePath: context.SourceNode.FullPath,
+            SourcePathResult: Mode == DeleteMode.Trash ? SourcePathResult.Trashed : SourcePathResult.Deleted,
+            NumberOfFilesAffected: CountAllFiles(context.SourceNode),
+            NumberOfFoldersAffected: CountAllFolders(context.SourceNode),
+            InputBytes: context.SourceNode.Size);
     }
+
+    private static int CountAllFiles(FileSystemNode node) =>
+        node.IsDirectory
+            ? node.Files.Count + node.Children.Sum(CountAllFiles)
+            : 1;
+
+    private static int CountAllFolders(FileSystemNode node) =>
+        node.IsDirectory
+            ? 1 + node.Children.Sum(CountAllFolders)
+            : 0;
 }

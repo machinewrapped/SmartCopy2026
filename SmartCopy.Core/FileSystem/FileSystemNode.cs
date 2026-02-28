@@ -152,6 +152,12 @@ public class FileSystemNode : INotifyPropertyChanged
         }
     }
 
+    internal int CountSelectedFiles() =>
+        (IsSelected && !IsDirectory ? 1 : 0) + (IsDirectory ? Children.Sum(c => c.CountSelectedFiles()) + Files.Count(f => f.IsSelected) : 0);
+    
+    internal int CountSelectedFolders() =>
+        (IsSelected && IsDirectory ? 1 : 0) + (IsDirectory ? Children.Sum(c => c.CountSelectedFolders()) : 0);
+
     private void EndBatchUpdate()
     {
         _batchUpdateDepth--;
