@@ -11,6 +11,7 @@ public partial class PreviewItemViewModel : ViewModelBase
     private string _sourcePath = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasDestination))]
     private string _destinationPath = string.Empty;
 
     [ObservableProperty]
@@ -18,6 +19,8 @@ public partial class PreviewItemViewModel : ViewModelBase
 
     [ObservableProperty]
     private PlanWarning? _warning;
+
+    public bool HasDestination => !string.IsNullOrEmpty(DestinationPath);
 }
 
 public partial class PreviewGroupViewModel : ViewModelBase

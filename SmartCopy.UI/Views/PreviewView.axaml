@@ -59,11 +59,17 @@
                                                   HorizontalAlignment="Stretch">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="vm:PreviewItemViewModel">
-                                                <Grid ColumnDefinitions="2*,2*,Auto" Margin="0,2,0,2">
-                                                    <TextBlock Grid.Column="0" Text="{Binding SourcePath}" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
-                                                    <TextBlock Grid.Column="1" Text="{Binding DestinationPath}" Opacity="0.85" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
-                                                    <TextBlock Grid.Column="2" Text="{Binding Action}" Opacity="0.75" />
-                                                </Grid>
+                                                <Panel Margin="0,2,0,2">
+                                                    <Grid ColumnDefinitions="2*,2*,Auto" IsVisible="{Binding HasDestination}">
+                                                        <TextBlock Grid.Column="0" Text="{Binding SourcePath}" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding DestinationPath}" Opacity="0.85" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                                                        <TextBlock Grid.Column="2" Text="{Binding Action}" Opacity="0.75" />
+                                                    </Grid>
+                                                    <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding !HasDestination}">
+                                                        <TextBlock Grid.Column="0" Text="{Binding SourcePath}" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding Action}" Opacity="0.75" />
+                                                    </Grid>
+                                                </Panel>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
