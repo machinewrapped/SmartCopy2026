@@ -389,6 +389,52 @@ public sealed class PipelineDirectoryTests
     // CollectSelectedNodes: dir node represents subtree (not individual children)
     // ─────────────────────────────────────────────────────────────────────────
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Copy: preview reports correct file count for directory nodes
+    // ─────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Copy_Preview_ExpandsDirectoryToPerFileActions()
+    {
+        var (sourceProvider, targetProvider) = MemoryFileSystemFixtures.CreatePair(
+            src => src
+                .WithSimulatedFile("/src/music/a.flac", 1000)
+                .WithSimulatedFile("/src/music/b.flac", 2000),
+            tgt => tgt
+                .WithDirectory("/dest")
+                .WithSimulatedFile("/dest/src/music/a.flac", 1000)); // a.flac already exists at dest
+        var ct = CancellationToken.None;
+        var dirNode = await sourceProvider.GetNodeAsync("/src/music", ct);
+        dirNode.FilterResult = FilterResult.Included;
+        dirNode.CheckState = CheckState.Checked;
+
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/dest")]));
+        var plan = await runner.PreviewAsync(
+            new PipelineJob
+            {
+                FilterIncludedFiles = [dirNode],
+                SelectedFiles       = [dirNode],
+                SourceProvider      = sourceProvider,
+                TargetProvider      = targetProvider,
+                OverwriteMode       = OverwriteMode.Always,
+                DeleteMode          = DeleteMode.Trash,
+            }, ct);
+
+        // One action per file, not one per directory
+        Assert.Equal(2, plan.Actions.Count);
+        Assert.Equal(2, plan.TotalFilesAffected);
+
+        // a.flac already exists → Overwritten; b.flac is new → Created
+        var aAction = plan.Actions.Single(a => a.SourcePath.EndsWith("a.flac"));
+        var bAction = plan.Actions.Single(a => a.SourcePath.EndsWith("b.flac"));
+        Assert.Equal(DestinationPathResult.Overwritten, aAction.DestinationPathResult);
+        Assert.Equal(DestinationPathResult.Created, bAction.DestinationPathResult);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // CollectSelectedNodes: dir node represents subtree (not individual children)
+    // ─────────────────────────────────────────────────────────────────────────
+
     [Fact]
     public async Task CollectSelectedNodes_ReturnsDirNode_NotChildren()
     {

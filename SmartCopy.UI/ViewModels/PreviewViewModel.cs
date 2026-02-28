@@ -185,7 +185,7 @@ public partial class PreviewViewModel : ViewModelBase
 
     private static string FormatTitle(string action, int files, int folders)
     {
-        return (folders > 0) ? $"Will {action} ({files} files, {folders} folders)" : $"Will {action} ({files} files)";
+        return (folders > 0) ? $"Will {action} {files} files and {folders} folders" : $"Will {action} {files} files";
     }
 
     [RelayCommand(CanExecute = nameof(CanRun))]
