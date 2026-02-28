@@ -35,12 +35,10 @@ public sealed class CopyStep : ITransformStep
         if (context.SourceNode.IsDirectory)
         {
             yield return new TransformResult(Success: true, StepType: StepType, DestinationPath: null);
-            yield break;
         }
 
-        var targetProvider = context.TargetProvider;
-        if (targetProvider is null)
-            throw new InvalidOperationException("TargetProvider must be set for CopyStep.");
+        var targetProvider = context.TargetProvider 
+                             ?? throw new InvalidOperationException("TargetProvider must be set for CopyStep.");
 
         var destination = StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, context.PathSegments);
         
