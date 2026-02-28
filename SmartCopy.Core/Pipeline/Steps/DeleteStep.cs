@@ -19,6 +19,8 @@ public sealed class DeleteStep : ITransformStep
     public StepKind StepType => StepKind.Delete;
     public bool IsExecutable => true;
 
+    public TransformStepConfig Config => new(StepType, new JsonObject { ["deleteMode"] = Mode.ToString() });
+
     public void Validate(StepValidationContext context)
     {
         context.ValidateHasSelectedInputs();
@@ -26,13 +28,6 @@ public sealed class DeleteStep : ITransformStep
         // Post-condition: delete consumes the source.
         context.SourceExists = false;
     }
-
-    public TransformStepConfig Config => new(
-        StepType,
-        new JsonObject
-        {
-            ["deleteMode"] = Mode.ToString(),
-        });
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {

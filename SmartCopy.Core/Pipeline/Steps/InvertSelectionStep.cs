@@ -11,6 +11,8 @@ public sealed class InvertSelectionStep : ITransformStep
     public bool IsConfigurable => false;
     public bool ProvidesInput => true;
 
+    public TransformStepConfig Config => new(StepType, new JsonObject());
+
     public void Validate(StepValidationContext context)
     {
         // No preconditions. Post-condition: reset SourceExists so downstream steps
@@ -18,8 +20,6 @@ public sealed class InvertSelectionStep : ITransformStep
         context.SourceExists = true;
         context.HasSelectedIncludedInputs = true;
     }
-
-    public TransformStepConfig Config => new(StepType, new JsonObject());
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {

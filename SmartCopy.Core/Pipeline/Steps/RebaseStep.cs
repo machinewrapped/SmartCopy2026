@@ -43,6 +43,9 @@ public sealed class RebaseStep : ITransformStep
     public StepKind StepType => StepKind.Rebase;
     public bool IsExecutable => false;
 
+    public TransformStepConfig Config => new(StepType,
+        new JsonObject { ["stripPrefix"] = StripPrefix, ["addPrefix"] = AddPrefix, });
+
     public void Validate(StepValidationContext context)
     {
         context.ValidateSourceExists("Rebase");
@@ -51,14 +54,6 @@ public sealed class RebaseStep : ITransformStep
                 "Rebase requires StripPrefix or AddPrefix.");
         // Post-condition: source is unchanged.
     }
-
-    public TransformStepConfig Config => new(
-        StepType,
-        new JsonObject
-        {
-            ["stripPrefix"] = StripPrefix,
-            ["addPrefix"] = AddPrefix,
-        });
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {

@@ -19,6 +19,8 @@ public sealed class RenameStep : ITransformStep
     public StepKind StepType => StepKind.Rename;
     public bool IsExecutable => false;
 
+    public TransformStepConfig Config => new(StepType, new JsonObject { ["pattern"] = Pattern });
+
     public void Validate(StepValidationContext context)
     {
         context.ValidateSourceExists("Rename");
@@ -26,13 +28,6 @@ public sealed class RenameStep : ITransformStep
             context.AddBlockingIssue("Step.RenamePatternRequired", "Rename requires a non-empty pattern.");
         // Post-condition: source is unchanged.
     }
-
-    public TransformStepConfig Config => new(
-        StepType,
-        new JsonObject
-        {
-            ["pattern"] = Pattern,
-        });
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {

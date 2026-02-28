@@ -17,18 +17,13 @@ public sealed class FlattenStep : ITransformStep
     public StepKind StepType => StepKind.Flatten;
     public bool IsExecutable => false;
 
+    public TransformStepConfig Config => new(StepType, new JsonObject { ["conflictStrategy"] = ConflictStrategy.ToString() });
+
     public void Validate(StepValidationContext context)
     {
         context.ValidateSourceExists("Flatten");
         // Post-condition: source is unchanged.
     }
-
-    public TransformStepConfig Config => new(
-        StepType,
-        new JsonObject
-        {
-            ["conflictStrategy"] = ConflictStrategy.ToString(),
-        });
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {

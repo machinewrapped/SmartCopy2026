@@ -19,32 +19,31 @@ public sealed class MoveStep : ITransformStep
     public StepKind StepType => StepKind.Move;
     public bool IsExecutable => true;
 
+    public TransformStepConfig Config => new(StepType, new JsonObject { ["destinationPath"] = DestinationPath });
+
     public void Validate(StepValidationContext context)
     {
         context.ValidateHasSelectedInputs();
         context.ValidateSourceExists("Move");
         if (string.IsNullOrWhiteSpace(DestinationPath))
+        {
             context.AddBlockingIssue("Step.MissingDestination", "Move requires a destination path.");
+        }
         // Post-condition: move consumes the source.
         context.SourceExists = false;
     }
 
-    public TransformStepConfig Config => new(
-        StepType,
-        new JsonObject { ["destinationPath"] = DestinationPath });
-
     public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
-        var targetProvider = context.TargetProvider;
+        var targetProvider = context.TargetProvider 
+                             ?? throw new InvalidOperationException("TargetProvider must be set for MoveStep.");
+
         var destination = StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, context.PathSegments);
         
         PlanWarning? warning = null;
-        if (targetProvider is not null)
+        if (await targetProvider.ExistsAsync(destination, ct))
         {
-            if (await targetProvider.ExistsAsync(destination, ct))
-            {
-                warning = PlanWarning.DestinationOverwritten;
-            }
+            warning = PlanWarning.DestinationOverwritten;
         }
 
         yield return new TransformResult(
@@ -107,6 +106,7 @@ public sealed class MoveStep : ITransformStep
 
         await using var sourceStream = context.ContentStream
                                        ?? await context.SourceProvider.OpenReadAsync(context.SourceNode.FullPath, ct);
+
         await targetProvider.WriteAsync(destination, sourceStream, progress: null, ct);
         await context.SourceProvider.DeleteAsync(context.SourceNode.FullPath, ct);
 

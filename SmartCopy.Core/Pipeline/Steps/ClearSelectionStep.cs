@@ -11,12 +11,12 @@ public sealed class ClearSelectionStep : ITransformStep
     public bool IsConfigurable => false;
     public bool ProvidesInput => true;
 
+    public TransformStepConfig Config => new(StepType, new JsonObject());
+
     public void Validate(StepValidationContext context)
     {
         // No preconditions or postconditions.
     }
-
-    public TransformStepConfig Config => new(StepType, new JsonObject());
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {

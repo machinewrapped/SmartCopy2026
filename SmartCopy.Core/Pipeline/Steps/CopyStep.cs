@@ -19,6 +19,8 @@ public sealed class CopyStep : ITransformStep
     public StepKind StepType => StepKind.Copy;
     public bool IsExecutable => true;
 
+    public TransformStepConfig Config => new(StepType, new JsonObject { ["destinationPath"] = DestinationPath });
+
     public void Validate(StepValidationContext context)
     {
         context.ValidateHasSelectedInputs();
@@ -27,10 +29,6 @@ public sealed class CopyStep : ITransformStep
             context.AddBlockingIssue("Step.MissingDestination", "Copy requires a destination path.");
         // Post-condition: source is still present after a copy.
     }
-
-    public TransformStepConfig Config => new(
-        StepType,
-        new JsonObject { ["destinationPath"] = DestinationPath });
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
@@ -41,15 +39,15 @@ public sealed class CopyStep : ITransformStep
         }
 
         var targetProvider = context.TargetProvider;
+        if (targetProvider is null)
+            throw new InvalidOperationException("TargetProvider must be set for CopyStep.");
+
         var destination = StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, context.PathSegments);
         
         PlanWarning? warning = null;
-        if (targetProvider is not null)
+        if (await targetProvider.ExistsAsync(destination, ct))
         {
-            if (await targetProvider.ExistsAsync(destination, ct))
-            {
-                warning = PlanWarning.DestinationOverwritten;
-            }
+            warning = PlanWarning.DestinationOverwritten;
         }
 
         yield return new TransformResult(
@@ -67,6 +65,7 @@ public sealed class CopyStep : ITransformStep
         ct.ThrowIfCancellationRequested();
         if (context.SourceNode.IsDirectory)
             return new TransformResult(Success: true, StepType: StepType, DestinationPath: null);
+
         var targetProvider = context.TargetProvider
                              ?? throw new InvalidOperationException("TargetProvider must be set for CopyStep.");
 
