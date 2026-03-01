@@ -12,18 +12,20 @@ public sealed class LocalFileSystemProviderTests
     public async Task GetChildrenAndGetNode_ReturnExpectedMetadata()
     {
         using var temp = new TempDirectory();
-        Directory.CreateDirectory(System.IO.Path.Combine(temp.Path, "albums"));
-        await File.WriteAllTextAsync(System.IO.Path.Combine(temp.Path, "albums", "track1.txt"), "abc");
+        Directory.CreateDirectory(Path.Combine(temp.Path, "albums"));
+        await File.WriteAllTextAsync(Path.Combine(temp.Path, "albums", "track1.txt"), "abc");
 
         var provider = new LocalFileSystemProvider(temp.Path);
-        var children = await provider.GetChildrenAsync(System.IO.Path.Combine(temp.Path, "albums"), CancellationToken.None);
+        var children = await provider.GetChildrenAsync(Path.Combine(temp.Path, "albums"), CancellationToken.None);
 
         Assert.Single(children);
         Assert.Equal("track1.txt", children.Single().Name);
 
-        var node = await provider.GetNodeAsync(System.IO.Path.Combine(temp.Path, "albums", "track1.txt"), CancellationToken.None);
+        var node = await provider.GetNodeAsync(Path.Combine(temp.Path, "albums", "track1.txt"), CancellationToken.None);
+        var relativePath = provider.GetRelativePath(provider.RootPath, node.FullPath);
+        var pathSegments = provider.SplitPath(relativePath);
         Assert.Equal(3, node.Size);
-        Assert.Equal(Path.Combine("albums", "track1.txt"), node.CanonicalPath.Replace('/', Path.DirectorySeparatorChar));
+        Assert.Equal(Path.Combine("albums", "track1.txt"), string.Join(Path.DirectorySeparatorChar, pathSegments));
     }
 
     [Fact]

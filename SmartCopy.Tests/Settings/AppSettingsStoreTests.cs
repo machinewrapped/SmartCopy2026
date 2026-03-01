@@ -9,7 +9,7 @@ public sealed class AppSettingsStoreTests
     public async Task SaveAndLoad_RoundTripsSettings()
     {
         using var temp = new TempDirectory();
-        var filePath = System.IO.Path.Combine(temp.Path, "settings.json");
+        var filePath = Path.Combine(temp.Path, "settings.json");
         var store = new AppSettingsStore();
 
         var settings = new AppSettings
@@ -33,7 +33,7 @@ public sealed class AppSettingsStoreTests
     public async Task Load_WithCorruptJson_ReturnsDefaults()
     {
         using var temp = new TempDirectory();
-        var filePath = System.IO.Path.Combine(temp.Path, "settings.json");
+        var filePath = Path.Combine(temp.Path, "settings.json");
         await File.WriteAllTextAsync(filePath, "{ invalid json");
 
         var store = new AppSettingsStore();
@@ -47,7 +47,7 @@ public sealed class AppSettingsStoreTests
     public async Task SaveAndLoad_RoundTripsNewOptions()
     {
         using var temp = new TempDirectory();
-        var filePath = System.IO.Path.Combine(temp.Path, "settings.json");
+        var filePath = Path.Combine(temp.Path, "settings.json");
         var store = new AppSettingsStore();
 
         var settings = new AppSettings

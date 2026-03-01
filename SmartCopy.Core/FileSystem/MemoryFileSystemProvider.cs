@@ -412,12 +412,10 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
             ? Root
             : path[(path.LastIndexOf('/') + 1)..];
 
-        var relativePath = GetRelativeToRoot(path);
         return new FileSystemNode
         {
             Name = name,
             FullPath = path,
-            CanonicalPath = GetCanonicalPath(relativePath),
             IsDirectory = entry.IsDirectory,
             Size = entry.IsDirectory ? 0 : entry.Size,
             CreatedAt = entry.CreatedAt,

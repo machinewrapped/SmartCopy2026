@@ -266,12 +266,10 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     private FileSystemNode CreateDirectoryNode(string directoryPath)
     {
         var info = new DirectoryInfo(directoryPath);
-        var relativePath = GetRelativePath(RootPath, info.FullName);
         return new FileSystemNode
         {
             Name = info.Name,
             FullPath = info.FullName,
-            CanonicalPath = GetCanonicalPath(relativePath),
             IsDirectory = true,
             Size = 0,
             CreatedAt = info.CreationTimeUtc,
@@ -283,12 +281,10 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     private FileSystemNode CreateFileNode(string filePath)
     {
         var info = new FileInfo(filePath);
-        var relativePath = GetRelativePath(RootPath, info.FullName);
         return new FileSystemNode
         {
             Name = info.Name,
             FullPath = info.FullName,
-            CanonicalPath = GetCanonicalPath(relativePath),
             IsDirectory = false,
             Size = info.Length,
             CreatedAt = info.CreationTimeUtc,

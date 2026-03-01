@@ -12,9 +12,9 @@ public sealed class SelectionSerializerTests
         var serializer = new SelectionSerializer();
         var snapshot = new SelectionSnapshot(["a/b/c.mp3", "x/y/z.flac"]);
 
-        var txtPath = System.IO.Path.Combine(temp.Path, "selection.txt");
-        var m3uPath = System.IO.Path.Combine(temp.Path, "selection.m3u");
-        var sc2Path = System.IO.Path.Combine(temp.Path, "selection.sc2sel");
+        var txtPath = Path.Combine(temp.Path, "selection.txt");
+        var m3uPath = Path.Combine(temp.Path, "selection.m3u");
+        var sc2Path = Path.Combine(temp.Path, "selection.sc2sel");
 
         await serializer.SaveTxtAsync(txtPath, snapshot, CancellationToken.None);
         await serializer.SaveM3uAsync(m3uPath, snapshot, CancellationToken.None);
@@ -36,7 +36,7 @@ public sealed class SelectionSerializerTests
         var serializer = new SelectionSerializer();
         var snapshot = new SelectionSnapshot(["a/b/c.mp3", "x/y/z.flac"]);
 
-        var m3u8Path = System.IO.Path.Combine(temp.Path, "selection.m3u8");
+        var m3u8Path = Path.Combine(temp.Path, "selection.m3u8");
         await serializer.SaveM3u8Async(m3u8Path, snapshot, CancellationToken.None);
         var loaded = await serializer.LoadM3u8Async(m3u8Path, CancellationToken.None);
 
@@ -52,10 +52,10 @@ public sealed class SelectionSerializerTests
         var serializer = new SelectionSerializer();
         var snapshot = new SelectionSnapshot(["songs/track.mp3"]);
 
-        var txtPath  = System.IO.Path.Combine(temp.Path, "sel.txt");
-        var m3uPath  = System.IO.Path.Combine(temp.Path, "sel.m3u");
-        var m3u8Path = System.IO.Path.Combine(temp.Path, "sel.m3u8");
-        var sc2Path  = System.IO.Path.Combine(temp.Path, "sel.sc2sel");
+        var txtPath  = Path.Combine(temp.Path, "sel.txt");
+        var m3uPath  = Path.Combine(temp.Path, "sel.m3u");
+        var m3u8Path = Path.Combine(temp.Path, "sel.m3u8");
+        var sc2Path  = Path.Combine(temp.Path, "sel.sc2sel");
 
         await serializer.SaveAsync(txtPath,  snapshot);
         await serializer.SaveAsync(m3uPath,  snapshot);
@@ -80,9 +80,9 @@ public sealed class SelectionSerializerTests
         var serializer = new SelectionSerializer();
         var snapshot = new SelectionSnapshot(["музыка/трек.mp3", "café/résumé.txt", "日本語/音楽.flac"]);
 
-        var txtPath  = System.IO.Path.Combine(temp.Path, "sel.txt");
-        var m3u8Path = System.IO.Path.Combine(temp.Path, "sel.m3u8");
-        var sc2Path  = System.IO.Path.Combine(temp.Path, "sel.sc2sel");
+        var txtPath  = Path.Combine(temp.Path, "sel.txt");
+        var m3u8Path = Path.Combine(temp.Path, "sel.m3u8");
+        var sc2Path  = Path.Combine(temp.Path, "sel.sc2sel");
 
         await serializer.SaveTxtAsync(txtPath, snapshot);
         await serializer.SaveM3u8Async(m3u8Path, snapshot);
@@ -107,7 +107,7 @@ public sealed class SelectionSerializerTests
         var serializer = new SelectionSerializer();
 
         // Write a .txt file with backslash-separated paths manually
-        var txtPath = System.IO.Path.Combine(temp.Path, "sel.txt");
+        var txtPath = Path.Combine(temp.Path, "sel.txt");
         await System.IO.File.WriteAllLinesAsync(txtPath, ["folder\\sub\\file.mp3", "other\\track.flac"]);
 
         var loaded = await serializer.LoadTxtAsync(txtPath);

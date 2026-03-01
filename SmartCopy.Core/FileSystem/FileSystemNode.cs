@@ -13,11 +13,6 @@ public sealed class FileSystemNode
     public string Name { get; init; } = string.Empty;
     public string FullPath { get; init; } = string.Empty;
 
-    /// <summary>
-    /// The relative path as a canonical forward-slash string/>.
-    /// </summary>
-    public string CanonicalPath { get; init; } = string.Empty;
-
     public bool IsDirectory { get; init; }
     public long Size { get; init; }
     public DateTime CreatedAt { get; init; }
