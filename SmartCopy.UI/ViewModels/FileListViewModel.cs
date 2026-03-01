@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
 
@@ -15,14 +16,14 @@ public class FileListViewModel(IFileSystemProvider provider, string directoryPat
 
     private FilterChain? _chain;
     private IFileSystemProvider? _comparisonProvider;
-    private FileSystemNode? _currentDirectoryNode;
+    private DirectoryTreeNode? _currentDirectoryNode;
 
     // The full unfiltered set of file nodes for the current directory.
-    private List<FileSystemNode> _files = [];
+    private List<DirectoryTreeNode> _files = [];
 
     // The subset (or whole set) exposed to the DataGrid, respecting ShowFilteredFiles.
-    private IReadOnlyList<FileSystemNode> _visibleFiles = [];
-    public IReadOnlyList<FileSystemNode> VisibleFiles
+    private IReadOnlyList<DirectoryTreeNode> _visibleFiles = [];
+    public IReadOnlyList<DirectoryTreeNode> VisibleFiles
     {
         get => _visibleFiles;
         private set => SetProperty(ref _visibleFiles, value);
@@ -60,7 +61,7 @@ public class FileListViewModel(IFileSystemProvider provider, string directoryPat
         RefreshVisibleFiles();
     }
 
-    public async Task LoadFilesForNodeAsync(FileSystemNode directoryNode)
+    public async Task LoadFilesForNodeAsync(DirectoryTreeNode directoryNode)
     {
         _loadCts?.Cancel();
         _loadCts?.Dispose();
@@ -73,31 +74,20 @@ public class FileListViewModel(IFileSystemProvider provider, string directoryPat
         if (directoryNode.Files.Count == 0)
         {
             var children = await _provider.GetChildrenAsync(_directoryPath, ct);
-            var files = new List<FileSystemNode>();
+            var files = new List<DirectoryTreeNode>();
 
-            foreach (var child in children)
+            foreach (FileSystemNode child in children)
             {
                 ct.ThrowIfCancellationRequested();
-                if (child.IsDirectory) continue;
+                if (child.IsDirectory)
+                    continue;
 
                 var checkState = directoryNode.CheckState == CheckState.Checked
                     ? CheckState.Checked
                     : CheckState.Unchecked;
 
-                files.Add(new FileSystemNode
-                {
-                    Name = child.Name,
-                    FullPath = child.FullPath,
-                    RelativePathSegments = child.RelativePathSegments,
-                    IsDirectory = false,
-                    Size = child.Size,
-                    CreatedAt = child.CreatedAt,
-                    ModifiedAt = child.ModifiedAt,
-                    Attributes = child.Attributes,
-                    CheckState = checkState,
-                    FilterResult = FilterResult.Included,
-                    Parent = directoryNode,
-                });
+                DirectoryTreeNode item = new(_filesystemNode: child, _parent: directoryNode, _checkState: checkState);
+                files.Add(item);
             }
 
             if (ct.IsCancellationRequested) return;

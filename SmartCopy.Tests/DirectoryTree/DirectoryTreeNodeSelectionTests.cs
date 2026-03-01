@@ -1,8 +1,10 @@
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
+using SmartCopy.Tests.TestInfrastructure;
 
-namespace SmartCopy.Tests.FileSystem;
+namespace SmartCopy.Tests.DirectoryTree;
 
-public sealed class FileSystemNodeSelectionTests
+public sealed class DirectoryTreeNodeSelectionTests
 {
     [Fact]
     public void SettingDirectoryChecked_PropagatesToDescendants()
@@ -60,27 +62,29 @@ public sealed class FileSystemNodeSelectionTests
         Assert.False(node.IsSelected);
     }
 
-    private static FileSystemNode CreateDirectory(string name, string fullPath, string relativePath, FileSystemNode? parent = null)
+    private static DirectoryTreeNode CreateDirectory(string name, string fullPath, string relativePath, DirectoryTreeNode? parent = null)
     {
-        return new FileSystemNode
+        FileSystemNode node = new()
         {
             Name = name,
             FullPath = fullPath,
-            RelativePathSegments = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries),
+            PathSegments = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries),
             IsDirectory = true,
-            Parent = parent,
         };
+
+        return new DirectoryTreeNode(node, parent);
     }
 
-    private static FileSystemNode CreateFile(string name, string fullPath, string relativePath, FileSystemNode? parent = null)
+    private static DirectoryTreeNode CreateFile(string name, string fullPath, string relativePath, DirectoryTreeNode? parent = null)
     {
-        return new FileSystemNode
-        {
-            Name = name,
-            FullPath = fullPath,
-            RelativePathSegments = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries),
-            IsDirectory = false,
-            Parent = parent,
-        };
+            FileSystemNode node = new()
+            {
+                Name = name,
+                FullPath = fullPath,
+                PathSegments = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries),
+                IsDirectory = false,
+            };
+
+            return new DirectoryTreeNode(node, parent);
     }
 }

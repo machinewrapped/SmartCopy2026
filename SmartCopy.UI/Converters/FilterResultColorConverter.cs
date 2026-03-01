@@ -2,7 +2,7 @@ using System;
 using System.Globalization;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
-using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.DirectoryTree;
 
 namespace SmartCopy.UI.Converters;
 

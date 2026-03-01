@@ -8,11 +8,11 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
-using SmartCopy.Core.Pipeline.Validation;
 using SmartCopy.Core.Progress;
 using SmartCopy.Core.Selection;
 using SmartCopy.Core.Settings;
@@ -535,13 +535,15 @@ public partial class MainViewModel : ViewModelBase
         int filteredOut = 0;
 
         foreach (var root in DirectoryTree.RootNodes)
+        {
             CollectStatsRecursive(root, ref selected, ref totalBytes, ref filteredOut);
+        }
 
         Pipeline.SetSelectedIncludedFileCount(selected);
         StatusBar.Selection.UpdateStats(selected, totalBytes, filteredOut);
     }
 
-    private static void CollectStatsRecursive(FileSystemNode node, ref int selected, ref long totalBytes, ref int filteredOut)
+    private static void CollectStatsRecursive(DirectoryTreeNode node, ref int selected, ref long totalBytes, ref int filteredOut)
     {
         foreach (var file in node.Files)
         {

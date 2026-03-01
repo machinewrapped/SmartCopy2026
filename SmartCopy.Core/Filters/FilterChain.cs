@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.DirectoryTree;
 
 namespace SmartCopy.Core.Filters;
 
@@ -19,12 +20,12 @@ public sealed class FilterChain
 
     public IReadOnlyList<IFilter> Filters => _filters;
 
-    public async Task<IReadOnlyList<FileSystemNode>> ApplyAsync(
-        IEnumerable<FileSystemNode> nodes,
+    public async Task<IReadOnlyList<DirectoryTreeNode>> ApplyAsync(
+        IEnumerable<DirectoryTreeNode> nodes,
         IFileSystemProvider? comparisonProvider = null,
         CancellationToken ct = default)
     {
-        var result = new List<FileSystemNode>();
+        var result = new List<DirectoryTreeNode>();
         foreach (var node in nodes)
         {
             ct.ThrowIfCancellationRequested();
@@ -39,12 +40,12 @@ public sealed class FilterChain
     }
 
     public async Task ApplyToTreeAsync(
-        IEnumerable<FileSystemNode> roots,
+        IEnumerable<DirectoryTreeNode> roots,
         IFileSystemProvider? comparisonProvider = null,
         CancellationToken ct = default)
     {
-        var stack = new Stack<FileSystemNode>(roots);
-        var postOrderList = new List<FileSystemNode>();
+        var stack = new Stack<DirectoryTreeNode>(roots);
+        var postOrderList = new List<DirectoryTreeNode>();
 
         while (stack.Count > 0)
         {
@@ -88,7 +89,7 @@ public sealed class FilterChain
         }
     }
 
-    public static void RecalculateParentExclusion(FileSystemNode? node)
+    public static void RecalculateParentExclusion(DirectoryTreeNode? node)
     {
         while (node != null)
         {
@@ -98,11 +99,11 @@ public sealed class FilterChain
     }
 
     /// <summary>
-    /// For a non-empty directory, sets its <see cref="FileSystemNode.FilterResult"/> based on
+    /// For a non-empty directory, sets its <see cref="DirectoryTreeNode.FilterResult"/> based on
     /// whether any child or file is still included. A directory is only excluded when ALL its
     /// content is excluded; individual filter evaluation on the directory itself is overridden.
     /// </summary>
-    private static void UpdateDirectoryExclusion(FileSystemNode node)
+    private static void UpdateDirectoryExclusion(DirectoryTreeNode node)
     {
         if (!node.IsDirectory || (node.Children.Count == 0 && node.Files.Count == 0))
             return;
@@ -143,7 +144,7 @@ public sealed class FilterChain
         => FromConfig(config, FilterFactory.FromConfig);
 
     private async Task<NodeEvaluation> EvaluateNodeAsync(
-        FileSystemNode node,
+        DirectoryTreeNode node,
         IFileSystemProvider? comparisonProvider,
         CancellationToken ct)
     {

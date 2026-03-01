@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Core.Pipeline;
@@ -11,10 +12,10 @@ namespace SmartCopy.Core.Pipeline;
 public sealed class PipelineJob
 {
     /// <summary>All files that passed the active filter chain (the full "universe" for input-providing steps).</summary>
-    public required IReadOnlyList<FileSystemNode> FilterIncludedFiles { get; init; }
+    public required IReadOnlyList<DirectoryTreeNode> FilterIncludedFiles { get; init; }
 
     /// <summary>The user's explicit selection — the initial working set for non-input steps.</summary>
-    public required IReadOnlyList<FileSystemNode> SelectedFiles { get; init; }
+    public required IReadOnlyList<DirectoryTreeNode> SelectedFiles { get; init; }
 
     /// <summary>Provider used to read source files.</summary>
     public required IFileSystemProvider SourceProvider { get; init; }

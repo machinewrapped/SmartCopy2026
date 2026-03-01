@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Core.Scanning;
@@ -12,18 +13,18 @@ public sealed class DirectoryScanner
 
     public DirectoryScanner(IFileSystemProvider provider) => _provider = provider;
 
-    public async IAsyncEnumerable<FileSystemNode> ScanAsync(
+    public async IAsyncEnumerable<DirectoryTreeNode> ScanAsync(
         string rootPath,
         ScanOptions options,
         IProgress<ScanProgress>? progress = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        var rootNode = CloneForTree(await _provider.GetNodeAsync(rootPath, ct), parent: null, rootPath);
+        var rootNode = new DirectoryTreeNode(await _provider.GetNodeAsync(rootPath, ct), _parent: null);
         yield return rootNode;
 
         // visited guards against circular symbolic links re-enqueueing an already-processed path.
         var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { rootNode.FullPath };
-        var queue = new Queue<(FileSystemNode Node, int Depth)>();
+        var queue = new Queue<(DirectoryTreeNode Node, int Depth)>();
         queue.Enqueue((rootNode, 0));
 
         var directoriesScanned = 0;
@@ -51,23 +52,23 @@ public sealed class DirectoryScanner
                     continue;
                 }
 
-                var cloned = CloneForTree(child, currentDirectory, rootPath);
-                if (cloned.IsDirectory)
+                var node = new DirectoryTreeNode(child, currentDirectory);
+                if (node.IsDirectory)
                 {
-                    currentDirectory.Children.Add(cloned);
-                    if (!options.LazyExpand && visited.Add(cloned.FullPath))
+                    currentDirectory.Children.Add(node);
+                    if (!options.LazyExpand && visited.Add(node.FullPath))
                     {
-                        queue.Enqueue((cloned, depth + 1));
+                        queue.Enqueue((node, depth + 1));
                     }
                 }
                 else
                 {
-                    currentDirectory.Files.Add(cloned);
+                    currentDirectory.Files.Add(node);
                 }
 
                 nodesDiscovered++;
-                progress?.Report(new ScanProgress(nodesDiscovered, directoriesScanned, cloned.FullPath));
-                yield return cloned;
+                progress?.Report(new ScanProgress(nodesDiscovered, directoriesScanned, node.FullPath));
+                yield return node;
             }
         }
     }
@@ -80,25 +81,5 @@ public sealed class DirectoryScanner
         }
 
         return (node.Attributes & FileAttributes.Hidden) == 0;
-    }
-
-    private FileSystemNode CloneForTree(FileSystemNode source, FileSystemNode? parent, string rootPath)
-    {
-        return new FileSystemNode
-        {
-            Name = source.Name,
-            FullPath = source.FullPath,
-            RelativePathSegments = _provider.SplitPath(_provider.GetRelativePath(rootPath, source.FullPath)),
-            IsDirectory = source.IsDirectory,
-            Size = source.Size,
-            CreatedAt = source.CreatedAt,
-            ModifiedAt = source.ModifiedAt,
-            Attributes = source.Attributes,
-            Parent = parent,
-            CheckState = source.CheckState,
-            FilterResult = source.FilterResult,
-            ExcludedByFilter = source.ExcludedByFilter,
-            Notes = source.Notes,
-        };
     }
 }

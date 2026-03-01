@@ -2,6 +2,7 @@ using System;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Core.Filters.Filters;
@@ -36,7 +37,7 @@ public sealed class DateRangeFilter : FilterBase
     public override string Description => $"DateRange: {Field}";
 
     public override ValueTask<bool> MatchesAsync(
-        FileSystemNode node,
+        DirectoryTreeNode node,
         IFileSystemProvider? comparisonProvider,
         CancellationToken ct = default)
     {

@@ -22,7 +22,7 @@ public sealed class MemoryFileSystemProviderTests
         var node = await provider.GetNodeAsync("/music/track.txt", CancellationToken.None);
         Assert.False(node.IsDirectory);
         Assert.Equal("track.txt", node.Name);
-        Assert.Equal("music/track.txt", node.CanonicalRelativePath);
+        Assert.Equal("music/track.txt", node.CanonicalPath);
 
         var children = await provider.GetChildrenAsync("/music", CancellationToken.None);
         Assert.Single(children);

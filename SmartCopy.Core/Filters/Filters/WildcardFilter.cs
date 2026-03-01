@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Core.Filters.Filters;
@@ -28,7 +29,7 @@ public sealed class WildcardFilter : FilterBase
     public override string Description => $"Wildcard: {Pattern}";
 
     public override ValueTask<bool> MatchesAsync(
-        FileSystemNode node,
+        DirectoryTreeNode node,
         IFileSystemProvider? comparisonProvider,
         CancellationToken ct = default)
     {

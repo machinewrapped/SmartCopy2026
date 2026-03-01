@@ -21,6 +21,8 @@ Key classes:
 ```
 SmartCopy2026/
 ├── SmartCopy.Core/                 # Business logic — no UI references
+│   ├── DirectoryTree
+│   │   ├── DirectoryTreeNode.cs        # Files and folders with hierarchy and filter/selection state
 │   ├── FileSystem/
 │   │   ├── IFileSystemProvider.cs      # Abstraction over local + MTP (incl. ProviderCapabilities)
 │   │   ├── LocalFileSystemProvider.cs
@@ -207,7 +209,7 @@ public interface IFilter
     /// comparisonProvider is non-null when filter needs to check a second location (MirrorFilter).
     /// </summary>
     ValueTask<bool> MatchesAsync(
-        FileSystemNode node,
+        DirectoryTreeNode node,
         IFileSystemProvider? comparisonProvider,
         CancellationToken ct = default);
 }
@@ -216,13 +218,13 @@ public sealed class FilterChain
 {
     public IReadOnlyList<IFilter> Filters { get; }
 
-    public Task<IReadOnlyList<FileSystemNode>> ApplyAsync(
-        IEnumerable<FileSystemNode> nodes,
+    public Task<IReadOnlyList<DirectoryTreeNode>> ApplyAsync(
+        IEnumerable<DirectoryTreeNode> nodes,
         IFileSystemProvider? comparisonProvider = null,
         CancellationToken ct = default);
 
     public Task ApplyToTreeAsync(
-        IEnumerable<FileSystemNode> roots,
+        IEnumerable<DirectoryTreeNode> roots,
         IFileSystemProvider? comparisonProvider = null,
         CancellationToken ct = default);
 
@@ -272,7 +274,7 @@ For each step:
 - **Selection steps** (`ProvidesInput = true`, e.g. `SelectAll`, `InvertSelection`, `ClearSelection`): run over `filterIncludedFiles`, mutating each node's `CheckState`. After the step completes, the working set is recomputed as `filterIncludedFiles.Where(n => n.CheckState == Checked)`.
 - **All other steps** (path, content, executable): run over the current working set. A `failedNodes` set tracks per-node failures across steps so a node that fails at step N is skipped for steps N+1 onwards.
 
-A `Dictionary<FileSystemNode, TransformContext>` is maintained across steps so that path mutations (e.g. from `FlattenStep`) are preserved when the same node is processed by a later step.
+A `Dictionary<DirectoryTreeNode, TransformContext>` is maintained across steps so that path mutations (e.g. from `FlattenStep`) are preserved when the same node is processed by a later step.
 
 Selection step `Preview()` methods mutate `CheckState` identically to `ApplyAsync()` and return `DestinationPath: null`, ensuring no spurious entries appear in the `OperationPlan`.
 
@@ -323,14 +325,14 @@ public class OperationPlan
 ### 2.6 Directory Scanner
 
 **Default: progressive scan.** The scanner shows top-level folders immediately, then streams
-children in the background via `IAsyncEnumerable<FileSystemNode>`. 
+children in the background via `IAsyncEnumerable<DirectoryTreeNode>`. 
 
 The user can browse and select folders while deeper levels are still loading, so that large libraries, network shares, and MTP sources don't block the UI.
 
 Selecting a folder that hasn't been fully scanned yet triggers a prioritised scan of that subtree.
 
-All enumeration runs on the threadpool. `DirectoryScanner` yields `FileSystemNode` objects via
-`IAsyncEnumerable<FileSystemNode>` so the UI can show nodes as they arrive.
+All enumeration runs on the threadpool. `DirectoryScanner` yields `DirectoryTreeNode` objects via
+`IAsyncEnumerable<DirectoryTreeNode>` so the UI can show nodes as they arrive.
 
 ### 2.7 Filesystem Watcher
 
@@ -360,7 +362,7 @@ correctly reimplemented. It exists because the predecessor source is not in this
 
 ### 3.1 Node Selection State
 
-Each `FileSystemNode` carries two independent pieces of application state:
+Each `DirectoryTreeNode` carries two independent pieces of application state:
 
 **`CheckState`** — user intent:
 - `Checked` — user has explicitly selected this node
@@ -580,8 +582,8 @@ The ComboBox nulls its `SelectedItem` (e.g. during `RefreshSourceBookmarks`), wh
 
 ```
 MainViewModel
-├── DirectoryTreeViewModel   — RootNodes: ObservableCollection<FileSystemNode>
-├── FileListViewModel        — Files: ObservableCollection<FileSystemNode>
+├── DirectoryTreeViewModel   — RootNodes: ObservableCollection<DirectoryTreeNode>
+├── FileListViewModel        — Files: ObservableCollection<DirectoryTreeNode>
 ├── FilterChainViewModel     — Filters: ObservableCollection<FilterViewModel>
 ├── PipelineViewModel        — Steps: ObservableCollection<PipelineStepViewModel>
 └── StatusBarViewModel

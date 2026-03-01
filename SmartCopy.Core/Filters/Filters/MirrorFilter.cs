@@ -2,6 +2,7 @@ using System;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Core.Filters.Filters;
@@ -33,7 +34,7 @@ public sealed class MirrorFilter : FilterBase
     public override string Description => $"Mirror: {ComparisonPath} ({CompareMode})";
 
     public override async ValueTask<bool> MatchesAsync(
-        FileSystemNode node,
+        DirectoryTreeNode node,
         IFileSystemProvider? comparisonProvider,
         CancellationToken ct = default)
     {

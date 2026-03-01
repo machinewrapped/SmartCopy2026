@@ -1,3 +1,4 @@
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
@@ -11,13 +12,33 @@ public sealed class PipelineRunnerSelectionTests
     // Helpers
     // ─────────────────────────────────────────────────────────────────────────
 
+    private static async Task<(MemoryFileSystemProvider Provider, DirectoryTreeNode A, DirectoryTreeNode B, DirectoryTreeNode C)>
+        CreateThreeFileFixtureAsync(string name1, string name2, string name3)
+    {
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithDirectory("/src")
+            .WithFile($"/src/{name1}.txt", "a"u8)
+            .WithFile($"/src/{name2}.txt", "b"u8)
+            .WithFile($"/src/{name3}.txt", "c"u8));
+
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var a = root.FindNodeByPathSegments(["src", $"{name1}.txt"]);
+        var b = root.FindNodeByPathSegments(["src", $"{name2}.txt"]);
+        var c = root.FindNodeByPathSegments(["src", $"{name3}.txt"]);
+        Assert.NotNull(a);
+        Assert.NotNull(b);
+        Assert.NotNull(c);
+
+        return (provider, a, b, c);
+    }
+
     /// <summary>
     /// Creates a single-provider fixture with several named files under /src,
-    /// a /dest directory, and returns the nodes with their check states set.
+    /// a /dest directory, and returns the nodes with their check states unchecked.
     /// </summary>
     private static async Task<(MemoryFileSystemProvider Provider,
-        FileSystemNode A, FileSystemNode B, FileSystemNode C,
-        FileSystemNode D, FileSystemNode E)>
+        DirectoryTreeNode A, DirectoryTreeNode B, DirectoryTreeNode C,
+        DirectoryTreeNode D, DirectoryTreeNode E)>
         CreateFiveFileFixtureAsync()
     {
         var provider = MemoryFileSystemFixtures.Create(f => f
@@ -29,12 +50,17 @@ public sealed class PipelineRunnerSelectionTests
             .WithFile("/src/d.txt", "d"u8)
             .WithFile("/src/e.txt", "e"u8));
 
-        var ct = CancellationToken.None;
-        var a = await provider.GetNodeAsync("/src/a.txt", ct);
-        var b = await provider.GetNodeAsync("/src/b.txt", ct);
-        var c = await provider.GetNodeAsync("/src/c.txt", ct);
-        var d = await provider.GetNodeAsync("/src/d.txt", ct);
-        var e = await provider.GetNodeAsync("/src/e.txt", ct);
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var a = root.FindNodeByPathSegments(["src", "a.txt"]);
+        var b = root.FindNodeByPathSegments(["src", "b.txt"]);
+        var c = root.FindNodeByPathSegments(["src", "c.txt"]);
+        var d = root.FindNodeByPathSegments(["src", "d.txt"]);
+        var e = root.FindNodeByPathSegments(["src", "e.txt"]);
+        Assert.NotNull(a);
+        Assert.NotNull(b);
+        Assert.NotNull(c);
+        Assert.NotNull(d);
+        Assert.NotNull(e);
 
         return (provider, a, b, c, d, e);
     }
@@ -53,8 +79,8 @@ public sealed class PipelineRunnerSelectionTests
         b.CheckState = CheckState.Checked;
         c.CheckState = CheckState.Checked;
 
-        FileSystemNode[] filterIncluded = [a, b, c, d, e];
-        FileSystemNode[] selected = [a, b, c];
+        DirectoryTreeNode[] filterIncluded = [a, b, c, d, e];
+        DirectoryTreeNode[] selected = [a, b, c];
 
         var runner = new PipelineRunner(new TransformPipeline(
         [
@@ -92,23 +118,13 @@ public sealed class PipelineRunnerSelectionTests
     [Fact]
     public async Task SelectAll_then_Copy_CopiesAllFilterIncludedFiles()
     {
-        var provider = MemoryFileSystemFixtures.Create(f => f
-            .WithDirectory("/src")
-            .WithDirectory("/dest")
-            .WithFile("/src/x.txt", "x"u8)
-            .WithFile("/src/y.txt", "y"u8)
-            .WithFile("/src/z.txt", "z"u8));
-
-        var ct = CancellationToken.None;
-        var x = await provider.GetNodeAsync("/src/x.txt", ct);
-        var y = await provider.GetNodeAsync("/src/y.txt", ct);
-        var z = await provider.GetNodeAsync("/src/z.txt", ct);
+        var (provider, x, y, z) = await CreateThreeFileFixtureAsync("x", "y", "z");
 
         // Only X is initially selected
         x.CheckState = CheckState.Checked;
 
-        FileSystemNode[] filterIncluded = [x, y, z];
-        FileSystemNode[] selected = [x];
+        DirectoryTreeNode[] filterIncluded = [x, y, z];
+        DirectoryTreeNode[] selected = [x];
 
         var runner = new PipelineRunner(new TransformPipeline(
         [
@@ -130,9 +146,9 @@ public sealed class PipelineRunnerSelectionTests
             ct: CancellationToken.None);
 
         // All three files should be copied after SelectAll
-        Assert.True(await provider.ExistsAsync("/dest/src/x.txt", ct));
-        Assert.True(await provider.ExistsAsync("/dest/src/y.txt", ct));
-        Assert.True(await provider.ExistsAsync("/dest/src/z.txt", ct));
+        Assert.True(await provider.ExistsAsync("/dest/src/x.txt", CancellationToken.None));
+        Assert.True(await provider.ExistsAsync("/dest/src/y.txt", CancellationToken.None));
+        Assert.True(await provider.ExistsAsync("/dest/src/z.txt", CancellationToken.None));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -142,25 +158,15 @@ public sealed class PipelineRunnerSelectionTests
     [Fact]
     public async Task ClearSelection_then_Copy_CopiesNothing()
     {
-        var provider = MemoryFileSystemFixtures.Create(f => f
-            .WithDirectory("/src")
-            .WithDirectory("/dest")
-            .WithFile("/src/p.txt", "p"u8)
-            .WithFile("/src/q.txt", "q"u8)
-            .WithFile("/src/r.txt", "r"u8));
-
-        var ct = CancellationToken.None;
-        var p = await provider.GetNodeAsync("/src/p.txt", ct);
-        var q = await provider.GetNodeAsync("/src/q.txt", ct);
-        var r = await provider.GetNodeAsync("/src/r.txt", ct);
+        var (provider, p, q, r) = await CreateThreeFileFixtureAsync("p", "q", "r");
 
         // All three initially selected
         p.CheckState = CheckState.Checked;
         q.CheckState = CheckState.Checked;
         r.CheckState = CheckState.Checked;
 
-        FileSystemNode[] filterIncluded = [p, q, r];
-        FileSystemNode[] selected = [p, q, r];
+        DirectoryTreeNode[] filterIncluded = [p, q, r];
+        DirectoryTreeNode[] selected = [p, q, r];
 
         var runner = new PipelineRunner(new TransformPipeline(
         [
@@ -182,9 +188,9 @@ public sealed class PipelineRunnerSelectionTests
             ct: CancellationToken.None);
 
         // Nothing should be copied — ClearSelection empties the working set
-        Assert.False(await provider.ExistsAsync("/dest/src/p.txt", ct));
-        Assert.False(await provider.ExistsAsync("/dest/src/q.txt", ct));
-        Assert.False(await provider.ExistsAsync("/dest/src/r.txt", ct));
+        Assert.False(await provider.ExistsAsync("/dest/src/p.txt", CancellationToken.None));
+        Assert.False(await provider.ExistsAsync("/dest/src/q.txt", CancellationToken.None));
+        Assert.False(await provider.ExistsAsync("/dest/src/r.txt", CancellationToken.None));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -202,14 +208,17 @@ public sealed class PipelineRunnerSelectionTests
                 .WithFile("/src/r.txt", "r"u8),
             tgt => tgt.WithDirectory("/dest"));
 
-        var ct = CancellationToken.None;
-        var p = await sourceProvider.GetNodeAsync("/src/p.txt", ct);
-        var q = await sourceProvider.GetNodeAsync("/src/q.txt", ct);
-        var r = await sourceProvider.GetNodeAsync("/src/r.txt", ct);
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(sourceProvider);
+        var p = root.FindNodeByPathSegments(["src", "p.txt"]);
+        var q = root.FindNodeByPathSegments(["src", "q.txt"]);
+        var r = root.FindNodeByPathSegments(["src", "r.txt"]);
+        Assert.NotNull(p);
+        Assert.NotNull(q);
+        Assert.NotNull(r);
 
         // None initially selected — SelectAll will select all
-        FileSystemNode[] filterIncluded = [p, q, r];
-        FileSystemNode[] selected = [];
+        DirectoryTreeNode[] filterIncluded = [p, q, r];
+        DirectoryTreeNode[] selected = [];
 
         var runner = new PipelineRunner(new TransformPipeline(
         [
@@ -227,7 +236,7 @@ public sealed class PipelineRunnerSelectionTests
                 OverwriteMode       = OverwriteMode.Always,
                 DeleteMode          = DeleteMode.Trash,
             },
-            ct);
+            ct: CancellationToken.None);
 
         // Exactly 3 copy actions — one per filter-included file
         Assert.Equal(3, plan.Actions.Count);

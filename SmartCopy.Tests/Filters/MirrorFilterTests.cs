@@ -1,6 +1,8 @@
+using System.Drawing;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Filters.Filters;
+using SmartCopy.Tests.TestInfrastructure;
 
 namespace SmartCopy.Tests.Filters;
 
@@ -13,51 +15,65 @@ public sealed class MirrorFilterTests
     [Fact]
     public async Task MatchesAsync_NameOnly_ReturnsTrueWhenFileExistsInMirror()
     {
-        var fs = new MemoryFileSystemProvider();
-        fs.SeedSimulatedFile("/mirror/song.mp3", size: 1000);
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithSimulatedFile("/music/song.mp3", size: 500)
+            .WithSimulatedFile("/mirror/song.mp3", size: 1000));
 
-        // Size intentionally differs — NameOnly should not care
-        var node = MakeFile("song.mp3", relativePath: "song.mp3", size: 500);
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider, "/music");
+        var node = root.FindNodeByPathSegments(["song.mp3"]);
+        Assert.NotNull(node);
+
         var filter = new MirrorFilter("/mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude);
 
-        Assert.True(await filter.MatchesAsync(node, fs));
+        Assert.True(await filter.MatchesAsync(node, provider));
     }
 
     [Fact]
     public async Task MatchesAsync_NameOnly_ReturnsFalseWhenFileNotInMirror()
     {
-        var fs = new MemoryFileSystemProvider();
-        // Nothing seeded under /mirror
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithSimulatedFile("/music/new.mp3", size: 500));
 
-        var node = MakeFile("new.mp3", relativePath: "new.mp3", size: 500);
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var node = root.FindNodeByPathSegments(["music", "new.mp3"]);
+        Assert.NotNull(node);
+
         var filter = new MirrorFilter("/mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude);
 
-        Assert.False(await filter.MatchesAsync(node, fs));
+        Assert.False(await filter.MatchesAsync(node, provider));
     }
 
     [Fact]
     public async Task MatchesAsync_NameOnly_NestedPath_ReturnsTrueWhenExistsInMirror()
     {
-        var fs = new MemoryFileSystemProvider();
-        fs.SeedSimulatedFile("/mirror/Alternative/Curve/song.mp3", size: 1000);
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithSimulatedFile("/source/Alternative/Curve/song.mp3", size: 1000)
+            .WithSimulatedFile("/mirror/Alternative/Curve/song.mp3", size: 1000));
 
-        var node = MakeFile("song.mp3", relativePath: "Alternative/Curve/song.mp3", size: 1000);
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider, "/source");
+        var node = root.FindNodeByPathSegments(["Alternative", "Curve", "song.mp3"]);
+        Assert.NotNull(node);
+
         var filter = new MirrorFilter("/mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude);
 
-        Assert.True(await filter.MatchesAsync(node, fs));
+        Assert.True(await filter.MatchesAsync(node, provider));
     }
 
     [Fact]
     public async Task MatchesAsync_NameOnly_NestedPath_ReturnsFalseWhenNotInMirror()
     {
-        var fs = new MemoryFileSystemProvider();
-        // Sibling folder exists, but not the exact path
-        fs.SeedSimulatedFile("/mirror/Alternative/Algiers/other.mp3", size: 100);
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithSimulatedFile("/source/Alternative/Curve/song.mp3", size: 1000)
+            // Sibling file exists in mirror but not the exact path
+            .WithSimulatedFile("/mirror/Alternative/Curve/other.mp3", size: 1000));
 
-        var node = MakeFile("song.mp3", relativePath: "Alternative/Curve/song.mp3", size: 1000);
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var node = root.FindNodeByPathSegments(["source", "Alternative", "Curve", "song.mp3"]);
+        Assert.NotNull(node);
+
         var filter = new MirrorFilter("/mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude);
 
-        Assert.False(await filter.MatchesAsync(node, fs));
+        Assert.False(await filter.MatchesAsync(node, provider));
     }
 
     // -------------------------------------------------------------------------
@@ -67,36 +83,49 @@ public sealed class MirrorFilterTests
     [Fact]
     public async Task MatchesAsync_NameAndSize_ReturnsTrueWhenNameAndSizeMatch()
     {
-        var fs = new MemoryFileSystemProvider();
-        fs.SeedSimulatedFile("/mirror/song.mp3", size: 1000);
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithSimulatedFile("/music/song.mp3", size: 1000)
+            .WithSimulatedFile("/mirror/song.mp3", size: 1000));
 
-        var node = MakeFile("song.mp3", relativePath: "song.mp3", size: 1000);
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider, "/music");
+        var node = root.FindNodeByPathSegments(["song.mp3"]);
+        Assert.NotNull(node);
+
         var filter = new MirrorFilter("/mirror", MirrorCompareMode.NameAndSize, FilterMode.Exclude);
 
-        Assert.True(await filter.MatchesAsync(node, fs));
+        Assert.True(await filter.MatchesAsync(node, provider));
     }
 
     [Fact]
     public async Task MatchesAsync_NameAndSize_ReturnsFalseWhenSizeDiffers()
     {
-        var fs = new MemoryFileSystemProvider();
-        fs.SeedSimulatedFile("/mirror/song.mp3", size: 1000);
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithSimulatedFile("/music/song.mp3", size: 1000)
+            .WithSimulatedFile("/mirror/song.mp3", size: 999)); // different size
 
-        var node = MakeFile("song.mp3", relativePath: "song.mp3", size: 999);
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var node = root.FindNodeByPathSegments(["music", "song.mp3"]);
+        Assert.NotNull(node);
+
         var filter = new MirrorFilter("/mirror", MirrorCompareMode.NameAndSize, FilterMode.Exclude);
 
-        Assert.False(await filter.MatchesAsync(node, fs));
+        Assert.False(await filter.MatchesAsync(node, provider));
     }
 
     [Fact]
     public async Task MatchesAsync_NameAndSize_ReturnsFalseWhenFileNotInMirror()
     {
-        var fs = new MemoryFileSystemProvider();
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithSimulatedFile("/music/song.mp3", size: 1000));
+            // No file seeded in mirror
 
-        var node = MakeFile("song.mp3", relativePath: "song.mp3", size: 1000);
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var node = root.FindNodeByPathSegments(["music", "song.mp3"]);
+        Assert.NotNull(node);
+
         var filter = new MirrorFilter("/mirror", MirrorCompareMode.NameAndSize, FilterMode.Exclude);
 
-        Assert.False(await filter.MatchesAsync(node, fs));
+        Assert.False(await filter.MatchesAsync(node, provider));
     }
 
     // -------------------------------------------------------------------------
@@ -107,74 +136,89 @@ public sealed class MirrorFilterTests
     [Fact]
     public async Task MatchesAsync_Directory_ReturnsTrueWhenEmptyDirectoryExistsInMirror()
     {
-        var fs = new MemoryFileSystemProvider();
-        fs.SeedDirectory("/mirror/Alternative");
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithDirectory("/source/Alternative")
+            .WithDirectory("/mirror/Alternative"));
 
-        var dir = MakeDirectory("Alternative", relativePath: "Alternative");
         var filter = new MirrorFilter("/mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude);
 
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider, "/source");
+        var dir = root.FindNodeByPathSegments(["Alternative"]);
+        Assert.NotNull(dir);
+
         // No files inside → vacuously all files are mirrored
-        Assert.True(await filter.MatchesAsync(dir, fs));
+        Assert.True(await filter.MatchesAsync(dir, provider));
     }
 
     [Fact]
     public async Task MatchesAsync_Directory_ReturnsFalseWhenDirectoryNotInMirror()
     {
-        var fs = new MemoryFileSystemProvider();
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithSimulatedFile("/music/song.mp3", size: 1000));
         // Nothing seeded under /mirror
 
-        var dir = MakeDirectory("NewBand", relativePath: "NewBand");
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var dir = root.FindNodeByPathSegments(["music"]);
+        Assert.NotNull(dir);
+
         var filter = new MirrorFilter("/mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude);
 
-        Assert.False(await filter.MatchesAsync(dir, fs));
+        Assert.False(await filter.MatchesAsync(dir, provider));
     }
 
     [Fact]
     public async Task MatchesAsync_Directory_ReturnsTrueWhenAllFilesInMirror()
     {
-        var fs = new MemoryFileSystemProvider();
-        fs.SeedDirectory("/mirror/Alternative");
-        fs.SeedSimulatedFile("/mirror/Alternative/song.mp3", size: 1000);
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithDirectory("/source/Alternative")
+            .WithSimulatedFile("/source/Alternative/song.mp3", size: 1000)
+            .WithDirectory("/mirror/Alternative")
+            .WithSimulatedFile("/mirror/Alternative/song.mp3", size: 1000));
 
-        var dir = MakeDirectory("Alternative", relativePath: "Alternative");
-        var file = MakeFile("song.mp3", relativePath: "Alternative/song.mp3", size: 1000);
-        dir.Files.Add(file);
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider, "/source");
+        var dir = root.FindNodeByPathSegments(["Alternative"]);
+        Assert.NotNull(dir);
 
         var filter = new MirrorFilter("/mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude);
 
-        Assert.True(await filter.MatchesAsync(dir, fs));
+        Assert.True(await filter.MatchesAsync(dir, provider));
     }
 
     [Fact]
     public async Task MatchesAsync_Directory_ReturnsFalseWhenSomeFilesNotInMirror()
-    {
-        var fs = new MemoryFileSystemProvider();
-        fs.SeedDirectory("/mirror/Alternative");
-        fs.SeedSimulatedFile("/mirror/Alternative/old.mp3", size: 1000);
-        // "new.mp3" is NOT seeded in the mirror
-
-        var dir = MakeDirectory("Alternative", relativePath: "Alternative");
-        dir.Files.Add(MakeFile("old.mp3", relativePath: "Alternative/old.mp3", size: 1000));
-        dir.Files.Add(MakeFile("new.mp3", relativePath: "Alternative/new.mp3", size: 800));
+    {   var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithDirectory("/Alternative")
+            .WithSimulatedFile("/Alternative/old.mp3", size: 1000)
+            .WithSimulatedFile("/Alternative/new.mp3", size: 800)
+            .WithDirectory("/mirror/Alternative")
+            .WithSimulatedFile("/mirror/Alternative/old.mp3", size: 1000));
+            // "new.mp3" is NOT seeded in the mirror
 
         var filter = new MirrorFilter("/mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude);
 
-        Assert.False(await filter.MatchesAsync(dir, fs));
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var dir = root.FindNodeByPathSegments(["Alternative"]);
+        Assert.NotNull(dir);
+
+        Assert.False(await filter.MatchesAsync(dir, provider));
     }
 
     [Fact]
     public async Task MatchesAsync_Directory_NameAndSize_ReturnsFalseWhenFileSizeDiffers()
     {
-        var fs = new MemoryFileSystemProvider();
-        fs.SeedDirectory("/mirror/Alternative");
-        fs.SeedSimulatedFile("/mirror/Alternative/song.mp3", size: 999); // different size
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithDirectory("/Alternative")
+            .WithSimulatedFile("/Alternative/song.mp3", size: 1000)
+            .WithDirectory("/mirror/Alternative")
+            .WithSimulatedFile("/mirror/Alternative/song.mp3", size: 999)); // different size
 
-        var dir = MakeDirectory("Alternative", relativePath: "Alternative");
-        dir.Files.Add(MakeFile("song.mp3", relativePath: "Alternative/song.mp3", size: 1000));
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var dir = root.FindNodeByPathSegments(["Alternative"]);
+        Assert.NotNull(dir);
 
         var filter = new MirrorFilter("/mirror", MirrorCompareMode.NameAndSize, FilterMode.Exclude);
 
-        Assert.False(await filter.MatchesAsync(dir, fs));
+        Assert.False(await filter.MatchesAsync(dir, provider));
     }
 
     // -------------------------------------------------------------------------
@@ -184,11 +228,18 @@ public sealed class MirrorFilterTests
     [Fact]
     public async Task FilterChain_MirrorExclude_ExcludesFilesAlreadyInMirror()
     {
-        var fs = new MemoryFileSystemProvider();
-        fs.SeedSimulatedFile("/mirror/old.mp3", size: 500);
+        var fs = MemoryFileSystemFixtures.Create(f => f
+            .WithDirectory("/music")
+            .WithSimulatedFile("/music/old.mp3", size: 500)
+            .WithSimulatedFile("/music/new.mp3", size: 300)
+            .WithDirectory("/mirror")
+            .WithSimulatedFile("/mirror/old.mp3", size: 500));
 
-        var oldFile = MakeFile("old.mp3", relativePath: "old.mp3", size: 500);
-        var newFile = MakeFile("new.mp3", relativePath: "new.mp3", size: 300);
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(fs, "/music");
+        var oldFile = root.FindNodeByPathSegments(["old.mp3"]);
+        var newFile = root.FindNodeByPathSegments(["new.mp3"]);
+        Assert.NotNull(oldFile);
+        Assert.NotNull(newFile);
 
         var chain = new FilterChain([new MirrorFilter("/mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude)]);
         var result = (await chain.ApplyAsync([oldFile, newFile], comparisonProvider: fs)).ToList();
@@ -200,15 +251,24 @@ public sealed class MirrorFilterTests
     [Fact]
     public async Task FilterChain_MirrorExclude_NestedFiles_ExcludesOnlyMirroredOnes()
     {
-        var fs = new MemoryFileSystemProvider();
-        // Mirror contains the Curve album but not Algiers
-        fs.SeedSimulatedFile("/mirror/Alternative/Curve/song.mp3", size: 1000);
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithDirectory("/source/Alternative")
+            .WithSimulatedFile("/source/Alternative/Curve/song.mp3", size: 1000)
+            .WithSimulatedFile("/source/Alternative/Algiers/pain.mp3", size: 800)
+            .WithDirectory("/mirror/Alternative")
+            .WithSimulatedFile("/mirror/Alternative/Curve/song.mp3", size: 1000));
+            // "Algiers/pain.mp3" is NOT seeded in the mirror
 
-        var curveSong = MakeFile("song.mp3", relativePath: "Alternative/Curve/song.mp3", size: 1000);
-        var algiersSong = MakeFile("pain.mp3", relativePath: "Alternative/Algiers/pain.mp3", size: 800);
+        // Mirror contains the Curve album but not Algiers
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider, "/source");
+
+        var curveSong = root.FindNodeByPathSegments(["Alternative", "Curve", "song.mp3"]);
+        var algiersSong = root.FindNodeByPathSegments(["Alternative", "Algiers", "pain.mp3"]);
+        Assert.NotNull(curveSong);
+        Assert.NotNull(algiersSong);
 
         var chain = new FilterChain([new MirrorFilter("/mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude)]);
-        var result = (await chain.ApplyAsync([curveSong, algiersSong], comparisonProvider: fs)).ToList();
+        var result = (await chain.ApplyAsync([curveSong, algiersSong], comparisonProvider: provider)).ToList();
 
         Assert.Single(result);
         Assert.Equal("pain.mp3", result[0].Name);
@@ -223,7 +283,7 @@ public sealed class MirrorFilterTests
         {
             Name = name,
             FullPath = "/source/" + relativePath,
-            RelativePathSegments = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries),
+            PathSegments = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries),
             IsDirectory = false,
             Size = size,
         };
@@ -233,7 +293,7 @@ public sealed class MirrorFilterTests
         {
             Name = name,
             FullPath = "/source/" + relativePath,
-            RelativePathSegments = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries),
+            PathSegments = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries),
             IsDirectory = true,
         };
 }

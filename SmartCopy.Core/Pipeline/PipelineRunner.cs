@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline.Validation;
 using SmartCopy.Core.Progress;
@@ -30,13 +31,13 @@ public sealed class PipelineRunner
         _pipeline.Validate(new PipelineValidationContext(job.SelectedFiles.Count > 0));
 
         var actions = new List<PlannedAction>();
-        var contexts = new Dictionary<FileSystemNode, TransformContext>();
-        TransformContext GetOrCreate(FileSystemNode node) =>
+        var contexts = new Dictionary<DirectoryTreeNode, TransformContext>();
+        TransformContext GetOrCreate(DirectoryTreeNode node) =>
             contexts.TryGetValue(node, out var ctx) ? ctx
             : contexts[node] = CreateContext(node, job);
 
         var workingSet = job.SelectedFiles.ToList();
-        var failedNodes = new HashSet<FileSystemNode>();
+        var failedNodes = new HashSet<DirectoryTreeNode>();
 
         foreach (var step in _pipeline.Steps)
         {
@@ -111,13 +112,13 @@ public sealed class PipelineRunner
         }
 
         var results = new List<TransformResult>();
-        var contexts = new Dictionary<FileSystemNode, TransformContext>();
-        TransformContext GetOrCreate(FileSystemNode node) =>
+        var contexts = new Dictionary<DirectoryTreeNode, TransformContext>();
+        TransformContext GetOrCreate(DirectoryTreeNode node) =>
             contexts.TryGetValue(node, out var ctx) ? ctx
             : contexts[node] = CreateContext(node, job);
 
         var workingSet = job.SelectedFiles.ToList();
-        var failedNodes = new HashSet<FileSystemNode>();
+        var failedNodes = new HashSet<DirectoryTreeNode>();
 
         var stopwatch = Stopwatch.StartNew();
         long completedBytes = 0;
@@ -186,12 +187,12 @@ public sealed class PipelineRunner
         return results;
     }
 
-    private static long GetNodeBytes(FileSystemNode node) =>
+    private static long GetNodeBytes(DirectoryTreeNode node) =>
         node.IsDirectory
             ? node.Files.Sum(f => f.Size) + node.Children.Sum(c => GetNodeBytes(c))
             : node.Size;
 
-    private static TransformContext CreateContext(FileSystemNode node, PipelineJob job)
+    private static TransformContext CreateContext(DirectoryTreeNode node, PipelineJob job)
     {
         var extension = Path.GetExtension(node.Name).TrimStart('.');
         var segments = node.RelativePathSegments.Length > 0
