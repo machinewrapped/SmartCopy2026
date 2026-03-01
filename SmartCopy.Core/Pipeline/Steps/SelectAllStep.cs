@@ -30,7 +30,7 @@ public sealed class SelectAllStep : IPipelineStep
         {
             ct.ThrowIfCancellationRequested();
             if (!node.IsDirectory)
-                node.CheckState = CheckState.Checked;
+                ctx.GetNodeContext(node).VirtualCheckState = CheckState.Checked;
             yield return new TransformResult(
                 IsSuccess: true,
                 SourcePath: node.FullPath,

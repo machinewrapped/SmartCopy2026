@@ -9,31 +9,31 @@ public sealed class PipelineValidator
         PipelineValidationContext? context = null)
     {
         context ??= new PipelineValidationContext();
-        var ctx = new StepValidationContext(context.HasSelectedIncludedInputs);
+        var validationContext = new StepValidationContext(context.HasSelectedIncludedInputs);
 
         if (steps.Count == 0)
         {
-            ctx.AddPipelineIssue("Pipeline.Empty", "Pipeline is empty.", PipelineValidationSeverity.Blocking);
-            return new PipelineValidationResult(ctx.Issues);
+            validationContext.AddPipelineIssue("Pipeline.Empty", "Pipeline is empty.", PipelineValidationSeverity.Blocking);
+            return new PipelineValidationResult(validationContext.Issues);
         }
 
         if (steps.Any(step => step.IsExecutable) == false)
         {
-            ctx.AddPipelineIssue("Pipeline.NoExecutableStep", "Pipeline has no executable steps.", PipelineValidationSeverity.Blocking);
-            return new PipelineValidationResult(ctx.Issues);
+            validationContext.AddPipelineIssue("Pipeline.NoExecutableStep", "Pipeline has no executable steps.", PipelineValidationSeverity.Blocking);
+            return new PipelineValidationResult(validationContext.Issues);
         }
 
         for (var i = 0; i < steps.Count; i++)
         {
-            ctx.StepIndex = i;
-            steps[i].Validate(ctx);
+            validationContext.StepIndex = i;
+            steps[i].Validate(validationContext);
 
-            if (ctx.HasBlockingIssue)
+            if (validationContext.HasBlockingIssue)
             {
                 break;
             }
         }
 
-        return new PipelineValidationResult(ctx.Issues);
+        return new PipelineValidationResult(validationContext.Issues);
     }
 }

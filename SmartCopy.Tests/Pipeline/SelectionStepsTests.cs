@@ -37,9 +37,9 @@ public sealed class SelectionStepsTests
 
         public PipelineContext GetNodeContext(DirectoryTreeNode node)
         {
-            if (!_contexts.TryGetValue(node, out var ctx))
+            if (!_contexts.TryGetValue(node, out var context))
             {
-                ctx = new PipelineContext
+                context = new PipelineContext
                 {
                     SourceNode = node,
                     SourceProvider = SourceProvider,
@@ -49,10 +49,11 @@ public sealed class SelectionStepsTests
                     CurrentExtension = Path.GetExtension(node.Name).TrimStart('.'),
                     OverwriteMode = OverwriteMode,
                     DeleteMode = DeleteMode,
+                    VirtualCheckState = node.CheckState,
                 };
-                _contexts[node] = ctx;
+                _contexts[node] = context;
             }
-            return ctx;
+            return context;
         }
 
         public bool IsNodeFailed(DirectoryTreeNode node) => _failed.Contains(node);
@@ -81,20 +82,21 @@ public sealed class SelectionStepsTests
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task SelectAllStep_Preview_SetsCheckedAndReturnsNullDestination()
+    public async Task SelectAllStep_Preview_SetsVirtualCheckState_DoesNotMutateRealState()
     {
         var step = new SelectAllStep();
         var (root, file, provider) = await MakeTree(CheckState.Unchecked);
-        var ctx = new TestStepContext(root, provider);
+        var context = new TestStepContext(root, provider);
 
         var results = new List<TransformResult>();
-        await foreach (var r in step.PreviewAsync(ctx, CancellationToken.None)) results.Add(r);
+        await foreach (var r in step.PreviewAsync(context, CancellationToken.None)) results.Add(r);
 
         var result = results.Single();
         Assert.True(result.IsSuccess);
         Assert.Equal(SourcePathResult.None, result.SourcePathResult);
         Assert.Null(result.DestinationPath);
-        Assert.Equal(CheckState.Checked, file.CheckState);
+        Assert.Equal(CheckState.Checked, context.GetNodeContext(file).VirtualCheckState);
+        Assert.Equal(CheckState.Unchecked, file.CheckState); // real state unchanged
     }
 
     [Fact]
@@ -102,10 +104,10 @@ public sealed class SelectionStepsTests
     {
         var step = new SelectAllStep();
         var (root, file, provider) = await MakeTree(CheckState.Unchecked);
-        var ctx = new TestStepContext(root, provider);
+        var context = new TestStepContext(root, provider);
 
         var results = new List<TransformResult>();
-        await foreach (var r in step.ApplyAsync(ctx, CancellationToken.None)) results.Add(r);
+        await foreach (var r in step.ApplyAsync(context, CancellationToken.None)) results.Add(r);
 
         Assert.True(results.Single().IsSuccess);
         Assert.Equal(CheckState.Checked, file.CheckState);
@@ -115,11 +117,11 @@ public sealed class SelectionStepsTests
     public void SelectAllStep_Validate_NoIssues()
     {
         var step = new SelectAllStep();
-        var ctx = MakeValidationContext();
+        var context = MakeValidationContext();
 
-        step.Validate(ctx);
+        step.Validate(context);
 
-        Assert.Empty(ctx.Issues);
+        Assert.Empty(context.Issues);
     }
 
     // -------------------------------------------------------------------------
@@ -127,20 +129,21 @@ public sealed class SelectionStepsTests
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task ClearSelectionStep_Preview_SetsUncheckedAndReturnsNullDestination()
+    public async Task ClearSelectionStep_Preview_SetsVirtualCheckState_DoesNotMutateRealState()
     {
         var step = new ClearSelectionStep();
         var (root, file, provider) = await MakeTree(CheckState.Checked);
-        var ctx = new TestStepContext(root, provider);
+        var context = new TestStepContext(root, provider);
 
         var results = new List<TransformResult>();
-        await foreach (var r in step.PreviewAsync(ctx, CancellationToken.None)) results.Add(r);
+        await foreach (var r in step.PreviewAsync(context, CancellationToken.None)) results.Add(r);
 
         var result = results.Single();
         Assert.True(result.IsSuccess);
         Assert.Equal(SourcePathResult.None, result.SourcePathResult);
         Assert.Null(result.DestinationPath);
-        Assert.Equal(CheckState.Unchecked, file.CheckState);
+        Assert.Equal(CheckState.Unchecked, context.GetNodeContext(file).VirtualCheckState);
+        Assert.Equal(CheckState.Checked, file.CheckState); // real state unchanged
     }
 
     [Fact]
@@ -148,10 +151,10 @@ public sealed class SelectionStepsTests
     {
         var step = new ClearSelectionStep();
         var (root, file, provider) = await MakeTree(CheckState.Checked);
-        var ctx = new TestStepContext(root, provider);
+        var context = new TestStepContext(root, provider);
 
         var results = new List<TransformResult>();
-        await foreach (var r in step.ApplyAsync(ctx, CancellationToken.None)) results.Add(r);
+        await foreach (var r in step.ApplyAsync(context, CancellationToken.None)) results.Add(r);
 
         Assert.True(results.Single().IsSuccess);
         Assert.Equal(CheckState.Unchecked, file.CheckState);
@@ -161,11 +164,11 @@ public sealed class SelectionStepsTests
     public void ClearSelectionStep_Validate_NoIssues()
     {
         var step = new ClearSelectionStep();
-        var ctx = MakeValidationContext();
+        var context = MakeValidationContext();
 
-        step.Validate(ctx);
+        step.Validate(context);
 
-        Assert.Empty(ctx.Issues);
+        Assert.Empty(context.Issues);
     }
 
     // -------------------------------------------------------------------------
@@ -173,20 +176,21 @@ public sealed class SelectionStepsTests
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task InvertSelectionStep_Preview_TogglesCheckedAndReturnsNullDestination()
+    public async Task InvertSelectionStep_Preview_TogglesVirtualCheckState_DoesNotMutateRealState()
     {
         var step = new InvertSelectionStep();
         var (root, file, provider) = await MakeTree(CheckState.Unchecked);
-        var ctx = new TestStepContext(root, provider);
+        var context = new TestStepContext(root, provider);
 
         var results = new List<TransformResult>();
-        await foreach (var r in step.PreviewAsync(ctx, CancellationToken.None)) results.Add(r);
+        await foreach (var r in step.PreviewAsync(context, CancellationToken.None)) results.Add(r);
 
         var result = results.Single();
         Assert.True(result.IsSuccess);
         Assert.Equal(SourcePathResult.None, result.SourcePathResult);
         Assert.Null(result.DestinationPath);
-        Assert.Equal(CheckState.Checked, file.CheckState);
+        Assert.Equal(CheckState.Checked, context.GetNodeContext(file).VirtualCheckState);
+        Assert.Equal(CheckState.Unchecked, file.CheckState); // real state unchanged
     }
 
     [Fact]
@@ -194,9 +198,9 @@ public sealed class SelectionStepsTests
     {
         var step = new InvertSelectionStep();
         var (root, file, provider) = await MakeTree(CheckState.Checked);
-        var ctx = new TestStepContext(root, provider);
+        var context = new TestStepContext(root, provider);
 
-        await foreach (var _ in step.ApplyAsync(ctx, CancellationToken.None)) { }
+        await foreach (var _ in step.ApplyAsync(context, CancellationToken.None)) { }
 
         Assert.Equal(CheckState.Unchecked, file.CheckState);
     }
@@ -206,9 +210,9 @@ public sealed class SelectionStepsTests
     {
         var step = new InvertSelectionStep();
         var (root, file, provider) = await MakeTree(CheckState.Unchecked);
-        var ctx = new TestStepContext(root, provider);
+        var context = new TestStepContext(root, provider);
 
-        await foreach (var _ in step.ApplyAsync(ctx, CancellationToken.None)) { }
+        await foreach (var _ in step.ApplyAsync(context, CancellationToken.None)) { }
 
         Assert.Equal(CheckState.Checked, file.CheckState);
     }
@@ -217,11 +221,11 @@ public sealed class SelectionStepsTests
     public void InvertSelectionStep_Validate_SetsSourceExistsTrue()
     {
         var step = new InvertSelectionStep();
-        var ctx = MakeValidationContext(sourceExists: false);
+        var validationContext = MakeValidationContext(sourceExists: false);
 
-        step.Validate(ctx);
+        step.Validate(validationContext);
 
-        Assert.True(ctx.SourceExists);
-        Assert.Empty(ctx.Issues);
+        Assert.True(validationContext.SourceExists);
+        Assert.Empty(validationContext.Issues);
     }
 }

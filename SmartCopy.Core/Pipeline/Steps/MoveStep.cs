@@ -39,12 +39,12 @@ public sealed class MoveStep : IPipelineStep
         var targetProvider = ctx.TargetProvider
             ?? throw new InvalidOperationException("TargetProvider must be set for MoveStep.");
 
-        foreach (var node in ctx.RootNode.GetSelectedDescendants())
+        foreach (var node in ctx.GetVirtuallySelectedDescendants())
         {
             ct.ThrowIfCancellationRequested();
             if (ctx.IsNodeFailed(node)) continue;
             // Only preview top-level selected nodes (parent not selected) to avoid duplicate entries.
-            if (node.Parent?.IsSelected == true) continue;
+            if (node.Parent is { } p && ctx.IsPreviewSelected(p)) continue;
 
             var nodeCtx = ctx.GetNodeContext(node);
             var destination = StepPathHelper.BuildDestinationPath(DestinationPath, nodeCtx.PathSegments);

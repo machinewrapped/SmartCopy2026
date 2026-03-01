@@ -104,6 +104,49 @@ public sealed class PipelineRunnerSelectionTests
         Assert.False(await provider.ExistsAsync("/dest/src/c.txt", CancellationToken.None));
     }
 
+    [Fact]
+    public async Task InvertSelection_Preview_then_Execute_CopiesInvertedFiles()
+    {
+        // Regression: PreviewAsync must not mutate real CheckState so that
+        // ExecuteAsync sees the correct (un-inverted) state and inverts it once.
+        var (provider, root, a, b, c, d, e) = await CreateFiveFileFixtureAsync();
+
+        // A, B, C initially selected; D, E not selected
+        a.CheckState = CheckState.Checked;
+        b.CheckState = CheckState.Checked;
+        c.CheckState = CheckState.Checked;
+
+        var job = new PipelineJob
+        {
+            RootNode       = root,
+            SourceProvider = provider,
+            TargetProvider = provider,
+            OverwriteMode  = OverwriteMode.Always,
+            DeleteMode     = DeleteMode.Trash,
+        };
+
+        var runner = new PipelineRunner(new TransformPipeline(
+        [
+            new InvertSelectionStep(),
+            new CopyStep("/dest"),
+        ]));
+
+        // Preview first — this must NOT flip real CheckState
+        await runner.PreviewAsync(job, ct: CancellationToken.None);
+
+        // Execute — inversion happens exactly once on the real tree
+        await runner.ExecuteAsync(job, progress: null, ct: CancellationToken.None);
+
+        // D and E should have been copied (they were unchecked → inverted to checked)
+        Assert.True(await provider.ExistsAsync("/dest/src/d.txt", CancellationToken.None));
+        Assert.True(await provider.ExistsAsync("/dest/src/e.txt", CancellationToken.None));
+
+        // A, B, C should NOT have been copied (they were checked → inverted to unchecked)
+        Assert.False(await provider.ExistsAsync("/dest/src/a.txt", CancellationToken.None));
+        Assert.False(await provider.ExistsAsync("/dest/src/b.txt", CancellationToken.None));
+        Assert.False(await provider.ExistsAsync("/dest/src/c.txt", CancellationToken.None));
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // SelectAll
     // ─────────────────────────────────────────────────────────────────────────

@@ -20,14 +20,14 @@ public sealed class ClearSelectionStep : IPipelineStep
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(
-        IStepContext ctx, [EnumeratorCancellation] CancellationToken ct)
+        IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
         await Task.Yield();
-        foreach (var node in ctx.RootNode.GetFilterIncludedDescendants())
+        foreach (var node in context.RootNode.GetFilterIncludedDescendants())
         {
             ct.ThrowIfCancellationRequested();
             if (!node.IsDirectory)
-                node.CheckState = CheckState.Unchecked;
+                context.GetNodeContext(node).VirtualCheckState = CheckState.Unchecked;
             yield return new TransformResult(
                 IsSuccess: true,
                 SourcePath: node.FullPath,

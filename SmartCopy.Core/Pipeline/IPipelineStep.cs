@@ -17,8 +17,8 @@ public interface IPipelineStep
 
     TransformStepConfig Config { get; }
 
-    IAsyncEnumerable<TransformResult> PreviewAsync(IStepContext ctx, CancellationToken ct);
-    IAsyncEnumerable<TransformResult> ApplyAsync(IStepContext ctx, CancellationToken ct);
+    IAsyncEnumerable<TransformResult> PreviewAsync(IStepContext context, CancellationToken ct);
+    IAsyncEnumerable<TransformResult> ApplyAsync(IStepContext context, CancellationToken ct);
 
     /// <summary>
     /// Validates this step within the pipeline.

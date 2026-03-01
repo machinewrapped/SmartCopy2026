@@ -31,14 +31,14 @@ public sealed class PipelineRunner
         _pipeline.Validate(new PipelineValidationContext(
             job.RootNode.GetSelectedDescendants().Any()));
 
-        var ctx = new StepContext(job);
+        var context = new StepContext(job);
         var actions = new List<PlannedAction>();
 
         foreach (var step in _pipeline.Steps)
         {
             ct.ThrowIfCancellationRequested();
 
-            await foreach (var result in step.PreviewAsync(ctx, ct))
+            await foreach (var result in step.PreviewAsync(context, ct))
             {
                 if (result.IsSuccess && result.SourcePathResult != SourcePathResult.None)
                 {
@@ -79,7 +79,7 @@ public sealed class PipelineRunner
                 "Pipelines containing a DeleteStep must be previewed before execution.");
         }
 
-        var ctx = new StepContext(job);
+        var context = new StepContext(job);
         var results = new List<TransformResult>();
 
         var stopwatch = Stopwatch.StartNew();
@@ -92,7 +92,7 @@ public sealed class PipelineRunner
         {
             ct.ThrowIfCancellationRequested();
 
-            await foreach (var result in step.ApplyAsync(ctx, ct))
+            await foreach (var result in step.ApplyAsync(context, ct))
             {
                 results.Add(result);
                 nodeProgress?.Report(result);
@@ -168,15 +168,15 @@ public sealed class PipelineRunner
 
         public PipelineContext GetNodeContext(DirectoryTreeNode node)
         {
-            if (_contexts.TryGetValue(node, out var ctx))
-                return ctx;
+            if (_contexts.TryGetValue(node, out var context))
+                return context;
 
             var extension = Path.GetExtension(node.Name).TrimStart('.');
             var segments = node.RelativePathSegments.Length > 0
                 ? node.RelativePathSegments
                 : [node.Name];
 
-            ctx = new PipelineContext
+            context = new PipelineContext
             {
                 SourceNode = node,
                 SourceProvider = SourceProvider,
@@ -185,9 +185,10 @@ public sealed class PipelineRunner
                 CurrentExtension = extension,
                 OverwriteMode = OverwriteMode,
                 DeleteMode = DeleteMode,
+                VirtualCheckState = node.CheckState,
             };
-            _contexts[node] = ctx;
-            return ctx;
+            _contexts[node] = context;
+            return context;
         }
 
         public bool IsNodeFailed(DirectoryTreeNode node) => _failedNodes.Contains(node);

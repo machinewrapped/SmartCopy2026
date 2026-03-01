@@ -31,15 +31,15 @@ public sealed class CopyStep : IPipelineStep
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(
-        IStepContext ctx, [EnumeratorCancellation] CancellationToken ct)
+        IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
-        var targetProvider = ctx.TargetProvider
+        var targetProvider = context.TargetProvider
             ?? throw new InvalidOperationException("TargetProvider must be set for CopyStep.");
 
-        foreach (var node in ctx.RootNode.GetSelectedDescendants())
+        foreach (var node in context.GetVirtuallySelectedDescendants())
         {
             ct.ThrowIfCancellationRequested();
-            if (ctx.IsNodeFailed(node)) continue;
+            if (context.IsNodeFailed(node)) continue;
 
             if (node.IsDirectory)
             {
@@ -50,7 +50,7 @@ public sealed class CopyStep : IPipelineStep
                 continue;
             }
 
-            var nodeCtx = ctx.GetNodeContext(node);
+            var nodeCtx = context.GetNodeContext(node);
             var destination = StepPathHelper.BuildDestinationPath(DestinationPath, nodeCtx.PathSegments);
             var destResult = await targetProvider.ExistsAsync(
                 StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, nodeCtx.PathSegments), ct)
@@ -70,15 +70,15 @@ public sealed class CopyStep : IPipelineStep
     }
 
     public async IAsyncEnumerable<TransformResult> ApplyAsync(
-        IStepContext ctx, [EnumeratorCancellation] CancellationToken ct)
+        IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
-        var targetProvider = ctx.TargetProvider
+        var targetProvider = context.TargetProvider
             ?? throw new InvalidOperationException("TargetProvider must be set for CopyStep.");
 
-        foreach (var node in ctx.RootNode.GetSelectedDescendants())
+        foreach (var node in context.RootNode.GetSelectedDescendants())
         {
             ct.ThrowIfCancellationRequested();
-            if (ctx.IsNodeFailed(node)) continue;
+            if (context.IsNodeFailed(node)) continue;
 
             if (node.IsDirectory)
             {
@@ -89,11 +89,11 @@ public sealed class CopyStep : IPipelineStep
                 continue;
             }
 
-            var nodeCtx = ctx.GetNodeContext(node);
+            var nodeCtx = context.GetNodeContext(node);
             var destination = StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, nodeCtx.PathSegments);
             var destinationExists = await targetProvider.ExistsAsync(destination, ct);
 
-            if (destinationExists && ctx.OverwriteMode == OverwriteMode.Skip)
+            if (destinationExists && context.OverwriteMode == OverwriteMode.Skip)
             {
                 yield return new TransformResult(
                     IsSuccess: true,
@@ -104,7 +104,7 @@ public sealed class CopyStep : IPipelineStep
                 continue;
             }
 
-            await using var sourceStream = await ctx.SourceProvider.OpenReadAsync(node.FullPath, ct);
+            await using var sourceStream = await context.SourceProvider.OpenReadAsync(node.FullPath, ct);
             await targetProvider.WriteAsync(destination, sourceStream, progress: null, ct);
 
             yield return new TransformResult(

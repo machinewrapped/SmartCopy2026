@@ -21,4 +21,11 @@ public sealed class PipelineContext
     public Stream? ContentStream { get; set; }
     public OverwriteMode OverwriteMode { get; init; } = OverwriteMode.IfNewer;
     public DeleteMode DeleteMode { get; init; } = DeleteMode.Trash;
+
+    /// <summary>
+    /// Per-run virtual check state used by selection steps' PreviewAsync.
+    /// Initialized from the node's real CheckState; only mutated during preview runs.
+    /// ApplyAsync always reads/writes the real <see cref="DirectoryTreeNode.CheckState"/>.
+    /// </summary>
+    public CheckState VirtualCheckState { get; set; }
 }

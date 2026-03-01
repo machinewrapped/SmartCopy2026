@@ -30,9 +30,12 @@ public sealed class InvertSelectionStep : IPipelineStep
         {
             ct.ThrowIfCancellationRequested();
             if (!node.IsDirectory)
-                node.CheckState = node.CheckState == CheckState.Checked
+            {
+                var nodeCtx = ctx.GetNodeContext(node);
+                nodeCtx.VirtualCheckState = nodeCtx.VirtualCheckState == CheckState.Checked
                     ? CheckState.Unchecked
                     : CheckState.Checked;
+            }
             yield return new TransformResult(
                 IsSuccess: true,
                 SourcePath: node.FullPath,

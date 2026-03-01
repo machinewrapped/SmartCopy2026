@@ -34,13 +34,13 @@ public sealed class DeleteStep : IPipelineStep
         var pathResult = Mode == DeleteMode.Trash ? SourcePathResult.Trashed : SourcePathResult.Deleted;
 
         // Include root node itself if selected, then all selected descendants.
-        if (ctx.RootNode.IsSelected)
+        if (ctx.IsPreviewSelected(ctx.RootNode))
         {
             yield return MakePreviewResult(ctx.RootNode, pathResult);
         }
 
         // Yield all affected nodes for preview so the user sees exactly what will be deleted
-        foreach (var node in ctx.RootNode.GetSelectedDescendants())
+        foreach (var node in ctx.GetVirtuallySelectedDescendants())
         {
             ct.ThrowIfCancellationRequested();
             if (ctx.IsNodeFailed(node)) continue;
