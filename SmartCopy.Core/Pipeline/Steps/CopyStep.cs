@@ -46,7 +46,7 @@ public sealed class CopyStep : IPipelineStep
                 yield return new TransformResult(
                     IsSuccess: true,
                     SourceNode: node,
-                    SourceNodeResult: SourcePathResult.None);
+                    SourceNodeResult: SourceResult.None);
                 continue;
             }
 
@@ -54,15 +54,15 @@ public sealed class CopyStep : IPipelineStep
             var destination = StepPathHelper.BuildDestinationPath(DestinationPath, nodeCtx.PathSegments);
             var destResult = await targetProvider.ExistsAsync(
                 StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, nodeCtx.PathSegments), ct)
-                ? DestinationPathResult.Overwritten
-                : DestinationPathResult.Created;
+                ? DestinationResult.Overwritten
+                : DestinationResult.Created;
 
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: node,
-                SourceNodeResult: SourcePathResult.Copied,
+                SourceNodeResult: SourceResult.Copied,
                 DestinationPath: destination,
-                DestinationPathResult: destResult,
+                DestinationResult: destResult,
                 NumberOfFilesAffected: 1,
                 InputBytes: node.Size,
                 OutputBytes: node.Size);
@@ -85,7 +85,7 @@ public sealed class CopyStep : IPipelineStep
                 yield return new TransformResult(
                     IsSuccess: true,
                     SourceNode: node,
-                    SourceNodeResult: SourcePathResult.None);
+                    SourceNodeResult: SourceResult.None);
                 continue;
             }
 
@@ -98,7 +98,7 @@ public sealed class CopyStep : IPipelineStep
                 yield return new TransformResult(
                     IsSuccess: true,
                     SourceNode: node,
-                    SourceNodeResult: SourcePathResult.None,
+                    SourceNodeResult: SourceResult.None,
                     DestinationPath: destination,
                     InputBytes: node.Size);
                 continue;
@@ -110,9 +110,9 @@ public sealed class CopyStep : IPipelineStep
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: node,
-                SourceNodeResult: SourcePathResult.Copied,
+                SourceNodeResult: SourceResult.Copied,
                 DestinationPath: destination,
-                DestinationPathResult: destinationExists ? DestinationPathResult.Overwritten : DestinationPathResult.Created,
+                DestinationResult: destinationExists ? DestinationResult.Overwritten : DestinationResult.Created,
                 NumberOfFilesAffected: 1,
                 InputBytes: node.Size,
                 OutputBytes: node.Size);

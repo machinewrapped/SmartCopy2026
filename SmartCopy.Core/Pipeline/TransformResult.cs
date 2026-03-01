@@ -2,16 +2,16 @@ using SmartCopy.Core.DirectoryTree;
 
 namespace SmartCopy.Core.Pipeline;
 
-public enum SourcePathResult { None, Copied, Moved, Trashed, Deleted }
+public enum SourceResult { None, Copied, Moved, Trashed, Deleted }
 
-public enum DestinationPathResult { None, Created, Overwritten }
+public enum DestinationResult { None, Created, Overwritten }
 
 public readonly record struct TransformResult(
     bool IsSuccess,
     DirectoryTreeNode SourceNode,
-    SourcePathResult SourceNodeResult,
+    SourceResult SourceNodeResult,
     string? DestinationPath                     = null,
-    DestinationPathResult DestinationPathResult = DestinationPathResult.None,
+    DestinationResult DestinationResult         = DestinationResult.None,
     int NumberOfFilesAffected                   = 0,
     int NumberOfFoldersAffected                 = 0,
     long InputBytes                             = 0,

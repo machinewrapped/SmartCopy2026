@@ -50,15 +50,15 @@ public sealed class MoveStep : IPipelineStep
             var destination = StepPathHelper.BuildDestinationPath(DestinationPath, nodeCtx.PathSegments);
             var destResult = await targetProvider.ExistsAsync(
                 StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, nodeCtx.PathSegments), ct)
-                ? DestinationPathResult.Overwritten
-                : DestinationPathResult.Created;
+                ? DestinationResult.Overwritten
+                : DestinationResult.Created;
 
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: node,
-                SourceNodeResult: SourcePathResult.Moved,
+                SourceNodeResult: SourceResult.Moved,
                 DestinationPath: destination,
-                DestinationPathResult: destResult,
+                DestinationResult: destResult,
                 NumberOfFilesAffected: node.CountSelectedFiles(),
                 NumberOfFoldersAffected: node.CountSelectedFolders(),
                 InputBytes: node.Size,
@@ -98,7 +98,7 @@ public sealed class MoveStep : IPipelineStep
                         yield return new TransformResult(
                             IsSuccess: true,
                             SourceNode: node,
-                            SourceNodeResult: SourcePathResult.None,
+                            SourceNodeResult: SourceResult.None,
                             DestinationPath: destination,
                             InputBytes: node.Size);
                         continue;
@@ -109,9 +109,9 @@ public sealed class MoveStep : IPipelineStep
                     yield return new TransformResult(
                         IsSuccess: true,
                         SourceNode: node,
-                        SourceNodeResult: SourcePathResult.Moved,
+                        SourceNodeResult: SourceResult.Moved,
                         DestinationPath: destination,
-                        DestinationPathResult: destExists ? DestinationPathResult.Overwritten : DestinationPathResult.Created,
+                        DestinationResult: destExists ? DestinationResult.Overwritten : DestinationResult.Created,
                         NumberOfFilesAffected: node.CountAllFiles(),
                         NumberOfFoldersAffected: node.CountAllFolders(),
                         InputBytes: node.Size,
@@ -125,7 +125,7 @@ public sealed class MoveStep : IPipelineStep
                     yield return new TransformResult(
                         IsSuccess: false,
                         SourceNode: node,
-                        SourceNodeResult: SourcePathResult.None);
+                        SourceNodeResult: SourceResult.None);
                 }
                 continue;
             }
@@ -140,7 +140,7 @@ public sealed class MoveStep : IPipelineStep
                 yield return new TransformResult(
                     IsSuccess: true,
                     SourceNode: node,
-                    SourceNodeResult: SourcePathResult.None,
+                    SourceNodeResult: SourceResult.None,
                     DestinationPath: fileDest,
                     InputBytes: node.Size);
                 continue;
@@ -160,9 +160,9 @@ public sealed class MoveStep : IPipelineStep
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: node,
-                SourceNodeResult: SourcePathResult.Moved,
+                SourceNodeResult: SourceResult.Moved,
                 DestinationPath: fileDest,
-                DestinationPathResult: fileDestExists ? DestinationPathResult.Overwritten : DestinationPathResult.Created,
+                DestinationResult: fileDestExists ? DestinationResult.Overwritten : DestinationResult.Created,
                 NumberOfFilesAffected: 1,
                 InputBytes: node.Size,
                 OutputBytes: node.Size);

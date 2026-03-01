@@ -225,19 +225,26 @@ public sealed class DirectoryTreeNode(FileSystemNode _filesystemNode, DirectoryT
         }
 
         // Remove any children marked for removal, and recurse into unmarked children
+        bool removedAnyChildren = false;
         for (var i = Children.Count - 1; i >= 0; i--)
         {
             if (Children[i].IsMarkedForRemoval)
             {
                 Children.RemoveAt(i);
+                removedAnyChildren = true;
             }
             else
             {
                 Children[i].RemoveNodesMarkedForRemoval();
-                FilterChain.RecalculateParentExclusion(this);
             }
         }
-}
+
+        if (removedAnyChildren)
+        {
+            // If we removed any children, we may need to recalculate our filter state
+            FilterChain.RecalculateParentExclusion(this);
+        }
+    }
 
 
     internal int CountSelectedFiles() =>

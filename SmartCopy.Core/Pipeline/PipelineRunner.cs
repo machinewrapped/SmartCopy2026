@@ -40,13 +40,13 @@ public sealed class PipelineRunner
 
             await foreach (var result in step.PreviewAsync(context, ct))
             {
-                if (result.IsSuccess && result.SourceNodeResult != SourcePathResult.None)
+                if (result.IsSuccess && result.SourceNodeResult != SourceResult.None)
                 {
                     actions.Add(new PlannedAction(
                         SourcePath: result.SourceNode.CanonicalRelativePath,
-                        SourcePathResult: result.SourceNodeResult,
+                        SourceResult: result.SourceNodeResult,
                         DestinationPath: result.DestinationPath,
-                        DestinationPathResult: result.DestinationPathResult,
+                        DestinationResult: result.DestinationResult,
                         NumberOfFilesAffected: result.NumberOfFilesAffected,
                         NumberOfFoldersAffected: result.NumberOfFoldersAffected,
                         InputBytes: result.InputBytes,
@@ -97,7 +97,7 @@ public sealed class PipelineRunner
                 results.Add(result);
                 nodeProgress?.Report(result);
 
-                if (!result.IsSuccess || result.SourceNodeResult == SourcePathResult.None)
+                if (!result.IsSuccess || result.SourceNodeResult == SourceResult.None)
                     continue;
 
                 if (step.IsExecutable)

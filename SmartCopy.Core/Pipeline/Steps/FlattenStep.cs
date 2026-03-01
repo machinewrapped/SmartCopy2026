@@ -36,7 +36,7 @@ public sealed class FlattenStep : IPipelineStep
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: node,
-                SourceNodeResult: SourcePathResult.None);
+                SourceNodeResult: SourceResult.None);
         }
     }
 
@@ -52,7 +52,7 @@ public sealed class FlattenStep : IPipelineStep
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: node,
-                SourceNodeResult: SourcePathResult.None);
+                SourceNodeResult: SourceResult.None);
         }
     }
 

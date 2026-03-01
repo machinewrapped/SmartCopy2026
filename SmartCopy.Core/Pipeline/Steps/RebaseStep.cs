@@ -66,7 +66,7 @@ public sealed class RebaseStep : IPipelineStep
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: node,
-                SourceNodeResult: SourcePathResult.None);
+                SourceNodeResult: SourceResult.None);
         }
     }
 
@@ -82,7 +82,7 @@ public sealed class RebaseStep : IPipelineStep
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: node,
-                SourceNodeResult: SourcePathResult.None);
+                SourceNodeResult: SourceResult.None);
         }
     }
 

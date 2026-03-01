@@ -42,7 +42,7 @@ public sealed class RenameStep : IPipelineStep
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: node,
-                SourceNodeResult: SourcePathResult.None);
+                SourceNodeResult: SourceResult.None);
         }
     }
 
@@ -58,7 +58,7 @@ public sealed class RenameStep : IPipelineStep
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: node,
-                SourceNodeResult: SourcePathResult.None);
+                SourceNodeResult: SourceResult.None);
         }
     }
 

@@ -58,7 +58,7 @@ public sealed class OperationJournal
         {
             ct.ThrowIfCancellationRequested();
             var action = MapAction(result);
-            var source = SanitizeField(result.SourceNode?.CanonicalRelativePath ?? string.Empty);
+            var source = SanitizeField(result.SourceNode.CanonicalRelativePath ?? string.Empty);
             var destination = SanitizeField(result.DestinationPath ?? string.Empty);
             var status = result.IsSuccess ? "ok" : "failed";
             var outputSize = FileSizeFormatter.FormatBytes(result.OutputBytes);
@@ -90,10 +90,10 @@ public sealed class OperationJournal
 
     private static string MapAction(TransformResult result) => result.SourceNodeResult switch
     {
-        SourcePathResult.Copied  => "copy",
-        SourcePathResult.Moved   => "move",
-        SourcePathResult.Trashed => "trash",
-        SourcePathResult.Deleted => "delete",
-        _                        => "skipped",
+        SourceResult.Copied  => "copy",
+        SourceResult.Moved   => "move",
+        SourceResult.Trashed => "trash",
+        SourceResult.Deleted => "delete",
+        _                    => "skipped",
     };
 }

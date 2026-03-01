@@ -125,7 +125,7 @@ public sealed class PipelineIntegrationTests
             progress: null,
             ct: CancellationToken.None);
 
-        Assert.Contains(skipResults, result => result.SourceNodeResult == SourcePathResult.None);
+        Assert.Contains(skipResults, result => result.SourceNodeResult == SourceResult.None);
 
         var alwaysResults = await runner.ExecuteAsync(
             new PipelineJob
@@ -139,7 +139,7 @@ public sealed class PipelineIntegrationTests
             progress: null,
             ct: CancellationToken.None);
 
-        Assert.Contains(alwaysResults, result => result.SourceNodeResult == SourcePathResult.Copied);
+        Assert.Contains(alwaysResults, result => result.SourceNodeResult == SourceResult.Copied);
     }
 
     [Fact]
@@ -206,7 +206,7 @@ public sealed class PipelineIntegrationTests
 
         var logDir = Path.Combine(Path.GetTempPath(), "SmartCopy2026.Tests", Guid.NewGuid().ToString("N"), "logs");
         var journal = new OperationJournal(logDir);
-        var path = await journal.WriteAsync(results.Where(r => r.SourceNodeResult != SourcePathResult.None));
+        var path = await journal.WriteAsync(results.Where(r => r.SourceNodeResult != SourceResult.None));
 
         Assert.True(File.Exists(path));
         var line = Assert.Single(await File.ReadAllLinesAsync(path));

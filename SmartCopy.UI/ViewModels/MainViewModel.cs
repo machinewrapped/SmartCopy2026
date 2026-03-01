@@ -756,7 +756,7 @@ public partial class MainViewModel : ViewModelBase
         {
             var results = await runner.ExecuteAsync(job, progress, nodeProgress, _runCts.Token);
 
-            await _operationJournal.WriteAsync(results.Where(r => r.SourceNodeResult != SourcePathResult.None));
+            await _operationJournal.WriteAsync(results.Where(r => r.SourceNodeResult != SourceResult.None));
 
             foreach (var r in results)
             {
@@ -764,22 +764,22 @@ public partial class MainViewModel : ViewModelBase
                 {
                     LogPanel.AddEntry($"Failed: {r.SourceNode.Name}", LogLevel.Error);
                 }
-                else if (r.SourceNodeResult == SourcePathResult.Copied)
+                else if (r.SourceNodeResult == SourceResult.Copied)
                 {
                     LogPanel.AddEntry($"Copied {r.SourceNode.Name} → {r.DestinationPath} ({FileSizeFormatter.FormatBytes(r.OutputBytes)})");
                 }
-                else if (r.SourceNodeResult == SourcePathResult.Moved)
+                else if (r.SourceNodeResult == SourceResult.Moved)
                 {
                     LogPanel.AddEntry($"Moved {r.SourceNode.Name} → {r.DestinationPath} ({FileSizeFormatter.FormatBytes(r.OutputBytes)})");
                 }
-                else if (r.SourceNodeResult is SourcePathResult.Trashed or SourcePathResult.Deleted)
+                else if (r.SourceNodeResult is SourceResult.Trashed or SourceResult.Deleted)
                 {
                     LogPanel.AddEntry($"Deleted {r.SourceNode.Name} ({FileSizeFormatter.FormatBytes(r.InputBytes)})");
                 }
 
-                if (r.DestinationPathResult != DestinationPathResult.None)
+                if (r.DestinationResult != DestinationResult.None)
                 {
-                    if (r.DestinationPathResult == DestinationPathResult.Overwritten)
+                    if (r.DestinationResult == DestinationResult.Overwritten)
                     {
                         LogPanel.AddEntry($"Overwrote {r.DestinationPath ?? "(unknown)"}");
                     }
@@ -804,7 +804,7 @@ public partial class MainViewModel : ViewModelBase
         if (!result.IsSuccess)
             return;
 
-        if (result.SourceNodeResult is SourcePathResult.Moved or SourcePathResult.Trashed or SourcePathResult.Deleted)
+        if (result.SourceNodeResult is SourceResult.Moved or SourceResult.Trashed or SourceResult.Deleted)
         {
             result.SourceNode.MarkForRemoval();
         }

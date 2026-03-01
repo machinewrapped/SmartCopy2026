@@ -31,7 +31,7 @@ public sealed class ClearSelectionStep : IPipelineStep
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: node,
-                SourceNodeResult: SourcePathResult.None);
+                SourceNodeResult: SourceResult.None);
         }
     }
 
@@ -47,7 +47,7 @@ public sealed class ClearSelectionStep : IPipelineStep
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: node,
-                SourceNodeResult: SourcePathResult.None);
+                SourceNodeResult: SourceResult.None);
         }
     }
 }

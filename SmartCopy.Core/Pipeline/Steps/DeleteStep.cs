@@ -31,7 +31,7 @@ public sealed class DeleteStep : IPipelineStep
         IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
         await Task.Yield();
-        var pathResult = Mode == DeleteMode.Trash ? SourcePathResult.Trashed : SourcePathResult.Deleted;
+        var pathResult = Mode == DeleteMode.Trash ? SourceResult.Trashed : SourceResult.Deleted;
 
         // Include root node itself if selected, then all selected descendants.
         if (context.IsPreviewSelected(context.RootNode))
@@ -52,7 +52,7 @@ public sealed class DeleteStep : IPipelineStep
         IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var pathResult = Mode == DeleteMode.Trash ? SourcePathResult.Trashed : SourcePathResult.Deleted;
+        var pathResult = Mode == DeleteMode.Trash ? SourceResult.Trashed : SourceResult.Deleted;
 
         // If the root node itself is fully selected, delete it atomically.
         if (context.RootNode.IsSelected)
@@ -87,7 +87,7 @@ public sealed class DeleteStep : IPipelineStep
     }
 
     private static TransformResult MakePreviewResult(
-        DirectoryTreeNode node, SourcePathResult pathResult)
+        DirectoryTreeNode node, SourceResult pathResult)
         => new(
             IsSuccess: true,
             SourceNode: node,
