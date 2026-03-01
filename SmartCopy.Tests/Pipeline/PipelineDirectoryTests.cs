@@ -93,7 +93,7 @@ public sealed class PipelineDirectoryTests
 
         Assert.Single(results);
         Assert.True(results[0].IsSuccess);
-        Assert.Equal(SourcePathResult.Moved, results[0].SourcePathResult);
+        Assert.Equal(SourcePathResult.Moved, results[0].SourceNodeResult);
         Assert.False(await provider.ExistsAsync("/src/music", ct));
         Assert.True(await provider.ExistsAsync("/dest/src/music", ct));
         Assert.True(await provider.ExistsAsync("/dest/src/music/a.flac", ct));
@@ -255,7 +255,7 @@ public sealed class PipelineDirectoryTests
             ct: ct);
 
         // FlattenStep + MoveStep each produce results for the nodes traversed
-        var moveResult = results.Single(r => r.SourcePathResult == SourcePathResult.Moved);
+        var moveResult = results.Single(r => r.SourceNodeResult == SourcePathResult.Moved);
         Assert.True(moveResult.IsSuccess);
         // Flattened: ["rock"] → destination /dest/rock
         Assert.True(await provider.ExistsAsync("/dest/rock", ct));
@@ -294,7 +294,7 @@ public sealed class PipelineDirectoryTests
             progress: null,
             ct: ct);
 
-        var moveResult = results.Single(r => r.SourcePathResult == SourcePathResult.Moved);
+        var moveResult = results.Single(r => r.SourceNodeResult == SourcePathResult.Moved);
         Assert.True(moveResult.IsSuccess);
         // music at scan root → segments ["music"] → add "archive" → ["archive","music"] → /dest/archive/music
         Assert.True(await provider.ExistsAsync("/dest/archive/music", ct));
@@ -336,7 +336,7 @@ public sealed class PipelineDirectoryTests
 
         // One atomic result covering the entire subtree including nested dirs
         Assert.Single(results);
-        Assert.Equal(SourcePathResult.Moved, results[0].SourcePathResult);
+        Assert.Equal(SourcePathResult.Moved, results[0].SourceNodeResult);
         Assert.False(await provider.ExistsAsync("/src/music", ct));
         Assert.True(await provider.ExistsAsync("/dest/src/music/rock/a.flac", ct));
         Assert.True(await provider.ExistsAsync("/dest/src/music/rock/b.flac", ct));
@@ -458,6 +458,6 @@ public sealed class PipelineDirectoryTests
             ct: ct);
 
         Assert.Single(results);
-        Assert.Equal(SourcePathResult.Moved, results[0].SourcePathResult);
+        Assert.Equal(SourcePathResult.Moved, results[0].SourceNodeResult);
     }
 }

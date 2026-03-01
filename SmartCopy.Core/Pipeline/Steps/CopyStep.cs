@@ -36,7 +36,7 @@ public sealed class CopyStep : IPipelineStep
         var targetProvider = context.TargetProvider
             ?? throw new InvalidOperationException("TargetProvider must be set for CopyStep.");
 
-        foreach (var node in context.GetVirtuallySelectedDescendants())
+        foreach (var node in context.GetPreviewSelectedDescendants())
         {
             ct.ThrowIfCancellationRequested();
             if (context.IsNodeFailed(node)) continue;
@@ -45,8 +45,8 @@ public sealed class CopyStep : IPipelineStep
             {
                 yield return new TransformResult(
                     IsSuccess: true,
-                    SourcePath: node.FullPath,
-                    SourcePathResult: SourcePathResult.None);
+                    SourceNode: node,
+                    SourceNodeResult: SourcePathResult.None);
                 continue;
             }
 
@@ -59,8 +59,8 @@ public sealed class CopyStep : IPipelineStep
 
             yield return new TransformResult(
                 IsSuccess: true,
-                SourcePath: node.CanonicalRelativePath,
-                SourcePathResult: SourcePathResult.Copied,
+                SourceNode: node,
+                SourceNodeResult: SourcePathResult.Copied,
                 DestinationPath: destination,
                 DestinationPathResult: destResult,
                 NumberOfFilesAffected: 1,
@@ -84,8 +84,8 @@ public sealed class CopyStep : IPipelineStep
             {
                 yield return new TransformResult(
                     IsSuccess: true,
-                    SourcePath: node.FullPath,
-                    SourcePathResult: SourcePathResult.None);
+                    SourceNode: node,
+                    SourceNodeResult: SourcePathResult.None);
                 continue;
             }
 
@@ -97,8 +97,8 @@ public sealed class CopyStep : IPipelineStep
             {
                 yield return new TransformResult(
                     IsSuccess: true,
-                    SourcePath: node.FullPath,
-                    SourcePathResult: SourcePathResult.None,
+                    SourceNode: node,
+                    SourceNodeResult: SourcePathResult.None,
                     DestinationPath: destination,
                     InputBytes: node.Size);
                 continue;
@@ -109,8 +109,8 @@ public sealed class CopyStep : IPipelineStep
 
             yield return new TransformResult(
                 IsSuccess: true,
-                SourcePath: node.FullPath,
-                SourcePathResult: SourcePathResult.Copied,
+                SourceNode: node,
+                SourceNodeResult: SourcePathResult.Copied,
                 DestinationPath: destination,
                 DestinationPathResult: destinationExists ? DestinationPathResult.Overwritten : DestinationPathResult.Created,
                 NumberOfFilesAffected: 1,

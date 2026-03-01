@@ -30,24 +30,24 @@ public sealed class ClearSelectionStep : IPipelineStep
                 context.GetNodeContext(node).VirtualCheckState = CheckState.Unchecked;
             yield return new TransformResult(
                 IsSuccess: true,
-                SourcePath: node.FullPath,
-                SourcePathResult: SourcePathResult.None);
+                SourceNode: node,
+                SourceNodeResult: SourcePathResult.None);
         }
     }
 
     public async IAsyncEnumerable<TransformResult> ApplyAsync(
-        IStepContext ctx, [EnumeratorCancellation] CancellationToken ct)
+        IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
         await Task.Yield();
-        foreach (var node in ctx.RootNode.GetFilterIncludedDescendants())
+        foreach (var node in context.RootNode.GetFilterIncludedDescendants())
         {
             ct.ThrowIfCancellationRequested();
             if (!node.IsDirectory)
                 node.CheckState = CheckState.Unchecked;
             yield return new TransformResult(
                 IsSuccess: true,
-                SourcePath: node.FullPath,
-                SourcePathResult: SourcePathResult.None);
+                SourceNode: node,
+                SourceNodeResult: SourcePathResult.None);
         }
     }
 }

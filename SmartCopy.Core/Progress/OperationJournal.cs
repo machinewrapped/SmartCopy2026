@@ -57,12 +57,13 @@ public sealed class OperationJournal
         {
             ct.ThrowIfCancellationRequested();
             var action = MapAction(result);
-            var source = SanitizeField(result.SourcePath);
+            var source = SanitizeField(result.SourceNode?.CanonicalRelativePath ?? string.Empty);
             var destination = SanitizeField(result.DestinationPath ?? string.Empty);
             var status = result.IsSuccess ? "ok" : "failed";
+            var outputSize = FormatBytes(result.OutputBytes);
 
             await writer.WriteLineAsync(
-                $"{DateTime.UtcNow:O}\t{status}\t{action}\t{source}\t{destination}\t{result.OutputBytes}");
+                $"{DateTime.UtcNow:O}\t{status}\t{action}\t{source}\t{destination}\t{outputSize}");
         }
 
         await writer.FlushAsync(ct);
@@ -86,12 +87,20 @@ public sealed class OperationJournal
     private static string SanitizeField(string value) =>
         value.Replace('\t', ' ').Replace('\r', ' ').Replace('\n', ' ');
 
-    private static string MapAction(TransformResult result) => result.SourcePathResult switch
+    private static string MapAction(TransformResult result) => result.SourceNodeResult switch
     {
         SourcePathResult.Copied  => "copy",
         SourcePathResult.Moved   => "move",
         SourcePathResult.Trashed => "trash",
         SourcePathResult.Deleted => "delete",
         _                        => "skipped",
+    };
+
+    private static string FormatBytes(long bytes) => bytes switch
+    {
+        < 1024 => $"{bytes}B",
+        < 1024 * 1024 => $"{bytes / 1024.0:F1}KB",
+        < 1024L * 1024 * 1024 => $"{bytes / (1024.0 * 1024):F1}MB",
+        _ => $"{bytes / (1024.0 * 1024 * 1024):F2}GB",
     };
 }

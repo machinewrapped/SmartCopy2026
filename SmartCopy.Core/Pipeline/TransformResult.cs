@@ -1,3 +1,5 @@
+using SmartCopy.Core.DirectoryTree;
+
 namespace SmartCopy.Core.Pipeline;
 
 public enum SourcePathResult { None, Copied, Moved, Trashed, Deleted }
@@ -6,8 +8,8 @@ public enum DestinationPathResult { None, Created, Overwritten }
 
 public readonly record struct TransformResult(
     bool IsSuccess,
-    string SourcePath,
-    SourcePathResult SourcePathResult,
+    DirectoryTreeNode SourceNode,
+    SourcePathResult SourceNodeResult,
     string? DestinationPath                     = null,
     DestinationPathResult DestinationPathResult = DestinationPathResult.None,
     int NumberOfFilesAffected                   = 0,

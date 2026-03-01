@@ -40,11 +40,11 @@ public sealed class PipelineRunner
 
             await foreach (var result in step.PreviewAsync(context, ct))
             {
-                if (result.IsSuccess && result.SourcePathResult != SourcePathResult.None)
+                if (result.IsSuccess && result.SourceNodeResult != SourcePathResult.None)
                 {
                     actions.Add(new PlannedAction(
-                        SourcePath: result.SourcePath,
-                        SourcePathResult: result.SourcePathResult,
+                        SourcePath: result.SourceNode.CanonicalRelativePath,
+                        SourcePathResult: result.SourceNodeResult,
                         DestinationPath: result.DestinationPath,
                         DestinationPathResult: result.DestinationPathResult,
                         NumberOfFilesAffected: result.NumberOfFilesAffected,
@@ -97,7 +97,7 @@ public sealed class PipelineRunner
                 results.Add(result);
                 nodeProgress?.Report(result);
 
-                if (!result.IsSuccess || result.SourcePathResult == SourcePathResult.None)
+                if (!result.IsSuccess || result.SourceNodeResult == SourcePathResult.None)
                     continue;
 
                 if (step.IsExecutable)
@@ -108,7 +108,7 @@ public sealed class PipelineRunner
                     var remaining = EstimateRemaining(elapsed, completedBytes, totalBytes);
 
                     progress?.Report(new OperationProgress(
-                        CurrentFile: result.SourcePath,
+                        CurrentFile: result.SourceNode.CanonicalRelativePath,
                         CurrentFileBytes: result.InputBytes,
                         CurrentFileTotalBytes: result.InputBytes,
                         FilesCompleted: filesCompleted,

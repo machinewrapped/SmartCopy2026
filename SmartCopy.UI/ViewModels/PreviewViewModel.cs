@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SmartCopy.Core.Pipeline;
+using SmartCopy.UI.Helpers;
 
 namespace SmartCopy.UI.ViewModels;
 
@@ -215,8 +216,8 @@ public partial class PreviewViewModel : ViewModelBase
         sb.AppendLine($"**Total Actions:** {TotalActionCount}");
         sb.AppendLine($"**Files Affected:** {TotalFilesAffected}");
         sb.AppendLine($"**Folders Affected:** {TotalFoldersAffected}");
-        sb.AppendLine($"**Total Input Size:** {TotalEstimatedInputBytes} bytes");
-        sb.AppendLine($"**Estimated Output Size:** {TotalEstimatedOutputBytes} bytes");
+        sb.AppendLine($"**Total Input Size:** { FileSizeFormatter.FormatBytes(TotalEstimatedInputBytes)}");
+        sb.AppendLine($"**Estimated Output Size:** {FileSizeFormatter.FormatBytes(TotalEstimatedOutputBytes)}");
         sb.AppendLine();
 
         var grouped = _currentPlan.Actions

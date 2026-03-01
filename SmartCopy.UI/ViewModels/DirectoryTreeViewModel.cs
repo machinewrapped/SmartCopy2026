@@ -64,7 +64,7 @@ public class DirectoryTreeViewModel : ViewModelBase
         await chain.ApplyToTreeAsync(RootNodes, comparisonProvider, ct);
     }
 
-    public async Task InitializeAsync(string? initialSelectionPath = null, CancellationToken ct = default)
+    public async Task InitializeAsync(CancellationToken ct = default)
     {
         // Unsubscribe from old roots before clearing
         foreach (var oldRoot in RootNodes)
@@ -91,9 +91,6 @@ public class DirectoryTreeViewModel : ViewModelBase
 
             if (root is not null)
                 SelectedNode = root;
-
-            if (!string.IsNullOrWhiteSpace(initialSelectionPath))
-                SelectByPath(initialSelectionPath);
         }
         finally
         {
@@ -107,73 +104,17 @@ public class DirectoryTreeViewModel : ViewModelBase
         await InitializeAsync(ct: ct);
     }
 
-    public bool SelectByPath(string fullPath)
-    {
-        if (string.IsNullOrWhiteSpace(fullPath))
-        {
-            return false;
-        }
-
-        var match = FindNode(fullPath);
-        if (match is null)
-        {
-            return false;
-        }
-
-        SelectedNode = match;
-        return true;
-    }
-
-    internal DirectoryTreeNode? MarkForRemoval(string sourcePath)
-    {
-        var node = FindNode(sourcePath);
-        if (node is null)
-            return null;
-
-        node.IsMarkedForRemoval = true;
-        return node;
-    }
-
-    /// <summary>
-    /// Removes the directory node at <paramref name="fullPath"/> from the tree and returns it,
-    /// or <c>null</c> if not found (e.g. the path belongs to a file, which lives in FileListViewModel).
-    /// </summary>
-    public DirectoryTreeNode? RemoveNode(string fullPath)
-    {
-        var node = FindNode(fullPath);
-        return RemoveNode(node);
-    }
-
-    public void RemoveAllMarkedForRemoval()
+    public void RemoveNodesMarkedForRemoval()
     {
         foreach (var root in RootNodes)
         {
-            RemoveMarkedForRemovalRecursive(root);
-        }
-    }
-
-    private void RemoveMarkedForRemovalRecursive(DirectoryTreeNode node)
-    {
-        if (node.IsMarkedForRemoval)
-        {
-            RemoveNode(node.FullPath);
-        }
-        else
-        {
-            // Iterate backwards to safely remove items while iterating
-            for (var i = node.Children.Count - 1; i >= 0; i--)
+            if (root.IsMarkedForRemoval)
             {
-                RemoveMarkedForRemovalRecursive(node.Children[i]);
+                RootNodes.Remove(root);
             }
-
-            // Remove files marked for removal too
-            for (var i = node.Files.Count - 1; i >= 0; i--)
+            else
             {
-                var file = node.Files[i];
-                if (file.IsMarkedForRemoval)
-                {
-                    node.Files.RemoveAt(i);
-                }
+                root.RemoveNodesMarkedForRemoval();
             }
         }
     }
@@ -213,69 +154,5 @@ public class DirectoryTreeViewModel : ViewModelBase
         }
 
         return null;
-    }
-
-    private DirectoryTreeNode? RemoveNode(DirectoryTreeNode? node)
-    {
-        if (node is null) return null;
-
-        if (node.Parent is not null)
-        {
-            var parent = node.Parent;
-            parent.Children.Remove(node);
-            FilterChain.RecalculateParentExclusion(parent);
-        }
-        else
-        {
-            RootNodes.Remove(node);
-        }
-
-        return node;
-    }
-
-    public IReadOnlyList<DirectoryTreeNode> CollectSelectedFiles()
-    {
-        var selected = new List<DirectoryTreeNode>();
-        foreach (var root in RootNodes)
-        {
-            CollectSelectedNodesRecursive(root, selected);
-        }
-        return selected;
-    }
-
-    public IReadOnlyList<DirectoryTreeNode> CollectAllIncludedFiles()
-    {
-        var all = new List<DirectoryTreeNode>();
-        foreach (var root in RootNodes)
-        {
-            CollectAllIncludedFilesRecursive(root, all);
-        }
-        return all;
-    }
-
-    private static void CollectSelectedNodesRecursive(DirectoryTreeNode node, List<DirectoryTreeNode> output)
-    {
-        if (node.IsDirectory && node.IsSelected)
-        {
-            output.Add(node); // atomic — all descendants selected and filter-included
-            return;           // do NOT recurse into children
-        }
-
-        output.AddRange(node.Files.Where(f => f.IsSelected)); // individual file selection#
-
-        foreach (var child in node.Children)
-        {
-            CollectSelectedNodesRecursive(child, output);
-        }
-    }
-
-    private static void CollectAllIncludedFilesRecursive(DirectoryTreeNode node, List<DirectoryTreeNode> output)
-    {
-        output.AddRange(node.Files.Where(f => f.FilterResult == FilterResult.Included));
-
-        foreach (var child in node.Children)
-        {
-            CollectAllIncludedFilesRecursive(child, output);
-        }
     }
 }

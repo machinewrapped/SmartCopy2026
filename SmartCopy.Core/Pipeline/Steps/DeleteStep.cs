@@ -28,58 +28,58 @@ public sealed class DeleteStep : IPipelineStep
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(
-        IStepContext ctx, [EnumeratorCancellation] CancellationToken ct)
+        IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
         await Task.Yield();
         var pathResult = Mode == DeleteMode.Trash ? SourcePathResult.Trashed : SourcePathResult.Deleted;
 
         // Include root node itself if selected, then all selected descendants.
-        if (ctx.IsPreviewSelected(ctx.RootNode))
+        if (context.IsPreviewSelected(context.RootNode))
         {
-            yield return MakePreviewResult(ctx.RootNode, pathResult);
+            yield return MakePreviewResult(context.RootNode, pathResult);
         }
 
         // Yield all affected nodes for preview so the user sees exactly what will be deleted
-        foreach (var node in ctx.GetVirtuallySelectedDescendants())
+        foreach (var node in context.GetPreviewSelectedDescendants())
         {
             ct.ThrowIfCancellationRequested();
-            if (ctx.IsNodeFailed(node)) continue;
+            if (context.IsNodeFailed(node)) continue;
             yield return MakePreviewResult(node, pathResult);
         }
     }
 
     public async IAsyncEnumerable<TransformResult> ApplyAsync(
-        IStepContext ctx, [EnumeratorCancellation] CancellationToken ct)
+        IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         var pathResult = Mode == DeleteMode.Trash ? SourcePathResult.Trashed : SourcePathResult.Deleted;
 
         // If the root node itself is fully selected, delete it atomically.
-        if (ctx.RootNode.IsSelected)
+        if (context.RootNode.IsSelected)
         {
-            await ctx.SourceProvider.DeleteAsync(ctx.RootNode.FullPath, ct);
+            await context.SourceProvider.DeleteAsync(context.RootNode.FullPath, ct);
             yield return new TransformResult(
                 IsSuccess: true,
-                SourcePath: ctx.RootNode.FullPath,
-                SourcePathResult: pathResult,
-                NumberOfFilesAffected: ctx.RootNode.CountAllFiles(),
-                NumberOfFoldersAffected: ctx.RootNode.CountAllFolders(),
-                InputBytes: ctx.RootNode.Size);
+                SourceNode: context.RootNode,
+                SourceNodeResult: pathResult,
+                NumberOfFilesAffected: context.RootNode.CountAllFiles(),
+                NumberOfFoldersAffected: context.RootNode.CountAllFolders(),
+                InputBytes: context.RootNode.Size);
             yield break;
         }
 
-        foreach (var node in ctx.RootNode.GetSelectedDescendants())
+        foreach (var node in context.RootNode.GetSelectedDescendants())
         {
             ct.ThrowIfCancellationRequested();
-            if (ctx.IsNodeFailed(node)) continue;
+            if (context.IsNodeFailed(node)) continue;
             // Skip nodes whose parent is also selected — the parent delete covers them.
             if (node.Parent?.IsSelected == true) continue;
 
-            await ctx.SourceProvider.DeleteAsync(node.FullPath, ct);
+            await context.SourceProvider.DeleteAsync(node.FullPath, ct);
             yield return new TransformResult(
                 IsSuccess: true,
-                SourcePath: node.FullPath,
-                SourcePathResult: pathResult,
+                SourceNode: node,
+                SourceNodeResult: pathResult,
                 NumberOfFilesAffected: node.CountAllFiles(),
                 NumberOfFoldersAffected: node.CountAllFolders(),
                 InputBytes: node.Size);
@@ -90,8 +90,8 @@ public sealed class DeleteStep : IPipelineStep
         DirectoryTreeNode node, SourcePathResult pathResult)
         => new(
             IsSuccess: true,
-            SourcePath: node.FullPath,
-            SourcePathResult: pathResult,
+            SourceNode: node,
+            SourceNodeResult: pathResult,
             NumberOfFilesAffected: node.IsDirectory ? 0 : 1,
             NumberOfFoldersAffected: node.IsDirectory ? 1 : 0,
             InputBytes: node.Size);

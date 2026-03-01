@@ -125,7 +125,7 @@ public sealed class PipelineIntegrationTests
             progress: null,
             ct: CancellationToken.None);
 
-        Assert.Contains(skipResults, result => result.SourcePathResult == SourcePathResult.None);
+        Assert.Contains(skipResults, result => result.SourceNodeResult == SourcePathResult.None);
 
         var alwaysResults = await runner.ExecuteAsync(
             new PipelineJob
@@ -139,7 +139,7 @@ public sealed class PipelineIntegrationTests
             progress: null,
             ct: CancellationToken.None);
 
-        Assert.Contains(alwaysResults, result => result.SourcePathResult == SourcePathResult.Copied);
+        Assert.Contains(alwaysResults, result => result.SourceNodeResult == SourcePathResult.Copied);
     }
 
     [Fact]
@@ -183,11 +183,13 @@ public sealed class PipelineIntegrationTests
         var provider = MemoryFileSystemFixtures.Create(f => f
             .WithDirectory("/src")
             .WithDirectory("/dest")
-            .WithFile("/src/song.mp3", "audio"u8));
+            .WithSimulatedFile("/src/song.mp3", 256*1024));
+
         var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
         var node = root.FindNodeByPathSegments(["src", "song.mp3"]);
         Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
+
         var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/dest")]));
 
         var results = await runner.ExecuteAsync(
@@ -204,14 +206,16 @@ public sealed class PipelineIntegrationTests
 
         var logDir = Path.Combine(Path.GetTempPath(), "SmartCopy2026.Tests", Guid.NewGuid().ToString("N"), "logs");
         var journal = new OperationJournal(logDir);
-        var path = await journal.WriteAsync(results.Where(r => r.SourcePathResult != SourcePathResult.None));
+        var path = await journal.WriteAsync(results.Where(r => r.SourceNodeResult != SourcePathResult.None));
 
         Assert.True(File.Exists(path));
         var line = Assert.Single(await File.ReadAllLinesAsync(path));
         var columns = line.Split('\t');
-        Assert.True(columns.Length >= 6);
+        Assert.True(columns.Length == 6);
         Assert.Equal("ok", columns[1]);
         Assert.Equal("copy", columns[2]);
-        Assert.Equal("/src/song.mp3", columns[3]);
+        Assert.Equal("src/song.mp3", columns[3]);
+        Assert.Equal("/dest/src/song.mp3", columns[4]);
+        Assert.Equal("256.0KB", columns[5]);
     }
 }

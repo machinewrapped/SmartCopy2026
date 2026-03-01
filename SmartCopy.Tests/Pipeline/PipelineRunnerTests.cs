@@ -44,7 +44,7 @@ public sealed class PipelineRunnerTests
 
         var results = await runner.ExecuteAsync(job, progress: null, ct: CancellationToken.None);
 
-        Assert.Contains(results, r => r.SourcePathResult == SourcePathResult.Copied && r.IsSuccess);
+        Assert.Contains(results, r => r.SourceNodeResult == SourcePathResult.Copied && r.IsSuccess);
         Assert.True(await targetProvider.ExistsAsync("/Mirror/source/song.flac", CancellationToken.None));
     }
 
@@ -113,17 +113,17 @@ public sealed class PipelineRunnerTests
             .WithDirectory("/source/sub")
             .WithFile("/source/sub/f3.txt", "z"u8));
 
-        DirectoryTreeViewModel treeViewModel = new(provider, "/source");
-        await treeViewModel.InitializeAsync(ct: CancellationToken.None);
+        DirectoryTreeNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
 
-        var rootNode = treeViewModel.RootNodes.First(n => n.Name == "source");
-        rootNode.CheckState = CheckState.Checked;
+        var sourceNode = root.FindNodeByPathSegments(["source"]);
+        Assert.NotNull(sourceNode);
+        sourceNode.CheckState = CheckState.Checked;
 
         var runner = new PipelineRunner(new TransformPipeline([new DeleteStep()]));
 
         var job = new PipelineJob
         {
-            RootNode       = rootNode,
+            RootNode       = sourceNode,
             SourceProvider = provider,
             TargetProvider = null,
             OverwriteMode  = OverwriteMode.Always,
@@ -133,11 +133,11 @@ public sealed class PipelineRunnerTests
         var plan = await runner.PreviewAsync(job, CancellationToken.None);
 
         Assert.Equal(5, plan.Actions.Count);
-        Assert.Contains(plan.Actions, a => a.SourcePath == "/source");
-        Assert.Contains(plan.Actions, a => a.SourcePath == "/source/f1.txt");
-        Assert.Contains(plan.Actions, a => a.SourcePath == "/source/f2.txt");
-        Assert.Contains(plan.Actions, a => a.SourcePath == "/source/sub");
-        Assert.Contains(plan.Actions, a => a.SourcePath == "/source/sub/f3.txt");
+        Assert.Contains(plan.Actions, a => a.SourcePath == "source");
+        Assert.Contains(plan.Actions, a => a.SourcePath == "source/f1.txt");
+        Assert.Contains(plan.Actions, a => a.SourcePath == "source/f2.txt");
+        Assert.Contains(plan.Actions, a => a.SourcePath == "source/sub");
+        Assert.Contains(plan.Actions, a => a.SourcePath == "source/sub/f3.txt");
     }
 
     [Fact]
@@ -237,7 +237,7 @@ public sealed class PipelineRunnerTests
             progress: null,
             ct: CancellationToken.None);
 
-        Assert.Contains(results, r => r.SourcePathResult == SourcePathResult.None);
+        Assert.Contains(results, r => r.SourceNodeResult == SourcePathResult.None);
         // Source must not have been deleted.
         Assert.True(await provider.ExistsAsync("/source/song.mp3", CancellationToken.None));
         // Destination must remain unchanged.

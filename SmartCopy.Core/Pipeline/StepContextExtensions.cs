@@ -13,8 +13,8 @@ public static class StepContextExtensions
     /// using the virtual check state from <see cref="PipelineContext.VirtualCheckState"/>
     /// rather than the real <see cref="DirectoryTreeNode.CheckState"/>.
     /// </summary>
-    public static bool IsPreviewSelected(this IStepContext ctx, DirectoryTreeNode node)
-        => ctx.GetNodeContext(node).VirtualCheckState == CheckState.Checked
+    public static bool IsPreviewSelected(this IStepContext context, DirectoryTreeNode node)
+        => context.GetNodeContext(node).VirtualCheckState == CheckState.Checked
            && node.FilterResult == FilterResult.Included;
 
     /// <summary>
@@ -22,25 +22,25 @@ public static class StepContextExtensions
     /// mirroring <see cref="DirectoryTreeNode.GetSelectedDescendants"/> but reading
     /// virtual state so that selection-step <c>PreviewAsync</c> mutations are visible.
     /// </summary>
-    public static IEnumerable<DirectoryTreeNode> GetVirtuallySelectedDescendants(
-        this IStepContext ctx)
-        => GetDescendantsFrom(ctx, ctx.RootNode);
+    public static IEnumerable<DirectoryTreeNode> GetPreviewSelectedDescendants(
+        this IStepContext context)
+        => GetPreviewSelectedDescendantsFrom(context, context.RootNode);
 
-    private static IEnumerable<DirectoryTreeNode> GetDescendantsFrom(
-        IStepContext ctx, DirectoryTreeNode node)
+    private static IEnumerable<DirectoryTreeNode> GetPreviewSelectedDescendantsFrom(
+        IStepContext context, DirectoryTreeNode node)
     {
         foreach (var file in node.Files)
-            if (ctx.IsPreviewSelected(file))
+            if (context.IsPreviewSelected(file))
                 yield return file;
 
         foreach (var child in node.Children)
         {
             if (!child.IsFilterIncluded) continue;
 
-            if (ctx.IsPreviewSelected(child))
+            if (context.IsPreviewSelected(child))
                 yield return child;
 
-            foreach (var desc in GetDescendantsFrom(ctx, child))
+            foreach (var desc in GetPreviewSelectedDescendantsFrom(context, child))
                 yield return desc;
         }
     }

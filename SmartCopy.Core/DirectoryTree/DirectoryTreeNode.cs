@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.Filters;
 
 namespace SmartCopy.Core.DirectoryTree;
 
@@ -136,6 +137,19 @@ public sealed class DirectoryTreeNode(FileSystemNode _filesystemNode, DirectoryT
         return new BatchUpdateScope(this);
     }
 
+    public void MarkForRemoval()
+    {
+        if (IsMarkedForRemoval) return;
+
+        IsMarkedForRemoval = true;
+
+        foreach (var child in Children)
+            child.MarkForRemoval();
+
+        foreach (var file in Files)
+            file.MarkForRemoval();
+    }
+
     public IEnumerable<DirectoryTreeNode> GetSelectedDescendants()
     {
         foreach (var file in Files)
@@ -196,6 +210,36 @@ public sealed class DirectoryTreeNode(FileSystemNode _filesystemNode, DirectoryT
         return currentNode;
     }
     
+    public void RemoveNodesMarkedForRemoval()
+    {
+        Debug.Assert(!IsMarkedForRemoval, "RemoveNodesMarkedForRemoval called on a node that's marked for removal - parent should have removed it.");
+
+        // Iterate backwards to safely remove items while iterating
+        for (var i = Files.Count - 1; i >= 0; i--)
+        {
+            var file = Files[i];
+            if (file.IsMarkedForRemoval)
+            {
+                Files.RemoveAt(i);
+            }
+        }
+
+        // Remove any children marked for removal, and recurse into unmarked children
+        for (var i = Children.Count - 1; i >= 0; i--)
+        {
+            if (Children[i].IsMarkedForRemoval)
+            {
+                Children.RemoveAt(i);
+            }
+            else
+            {
+                Children[i].RemoveNodesMarkedForRemoval();
+                FilterChain.RecalculateParentExclusion(this);
+            }
+        }
+}
+
+
     internal int CountSelectedFiles() =>
         (IsSelected && !IsDirectory ? 1 : 0) + (IsDirectory ? Children.Sum(c => c.CountSelectedFiles()) + Files.Count(f => f.IsSelected) : 0);
 
