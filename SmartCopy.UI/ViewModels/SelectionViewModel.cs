@@ -1,6 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using SmartCopy.UI.Helpers;
-
+using SmartCopy.Core.FileSystem;
 namespace SmartCopy.UI.ViewModels;
 
 public partial class SelectionViewModel : ViewModelBase

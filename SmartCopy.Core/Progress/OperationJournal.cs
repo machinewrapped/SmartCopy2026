@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 
 namespace SmartCopy.Core.Progress;
@@ -60,7 +61,7 @@ public sealed class OperationJournal
             var source = SanitizeField(result.SourceNode?.CanonicalRelativePath ?? string.Empty);
             var destination = SanitizeField(result.DestinationPath ?? string.Empty);
             var status = result.IsSuccess ? "ok" : "failed";
-            var outputSize = FormatBytes(result.OutputBytes);
+            var outputSize = FileSizeFormatter.FormatBytes(result.OutputBytes);
 
             await writer.WriteLineAsync(
                 $"{DateTime.UtcNow:O}\t{status}\t{action}\t{source}\t{destination}\t{outputSize}");
@@ -94,13 +95,5 @@ public sealed class OperationJournal
         SourcePathResult.Trashed => "trash",
         SourcePathResult.Deleted => "delete",
         _                        => "skipped",
-    };
-
-    private static string FormatBytes(long bytes) => bytes switch
-    {
-        < 1024 => $"{bytes}B",
-        < 1024 * 1024 => $"{bytes / 1024.0:F1}KB",
-        < 1024L * 1024 * 1024 => $"{bytes / (1024.0 * 1024):F1}MB",
-        _ => $"{bytes / (1024.0 * 1024 * 1024):F2}GB",
     };
 }

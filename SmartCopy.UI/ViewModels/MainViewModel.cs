@@ -17,7 +17,6 @@ using SmartCopy.Core.Progress;
 using SmartCopy.Core.Selection;
 using SmartCopy.Core.Settings;
 using SmartCopy.Core.Workflows;
-using SmartCopy.UI.Helpers;
 using SmartCopy.UI.Services;
 using SmartCopy.UI.ViewModels.Workflows;
 using SmartCopy.UI.Views;

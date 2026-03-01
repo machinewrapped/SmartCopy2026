@@ -22,7 +22,7 @@ public sealed class SelectionViewModelTests
         vm.UpdateStats(3, 1536, 0);
 
         Assert.Contains("3 files selected", vm.StatusText);
-        Assert.Contains("1.5 KB", vm.StatusText);
+        Assert.Contains("1.5KB", vm.StatusText);
     }
 
     [Fact]

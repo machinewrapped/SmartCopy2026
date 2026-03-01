@@ -1,8 +1,8 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
-using SmartCopy.UI.Helpers;
 
 namespace SmartCopy.UI.ViewModels;
 
