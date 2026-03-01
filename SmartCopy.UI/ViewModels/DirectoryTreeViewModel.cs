@@ -106,11 +106,12 @@ public class DirectoryTreeViewModel : ViewModelBase
 
     public void RemoveNodesMarkedForRemoval()
     {
-        foreach (var root in RootNodes)
+        for (var i = RootNodes.Count - 1; i >= 0; i--)
         {
+            var root = RootNodes[i];
             if (root.IsMarkedForRemoval)
             {
-                RootNodes.Remove(root);
+                RootNodes.RemoveAt(i);
             }
             else
             {
