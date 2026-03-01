@@ -342,7 +342,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
             if (AddArtificialDelay)
             {
                 // Simulate delay for testing progress reporting
-                await Task.Delay(100, ct); // Simulate delay for testing progress reporting
+                await Task.Delay(10, ct); // Simulate delay for testing progress reporting
             }
         }
     }
