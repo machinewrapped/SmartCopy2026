@@ -37,13 +37,13 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
             foreach (var childDirectory in Directory.EnumerateDirectories(fullPath))
             {
                 ct.ThrowIfCancellationRequested();
-                nodes.Add(CreateDirectoryNode(childDirectory, parent: null));
+                nodes.Add(CreateDirectoryNode(childDirectory));
             }
 
             foreach (var childFile in Directory.EnumerateFiles(fullPath))
             {
                 ct.ThrowIfCancellationRequested();
-                nodes.Add(CreateFileNode(childFile, parent: null));
+                nodes.Add(CreateFileNode(childFile));
             }
 
             return nodes;
@@ -59,12 +59,12 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 
             if (Directory.Exists(fullPath))
             {
-                return CreateDirectoryNode(fullPath, parent: null);
+                return CreateDirectoryNode(fullPath);
             }
 
             if (File.Exists(fullPath))
             {
-                return CreateFileNode(fullPath, parent: null);
+                return CreateFileNode(fullPath);
             }
 
             throw new FileNotFoundException($"Path does not exist: {fullPath}", fullPath);
@@ -263,7 +263,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         return CombinePath(RootPath, path);
     }
 
-    private FileSystemNode CreateDirectoryNode(string directoryPath, FileSystemNode? parent)
+    private FileSystemNode CreateDirectoryNode(string directoryPath)
     {
         var info = new DirectoryInfo(directoryPath);
         var relativePath = GetRelativePath(RootPath, info.FullName);
@@ -271,17 +271,16 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         {
             Name = info.Name,
             FullPath = info.FullName,
-            RelativePathSegments = SplitPath(relativePath),
+            PathSegments = SplitPath(relativePath),
             IsDirectory = true,
             Size = 0,
             CreatedAt = info.CreationTimeUtc,
             ModifiedAt = info.LastWriteTimeUtc,
             Attributes = info.Attributes,
-            Parent = parent,
         };
     }
 
-    private FileSystemNode CreateFileNode(string filePath, FileSystemNode? parent)
+    private FileSystemNode CreateFileNode(string filePath)
     {
         var info = new FileInfo(filePath);
         var relativePath = GetRelativePath(RootPath, info.FullName);
@@ -289,13 +288,12 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         {
             Name = info.Name,
             FullPath = info.FullName,
-            RelativePathSegments = SplitPath(relativePath),
+            PathSegments = SplitPath(relativePath),
             IsDirectory = false,
             Size = info.Length,
             CreatedAt = info.CreationTimeUtc,
             ModifiedAt = info.LastWriteTimeUtc,
             Attributes = info.Attributes,
-            Parent = parent,
         };
     }
 }

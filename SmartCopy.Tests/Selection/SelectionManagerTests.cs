@@ -1,42 +1,37 @@
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Selection;
+using SmartCopy.Tests.TestInfrastructure;
 
 namespace SmartCopy.Tests.Selection;
 
 public sealed class SelectionManagerTests
 {
-    [Fact]
-    public void CaptureAndRestore_PreservesSelectionByRelativePath()
+    // ── helpers ────────────────────────────────────────────────────────────────
+
+    private static async Task<(DirectoryTreeNode root, DirectoryTreeNode fileA, DirectoryTreeNode fileB)> BuildTree()
     {
-        var root = new FileSystemNode
-        {
-            Name = "root",
-            FullPath = "/root",
-            RelativePathSegments = ["root"],
-            IsDirectory = true,
-        };
+        DirectoryTreeNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
+            .WithDirectory("/root")
+            .WithFile("/root/a.mp3", "x"u8)
+            .WithFile("/root/b.mp3", "y"u8));
 
-        var fileA = new FileSystemNode
-        {
-            Name = "a.mp3",
-            FullPath = "/root/a.mp3",
-            RelativePathSegments = ["root", "a.mp3"],
-            IsDirectory = false,
-            Parent = root,
-            CheckState = CheckState.Checked,
-        };
-        var fileB = new FileSystemNode
-        {
-            Name = "b.mp3",
-            FullPath = "/root/b.mp3",
-            RelativePathSegments = ["root", "b.mp3"],
-            IsDirectory = false,
-            Parent = root,
-            CheckState = CheckState.Unchecked,
-        };
+        var fileA = root.FindNodeByPathSegments(["root", "a.mp3"]);
+        Assert.NotNull(fileA);
 
-        root.Children.Add(fileA);
-        root.Children.Add(fileB);
+        var fileB = root.FindNodeByPathSegments(["root", "b.mp3"]);
+        Assert.NotNull(fileB);
+
+        return (root, fileA, fileB);
+    }
+
+    [Fact]
+    public async Task CaptureAndRestore_PreservesSelectionByRelativePath()
+    {
+        var (root, fileA, fileB) = await BuildTree();
+
+        fileA.CheckState = CheckState.Checked;
+        fileB.CheckState = CheckState.Unchecked;
 
         var manager = new SelectionManager();
         var snapshot = manager.Capture([root]);
@@ -49,9 +44,9 @@ public sealed class SelectionManagerTests
     }
 
     [Fact]
-    public void Restore_ReturnsMatchedCount()
+    public async Task Restore_ReturnsMatchedCount()
     {
-        var (root, fileA, _) = BuildTree();
+        var (root, fileA, _) = await BuildTree();
         var snapshot = new SelectionSnapshot([fileA.CanonicalRelativePath]);
 
         var result = new SelectionManager().Restore([root], snapshot);
@@ -61,9 +56,9 @@ public sealed class SelectionManagerTests
     }
 
     [Fact]
-    public void Restore_ReturnsUnmatchedPaths()
+    public async Task Restore_ReturnsUnmatchedPaths()
     {
-        var (root, _, _) = BuildTree();
+        var (root, _, _) = await BuildTree();
         var snapshot = new SelectionSnapshot(["does/not/exist.mp3", "also/missing.flac"]);
 
         var result = new SelectionManager().Restore([root], snapshot);
@@ -74,9 +69,9 @@ public sealed class SelectionManagerTests
     }
 
     [Fact]
-    public void Capture_AbsolutePaths_UsesFullPath()
+    public async Task Capture_AbsolutePaths_UsesFullPath()
     {
-        var (root, fileA, _) = BuildTree();
+        var (root, fileA, _) = await BuildTree();
         fileA.CheckState = CheckState.Checked;
 
         var snapshot = new SelectionManager().Capture([root], useAbsolutePaths: true);
@@ -86,12 +81,12 @@ public sealed class SelectionManagerTests
     }
 
     [Fact]
-    public void Restore_WithAbsolutePaths_ReturnsCorrectUnmatched()
+    public async Task Restore_WithAbsolutePaths_ReturnsCorrectUnmatched()
     {
         // Verify that when a snapshot is captured with absolute paths, Restore does not
         // falsely report matched nodes as unmatched (the original bug: matchedKeys always
         // stored relative paths, so absolute-path entries were never found in matchedKeys).
-        var (root, fileA, fileB) = BuildTree();
+        var (root, fileA, fileB) = await BuildTree();
         fileA.CheckState = CheckState.Checked;
         fileB.CheckState = CheckState.Unchecked;
 
@@ -108,9 +103,9 @@ public sealed class SelectionManagerTests
     }
 
     [Fact]
-    public void SelectAll_SetsAllChecked()
+    public async Task SelectAll_SetsAllChecked()
     {
-        var (root, fileA, fileB) = BuildTree();
+        var (root, fileA, fileB) = await BuildTree();
         fileA.CheckState = CheckState.Unchecked;
         fileB.CheckState = CheckState.Unchecked;
 
@@ -121,9 +116,9 @@ public sealed class SelectionManagerTests
     }
 
     [Fact]
-    public void ClearAll_SetsAllUnchecked()
+    public async Task ClearAll_SetsAllUnchecked()
     {
-        var (root, fileA, fileB) = BuildTree();
+        var (root, fileA, fileB) = await BuildTree();
         fileA.CheckState = CheckState.Checked;
         fileB.CheckState = CheckState.Checked;
 
@@ -134,9 +129,9 @@ public sealed class SelectionManagerTests
     }
 
     [Fact]
-    public void InvertAll_TogglesCheckedToUnchecked()
+    public async Task InvertAll_TogglesCheckedToUnchecked()
     {
-        var (root, fileA, fileB) = BuildTree();
+        var (root, fileA, fileB) = await BuildTree();
         fileA.CheckState = CheckState.Checked;
         fileB.CheckState = CheckState.Unchecked;
 
@@ -144,41 +139,5 @@ public sealed class SelectionManagerTests
 
         Assert.Equal(CheckState.Unchecked, fileA.CheckState);
         Assert.Equal(CheckState.Checked, fileB.CheckState);
-    }
-
-    // ── helpers ────────────────────────────────────────────────────────────────
-
-    private static (FileSystemNode root, FileSystemNode fileA, FileSystemNode fileB) BuildTree()
-    {
-        var root = new FileSystemNode
-        {
-            Name = "root",
-            FullPath = "/root",
-            RelativePathSegments = ["root"],
-            IsDirectory = true,
-        };
-
-        var fileA = new FileSystemNode
-        {
-            Name = "a.mp3",
-            FullPath = "/root/a.mp3",
-            RelativePathSegments = ["root", "a.mp3"],
-            IsDirectory = false,
-            Parent = root,
-        };
-
-        var fileB = new FileSystemNode
-        {
-            Name = "b.mp3",
-            FullPath = "/root/b.mp3",
-            RelativePathSegments = ["root", "b.mp3"],
-            IsDirectory = false,
-            Parent = root,
-        };
-
-        root.Files.Add(fileA);
-        root.Files.Add(fileB);
-
-        return (root, fileA, fileB);
     }
 }

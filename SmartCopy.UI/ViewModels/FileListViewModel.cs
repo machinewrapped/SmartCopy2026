@@ -1,28 +1,23 @@
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
 
 namespace SmartCopy.UI.ViewModels;
 
-public class FileListViewModel(IFileSystemProvider provider, string directoryPath) : ViewModelBase
+public class FileListViewModel : ViewModelBase
 {
-    private readonly IFileSystemProvider _provider = provider;
-    private string _directoryPath = directoryPath;
     private CancellationTokenSource? _loadCts;
 
     private FilterChain? _chain;
     private IFileSystemProvider? _comparisonProvider;
-    private FileSystemNode? _currentDirectoryNode;
+    private DirectoryTreeNode? _currentDirectoryNode;
 
     // The full unfiltered set of file nodes for the current directory.
-    private List<FileSystemNode> _files = [];
+    private List<DirectoryTreeNode> _files = [];
 
     // The subset (or whole set) exposed to the DataGrid, respecting ShowFilteredFiles.
-    private IReadOnlyList<FileSystemNode> _visibleFiles = [];
-    public IReadOnlyList<FileSystemNode> VisibleFiles
+    private IReadOnlyList<DirectoryTreeNode> _visibleFiles = [];
+    public IReadOnlyList<DirectoryTreeNode> VisibleFiles
     {
         get => _visibleFiles;
         private set => SetProperty(ref _visibleFiles, value);
@@ -60,52 +55,18 @@ public class FileListViewModel(IFileSystemProvider provider, string directoryPat
         RefreshVisibleFiles();
     }
 
-    public async Task LoadFilesForNodeAsync(FileSystemNode directoryNode)
+    /// <summary>
+    /// Displays the files already scanned into <paramref name="directoryNode"/>,
+    /// then applies the current filter chain.
+    /// </summary>
+    public async Task LoadFilesForNodeAsync(DirectoryTreeNode directoryNode)
     {
         _loadCts?.Cancel();
         _loadCts?.Dispose();
         _loadCts = new CancellationTokenSource();
         var ct = _loadCts.Token;
 
-        _directoryPath = directoryNode.FullPath;
         _currentDirectoryNode = directoryNode;
-
-        if (directoryNode.Files.Count == 0)
-        {
-            var children = await _provider.GetChildrenAsync(_directoryPath, ct);
-            var files = new List<FileSystemNode>();
-
-            foreach (var child in children)
-            {
-                ct.ThrowIfCancellationRequested();
-                if (child.IsDirectory) continue;
-
-                var checkState = directoryNode.CheckState == CheckState.Checked
-                    ? CheckState.Checked
-                    : CheckState.Unchecked;
-
-                files.Add(new FileSystemNode
-                {
-                    Name = child.Name,
-                    FullPath = child.FullPath,
-                    RelativePathSegments = child.RelativePathSegments,
-                    IsDirectory = false,
-                    Size = child.Size,
-                    CreatedAt = child.CreatedAt,
-                    ModifiedAt = child.ModifiedAt,
-                    Attributes = child.Attributes,
-                    CheckState = checkState,
-                    FilterResult = FilterResult.Included,
-                    Parent = directoryNode,
-                });
-            }
-
-            if (ct.IsCancellationRequested) return;
-
-            foreach (var file in files)
-                directoryNode.Files.Add(file);
-        }
-
         _files = [.. directoryNode.Files];
 
         await ApplyChainToFilesAsync(ct);
@@ -123,13 +84,19 @@ public class FileListViewModel(IFileSystemProvider provider, string directoryPat
         RefreshVisibleFiles();
     }
 
-    public void ClearIfUnder(string dirFullPath)
+    public void ClearIfUnder(DirectoryTreeNode removedDirectory)
     {
-        if (_directoryPath.StartsWith(dirFullPath, StringComparison.OrdinalIgnoreCase))
+        var node = _currentDirectoryNode;
+        while (node is not null)
         {
-            _files.Clear();
-            _currentDirectoryNode = null;
-            RefreshVisibleFiles();
+            if (node == removedDirectory)
+            {
+                _files.Clear();
+                _currentDirectoryNode = null;
+                RefreshVisibleFiles();
+                return;
+            }
+            node = node.Parent;
         }
     }
 

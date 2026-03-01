@@ -1,10 +1,10 @@
-using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.DirectoryTree;
 
 namespace SmartCopy.Core.Selection;
 
 public sealed class SelectionManager
 {
-    public SelectionSnapshot Capture(IEnumerable<FileSystemNode> roots, bool useAbsolutePaths = false)
+    public SelectionSnapshot Capture(IEnumerable<DirectoryTreeNode> roots, bool useAbsolutePaths = false)
     {
         var selected = new List<string>();
         foreach (var node in Traverse(roots))
@@ -16,7 +16,7 @@ public sealed class SelectionManager
         return new SelectionSnapshot(selected);
     }
 
-    public SelectionRestoreResult Restore(IEnumerable<FileSystemNode> roots, SelectionSnapshot snapshot)
+    public SelectionRestoreResult Restore(IEnumerable<DirectoryTreeNode> roots, SelectionSnapshot snapshot)
     {
         var matchedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var node in Traverse(roots))
@@ -44,19 +44,19 @@ public sealed class SelectionManager
         return new SelectionRestoreResult(matchedKeys.Count, unmatched);
     }
 
-    public void SelectAll(IEnumerable<FileSystemNode> roots)
+    public void SelectAll(IEnumerable<DirectoryTreeNode> roots)
     {
         foreach (var n in Traverse(roots))
             n.CheckState = CheckState.Checked;
     }
 
-    public void ClearAll(IEnumerable<FileSystemNode> roots)
+    public void ClearAll(IEnumerable<DirectoryTreeNode> roots)
     {
         foreach (var n in Traverse(roots))
             n.CheckState = CheckState.Unchecked;
     }
 
-    public void InvertAll(IEnumerable<FileSystemNode> roots)
+    public void InvertAll(IEnumerable<DirectoryTreeNode> roots)
     {
         // Only invert leaf nodes (no children, no files of their own) to avoid
         // cascade-down overwriting individual file states when a parent is processed.
@@ -65,9 +65,9 @@ public sealed class SelectionManager
                 n.CheckState = n.CheckState == CheckState.Checked ? CheckState.Unchecked : CheckState.Checked;
     }
 
-    private static IEnumerable<FileSystemNode> Traverse(IEnumerable<FileSystemNode> roots)
+    private static IEnumerable<DirectoryTreeNode> Traverse(IEnumerable<DirectoryTreeNode> roots)
     {
-        var stack = new Stack<FileSystemNode>(roots);
+        var stack = new Stack<DirectoryTreeNode>(roots);
         while (stack.Count > 0)
         {
             var node = stack.Pop();

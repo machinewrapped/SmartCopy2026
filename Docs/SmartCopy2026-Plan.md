@@ -35,7 +35,7 @@ Before redesigning, preserve these patterns:
 - **Background worker pattern** — clean separation of long-running operations with pause/resume,
   cancellation, progress reporting, and per-operation logging
 - **Filesystem wrapper model** — wrapping raw `FileInfo`/`DirectoryInfo` with application state
-  (checked, filtered, removed) was the right instinct; `FileSystemNode` continues this
+  (checked, filtered, removed) was the right instinct; `DirectoryTreeNode` continues this
 - **Wildcard → Regex** — simple, effective, semicolon-delimited multi-pattern matching
 - **Selection persistence** — txt and m3u formats with relative paths, portable across machines
 - **Mirror detection options** — name-only / name+size / extension-agnostic comparison modes

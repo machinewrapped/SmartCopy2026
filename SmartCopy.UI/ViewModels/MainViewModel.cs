@@ -8,11 +8,11 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
-using SmartCopy.Core.Pipeline.Validation;
 using SmartCopy.Core.Progress;
 using SmartCopy.Core.Selection;
 using SmartCopy.Core.Settings;
@@ -121,7 +121,7 @@ public partial class MainViewModel : ViewModelBase
             await ApplySourcePathCoreAsync(path);
         };
 
-        FileList = new FileListViewModel(_memoryProvider, MockMemoryFileSystemFactory.DefaultFileListPath);
+        FileList = new FileListViewModel();
 
         WorkflowMenu = new WorkflowMenuViewModel(_workflowStore);
         WorkflowMenu.SaveRequested += async (_, _) => await SaveWorkflowAsync();
@@ -535,13 +535,15 @@ public partial class MainViewModel : ViewModelBase
         int filteredOut = 0;
 
         foreach (var root in DirectoryTree.RootNodes)
+        {
             CollectStatsRecursive(root, ref selected, ref totalBytes, ref filteredOut);
+        }
 
         Pipeline.SetSelectedIncludedFileCount(selected);
         StatusBar.Selection.UpdateStats(selected, totalBytes, filteredOut);
     }
 
-    private static void CollectStatsRecursive(FileSystemNode node, ref int selected, ref long totalBytes, ref int filteredOut)
+    private static void CollectStatsRecursive(DirectoryTreeNode node, ref int selected, ref long totalBytes, ref int filteredOut)
     {
         foreach (var file in node.Files)
         {
@@ -785,14 +787,21 @@ public partial class MainViewModel : ViewModelBase
 
     private void OnNodeCompleted(TransformResult result)
     {
-        if (!result.IsSuccess) return;
-        if (result.SourcePathResult is not (SourcePathResult.Moved or SourcePathResult.Trashed or SourcePathResult.Deleted)) return;
+        if (!result.IsSuccess)
+            return;
+
+        if (result.SourcePathResult is not (SourcePathResult.Moved or SourcePathResult.Trashed or SourcePathResult.Deleted))
+            return;
 
         var removedDir = DirectoryTree.RemoveNode(result.SourcePath);
-        if (removedDir)
-            FileList.ClearIfUnder(result.SourcePath);
+        if (removedDir is not null)
+        {
+            FileList.ClearIfUnder(removedDir);
+        }
         else
+        {
             FileList.RemoveFile(result.SourcePath);
+        }
     }
 
     private async Task SaveWorkflowAsync()

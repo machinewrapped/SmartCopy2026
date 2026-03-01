@@ -1,12 +1,16 @@
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Filters.Filters;
+using SmartCopy.Tests.TestInfrastructure;
 using SmartCopy.UI.ViewModels;
 
 namespace SmartCopy.Tests.Filters;
 
 public sealed class FilterLiveWiringTests
 {
+    private static readonly string[] defaultFiles = ["track.mp3", "photo.jpg"];
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
@@ -16,33 +20,31 @@ public sealed class FilterLiveWiringTests
     /// an .mp3 file and a .jpg file, plus returns the directory node needed by
     /// LoadFilesForNodeAsync.
     /// </summary>
-    private static (MemoryFileSystemProvider fs, FileSystemNode dirNode) BuildMusicFs()
+    private static async Task<DirectoryTreeNode> BuildMusicDirNode(IEnumerable<string> files)
     {
-        var fs = new MemoryFileSystemProvider();
-        fs.SeedDirectory("/music");
-        fs.SeedSimulatedFile("/music/track.mp3", 1024);
-        fs.SeedSimulatedFile("/music/photo.jpg", 512);
+        MemoryFileSystemProvider provider = MemoryFileSystemFixtures.Create(f => f
+            .WithDirectory("/music"));
 
-        var dirNode = new FileSystemNode
+        foreach (var file in files)
         {
-            Name = "music",
-            FullPath = "/music",
-            RelativePathSegments = ["music"],
-            IsDirectory = true,
-        };
+            provider.SeedFile($"/music/{file}", content: new byte[100]);
+        }
 
-        return (fs, dirNode);
+        DirectoryTreeNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+
+        return root.Children.Single(n => n.Name == "music");
     }
 
     // -------------------------------------------------------------------------
     // Tests
     // -------------------------------------------------------------------------
 
+
     [Fact]
     public async Task ExtensionFilter_ExcludesNonMatchingFiles()
     {
-        var (fs, dirNode) = BuildMusicFs();
-        var vm = new FileListViewModel(fs, "/music");
+        var dirNode = await BuildMusicDirNode(defaultFiles);
+        var vm = new FileListViewModel();
 
         // Include only mp3 — jpg should be excluded
         var chain = new FilterChain([new ExtensionFilter(["mp3"], FilterMode.Only)]);
@@ -64,13 +66,9 @@ public sealed class FilterLiveWiringTests
         fs.SeedSimulatedFile("/music/large.mp3", 10_000_000);
         fs.SeedSimulatedFile("/music/photo.jpg", 200);
 
-        var dirNode = new FileSystemNode
-        {
-            Name = "music",
-            FullPath = "/music",
-            RelativePathSegments = ["music"],
-            IsDirectory = true,
-        };
+        DirectoryTreeNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(fs);
+
+        var dirNode = root.Children.Single(n => n.Name == "music");
 
         var chain = new FilterChain(
         [
@@ -78,7 +76,7 @@ public sealed class FilterLiveWiringTests
             new SizeRangeFilter(minBytes: 1_000_000, maxBytes: null, FilterMode.Exclude),
         ]);
 
-        var vm = new FileListViewModel(fs, "/music");
+        var vm = new FileListViewModel();
         vm.UpdateChain(chain, null);
         await vm.LoadFilesForNodeAsync(dirNode);
 
@@ -94,10 +92,10 @@ public sealed class FilterLiveWiringTests
     [Fact]
     public async Task ShowFilteredFiles_False_VisibleFilesOmitsExcluded()
     {
-        var (fs, dirNode) = BuildMusicFs();
+        var dirNode = await BuildMusicDirNode(defaultFiles);
         var chain = new FilterChain([new ExtensionFilter(["mp3"], FilterMode.Only)]);
 
-        var vm = new FileListViewModel(fs, "/music");
+        var vm = new FileListViewModel();
         vm.UpdateChain(chain, null);
         await vm.LoadFilesForNodeAsync(dirNode);
 
@@ -110,10 +108,10 @@ public sealed class FilterLiveWiringTests
     [Fact]
     public async Task ShowFilteredFiles_True_VisibleFilesIncludesAll()
     {
-        var (fs, dirNode) = BuildMusicFs();
+        var dirNode = await BuildMusicDirNode(defaultFiles);
         var chain = new FilterChain([new ExtensionFilter(["mp3"], FilterMode.Only)]);
 
-        var vm = new FileListViewModel(fs, "/music");
+        var vm = new FileListViewModel();
         vm.UpdateChain(chain, null);
         await vm.LoadFilesForNodeAsync(dirNode);
 
@@ -126,12 +124,12 @@ public sealed class FilterLiveWiringTests
     [Fact]
     public async Task DisablingFilter_ResetsExcludedNodesToIncluded()
     {
-        var (fs, dirNode) = BuildMusicFs();
+        var dirNode = await BuildMusicDirNode(defaultFiles);
 
         var activeFilter = new ExtensionFilter(["mp3"], FilterMode.Only);
         var activeChain = new FilterChain([activeFilter]);
 
-        var vm = new FileListViewModel(fs, "/music");
+        var vm = new FileListViewModel();
         vm.UpdateChain(activeChain, null);
         await vm.LoadFilesForNodeAsync(dirNode);
 
@@ -152,9 +150,9 @@ public sealed class FilterLiveWiringTests
     [Fact]
     public async Task ReapplyFiltersAsync_UpdatesExistingFileListNodes()
     {
-        var (fs, dirNode) = BuildMusicFs();
+        var dirNode = await BuildMusicDirNode(defaultFiles);
 
-        var vm = new FileListViewModel(fs, "/music");
+        var vm = new FileListViewModel();
         // Load with no chain — all Included by default
         await vm.LoadFilesForNodeAsync(dirNode);
 
@@ -175,12 +173,12 @@ public sealed class FilterLiveWiringTests
     [Fact]
     public async Task RemoveNode_RecalculatesParentExclusion()
     {
-        var fs = new MemoryFileSystemProvider();
-        fs.SeedDirectory("/root");
-        fs.SeedDirectory("/root/child1");
-        fs.SeedSimulatedFile("/root/child1/file1.txt", 100);
-        fs.SeedDirectory("/root/child2");
-        fs.SeedSimulatedFile("/root/child2/track.mp3", 100);
+        MemoryFileSystemProvider fs = MemoryFileSystemFixtures.Create(f => f
+             .WithDirectory("/root")
+             .WithDirectory("/root/child1")
+             .WithSimulatedFile("/root/child1/file1.txt", 100)
+             .WithDirectory("/root/child2")
+             .WithSimulatedFile("/root/child2/track.mp3", 100));
 
         var vm = new DirectoryTreeViewModel(fs, "/root");
         await vm.InitializeAsync();
@@ -189,14 +187,14 @@ public sealed class FilterLiveWiringTests
         await vm.ApplyFiltersAsync(chain, null);
 
         var rootNode = vm.RootNodes.First(n => n.Name == "root");
-        
+
         // At this point, child2 has the included mp3, so root should be Mixed (or Included if it has no files itself and all children match, but child1 is excluded)
         Assert.Equal(FilterResult.Mixed, rootNode.FilterResult);
 
         // Removing the only branch that contains included files should cause the root to become Excluded
         var removed = vm.RemoveNode("/root/child2");
-        Assert.True(removed);
-        
+        Assert.NotNull(removed);
+
         Assert.Equal(FilterResult.Excluded, rootNode.FilterResult);
     }
 }

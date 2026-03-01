@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.DirectoryTree;
 
 namespace SmartCopy.Core.Filters;
 
@@ -23,7 +24,7 @@ public abstract class FilterBase : IFilter
     public abstract string Summary { get; }
     public abstract string Description { get; }
     public abstract ValueTask<bool> MatchesAsync(
-        FileSystemNode node,
+        DirectoryTreeNode node,
         IFileSystemProvider? comparisonProvider,
         CancellationToken ct = default);
 

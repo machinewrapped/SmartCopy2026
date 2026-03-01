@@ -1,3 +1,4 @@
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Scanning;
 using SmartCopy.Tests.TestInfrastructure;
@@ -17,7 +18,7 @@ public sealed class DirectoryScannerTests
             .WithDirectory("/root/jazz"));
 
         var scanner = new DirectoryScanner(provider);
-        var results = new List<FileSystemNode>();
+        var results = new List<DirectoryTreeNode>();
         await foreach (var node in scanner.ScanAsync(
                            "/root",
                            new ScanOptions { LazyExpand = false, IncludeHidden = true },
@@ -57,7 +58,7 @@ public sealed class DirectoryScannerTests
             .WithFile("/root/a/b/file.txt", "x"u8));
 
         var scanner = new DirectoryScanner(provider);
-        var results = new List<FileSystemNode>();
+        var results = new List<DirectoryTreeNode>();
         await foreach (var node in scanner.ScanAsync(
                            "/root",
                            new ScanOptions { LazyExpand = false, MaxDepth = 1, IncludeHidden = true },

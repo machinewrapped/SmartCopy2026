@@ -1,7 +1,7 @@
 using System.IO;
 using System.Linq;
 using System.Text;
-using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Tests.TestInfrastructure;
@@ -20,7 +20,10 @@ public sealed class PipelineRunnerTests
                 .WithFile("/source/song.flac", Encoding.UTF8.GetBytes("audio")),
             target => target.WithDirectory("/Mirror"));
 
-        var sourceNode = await sourceProvider.GetNodeAsync("/source/song.flac", CancellationToken.None);
+        var sourceRoot = await MemoryFileSystemFixtures.BuildDirectoryTree(sourceProvider);
+        var sourceNode = sourceRoot.FindNodeByPathSegments(["source", "song.flac"]);
+        Assert.NotNull(sourceNode);
+
         sourceNode.CheckState = CheckState.Checked;
         var pipeline = new TransformPipeline([new CopyStep("/Mirror")]);
         var runner = new PipelineRunner(pipeline);
@@ -53,8 +56,11 @@ public sealed class PipelineRunnerTests
             .WithDirectory("/source")
             .WithFile("/source/delete-me.txt", "x"u8));
 
-        var node = await provider.GetNodeAsync("/source/delete-me.txt", CancellationToken.None);
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var node = root.FindNodeByPathSegments(["source", "delete-me.txt"]);
+        Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
+
         var runner = new PipelineRunner(new TransformPipeline([new DeleteStep()]));
 
         var job = new PipelineJob
@@ -78,7 +84,9 @@ public sealed class PipelineRunnerTests
             .WithDirectory("/source")
             .WithFile("/source/delete-me.txt", "x"u8));
 
-        var node = await provider.GetNodeAsync("/source/delete-me.txt", CancellationToken.None);
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var node = root.FindNodeByPathSegments(["source", "delete-me.txt"]);
+        Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
         var runner = new PipelineRunner(new TransformPipeline([new DeleteStep()]));
 
@@ -147,7 +155,9 @@ public sealed class PipelineRunnerTests
                 .WithFile("/source/deep/folder/track.mp3", "x"u8),
             target => target.WithDirectory("/out"));
 
-        var node = await sourceProvider.GetNodeAsync("/source/deep/folder/track.mp3", CancellationToken.None);
+        var sourceRoot = await MemoryFileSystemFixtures.BuildDirectoryTree(sourceProvider);
+        var node = sourceRoot.FindNodeByPathSegments(["source", "deep", "folder", "track.mp3"]);
+        Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
         var runner = new PipelineRunner(new TransformPipeline(
         [
@@ -180,7 +190,9 @@ public sealed class PipelineRunnerTests
                 .WithFile("/source/deep/folder/track.mp3", "x"u8),
             target => target.WithDirectory("/out"));
 
-        var node = await sourceProvider.GetNodeAsync("/source/deep/folder/track.mp3", CancellationToken.None);
+        var sourceRoot = await MemoryFileSystemFixtures.BuildDirectoryTree(sourceProvider);
+        var node = sourceRoot.FindNodeByPathSegments(["source", "deep", "folder", "track.mp3"]);
+        Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
         var runner = new PipelineRunner(new TransformPipeline(
         [
@@ -213,7 +225,9 @@ public sealed class PipelineRunnerTests
             .WithFile("/source/song.mp3", "original"u8)
             .WithFile("/dest/source/song.mp3", "existing"u8));
 
-        var node = await provider.GetNodeAsync("/source/song.mp3", CancellationToken.None);
+        var sourceRoot = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var node = sourceRoot.FindNodeByPathSegments(["source", "song.mp3"]);
+        Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
         var runner = new PipelineRunner(new TransformPipeline([new MoveStep("/dest")]));
 

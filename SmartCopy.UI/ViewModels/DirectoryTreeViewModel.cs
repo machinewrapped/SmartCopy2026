@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Threading;
 using System.Threading.Tasks;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Scanning;
@@ -12,7 +13,7 @@ public class DirectoryTreeViewModel : ViewModelBase
 {
     private readonly DirectoryScanner _scanner;
     private string _rootPath;
-    private FileSystemNode? _selectedNode;
+    private DirectoryTreeNode? _selectedNode;
     private bool _isLoading;
 
     public bool IsLoading
@@ -21,7 +22,7 @@ public class DirectoryTreeViewModel : ViewModelBase
         private set => SetProperty(ref _isLoading, value);
     }
 
-    /// <summary>Raised when any node's <see cref="FileSystemNode.CheckState"/> changes.</summary>
+    /// <summary>Raised when any node's <see cref="DirectoryTreeNode.CheckState"/> changes.</summary>
     public event EventHandler? SelectionChanged;
 
     /// <summary>Raised when the user requests a node's path be set as the source root.</summary>
@@ -30,7 +31,7 @@ public class DirectoryTreeViewModel : ViewModelBase
     public void RequestSetAsSourcePath(string path) =>
         SetAsSourcePathRequested?.Invoke(this, path);
 
-    public ObservableCollection<FileSystemNode> RootNodes { get; } = [];
+    public ObservableCollection<DirectoryTreeNode> RootNodes { get; } = [];
 
     public DirectoryTreeViewModel(IFileSystemProvider provider, string rootPath)
     {
@@ -38,7 +39,7 @@ public class DirectoryTreeViewModel : ViewModelBase
         _scanner = new DirectoryScanner(provider);
     }
 
-    public FileSystemNode? SelectedNode
+    public DirectoryTreeNode? SelectedNode
     {
         get => _selectedNode;
         set => SetProperty(ref _selectedNode, value);
@@ -53,7 +54,7 @@ public class DirectoryTreeViewModel : ViewModelBase
 
     /// <summary>
     /// Applies <paramref name="chain"/> to every node in the tree, setting
-    /// <see cref="FileSystemNode.FilterResult"/> and <see cref="FileSystemNode.ExcludedByFilter"/>.
+    /// <see cref="DirectoryTreeNode.FilterResult"/> and <see cref="DirectoryTreeNode.ExcludedByFilter"/>.
     /// </summary>
     public async Task ApplyFiltersAsync(
         FilterChain chain,
@@ -72,7 +73,7 @@ public class DirectoryTreeViewModel : ViewModelBase
         RootNodes.Clear();
         IsLoading = true;
 
-        FileSystemNode? root = null;
+        DirectoryTreeNode? root = null;
         try
         {
             var scanOptions = new ScanOptions { LazyExpand = false, IncludeHidden = true };
@@ -124,14 +125,13 @@ public class DirectoryTreeViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Removes the directory node at <paramref name="fullPath"/> from the tree.
-    /// Returns <c>true</c> if a node was found and removed; <c>false</c> if not found
-    /// (e.g. the path belongs to a file, which lives in FileListViewModel).
+    /// Removes the directory node at <paramref name="fullPath"/> from the tree and returns it,
+    /// or <c>null</c> if not found (e.g. the path belongs to a file, which lives in FileListViewModel).
     /// </summary>
-    public bool RemoveNode(string fullPath)
+    public DirectoryTreeNode? RemoveNode(string fullPath)
     {
         var node = FindByPath(fullPath);
-        if (node is null) return false;
+        if (node is null) return null;
 
         if (node.Parent is not null)
         {
@@ -144,21 +144,21 @@ public class DirectoryTreeViewModel : ViewModelBase
             RootNodes.Remove(node);
         }
 
-        return true;
+        return node;
     }
 
     private void OnRootNodePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         // null property name = batch reset; CheckState or IsSelected = individual change
-        if (e.PropertyName is null or nameof(FileSystemNode.CheckState) or nameof(FileSystemNode.IsSelected))
+        if (e.PropertyName is null or nameof(DirectoryTreeNode.CheckState) or nameof(DirectoryTreeNode.IsSelected))
         {
             SelectionChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
-    private FileSystemNode? FindByPath(string fullPath)
+    private DirectoryTreeNode? FindByPath(string fullPath)
     {
-        var stack = new Stack<FileSystemNode>(RootNodes);
+        var stack = new Stack<DirectoryTreeNode>(RootNodes);
         while (stack.Count > 0)
         {
             var node = stack.Pop();
@@ -176,9 +176,9 @@ public class DirectoryTreeViewModel : ViewModelBase
         return null;
     }
 
-    public IReadOnlyList<FileSystemNode> CollectSelectedFiles()
+    public IReadOnlyList<DirectoryTreeNode> CollectSelectedFiles()
     {
-        var selected = new List<FileSystemNode>();
+        var selected = new List<DirectoryTreeNode>();
         foreach (var root in RootNodes)
         {
             CollectSelectedNodesRecursive(root, selected);
@@ -186,9 +186,9 @@ public class DirectoryTreeViewModel : ViewModelBase
         return selected;
     }
 
-    public IReadOnlyList<FileSystemNode> CollectAllIncludedFiles()
+    public IReadOnlyList<DirectoryTreeNode> CollectAllIncludedFiles()
     {
-        var all = new List<FileSystemNode>();
+        var all = new List<DirectoryTreeNode>();
         foreach (var root in RootNodes)
         {
             CollectAllIncludedFilesRecursive(root, all);
@@ -196,7 +196,7 @@ public class DirectoryTreeViewModel : ViewModelBase
         return all;
     }
 
-    private static void CollectSelectedNodesRecursive(FileSystemNode node, List<FileSystemNode> output)
+    private static void CollectSelectedNodesRecursive(DirectoryTreeNode node, List<DirectoryTreeNode> output)
     {
         if (node.IsDirectory && node.IsSelected)
         {
@@ -212,7 +212,7 @@ public class DirectoryTreeViewModel : ViewModelBase
         }
     }
 
-    private static void CollectAllIncludedFilesRecursive(FileSystemNode node, List<FileSystemNode> output)
+    private static void CollectAllIncludedFilesRecursive(DirectoryTreeNode node, List<DirectoryTreeNode> output)
     {
         output.AddRange(node.Files.Where(f => f.FilterResult == FilterResult.Included));
 

@@ -1,7 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.UI.ViewModels;
 
 namespace SmartCopy.UI.Views;
@@ -15,7 +15,7 @@ public partial class DirectoryTreeView : UserControl
 
     private void OnSetAsSourcePathClick(object? sender, RoutedEventArgs e)
     {
-        if (sender is MenuItem { DataContext: FileSystemNode node }
+        if (sender is MenuItem { DataContext: DirectoryTreeNode node }
             && DataContext is DirectoryTreeViewModel vm)
         {
             vm.RequestSetAsSourcePath(node.FullPath);
@@ -31,7 +31,7 @@ public partial class DirectoryTreeView : UserControl
     {
         if (e.Key != Key.Space) return;
 
-        if (DirectoryTree.SelectedItem is FileSystemNode { IsFilterIncluded: true } node)
+        if (DirectoryTree.SelectedItem is DirectoryTreeNode { IsFilterIncluded: true } node)
         {
             node.CheckState = node.CheckState == CheckState.Checked
                 ? CheckState.Unchecked

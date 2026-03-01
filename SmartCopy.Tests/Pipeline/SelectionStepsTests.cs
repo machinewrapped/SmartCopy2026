@@ -1,7 +1,9 @@
 using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Pipeline.Validation;
+using SmartCopy.Tests.TestInfrastructure;
 
 namespace SmartCopy.Tests.Pipeline;
 
@@ -11,25 +13,22 @@ public sealed class SelectionStepsTests
     // Helpers
     // -------------------------------------------------------------------------
 
-    private static TransformContext MakeContext(CheckState initialState = CheckState.Unchecked)
+    private static async Task<TransformContext> MakeContext(CheckState initialState = CheckState.Unchecked)
     {
-        var provider = new MemoryFileSystemProvider();
-        var node = new FileSystemNode
-        {
-            Name = "file.txt",
-            FullPath = "/src/file.txt",
-            RelativePathSegments = ["src", "file.txt"],
-        };
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithFile("/src/file.txt", "content"u8));
 
-        // Set the initial check state via the backing field by going through
-        // the property so propagation logic runs (node has no parent here).
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+
+        var node = root.FindNodeByPathSegments(["src", "file.txt"]);
+        Assert.NotNull(node);
         node.CheckState = initialState;
 
         return new TransformContext
         {
             SourceNode = node,
             SourceProvider = provider,
-            PathSegments = ["src", "file.txt"],
+            PathSegments = node.RelativePathSegments,
             CurrentExtension = ".txt",
         };
     }
@@ -45,7 +44,7 @@ public sealed class SelectionStepsTests
     public async Task SelectAllStep_Preview_SetsCheckedAndReturnsNullDestination()
     {
         var step = new SelectAllStep();
-        var ctx = MakeContext(CheckState.Unchecked);
+        var ctx = await MakeContext(CheckState.Unchecked);
 
         var results = new List<TransformResult>();
         await foreach (var r in step.PreviewAsync(ctx, CancellationToken.None)) results.Add(r);
@@ -61,7 +60,7 @@ public sealed class SelectionStepsTests
     public async Task SelectAllStep_ApplyAsync_SetsChecked()
     {
         var step = new SelectAllStep();
-        var ctx = MakeContext(CheckState.Unchecked);
+        var ctx = await MakeContext(CheckState.Unchecked);
 
         var result = await step.ApplyAsync(ctx, CancellationToken.None);
 
@@ -88,7 +87,7 @@ public sealed class SelectionStepsTests
     public async Task ClearSelectionStep_Preview_SetsUncheckedAndReturnsNullDestination()
     {
         var step = new ClearSelectionStep();
-        var ctx = MakeContext(CheckState.Checked);
+        var ctx = await MakeContext(CheckState.Checked);
 
         var results = new List<TransformResult>();
         await foreach (var r in step.PreviewAsync(ctx, CancellationToken.None)) results.Add(r);
@@ -104,7 +103,7 @@ public sealed class SelectionStepsTests
     public async Task ClearSelectionStep_ApplyAsync_SetsUnchecked()
     {
         var step = new ClearSelectionStep();
-        var ctx = MakeContext(CheckState.Checked);
+        var ctx = await MakeContext(CheckState.Checked);
 
         var result = await step.ApplyAsync(ctx, CancellationToken.None);
 
@@ -131,7 +130,7 @@ public sealed class SelectionStepsTests
     public async Task InvertSelectionStep_Preview_TogglesCheckedAndReturnsNullDestination()
     {
         var step = new InvertSelectionStep();
-        var ctx = MakeContext(CheckState.Unchecked);
+        var ctx = await MakeContext(CheckState.Unchecked);
 
         var results = new List<TransformResult>();
         await foreach (var r in step.PreviewAsync(ctx, CancellationToken.None)) results.Add(r);
@@ -147,7 +146,7 @@ public sealed class SelectionStepsTests
     public async Task InvertSelectionStep_ApplyAsync_TogglesChecked()
     {
         var step = new InvertSelectionStep();
-        var ctx = MakeContext(CheckState.Checked);
+        var ctx = await MakeContext(CheckState.Checked);
 
         await step.ApplyAsync(ctx, CancellationToken.None);
 
@@ -158,7 +157,7 @@ public sealed class SelectionStepsTests
     public async Task InvertSelectionStep_ApplyAsync_TogglesUnchecked()
     {
         var step = new InvertSelectionStep();
-        var ctx = MakeContext(CheckState.Unchecked);
+        var ctx = await MakeContext(CheckState.Unchecked);
 
         await step.ApplyAsync(ctx, CancellationToken.None);
 

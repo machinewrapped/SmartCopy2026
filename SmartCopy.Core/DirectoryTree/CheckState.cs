@@ -1,4 +1,4 @@
-namespace SmartCopy.Core.FileSystem;
+namespace SmartCopy.Core.DirectoryTree;
 
 public enum CheckState
 {

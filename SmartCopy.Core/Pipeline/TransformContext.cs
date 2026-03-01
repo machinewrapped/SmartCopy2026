@@ -1,10 +1,11 @@
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Core.Pipeline;
 
 public sealed class TransformContext
 {
-    public required FileSystemNode SourceNode { get; init; }
+    public required DirectoryTreeNode SourceNode { get; init; }
     public required IFileSystemProvider SourceProvider { get; init; }
     public IFileSystemProvider? TargetProvider { get; set; }
 
