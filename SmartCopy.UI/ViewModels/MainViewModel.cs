@@ -785,6 +785,10 @@ public partial class MainViewModel : ViewModelBase
         {
             StatusBar.Progress.Cancelled();
         }
+        finally
+        {
+            DirectoryTree.RemoveAllMarkedForRemoval();
+        }
     }
 
     private void OnNodeCompleted(TransformResult result)
@@ -792,17 +796,16 @@ public partial class MainViewModel : ViewModelBase
         if (!result.IsSuccess)
             return;
 
-        if (result.SourcePathResult is not (SourcePathResult.Moved or SourcePathResult.Trashed or SourcePathResult.Deleted))
-            return;
-
-        var removedDir = DirectoryTree.RemoveNode(result.SourcePath);
-        if (removedDir is not null)
+        if (result.SourcePathResult is SourcePathResult.Moved or SourcePathResult.Trashed or SourcePathResult.Deleted)
         {
-            FileList.ClearIfUnder(removedDir);
-        }
-        else
-        {
-            FileList.RemoveFile(result.SourcePath);
+            DirectoryTreeNode? node = DirectoryTree.MarkForRemoval(result.SourcePath);
+            if (node is not null)
+            {
+                if (node.IsDirectory)
+                {
+                    FileList.ClearIfUnder(node);
+                }
+            }
         }
     }
 

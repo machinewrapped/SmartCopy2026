@@ -73,10 +73,15 @@ public class FileListViewModel : ViewModelBase
         RefreshVisibleFiles();
     }
 
+    public DirectoryTreeNode? FindFile(string fullPath)
+    {
+        return _files.FirstOrDefault(f =>
+            string.Equals(f.FullPath, fullPath, StringComparison.OrdinalIgnoreCase));
+    }
+
     public void RemoveFile(string fullPath)
     {
-        var node = _files.FirstOrDefault(f =>
-            string.Equals(f.FullPath, fullPath, StringComparison.OrdinalIgnoreCase));
+        var node = FindFile(fullPath);
         if (node is null) return;
 
         _files.Remove(node);

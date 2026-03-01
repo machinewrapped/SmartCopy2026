@@ -30,6 +30,10 @@
                     </Setter.Value>
                 </Setter>
             </Style>
+            <Style Selector="TextBlock.removed">
+                <Setter Property="Opacity" Value="0.5" />
+                <Setter Property="TextDecorations" Value="Strikethrough" />
+            </Style>
         </TreeView.Styles>
         <TreeView.ItemTemplate>
             <TreeDataTemplate ItemsSource="{Binding Children}">
@@ -44,7 +48,7 @@
                               IsEnabled="{Binding IsFilterIncluded}"
                               AutomationProperties.Name="Select folder"
                               IsThreeState="False" />
-                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" Classes.removed="{Binding IsMarkedForRemoval}" />
                 </StackPanel>
             </TreeDataTemplate>
         </TreeView.ItemTemplate>

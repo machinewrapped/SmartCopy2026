@@ -92,6 +92,20 @@ public sealed class DirectoryTreeNode(FileSystemNode _filesystemNode, DirectoryT
         }
     }
 
+    private bool _isMarkedForRemoval;
+    public bool IsMarkedForRemoval
+    {
+        get => _isMarkedForRemoval;
+        set
+        {
+            if (_isMarkedForRemoval != value)
+            {
+                _isMarkedForRemoval = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
     private bool _isExpanded;
     public bool IsExpanded
     {
