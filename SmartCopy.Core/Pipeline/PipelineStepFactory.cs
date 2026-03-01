@@ -5,7 +5,7 @@ namespace SmartCopy.Core.Pipeline;
 
 public static class PipelineStepFactory
 {
-    public static ITransformStep FromConfig(TransformStepConfig config)
+    public static IPipelineStep FromConfig(TransformStepConfig config)
     {
         return config.StepType switch
         {

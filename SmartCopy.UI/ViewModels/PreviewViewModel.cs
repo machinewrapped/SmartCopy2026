@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 
 namespace SmartCopy.UI.ViewModels;
@@ -15,25 +16,25 @@ public partial class PreviewItemViewModel : ViewModelBase
     private string _destinationPath = string.Empty;
 
     [ObservableProperty]
-    private SourcePathResult _sourcePathResult;
+    private SourceResult _sourceResult;
 
     [ObservableProperty]
-    private DestinationPathResult _destinationPathResult;
+    private DestinationResult _destinationResult;
 
     public bool HasDestination => !string.IsNullOrEmpty(DestinationPath);
 
-    public string ActionText => GetActionText(SourcePathResult, DestinationPathResult);
+    public string ActionText => GetActionText(SourceResult, DestinationResult);
 
-    internal static string GetActionText(SourcePathResult source, DestinationPathResult destination) =>
+    internal static string GetActionText(SourceResult source, DestinationResult destination) =>
         (source, destination) switch
         {
-            (SourcePathResult.Copied, DestinationPathResult.Overwritten) => "Copy (overwrite)",
-            (SourcePathResult.Copied, _)                                 => "Copy",
-            (SourcePathResult.Moved,  DestinationPathResult.Overwritten) => "Move (overwrite)",
-            (SourcePathResult.Moved,  _)                                 => "Move",
-            (SourcePathResult.Trashed, _)                                => "Trash",
-            (SourcePathResult.Deleted, _)                                => "Delete",
-            _                                                            => string.Empty,
+            (SourceResult.Copied, DestinationResult.Overwritten)    => "Copy (overwrite)",
+            (SourceResult.Copied, _)                                => "Copy",
+            (SourceResult.Moved,  DestinationResult.Overwritten)    => "Move (overwrite)",
+            (SourceResult.Moved,  _)                                => "Move",
+            (SourceResult.Trashed, _)                               => "Trash",
+            (SourceResult.Deleted, _)                               => "Delete",
+            _                                                       => string.Empty,
         };
 }
 
@@ -157,8 +158,8 @@ public partial class PreviewViewModel : ViewModelBase
                 {
                     SourcePath = action.SourcePath,
                     DestinationPath = action.DestinationPath ?? string.Empty,
-                    SourcePathResult = action.SourcePathResult,
-                    DestinationPathResult = action.DestinationPathResult,
+                    SourceResult = action.SourceResult,
+                    DestinationResult = action.DestinationResult,
                 });
             }
 
@@ -171,16 +172,16 @@ public partial class PreviewViewModel : ViewModelBase
 
     private static GroupKey ActionGrouping(PlannedAction a)
     {
-        if (a.SourcePathResult is SourcePathResult.Trashed or SourcePathResult.Deleted)
+        if (a.SourceResult is SourceResult.Trashed or SourceResult.Deleted)
             return GroupKey.Delete;
 
-        if (a.DestinationPathResult == DestinationPathResult.Overwritten)
+        if (a.DestinationResult == DestinationResult.Overwritten)
             return GroupKey.Overwrite;
 
-        if (a.SourcePathResult == SourcePathResult.Moved)
+        if (a.SourceResult == SourceResult.Moved)
             return GroupKey.Move;
 
-        if (a.SourcePathResult == SourcePathResult.Copied)
+        if (a.SourceResult == SourceResult.Copied)
             return GroupKey.Copy;
         
         return GroupKey.Ready;
@@ -215,8 +216,8 @@ public partial class PreviewViewModel : ViewModelBase
         sb.AppendLine($"**Total Actions:** {TotalActionCount}");
         sb.AppendLine($"**Files Affected:** {TotalFilesAffected}");
         sb.AppendLine($"**Folders Affected:** {TotalFoldersAffected}");
-        sb.AppendLine($"**Total Input Size:** {TotalEstimatedInputBytes} bytes");
-        sb.AppendLine($"**Estimated Output Size:** {TotalEstimatedOutputBytes} bytes");
+        sb.AppendLine($"**Total Input Size:** { FileSizeFormatter.FormatBytes(TotalEstimatedInputBytes)}");
+        sb.AppendLine($"**Estimated Output Size:** {FileSizeFormatter.FormatBytes(TotalEstimatedOutputBytes)}");
         sb.AppendLine();
 
         var grouped = _currentPlan.Actions
@@ -243,7 +244,7 @@ public partial class PreviewViewModel : ViewModelBase
 
             foreach (var action in group)
             {
-                var actionText = PreviewItemViewModel.GetActionText(action.SourcePathResult, action.DestinationPathResult);
+                var actionText = PreviewItemViewModel.GetActionText(action.SourceResult, action.DestinationResult);
                 sb.AppendLine($"| `{action.SourcePath}` | `{action.DestinationPath}` | {actionText} |");
             }
             sb.AppendLine();

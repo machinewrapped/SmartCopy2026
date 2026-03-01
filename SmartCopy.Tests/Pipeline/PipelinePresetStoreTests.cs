@@ -77,7 +77,7 @@ public sealed class PipelinePresetStoreTests
     [Fact]
     public void PipelineStepFactory_RoundTripsImplementedStepTypes()
     {
-        var input = new ITransformStep[]
+        var input = new IPipelineStep[]
         {
             new CopyStep("/mem/copy"),
             new MoveStep("/mem/move"),

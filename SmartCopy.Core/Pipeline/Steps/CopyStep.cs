@@ -1,13 +1,12 @@
 using System;
-using System.IO;
+using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using System.Threading;
-using System.Threading.Tasks;
 using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
-public sealed class CopyStep : ITransformStep
+public sealed class CopyStep : IPipelineStep
 {
     public CopyStep(string destinationPath)
     {
@@ -26,93 +25,97 @@ public sealed class CopyStep : ITransformStep
         context.ValidateHasSelectedInputs();
         context.ValidateSourceExists("Copy");
         if (string.IsNullOrWhiteSpace(DestinationPath))
+        {
             context.AddBlockingIssue("Step.MissingDestination", "Copy requires a destination path.");
-        // Post-condition: source is still present after a copy.
+        }
     }
 
-    public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    public async IAsyncEnumerable<TransformResult> PreviewAsync(
+        IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
         var targetProvider = context.TargetProvider
-                             ?? throw new InvalidOperationException("TargetProvider must be set for CopyStep.");
+            ?? throw new InvalidOperationException("TargetProvider must be set for CopyStep.");
 
-        if (context.SourceNode.IsDirectory)
+        foreach (var node in context.GetPreviewSelectedDescendants())
         {
-            var dirSegmentCount = context.SourceNode.RelativePathSegments.Length;
-            foreach (var file in context.SourceNode.GetSelectedDescendants().Where(n => !n.IsDirectory))
-            {
-                string[] fileSegments = [..context.PathSegments, ..file.RelativePathSegments[dirSegmentCount..]];
-                var destination = StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, fileSegments);
-                var destResult = await targetProvider.ExistsAsync(destination, ct)
-                    ? DestinationPathResult.Overwritten
-                    : DestinationPathResult.Created;
+            ct.ThrowIfCancellationRequested();
+            if (context.IsNodeFailed(node)) continue;
 
+            if (node.IsDirectory)
+            {
                 yield return new TransformResult(
                     IsSuccess: true,
-                    SourcePath: file.CanonicalRelativePath,
-                    SourcePathResult: SourcePathResult.Copied,
-                    DestinationPath: destination,
-                    DestinationPathResult: destResult,
-                    NumberOfFilesAffected: 1,
-                    InputBytes: file.Size,
-                    OutputBytes: file.Size);
+                    SourceNode: node,
+                    SourceNodeResult: SourceResult.None);
+                continue;
             }
-            yield break;
+
+            var nodeCtx = context.GetNodeContext(node);
+            var destination = StepPathHelper.BuildDestinationPath(DestinationPath, nodeCtx.PathSegments);
+            var destResult = await targetProvider.ExistsAsync(
+                StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, nodeCtx.PathSegments), ct)
+                ? DestinationResult.Overwritten
+                : DestinationResult.Created;
+
+            yield return new TransformResult(
+                IsSuccess: true,
+                SourceNode: node,
+                SourceNodeResult: SourceResult.Copied,
+                DestinationPath: destination,
+                DestinationResult: destResult,
+                NumberOfFilesAffected: 1,
+                InputBytes: node.Size,
+                OutputBytes: node.Size);
         }
-
-        var dest = StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, context.PathSegments);
-        var result = await targetProvider.ExistsAsync(dest, ct)
-            ? DestinationPathResult.Overwritten
-            : DestinationPathResult.Created;
-
-        yield return new TransformResult(
-            IsSuccess: true,
-            SourcePath: context.SourceNode.CanonicalRelativePath,
-            SourcePathResult: SourcePathResult.Copied,
-            DestinationPath: dest,
-            DestinationPathResult: result,
-            NumberOfFilesAffected: 1,
-            InputBytes: context.SourceNode.Size,
-            OutputBytes: context.SourceNode.Size);
     }
 
-    public async Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)
+    public async IAsyncEnumerable<TransformResult> ApplyAsync(
+        IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        if (context.SourceNode.IsDirectory)
-        {
-            return new TransformResult(
-                IsSuccess: true,
-                SourcePath: context.SourceNode.FullPath,
-                SourcePathResult: SourcePathResult.None);
-        }
-
         var targetProvider = context.TargetProvider
-                             ?? throw new InvalidOperationException("TargetProvider must be set for CopyStep.");
+            ?? throw new InvalidOperationException("TargetProvider must be set for CopyStep.");
 
-        var destination = StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, context.PathSegments);
-        var destinationExists = await targetProvider.ExistsAsync(destination, ct);
-        if (destinationExists && context.OverwriteMode == OverwriteMode.Skip)
+        foreach (var node in context.RootNode.GetSelectedDescendants())
         {
-            return new TransformResult(
+            ct.ThrowIfCancellationRequested();
+            if (context.IsNodeFailed(node)) continue;
+
+            if (node.IsDirectory)
+            {
+                yield return new TransformResult(
+                    IsSuccess: true,
+                    SourceNode: node,
+                    SourceNodeResult: SourceResult.None);
+                continue;
+            }
+
+            var nodeCtx = context.GetNodeContext(node);
+            var destination = StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, nodeCtx.PathSegments);
+            var destinationExists = await targetProvider.ExistsAsync(destination, ct);
+
+            if (destinationExists && context.OverwriteMode == OverwriteMode.Skip)
+            {
+                yield return new TransformResult(
+                    IsSuccess: true,
+                    SourceNode: node,
+                    SourceNodeResult: SourceResult.None,
+                    DestinationPath: destination,
+                    InputBytes: node.Size);
+                continue;
+            }
+
+            await using var sourceStream = await context.SourceProvider.OpenReadAsync(node.FullPath, ct);
+            await targetProvider.WriteAsync(destination, sourceStream, progress: null, ct);
+
+            yield return new TransformResult(
                 IsSuccess: true,
-                SourcePath: context.SourceNode.FullPath,
-                SourcePathResult: SourcePathResult.None,
+                SourceNode: node,
+                SourceNodeResult: SourceResult.Copied,
                 DestinationPath: destination,
-                InputBytes: context.SourceNode.Size);
+                DestinationResult: destinationExists ? DestinationResult.Overwritten : DestinationResult.Created,
+                NumberOfFilesAffected: 1,
+                InputBytes: node.Size,
+                OutputBytes: node.Size);
         }
-
-        await using var sourceStream = context.ContentStream
-                                       ?? await context.SourceProvider.OpenReadAsync(context.SourceNode.FullPath, ct);
-        await targetProvider.WriteAsync(destination, sourceStream, progress: null, ct);
-
-        return new TransformResult(
-            IsSuccess: true,
-            SourcePath: context.SourceNode.FullPath,
-            SourcePathResult: SourcePathResult.Copied,
-            DestinationPath: destination,
-            DestinationPathResult: destinationExists ? DestinationPathResult.Overwritten : DestinationPathResult.Created,
-            NumberOfFilesAffected: 1,
-            InputBytes: context.SourceNode.Size,
-            OutputBytes: context.SourceNode.Size);
     }
 }

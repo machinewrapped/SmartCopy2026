@@ -30,7 +30,7 @@ public partial class CopyStepEditorViewModel : StepEditorViewModelBase
 
     public override bool IsValid => !string.IsNullOrWhiteSpace(DestinationPath);
 
-    public override ITransformStep BuildStep() => new CopyStep(DestinationPath.Trim());
+    public override IPipelineStep BuildStep() => new CopyStep(DestinationPath.Trim());
 
     public override void LoadFrom(PipelineStepViewModel stepViewModel)
     {

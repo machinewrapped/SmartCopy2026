@@ -7,7 +7,7 @@ public sealed class ClearSelectionStepEditorViewModel : StepEditorViewModelBase
 {
     public override bool IsValid => true;
 
-    public override ITransformStep BuildStep() => new ClearSelectionStep();
+    public override IPipelineStep BuildStep() => new ClearSelectionStep();
 
     public override void LoadFrom(PipelineStepViewModel stepViewModel) { }
 }

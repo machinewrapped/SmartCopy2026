@@ -15,6 +15,10 @@
        <Style Selector="TextBlock.excluded-file">
            <Setter Property="Foreground" Value="SlateBlue" />
        </Style>
+       <Style Selector="TextBlock.removed">
+           <Setter Property="Opacity" Value="0.5" />
+           <Setter Property="TextDecorations" Value="Strikethrough" />
+       </Style>
    </UserControl.Styles>
 
    <DataGrid ItemsSource="{Binding VisibleFiles}" AutoGenerateColumns="False"
@@ -40,6 +44,7 @@
                    <DataTemplate>
                        <TextBlock Text="{Binding Name}"
                                   Classes.excluded-file="{Binding FilterResult, Converter={StaticResource FilterResultExcludedConverter}}"
+                                  Classes.removed="{Binding IsMarkedForRemoval}"
                                   VerticalAlignment="Center" Padding="4,0" />
                    </DataTemplate>
                </DataGridTemplateColumn.CellTemplate>

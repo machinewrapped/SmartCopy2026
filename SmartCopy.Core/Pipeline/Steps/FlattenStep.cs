@@ -1,11 +1,11 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using System.Threading;
-using System.Threading.Tasks;
 using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
-public sealed class FlattenStep : ITransformStep
+public sealed class FlattenStep : IPipelineStep
 {
     public FlattenStep(FlattenConflictStrategy conflictStrategy = FlattenConflictStrategy.AutoRenameCounter)
     {
@@ -22,34 +22,43 @@ public sealed class FlattenStep : ITransformStep
     public void Validate(StepValidationContext context)
     {
         context.ValidateSourceExists("Flatten");
-        // Post-condition: source is unchanged.
     }
 
-    public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    public async IAsyncEnumerable<TransformResult> PreviewAsync(
+        IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
         await Task.Yield();
-        Apply(context);
-        yield return new TransformResult(
-            IsSuccess: true,
-            SourcePath: context.SourceNode.FullPath,
-            SourcePathResult: SourcePathResult.None);
+        foreach (var node in context.RootNode.GetSelectedDescendants())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (context.IsNodeFailed(node)) continue;
+            ApplyToContext(context.GetNodeContext(node));
+            yield return new TransformResult(
+                IsSuccess: true,
+                SourceNode: node,
+                SourceNodeResult: SourceResult.None);
+        }
     }
 
-    public Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)
+    public async IAsyncEnumerable<TransformResult> ApplyAsync(
+        IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        Apply(context);
-        return Task.FromResult(new TransformResult(
-            IsSuccess: true,
-            SourcePath: context.SourceNode.FullPath,
-            SourcePathResult: SourcePathResult.None));
+        await Task.Yield();
+        foreach (var node in context.RootNode.GetSelectedDescendants())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (context.IsNodeFailed(node)) continue;
+            ApplyToContext(context.GetNodeContext(node));
+            yield return new TransformResult(
+                IsSuccess: true,
+                SourceNode: node,
+                SourceNodeResult: SourceResult.None);
+        }
     }
 
-    private static void Apply(TransformContext context)
+    private static void ApplyToContext(PipelineContext context)
     {
         if (context.PathSegments.Length > 0)
-        {
             context.PathSegments = [context.PathSegments[^1]];
-        }
     }
 }

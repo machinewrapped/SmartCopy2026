@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 
 namespace SmartCopy.Core.Progress;
@@ -57,12 +58,13 @@ public sealed class OperationJournal
         {
             ct.ThrowIfCancellationRequested();
             var action = MapAction(result);
-            var source = SanitizeField(result.SourcePath);
+            var source = SanitizeField(result.SourceNode.CanonicalRelativePath ?? string.Empty);
             var destination = SanitizeField(result.DestinationPath ?? string.Empty);
             var status = result.IsSuccess ? "ok" : "failed";
+            var outputSize = FileSizeFormatter.FormatBytes(result.OutputBytes);
 
             await writer.WriteLineAsync(
-                $"{DateTime.UtcNow:O}\t{status}\t{action}\t{source}\t{destination}\t{result.OutputBytes}");
+                $"{DateTime.UtcNow:O}\t{status}\t{action}\t{source}\t{destination}\t{outputSize}");
         }
 
         await writer.FlushAsync(ct);
@@ -86,12 +88,12 @@ public sealed class OperationJournal
     private static string SanitizeField(string value) =>
         value.Replace('\t', ' ').Replace('\r', ' ').Replace('\n', ' ');
 
-    private static string MapAction(TransformResult result) => result.SourcePathResult switch
+    private static string MapAction(TransformResult result) => result.SourceNodeResult switch
     {
-        SourcePathResult.Copied  => "copy",
-        SourcePathResult.Moved   => "move",
-        SourcePathResult.Trashed => "trash",
-        SourcePathResult.Deleted => "delete",
-        _                        => "skipped",
+        SourceResult.Copied  => "copy",
+        SourceResult.Moved   => "move",
+        SourceResult.Trashed => "trash",
+        SourceResult.Deleted => "delete",
+        _                    => "skipped",
     };
 }

@@ -1,15 +1,16 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
+using System.Threading;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
-public sealed class ClearSelectionStep : ITransformStep
+public sealed class ClearSelectionStep : IPipelineStep
 {
     public StepKind StepType => StepKind.ClearSelection;
     public bool IsExecutable => false;
     public bool IsConfigurable => false;
-    public bool ProvidesInput => true;
 
     public TransformStepConfig Config => new(StepType, new JsonObject());
 
@@ -18,23 +19,35 @@ public sealed class ClearSelectionStep : ITransformStep
         // No preconditions or postconditions.
     }
 
-    public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    public async IAsyncEnumerable<TransformResult> PreviewAsync(
+        IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
         await Task.Yield();
-        context.SourceNode.CheckState = CheckState.Unchecked;
-        yield return new TransformResult(
-            IsSuccess: true,
-            SourcePath: context.SourceNode.FullPath,
-            SourcePathResult: SourcePathResult.None);
+        foreach (var node in context.RootNode.GetFilterIncludedDescendants())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!node.IsDirectory)
+                context.GetNodeContext(node).VirtualCheckState = CheckState.Unchecked;
+            yield return new TransformResult(
+                IsSuccess: true,
+                SourceNode: node,
+                SourceNodeResult: SourceResult.None);
+        }
     }
 
-    public Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)
+    public async IAsyncEnumerable<TransformResult> ApplyAsync(
+        IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        context.SourceNode.CheckState = CheckState.Unchecked;
-        return Task.FromResult(new TransformResult(
-            IsSuccess: true,
-            SourcePath: context.SourceNode.FullPath,
-            SourcePathResult: SourcePathResult.None));
+        await Task.Yield();
+        foreach (var node in context.RootNode.GetFilterIncludedDescendants())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!node.IsDirectory)
+                node.CheckState = CheckState.Unchecked;
+            yield return new TransformResult(
+                IsSuccess: true,
+                SourceNode: node,
+                SourceNodeResult: SourceResult.None);
+        }
     }
 }

@@ -44,9 +44,9 @@ SmartCopy2026/
 │   │   └── Filters/
 │   │       ├── .. various filters
 │   ├── Pipeline/
-│   │   ├── ITransformStep.cs
+│   │   ├── IPipelineStep.cs
 │   │   ├── TransformPipeline.cs
-│   │   ├── TransformContext.cs
+│   │   ├── PipelineContext.cs
 │   │   ├── PipelineRunner.cs
 │   │   ├── StepKind.cs
 │   │   ├── Validation/
@@ -241,7 +241,7 @@ Runtime semantics are set-based and order-sensitive:
 
 ### 2.3 Transform Pipeline
 
-A **pipeline** is an ordered sequence of `ITransformStep` objects applied to each selected file.
+A **pipeline** is an ordered sequence of `IPipelineStep` objects applied to each selected file.
 Steps are categorised:
 
 **Executable steps** — perform filesystem side effects (`Copy`, `Move`, `Delete`).
@@ -252,15 +252,15 @@ Steps are categorised:
 This rejects invalid flows like `Delete -> Copy` because `Delete` sets `SourceExists=false` and `Copy` requires `SourceExists=true`.
 
 ```csharp
-public interface ITransformStep
+public interface IPipelineStep
 {
     string StepType { get; }
     bool IsExecutable { get; }
 
     TransformStepConfig Config { get; }
 
-    IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, CancellationToken ct);
-    Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct);
+    IAsyncEnumerable<TransformResult> PreviewAsync(PipelineContext context, CancellationToken ct);
+    Task<TransformResult> ApplyAsync(PipelineContext context, CancellationToken ct);
     void Validate(StepValidationContext context);
 }
 ```
@@ -274,13 +274,13 @@ For each step:
 - **Selection steps** (`ProvidesInput = true`, e.g. `SelectAll`, `InvertSelection`, `ClearSelection`): run over `filterIncludedFiles`, mutating each node's `CheckState`. After the step completes, the working set is recomputed as `filterIncludedFiles.Where(n => n.CheckState == Checked)`.
 - **All other steps** (path, content, executable): run over the current working set. A `failedNodes` set tracks per-node failures across steps so a node that fails at step N is skipped for steps N+1 onwards.
 
-A `Dictionary<DirectoryTreeNode, TransformContext>` is maintained across steps so that path mutations (e.g. from `FlattenStep`) are preserved when the same node is processed by a later step.
+A `Dictionary<DirectoryTreeNode, PipelineContext>` is maintained across steps so that path mutations (e.g. from `FlattenStep`) are preserved when the same node is processed by a later step.
 
 Selection step `Preview()` methods mutate `CheckState` identically to `ApplyAsync()` and return `DestinationPath: null`, ensuring no spurious entries appear in the `OperationPlan`.
 
 Progress is reported after each node through an executable step. `totalBytes` is derived from `filterIncludedFiles` as a conservative upper bound.
 
-**Destination ownership:** `TargetProvider` in `TransformContext` is populated by `CopyStep` and
+**Destination ownership:** `TargetProvider` in `PipelineContext` is populated by `CopyStep` and
 `MoveStep` from their own `Config.DestinationPath` (resolved to an `IFileSystemProvider` at
 pipeline execution time). It is not set from a global target path — there is no global target.
 Each executable step carries its own destination, which means a single pipeline could in principle

@@ -31,7 +31,7 @@ public partial class RenameStepEditorViewModel : StepEditorViewModelBase
         }
     }
 
-    public override ITransformStep BuildStep() => new RenameStep(Pattern.Trim());
+    public override IPipelineStep BuildStep() => new RenameStep(Pattern.Trim());
 
     public override void LoadFrom(PipelineStepViewModel stepViewModel)
     {

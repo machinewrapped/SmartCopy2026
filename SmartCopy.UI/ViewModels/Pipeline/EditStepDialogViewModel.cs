@@ -28,7 +28,7 @@ public partial class EditStepDialogViewModel : ObservableObject
     };
 
     [ObservableProperty]
-    private ITransformStep? _resultStep;
+    private IPipelineStep? _resultStep;
 
     [ObservableProperty]
     private string? _resultCustomName;

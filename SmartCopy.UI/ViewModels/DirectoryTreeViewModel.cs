@@ -64,7 +64,7 @@ public class DirectoryTreeViewModel : ViewModelBase
         await chain.ApplyToTreeAsync(RootNodes, comparisonProvider, ct);
     }
 
-    public async Task InitializeAsync(string? initialSelectionPath = null, CancellationToken ct = default)
+    public async Task InitializeAsync(CancellationToken ct = default)
     {
         // Unsubscribe from old roots before clearing
         foreach (var oldRoot in RootNodes)
@@ -91,9 +91,6 @@ public class DirectoryTreeViewModel : ViewModelBase
 
             if (root is not null)
                 SelectedNode = root;
-
-            if (!string.IsNullOrWhiteSpace(initialSelectionPath))
-                SelectByPath(initialSelectionPath);
         }
         finally
         {
@@ -107,44 +104,20 @@ public class DirectoryTreeViewModel : ViewModelBase
         await InitializeAsync(ct: ct);
     }
 
-    public bool SelectByPath(string fullPath)
+    public void RemoveNodesMarkedForRemoval()
     {
-        if (string.IsNullOrWhiteSpace(fullPath))
+        for (var i = RootNodes.Count - 1; i >= 0; i--)
         {
-            return false;
+            var root = RootNodes[i];
+            if (root.IsMarkedForRemoval)
+            {
+                RootNodes.RemoveAt(i);
+            }
+            else
+            {
+                root.RemoveNodesMarkedForRemoval();
+            }
         }
-
-        var match = FindByPath(fullPath);
-        if (match is null)
-        {
-            return false;
-        }
-
-        SelectedNode = match;
-        return true;
-    }
-
-    /// <summary>
-    /// Removes the directory node at <paramref name="fullPath"/> from the tree and returns it,
-    /// or <c>null</c> if not found (e.g. the path belongs to a file, which lives in FileListViewModel).
-    /// </summary>
-    public DirectoryTreeNode? RemoveNode(string fullPath)
-    {
-        var node = FindByPath(fullPath);
-        if (node is null) return null;
-
-        if (node.Parent is not null)
-        {
-            var parent = node.Parent;
-            parent.Children.Remove(node);
-            FilterChain.RecalculateParentExclusion(parent);
-        }
-        else
-        {
-            RootNodes.Remove(node);
-        }
-
-        return node;
     }
 
     private void OnRootNodePropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -156,7 +129,7 @@ public class DirectoryTreeViewModel : ViewModelBase
         }
     }
 
-    private DirectoryTreeNode? FindByPath(string fullPath)
+    private DirectoryTreeNode? FindNode(string fullPath)
     {
         var stack = new Stack<DirectoryTreeNode>(RootNodes);
         while (stack.Count > 0)
@@ -171,54 +144,16 @@ public class DirectoryTreeViewModel : ViewModelBase
             {
                 stack.Push(node.Children[i]);
             }
+
+            foreach (var file in node.Files)
+            {
+                if (string.Equals(file.FullPath, fullPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    return file;
+                }
+            }
         }
 
         return null;
-    }
-
-    public IReadOnlyList<DirectoryTreeNode> CollectSelectedFiles()
-    {
-        var selected = new List<DirectoryTreeNode>();
-        foreach (var root in RootNodes)
-        {
-            CollectSelectedNodesRecursive(root, selected);
-        }
-        return selected;
-    }
-
-    public IReadOnlyList<DirectoryTreeNode> CollectAllIncludedFiles()
-    {
-        var all = new List<DirectoryTreeNode>();
-        foreach (var root in RootNodes)
-        {
-            CollectAllIncludedFilesRecursive(root, all);
-        }
-        return all;
-    }
-
-    private static void CollectSelectedNodesRecursive(DirectoryTreeNode node, List<DirectoryTreeNode> output)
-    {
-        if (node.IsDirectory && node.IsSelected)
-        {
-            output.Add(node); // atomic — all descendants selected and filter-included
-            return;           // do NOT recurse into children
-        }
-
-        output.AddRange(node.Files.Where(f => f.IsSelected)); // individual file selection#
-
-        foreach (var child in node.Children)
-        {
-            CollectSelectedNodesRecursive(child, output);
-        }
-    }
-
-    private static void CollectAllIncludedFilesRecursive(DirectoryTreeNode node, List<DirectoryTreeNode> output)
-    {
-        output.AddRange(node.Files.Where(f => f.FilterResult == FilterResult.Included));
-
-        foreach (var child in node.Children)
-        {
-            CollectAllIncludedFilesRecursive(child, output);
-        }
     }
 }

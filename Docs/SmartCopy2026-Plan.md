@@ -279,7 +279,7 @@ Verification — all automated suites passing:
   `EditStepDialogViewModel`, `Views/Pipeline/EditStepDialog.axaml`,
   step-editor views under `Views/Pipeline/StepEditors/`
 - [x] `PipelineViewModel` rewrite:
-  live `ITransformStep` wrapping, validation state, blocking reason, preset integration,
+  live `IPipelineStep` wrapping, validation state, blocking reason, preset integration,
   first-destination tracking, add/replace/remove wiring, run/preview events
 - [x] `PipelineView` rewrite:
   popup flyout integration, step edit pencil wiring, validation feedback, delete badge,

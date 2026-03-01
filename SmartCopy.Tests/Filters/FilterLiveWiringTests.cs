@@ -192,8 +192,11 @@ public sealed class FilterLiveWiringTests
         Assert.Equal(FilterResult.Mixed, rootNode.FilterResult);
 
         // Removing the only branch that contains included files should cause the root to become Excluded
-        var removed = vm.RemoveNode("/root/child2");
-        Assert.NotNull(removed);
+        var nodeToRemove = vm.RootNodes.SelectMany(n => n.Children).First(n => n.Name == "child2");
+        Assert.NotNull(nodeToRemove);
+
+        nodeToRemove.MarkForRemoval();
+        vm.RemoveNodesMarkedForRemoval();
 
         Assert.Equal(FilterResult.Excluded, rootNode.FilterResult);
     }

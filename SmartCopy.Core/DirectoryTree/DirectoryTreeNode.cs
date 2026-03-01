@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.Filters;
 
 namespace SmartCopy.Core.DirectoryTree;
 
@@ -92,6 +93,20 @@ public sealed class DirectoryTreeNode(FileSystemNode _filesystemNode, DirectoryT
         }
     }
 
+    private bool _isMarkedForRemoval;
+    public bool IsMarkedForRemoval
+    {
+        get => _isMarkedForRemoval;
+        set
+        {
+            if (_isMarkedForRemoval != value)
+            {
+                _isMarkedForRemoval = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
     private bool _isExpanded;
     public bool IsExpanded
     {
@@ -122,6 +137,19 @@ public sealed class DirectoryTreeNode(FileSystemNode _filesystemNode, DirectoryT
         return new BatchUpdateScope(this);
     }
 
+    public void MarkForRemoval()
+    {
+        if (IsMarkedForRemoval) return;
+
+        IsMarkedForRemoval = true;
+
+        foreach (var child in Children)
+            child.MarkForRemoval();
+
+        foreach (var file in Files)
+            file.MarkForRemoval();
+    }
+
     public IEnumerable<DirectoryTreeNode> GetSelectedDescendants()
     {
         foreach (var file in Files)
@@ -134,6 +162,27 @@ public sealed class DirectoryTreeNode(FileSystemNode _filesystemNode, DirectoryT
                 yield return child;
 
             foreach (var desc in child.GetSelectedDescendants())
+                yield return desc;
+        }
+    }
+
+    /// <summary>
+    /// Returns all non-excluded descendants (files and subdirectories) where
+    /// <see cref="FilterResult"/> != <see cref="FilterResult.Excluded"/>.
+    /// Used by selection steps to avoid touching filter-excluded nodes' CheckState.
+    /// </summary>
+    public IEnumerable<DirectoryTreeNode> GetFilterIncludedDescendants()
+    {
+        foreach (var file in Files)
+            if (file.IsFilterIncluded)
+                yield return file;
+
+        foreach (var child in Children)
+        {
+            if (child.IsFilterIncluded)
+                yield return child;
+
+            foreach (var desc in child.GetFilterIncludedDescendants())
                 yield return desc;
         }
     }
@@ -161,6 +210,43 @@ public sealed class DirectoryTreeNode(FileSystemNode _filesystemNode, DirectoryT
         return currentNode;
     }
     
+    public void RemoveNodesMarkedForRemoval()
+    {
+        Debug.Assert(!IsMarkedForRemoval, "RemoveNodesMarkedForRemoval called on a node that's marked for removal - parent should have removed it.");
+
+        // Iterate backwards to safely remove items while iterating
+        for (var i = Files.Count - 1; i >= 0; i--)
+        {
+            var file = Files[i];
+            if (file.IsMarkedForRemoval)
+            {
+                Files.RemoveAt(i);
+            }
+        }
+
+        // Remove any children marked for removal, and recurse into unmarked children
+        bool removedAnyChildren = false;
+        for (var i = Children.Count - 1; i >= 0; i--)
+        {
+            if (Children[i].IsMarkedForRemoval)
+            {
+                Children.RemoveAt(i);
+                removedAnyChildren = true;
+            }
+            else
+            {
+                Children[i].RemoveNodesMarkedForRemoval();
+            }
+        }
+
+        if (removedAnyChildren)
+        {
+            // If we removed any children, we may need to recalculate our filter state
+            FilterChain.RecalculateParentExclusion(this);
+        }
+    }
+
+
     internal int CountSelectedFiles() =>
         (IsSelected && !IsDirectory ? 1 : 0) + (IsDirectory ? Children.Sum(c => c.CountSelectedFiles()) + Files.Count(f => f.IsSelected) : 0);
 

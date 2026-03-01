@@ -117,9 +117,9 @@ public partial class PipelineView : UserControl
         }
     }
 
-    private async System.Threading.Tasks.Task SaveStepPresetAsync(
+    private async Task SaveStepPresetAsync(
         StepKind kind,
-        ITransformStep step,
+        IPipelineStep step,
         string name)
     {
         if (_currentViewModel is null) return;

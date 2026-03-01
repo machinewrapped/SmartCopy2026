@@ -1,13 +1,13 @@
 using System;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using System.Threading;
-using System.Threading.Tasks;
 using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
-public sealed class RenameStep : ITransformStep
+public sealed class RenameStep : IPipelineStep
 {
     public RenameStep(string pattern)
     {
@@ -15,7 +15,7 @@ public sealed class RenameStep : ITransformStep
     }
 
     public string Pattern { get; set; }
-    
+
     public StepKind StepType => StepKind.Rename;
     public bool IsExecutable => false;
 
@@ -25,37 +25,49 @@ public sealed class RenameStep : ITransformStep
     {
         context.ValidateSourceExists("Rename");
         if (string.IsNullOrWhiteSpace(Pattern))
+        {
             context.AddBlockingIssue("Step.RenamePatternRequired", "Rename requires a non-empty pattern.");
-        // Post-condition: source is unchanged.
+        }
     }
 
-    public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    public async IAsyncEnumerable<TransformResult> PreviewAsync(
+        IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
         await Task.Yield();
-        Apply(context);
-        yield return new TransformResult(
-            IsSuccess: true,
-            SourcePath: context.SourceNode.FullPath,
-            SourcePathResult: SourcePathResult.None);
+        foreach (var node in context.RootNode.GetSelectedDescendants())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (context.IsNodeFailed(node)) continue;
+            ApplyToContext(context.GetNodeContext(node));
+            yield return new TransformResult(
+                IsSuccess: true,
+                SourceNode: node,
+                SourceNodeResult: SourceResult.None);
+        }
     }
 
-    public Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)
+    public async IAsyncEnumerable<TransformResult> ApplyAsync(
+        IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        Apply(context);
-        return Task.FromResult(new TransformResult(
-            IsSuccess: true,
-            SourcePath: context.SourceNode.FullPath,
-            SourcePathResult: SourcePathResult.None));
+        await Task.Yield();
+        foreach (var node in context.RootNode.GetSelectedDescendants())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (context.IsNodeFailed(node)) continue;
+            ApplyToContext(context.GetNodeContext(node));
+            yield return new TransformResult(
+                IsSuccess: true,
+                SourceNode: node,
+                SourceNodeResult: SourceResult.None);
+        }
     }
 
-    private void Apply(TransformContext context)
+    private void ApplyToContext(PipelineContext context)
     {
         if (context.PathSegments.Length == 0) return;
 
         var filename = context.PathSegments[^1];
         var renamed = RenameFilename(filename);
-
         context.PathSegments = [.. context.PathSegments[..^1], renamed];
     }
 

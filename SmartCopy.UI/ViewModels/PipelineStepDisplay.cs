@@ -24,7 +24,7 @@ internal static class PipelineStepDisplay
         };
     }
 
-    public static string GetSummary(ITransformStep step)
+    public static string GetSummary(IPipelineStep step)
     {
         return step switch
         {
@@ -47,7 +47,7 @@ internal static class PipelineStepDisplay
         };
     }
 
-    public static string GetDescription(ITransformStep step)
+    public static string GetDescription(IPipelineStep step)
     {
         return step switch
         {

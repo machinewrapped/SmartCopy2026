@@ -28,62 +28,29 @@ public sealed class PipelineRunner
         PipelineJob job,
         CancellationToken ct = default)
     {
-        _pipeline.Validate(new PipelineValidationContext(job.SelectedFiles.Count > 0));
+        _pipeline.Validate(new PipelineValidationContext(
+            job.RootNode.GetSelectedDescendants().Any()));
 
+        var context = new StepContext(job);
         var actions = new List<PlannedAction>();
-        var contexts = new Dictionary<DirectoryTreeNode, TransformContext>();
-        TransformContext GetOrCreate(DirectoryTreeNode node) =>
-            contexts.TryGetValue(node, out var ctx) ? ctx
-            : contexts[node] = CreateContext(node, job);
-
-        var workingSet = job.SelectedFiles.ToList();
-        var failedNodes = new HashSet<DirectoryTreeNode>();
 
         foreach (var step in _pipeline.Steps)
         {
             ct.ThrowIfCancellationRequested();
 
-            if (step.ProvidesInput)
+            await foreach (var result in step.PreviewAsync(context, ct))
             {
-                foreach (var node in job.FilterIncludedFiles)
+                if (result.IsSuccess && result.SourceNodeResult != SourceResult.None)
                 {
-                    ct.ThrowIfCancellationRequested();
-                    await foreach (var _ in step.PreviewAsync(GetOrCreate(node), ct)) { }
-                }
-                workingSet = job.FilterIncludedFiles
-                    .Where(n => n.CheckState == CheckState.Checked)
-                    .ToList();
-            }
-            else
-            {
-                foreach (var node in workingSet)
-                {
-                    ct.ThrowIfCancellationRequested();
-
-                    if (failedNodes.Contains(node))
-                        continue;
-
-                    TransformContext context = GetOrCreate(node);
-
-                    await foreach (TransformResult preview in step.PreviewAsync(context, ct))
-                    {
-                        if (preview.IsSuccess && preview.SourcePathResult != SourcePathResult.None)
-                        {
-                            actions.Add(new PlannedAction(
-                                SourcePath: preview.SourcePath,
-                                SourcePathResult: preview.SourcePathResult,
-                                DestinationPath: preview.DestinationPath,
-                                DestinationPathResult: preview.DestinationPathResult,
-                                NumberOfFilesAffected: preview.NumberOfFilesAffected,
-                                NumberOfFoldersAffected: preview.NumberOfFoldersAffected,
-                                InputBytes: preview.InputBytes,
-                                OutputBytes: preview.OutputBytes));
-                        }
-                        else if (!preview.IsSuccess)
-                        {
-                            failedNodes.Add(node);
-                        }
-                    }
+                    actions.Add(new PlannedAction(
+                        SourcePath: result.SourceNode.CanonicalRelativePath,
+                        SourceResult: result.SourceNodeResult,
+                        DestinationPath: result.DestinationPath,
+                        DestinationResult: result.DestinationResult,
+                        NumberOfFilesAffected: result.NumberOfFilesAffected,
+                        NumberOfFoldersAffected: result.NumberOfFoldersAffected,
+                        InputBytes: result.InputBytes,
+                        OutputBytes: result.OutputBytes));
                 }
             }
         }
@@ -103,7 +70,8 @@ public sealed class PipelineRunner
         IProgress<TransformResult>? nodeProgress = null,
         CancellationToken ct = default)
     {
-        _pipeline.Validate(new PipelineValidationContext(job.SelectedFiles.Count > 0));
+        _pipeline.Validate(new PipelineValidationContext(
+            job.RootNode.GetSelectedDescendants().Any()));
 
         if (_pipeline.HasDeleteStep && !_previewCompleted)
         {
@@ -111,16 +79,12 @@ public sealed class PipelineRunner
                 "Pipelines containing a DeleteStep must be previewed before execution.");
         }
 
+        var context = new StepContext(job);
         var results = new List<TransformResult>();
-        var contexts = new Dictionary<DirectoryTreeNode, TransformContext>();
-        TransformContext GetOrCreate(DirectoryTreeNode node) =>
-            contexts.TryGetValue(node, out var ctx) ? ctx
-            : contexts[node] = CreateContext(node, job);
-
-        var workingSet = job.SelectedFiles.ToList();
-        var failedNodes = new HashSet<DirectoryTreeNode>();
 
         var stopwatch = Stopwatch.StartNew();
+        long totalBytes = GetAllSelectedBytes(job.RootNode);
+        int totalFiles = job.RootNode.CountSelectedFiles();
         long completedBytes = 0;
         int filesCompleted = 0;
 
@@ -128,58 +92,31 @@ public sealed class PipelineRunner
         {
             ct.ThrowIfCancellationRequested();
 
-            if (step.ProvidesInput)
+            await foreach (var result in step.ApplyAsync(context, ct))
             {
-                foreach (var node in job.FilterIncludedFiles)
+                results.Add(result);
+                nodeProgress?.Report(result);
+
+                if (!result.IsSuccess || result.SourceNodeResult == SourceResult.None)
+                    continue;
+
+                if (step.IsExecutable)
                 {
-                    ct.ThrowIfCancellationRequested();
-                    var result = await step.ApplyAsync(GetOrCreate(node), ct);
-                    results.Add(result);
-                }
-                workingSet = job.FilterIncludedFiles
-                    .Where(n => n.CheckState == CheckState.Checked)
-                    .ToList();
-            }
-            else
-            {
-                long totalBytes = workingSet.Sum(GetNodeBytes);
-                int totalFiles = workingSet.Sum(n => n.CountAllFiles());
+                    filesCompleted += result.NumberOfFilesAffected;
+                    completedBytes += result.InputBytes;
+                    var elapsed = stopwatch.Elapsed;
+                    var remaining = EstimateRemaining(elapsed, completedBytes, totalBytes);
 
-                foreach (var node in workingSet)
-                {
-                    ct.ThrowIfCancellationRequested();
-
-                    if (failedNodes.Contains(node))
-                        continue;
-
-                    var result = await step.ApplyAsync(GetOrCreate(node), ct);
-                    results.Add(result);
-                    nodeProgress?.Report(result);
-
-                    if (!result.IsSuccess)
-                    {
-                        failedNodes.Add(node);
-                    }
-
-                    if (step.IsExecutable)
-                    {
-                        var nodeBytes = GetNodeBytes(node);
-                        filesCompleted += result.NumberOfFilesAffected;
-                        completedBytes += nodeBytes;
-                        var elapsed = stopwatch.Elapsed;
-                        var remaining = EstimateRemaining(elapsed, completedBytes, totalBytes);
-
-                        progress?.Report(new OperationProgress(
-                            CurrentFile: node.FullPath,
-                            CurrentFileBytes: nodeBytes,
-                            CurrentFileTotalBytes: nodeBytes,
-                            FilesCompleted: filesCompleted,
-                            FilesTotal: totalFiles,
-                            TotalBytesCompleted: completedBytes,
-                            TotalBytes: totalBytes,
-                            Elapsed: elapsed,
-                            EstimatedRemaining: remaining));
-                    }
+                    progress?.Report(new OperationProgress(
+                        CurrentFile: result.SourceNode.CanonicalRelativePath,
+                        CurrentFileBytes: result.InputBytes,
+                        CurrentFileTotalBytes: result.InputBytes,
+                        FilesCompleted: filesCompleted,
+                        FilesTotal: totalFiles,
+                        TotalBytesCompleted: completedBytes,
+                        TotalBytes: totalBytes,
+                        Elapsed: elapsed,
+                        EstimatedRemaining: remaining));
                 }
             }
         }
@@ -187,43 +124,74 @@ public sealed class PipelineRunner
         return results;
     }
 
-    private static long GetNodeBytes(DirectoryTreeNode node) =>
-        node.IsDirectory
-            ? node.Files.Sum(f => f.Size) + node.Children.Sum(c => GetNodeBytes(c))
-            : node.Size;
-
-    private static TransformContext CreateContext(DirectoryTreeNode node, PipelineJob job)
+    private static long GetAllSelectedBytes(DirectoryTreeNode node)
     {
-        var extension = Path.GetExtension(node.Name).TrimStart('.');
-        var segments = node.RelativePathSegments.Length > 0
-            ? node.RelativePathSegments
-            : [node.Name];
-        return new TransformContext
-        {
-            SourceNode = node,
-            SourceProvider = job.SourceProvider,
-            TargetProvider = job.TargetProvider,
-            PathSegments = segments,
-            CurrentExtension = extension,
-            OverwriteMode = job.OverwriteMode,
-            DeleteMode = job.DeleteMode,
-        };
+        long total = 0;
+        foreach (var file in node.Files)
+            if (file.IsSelected) total += file.Size;
+        foreach (var child in node.Children)
+            total += GetAllSelectedBytes(child);
+        return total;
     }
 
     private static TimeSpan EstimateRemaining(TimeSpan elapsed, long completed, long total)
     {
         if (completed <= 0 || elapsed.TotalSeconds <= 0 || completed >= total)
-        {
             return TimeSpan.Zero;
-        }
 
         var rate = completed / elapsed.TotalSeconds;
         if (rate <= 0)
-        {
             return TimeSpan.Zero;
+
+        return TimeSpan.FromSeconds((total - completed) / rate);
+    }
+
+    private sealed class StepContext : IStepContext
+    {
+        private readonly Dictionary<DirectoryTreeNode, PipelineContext> _contexts = new();
+        private readonly HashSet<DirectoryTreeNode> _failedNodes = new();
+
+        public DirectoryTreeNode RootNode { get; }
+        public IFileSystemProvider SourceProvider { get; }
+        public IFileSystemProvider? TargetProvider { get; }
+        public OverwriteMode OverwriteMode { get; }
+        public DeleteMode DeleteMode { get; }
+
+        public StepContext(PipelineJob job)
+        {
+            RootNode = job.RootNode;
+            SourceProvider = job.SourceProvider;
+            TargetProvider = job.TargetProvider;
+            OverwriteMode = job.OverwriteMode;
+            DeleteMode = job.DeleteMode;
         }
 
-        var seconds = (total - completed) / rate;
-        return TimeSpan.FromSeconds(seconds);
+        public PipelineContext GetNodeContext(DirectoryTreeNode node)
+        {
+            if (_contexts.TryGetValue(node, out var context))
+                return context;
+
+            var extension = Path.GetExtension(node.Name).TrimStart('.');
+            var segments = node.RelativePathSegments.Length > 0
+                ? node.RelativePathSegments
+                : [node.Name];
+
+            context = new PipelineContext
+            {
+                SourceNode = node,
+                SourceProvider = SourceProvider,
+                TargetProvider = TargetProvider,
+                PathSegments = segments,
+                CurrentExtension = extension,
+                OverwriteMode = OverwriteMode,
+                DeleteMode = DeleteMode,
+                VirtualCheckState = node.CheckState,
+            };
+            _contexts[node] = context;
+            return context;
+        }
+
+        public bool IsNodeFailed(DirectoryTreeNode node) => _failedNodes.Contains(node);
+        public void MarkFailed(DirectoryTreeNode node) => _failedNodes.Add(node);
     }
 }

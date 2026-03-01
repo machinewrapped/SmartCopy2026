@@ -73,14 +73,35 @@ public class FileListViewModel : ViewModelBase
         RefreshVisibleFiles();
     }
 
+    public DirectoryTreeNode? FindFile(string fullPath)
+    {
+        return _files.FirstOrDefault(f =>
+            string.Equals(f.FullPath, fullPath, StringComparison.OrdinalIgnoreCase));
+    }
+
     public void RemoveFile(string fullPath)
     {
-        var node = _files.FirstOrDefault(f =>
-            string.Equals(f.FullPath, fullPath, StringComparison.OrdinalIgnoreCase));
+        var node = FindFile(fullPath);
         if (node is null) return;
 
         _files.Remove(node);
         _currentDirectoryNode?.Files.Remove(node);
+        RefreshVisibleFiles();
+    }
+
+    public void RemoveAllMarkedForRemoval()
+    {
+        if (_currentDirectoryNode is null) return;
+
+        if (_currentDirectoryNode.IsMarkedForRemoval)
+        {
+            _files.Clear();
+            _currentDirectoryNode = null;
+            VisibleFiles = [];
+            return;
+        }
+
+        _files.RemoveAll(f => f.IsMarkedForRemoval);
         RefreshVisibleFiles();
     }
 
