@@ -165,6 +165,16 @@ public class DirectoryTreeViewModel : ViewModelBase
             {
                 RemoveMarkedForRemovalRecursive(node.Children[i]);
             }
+
+            // Remove files marked for removal too
+            for (var i = node.Files.Count - 1; i >= 0; i--)
+            {
+                var file = node.Files[i];
+                if (file.IsMarkedForRemoval)
+                {
+                    node.Files.RemoveAt(i);
+                }
+            }
         }
     }
 
@@ -191,6 +201,14 @@ public class DirectoryTreeViewModel : ViewModelBase
             for (var i = node.Children.Count - 1; i >= 0; i--)
             {
                 stack.Push(node.Children[i]);
+            }
+
+            foreach (var file in node.Files)
+            {
+                if (string.Equals(file.FullPath, fullPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    return file;
+                }
             }
         }
 

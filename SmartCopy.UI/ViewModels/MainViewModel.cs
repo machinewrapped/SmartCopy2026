@@ -788,6 +788,7 @@ public partial class MainViewModel : ViewModelBase
         finally
         {
             DirectoryTree.RemoveAllMarkedForRemoval();
+            FileList.RemoveAllMarkedForRemoval();
         }
     }
 
