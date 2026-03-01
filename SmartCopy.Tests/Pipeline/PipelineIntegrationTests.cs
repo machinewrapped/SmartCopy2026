@@ -26,12 +26,11 @@ public sealed class PipelineIntegrationTests
         await runner.ExecuteAsync(
             new PipelineJob
             {
-                FilterIncludedFiles = [node],
-                SelectedFiles       = [node],
-                SourceProvider      = provider,
-                TargetProvider      = provider,
-                OverwriteMode       = OverwriteMode.Always,
-                DeleteMode          = DeleteMode.Trash,
+                RootNode       = root,
+                SourceProvider = provider,
+                TargetProvider = provider,
+                OverwriteMode  = OverwriteMode.Always,
+                DeleteMode     = DeleteMode.Trash,
             },
             progress: null,
             ct: CancellationToken.None);
@@ -60,12 +59,11 @@ public sealed class PipelineIntegrationTests
         await runner.ExecuteAsync(
             new PipelineJob
             {
-                FilterIncludedFiles = [node],
-                SelectedFiles       = [node],
-                SourceProvider      = provider,
-                TargetProvider      = provider,
-                OverwriteMode       = OverwriteMode.Always,
-                DeleteMode          = DeleteMode.Trash,
+                RootNode       = root,
+                SourceProvider = provider,
+                TargetProvider = provider,
+                OverwriteMode  = OverwriteMode.Always,
+                DeleteMode     = DeleteMode.Trash,
             },
             progress: null,
             ct: CancellationToken.None);
@@ -90,12 +88,11 @@ public sealed class PipelineIntegrationTests
             runner.ExecuteAsync(
                 new PipelineJob
                 {
-                    FilterIncludedFiles = [node],
-                    SelectedFiles       = [node],
-                    SourceProvider      = provider,
-                    TargetProvider      = null,
-                    OverwriteMode       = OverwriteMode.Always,
-                    DeleteMode          = DeleteMode.Permanent,
+                    RootNode       = root,
+                    SourceProvider = provider,
+                    TargetProvider = null,
+                    OverwriteMode  = OverwriteMode.Always,
+                    DeleteMode     = DeleteMode.Permanent,
                 },
                 progress: null,
                 ct: CancellationToken.None));
@@ -109,7 +106,7 @@ public sealed class PipelineIntegrationTests
             .WithDirectory("/dest/src")
             .WithFile("/src/song.mp3", "new"u8)
             .WithFile("/dest/src/song.mp3", "old"u8));
-            
+
         var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
         var node = root.FindNodeByPathSegments(["src", "song.mp3"]);
         Assert.NotNull(node);
@@ -119,12 +116,11 @@ public sealed class PipelineIntegrationTests
         var skipResults = await runner.ExecuteAsync(
             new PipelineJob
             {
-                FilterIncludedFiles = [node],
-                SelectedFiles       = [node],
-                SourceProvider      = provider,
-                TargetProvider      = provider,
-                OverwriteMode       = OverwriteMode.Skip,
-                DeleteMode          = DeleteMode.Trash,
+                RootNode       = root,
+                SourceProvider = provider,
+                TargetProvider = provider,
+                OverwriteMode  = OverwriteMode.Skip,
+                DeleteMode     = DeleteMode.Trash,
             },
             progress: null,
             ct: CancellationToken.None);
@@ -134,12 +130,11 @@ public sealed class PipelineIntegrationTests
         var alwaysResults = await runner.ExecuteAsync(
             new PipelineJob
             {
-                FilterIncludedFiles = [node],
-                SelectedFiles       = [node],
-                SourceProvider      = provider,
-                TargetProvider      = provider,
-                OverwriteMode       = OverwriteMode.Always,
-                DeleteMode          = DeleteMode.Trash,
+                RootNode       = root,
+                SourceProvider = provider,
+                TargetProvider = provider,
+                OverwriteMode  = OverwriteMode.Always,
+                DeleteMode     = DeleteMode.Trash,
             },
             progress: null,
             ct: CancellationToken.None);
@@ -168,12 +163,11 @@ public sealed class PipelineIntegrationTests
         await runner.ExecuteAsync(
             new PipelineJob
             {
-                FilterIncludedFiles = [node],
-                SelectedFiles       = [node],
-                SourceProvider      = provider,
-                TargetProvider      = provider,
-                OverwriteMode       = OverwriteMode.Always,
-                DeleteMode          = DeleteMode.Trash,
+                RootNode       = root,
+                SourceProvider = provider,
+                TargetProvider = provider,
+                OverwriteMode  = OverwriteMode.Always,
+                DeleteMode     = DeleteMode.Trash,
             },
             progress: null,
             ct: CancellationToken.None);
@@ -199,19 +193,18 @@ public sealed class PipelineIntegrationTests
         var results = await runner.ExecuteAsync(
             new PipelineJob
             {
-                FilterIncludedFiles = [node],
-                SelectedFiles       = [node],
-                SourceProvider      = provider,
-                TargetProvider      = provider,
-                OverwriteMode       = OverwriteMode.Always,
-                DeleteMode          = DeleteMode.Trash,
+                RootNode       = root,
+                SourceProvider = provider,
+                TargetProvider = provider,
+                OverwriteMode  = OverwriteMode.Always,
+                DeleteMode     = DeleteMode.Trash,
             },
             progress: null,
             ct: CancellationToken.None);
 
         var logDir = Path.Combine(Path.GetTempPath(), "SmartCopy2026.Tests", Guid.NewGuid().ToString("N"), "logs");
         var journal = new OperationJournal(logDir);
-        var path = await journal.WriteAsync(results);
+        var path = await journal.WriteAsync(results.Where(r => r.SourcePathResult != SourcePathResult.None));
 
         Assert.True(File.Exists(path));
         var line = Assert.Single(await File.ReadAllLinesAsync(path));

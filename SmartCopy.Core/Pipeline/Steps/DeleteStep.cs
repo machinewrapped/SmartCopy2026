@@ -1,8 +1,7 @@
-using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using System.Threading;
-using System.Threading.Tasks;
-using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
@@ -25,48 +24,74 @@ public sealed class DeleteStep : ITransformStep
     {
         context.ValidateHasSelectedInputs();
         context.ValidateSourceExists("Delete");
-        // Post-condition: delete consumes the source.
         context.SourceExists = false;
     }
 
-    public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    public async IAsyncEnumerable<TransformResult> PreviewAsync(
+        IStepContext ctx, [EnumeratorCancellation] CancellationToken ct)
     {
         await Task.Yield();
         var pathResult = Mode == DeleteMode.Trash ? SourcePathResult.Trashed : SourcePathResult.Deleted;
 
-        yield return new TransformResult(
-            IsSuccess: true,
-            SourcePath: context.SourceNode.FullPath,
-            SourcePathResult: pathResult,
-            NumberOfFilesAffected: context.SourceNode.IsDirectory ? 0 : 1,
-            NumberOfFoldersAffected: context.SourceNode.IsDirectory ? 1 : 0,
-            InputBytes: context.SourceNode.Size);
-
-        if (context.SourceNode.IsDirectory)
+        // Include root node itself if selected, then all selected descendants.
+        if (ctx.RootNode.IsSelected)
         {
-            foreach (var child in context.SourceNode.GetSelectedDescendants())
-            {
-                yield return new TransformResult(
-                    IsSuccess: true,
-                    SourcePath: child.FullPath,
-                    SourcePathResult: pathResult,
-                    NumberOfFilesAffected: child.IsDirectory ? 0 : 1,
-                    NumberOfFoldersAffected: child.IsDirectory ? 1 : 0,
-                    InputBytes: child.Size);
-            }
+            yield return MakePreviewResult(ctx.RootNode, pathResult);
+        }
+
+        foreach (var node in ctx.RootNode.GetSelectedDescendants())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (ctx.IsNodeFailed(node)) continue;
+            yield return MakePreviewResult(node, pathResult);
         }
     }
 
-    public async Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)
+    public async IAsyncEnumerable<TransformResult> ApplyAsync(
+        IStepContext ctx, [EnumeratorCancellation] CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        await context.SourceProvider.DeleteAsync(context.SourceNode.FullPath, ct);
-        return new TransformResult(
-            IsSuccess: true,
-            SourcePath: context.SourceNode.FullPath,
-            SourcePathResult: Mode == DeleteMode.Trash ? SourcePathResult.Trashed : SourcePathResult.Deleted,
-            NumberOfFilesAffected: context.SourceNode.CountAllFiles(),
-            NumberOfFoldersAffected: context.SourceNode.CountAllFolders(),
-            InputBytes: context.SourceNode.Size);
+        var pathResult = Mode == DeleteMode.Trash ? SourcePathResult.Trashed : SourcePathResult.Deleted;
+
+        // If the root node itself is fully selected, delete it atomically.
+        if (ctx.RootNode.IsSelected)
+        {
+            await ctx.SourceProvider.DeleteAsync(ctx.RootNode.FullPath, ct);
+            yield return new TransformResult(
+                IsSuccess: true,
+                SourcePath: ctx.RootNode.FullPath,
+                SourcePathResult: pathResult,
+                NumberOfFilesAffected: ctx.RootNode.CountAllFiles(),
+                NumberOfFoldersAffected: ctx.RootNode.CountAllFolders(),
+                InputBytes: ctx.RootNode.Size);
+            yield break;
+        }
+
+        foreach (var node in ctx.RootNode.GetSelectedDescendants())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (ctx.IsNodeFailed(node)) continue;
+            // Skip nodes whose parent is also selected — the parent delete covers them.
+            if (node.Parent?.IsSelected == true) continue;
+
+            await ctx.SourceProvider.DeleteAsync(node.FullPath, ct);
+            yield return new TransformResult(
+                IsSuccess: true,
+                SourcePath: node.FullPath,
+                SourcePathResult: pathResult,
+                NumberOfFilesAffected: node.CountAllFiles(),
+                NumberOfFoldersAffected: node.CountAllFolders(),
+                InputBytes: node.Size);
+        }
     }
+
+    private static TransformResult MakePreviewResult(
+        DirectoryTreeNode node, SourcePathResult pathResult)
+        => new(
+            IsSuccess: true,
+            SourcePath: node.FullPath,
+            SourcePathResult: pathResult,
+            NumberOfFilesAffected: node.IsDirectory ? 0 : 1,
+            NumberOfFoldersAffected: node.IsDirectory ? 1 : 0,
+            InputBytes: node.Size);
 }

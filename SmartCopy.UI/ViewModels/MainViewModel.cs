@@ -673,22 +673,23 @@ public partial class MainViewModel : ViewModelBase
     private async Task PreviewPipelineAsync()
     {
         var pipeline = Pipeline.BuildLivePipeline();
-        var filterIncludedFiles = DirectoryTree.CollectAllIncludedFiles();
-        var selectedFiles = DirectoryTree.CollectSelectedFiles();
-        Pipeline.SetSelectedIncludedFileCount(selectedFiles.Count);
+        if (DirectoryTree.RootNodes.Count == 0)
+            return;
 
-        if (!Pipeline.CanRun || (filterIncludedFiles.Count == 0 && selectedFiles.Count == 0))
+        var rootNode = DirectoryTree.RootNodes.First();
+        Pipeline.SetSelectedIncludedFileCount(rootNode.GetSelectedDescendants().Count(n => !n.IsDirectory));
+
+        if (!Pipeline.CanRun)
             return;
 
         var runner = new PipelineRunner(pipeline);
         var job = new PipelineJob
         {
-            FilterIncludedFiles = filterIncludedFiles,
-            SelectedFiles       = selectedFiles,
-            SourceProvider      = _memoryProvider,
-            TargetProvider      = _memoryProvider,
-            OverwriteMode       = ParseOverwriteMode(_settings.DefaultOverwriteMode),
-            DeleteMode          = ParseDeleteMode(_settings.DefaultDeleteMode),
+            RootNode       = rootNode,
+            SourceProvider = _memoryProvider,
+            TargetProvider = _memoryProvider,
+            OverwriteMode  = ParseOverwriteMode(_settings.DefaultOverwriteMode),
+            DeleteMode     = ParseDeleteMode(_settings.DefaultDeleteMode),
         };
 
         var plan = await runner.PreviewAsync(job, CancellationToken.None);
@@ -718,22 +719,23 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
-        var filterIncludedFiles = DirectoryTree.CollectAllIncludedFiles();
-        var selectedFiles = DirectoryTree.CollectSelectedFiles();
-        Pipeline.SetSelectedIncludedFileCount(selectedFiles.Count);
+        if (DirectoryTree.RootNodes.Count == 0)
+            return;
 
-        if (!Pipeline.CanRun || filterIncludedFiles.Count == 0)
+        var rootNode = DirectoryTree.RootNodes.First();
+        Pipeline.SetSelectedIncludedFileCount(rootNode.GetSelectedDescendants().Count(n => !n.IsDirectory));
+
+        if (!Pipeline.CanRun)
             return;
 
         var runner = new PipelineRunner(pipeline);
         var job = new PipelineJob
         {
-            FilterIncludedFiles = filterIncludedFiles,
-            SelectedFiles       = selectedFiles,
-            SourceProvider      = _memoryProvider,
-            TargetProvider      = _memoryProvider,
-            OverwriteMode       = ParseOverwriteMode(_settings.DefaultOverwriteMode),
-            DeleteMode          = ParseDeleteMode(_settings.DefaultDeleteMode),
+            RootNode       = rootNode,
+            SourceProvider = _memoryProvider,
+            TargetProvider = _memoryProvider,
+            OverwriteMode  = ParseOverwriteMode(_settings.DefaultOverwriteMode),
+            DeleteMode     = ParseDeleteMode(_settings.DefaultDeleteMode),
         };
         await ExecutePipelineAsync(runner, job);
     }

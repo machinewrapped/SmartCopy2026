@@ -1,5 +1,7 @@
-using SmartCopy.Core.FileSystem;
+using System.Collections.Generic;
+using System.IO;
 using SmartCopy.Core.DirectoryTree;
+using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Pipeline.Validation;
@@ -10,27 +12,65 @@ namespace SmartCopy.Tests.Pipeline;
 public sealed class SelectionStepsTests
 {
     // -------------------------------------------------------------------------
-    // Helpers
+    // Test infrastructure
     // -------------------------------------------------------------------------
 
-    private static async Task<TransformContext> MakeContext(CheckState initialState = CheckState.Unchecked)
+    /// <summary>
+    /// Minimal IStepContext for unit-testing individual steps.
+    /// </summary>
+    private sealed class TestStepContext : IStepContext
     {
-        var provider = MemoryFileSystemFixtures.Create(f => f
-            .WithFile("/src/file.txt", "content"u8));
+        private readonly Dictionary<DirectoryTreeNode, TransformContext> _contexts = new();
+        private readonly HashSet<DirectoryTreeNode> _failed = new();
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        public DirectoryTreeNode RootNode { get; }
+        public IFileSystemProvider SourceProvider { get; }
+        public IFileSystemProvider? TargetProvider => null;
+        public OverwriteMode OverwriteMode => OverwriteMode.Always;
+        public DeleteMode DeleteMode => DeleteMode.Trash;
 
-        var node = root.FindNodeByPathSegments(["src", "file.txt"]);
-        Assert.NotNull(node);
-        node.CheckState = initialState;
-
-        return new TransformContext
+        public TestStepContext(DirectoryTreeNode root, IFileSystemProvider provider)
         {
-            SourceNode = node,
-            SourceProvider = provider,
-            PathSegments = node.RelativePathSegments,
-            CurrentExtension = ".txt",
-        };
+            RootNode = root;
+            SourceProvider = provider;
+        }
+
+        public TransformContext GetNodeContext(DirectoryTreeNode node)
+        {
+            if (!_contexts.TryGetValue(node, out var ctx))
+            {
+                ctx = new TransformContext
+                {
+                    SourceNode = node,
+                    SourceProvider = SourceProvider,
+                    PathSegments = node.RelativePathSegments.Length > 0
+                        ? node.RelativePathSegments
+                        : [node.Name],
+                    CurrentExtension = Path.GetExtension(node.Name).TrimStart('.'),
+                    OverwriteMode = OverwriteMode,
+                    DeleteMode = DeleteMode,
+                };
+                _contexts[node] = ctx;
+            }
+            return ctx;
+        }
+
+        public bool IsNodeFailed(DirectoryTreeNode node) => _failed.Contains(node);
+        public void MarkFailed(DirectoryTreeNode node) => _failed.Add(node);
+    }
+
+    /// <summary>
+    /// Builds a minimal tree rooted at /src with a single file.txt.
+    /// </summary>
+    private static async Task<(DirectoryTreeNode Root, DirectoryTreeNode File, IFileSystemProvider Provider)>
+        MakeTree(CheckState initialState = CheckState.Unchecked)
+    {
+        var provider = MemoryFileSystemFixtures.Create(f => f.WithFile("/src/file.txt", "content"u8));
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider, "/src");
+        var file = root.Files.Single(f => f.Name == "file.txt");
+        if (initialState != CheckState.Unchecked)
+            file.CheckState = initialState;
+        return (root, file, provider);
     }
 
     private static StepValidationContext MakeValidationContext(bool sourceExists = true) =>
@@ -44,28 +84,31 @@ public sealed class SelectionStepsTests
     public async Task SelectAllStep_Preview_SetsCheckedAndReturnsNullDestination()
     {
         var step = new SelectAllStep();
-        var ctx = await MakeContext(CheckState.Unchecked);
+        var (root, file, provider) = await MakeTree(CheckState.Unchecked);
+        var ctx = new TestStepContext(root, provider);
 
         var results = new List<TransformResult>();
         await foreach (var r in step.PreviewAsync(ctx, CancellationToken.None)) results.Add(r);
-        var result = results.Single();
 
+        var result = results.Single();
         Assert.True(result.IsSuccess);
         Assert.Equal(SourcePathResult.None, result.SourcePathResult);
         Assert.Null(result.DestinationPath);
-        Assert.Equal(CheckState.Checked, ctx.SourceNode.CheckState);
+        Assert.Equal(CheckState.Checked, file.CheckState);
     }
 
     [Fact]
     public async Task SelectAllStep_ApplyAsync_SetsChecked()
     {
         var step = new SelectAllStep();
-        var ctx = await MakeContext(CheckState.Unchecked);
+        var (root, file, provider) = await MakeTree(CheckState.Unchecked);
+        var ctx = new TestStepContext(root, provider);
 
-        var result = await step.ApplyAsync(ctx, CancellationToken.None);
+        var results = new List<TransformResult>();
+        await foreach (var r in step.ApplyAsync(ctx, CancellationToken.None)) results.Add(r);
 
-        Assert.True(result.IsSuccess);
-        Assert.Equal(CheckState.Checked, ctx.SourceNode.CheckState);
+        Assert.True(results.Single().IsSuccess);
+        Assert.Equal(CheckState.Checked, file.CheckState);
     }
 
     [Fact]
@@ -87,28 +130,31 @@ public sealed class SelectionStepsTests
     public async Task ClearSelectionStep_Preview_SetsUncheckedAndReturnsNullDestination()
     {
         var step = new ClearSelectionStep();
-        var ctx = await MakeContext(CheckState.Checked);
+        var (root, file, provider) = await MakeTree(CheckState.Checked);
+        var ctx = new TestStepContext(root, provider);
 
         var results = new List<TransformResult>();
         await foreach (var r in step.PreviewAsync(ctx, CancellationToken.None)) results.Add(r);
-        var result = results.Single();
 
+        var result = results.Single();
         Assert.True(result.IsSuccess);
         Assert.Equal(SourcePathResult.None, result.SourcePathResult);
         Assert.Null(result.DestinationPath);
-        Assert.Equal(CheckState.Unchecked, ctx.SourceNode.CheckState);
+        Assert.Equal(CheckState.Unchecked, file.CheckState);
     }
 
     [Fact]
     public async Task ClearSelectionStep_ApplyAsync_SetsUnchecked()
     {
         var step = new ClearSelectionStep();
-        var ctx = await MakeContext(CheckState.Checked);
+        var (root, file, provider) = await MakeTree(CheckState.Checked);
+        var ctx = new TestStepContext(root, provider);
 
-        var result = await step.ApplyAsync(ctx, CancellationToken.None);
+        var results = new List<TransformResult>();
+        await foreach (var r in step.ApplyAsync(ctx, CancellationToken.None)) results.Add(r);
 
-        Assert.True(result.IsSuccess);
-        Assert.Equal(CheckState.Unchecked, ctx.SourceNode.CheckState);
+        Assert.True(results.Single().IsSuccess);
+        Assert.Equal(CheckState.Unchecked, file.CheckState);
     }
 
     [Fact]
@@ -130,45 +176,47 @@ public sealed class SelectionStepsTests
     public async Task InvertSelectionStep_Preview_TogglesCheckedAndReturnsNullDestination()
     {
         var step = new InvertSelectionStep();
-        var ctx = await MakeContext(CheckState.Unchecked);
+        var (root, file, provider) = await MakeTree(CheckState.Unchecked);
+        var ctx = new TestStepContext(root, provider);
 
         var results = new List<TransformResult>();
         await foreach (var r in step.PreviewAsync(ctx, CancellationToken.None)) results.Add(r);
-        var result = results.Single();
 
+        var result = results.Single();
         Assert.True(result.IsSuccess);
         Assert.Equal(SourcePathResult.None, result.SourcePathResult);
         Assert.Null(result.DestinationPath);
-        Assert.Equal(CheckState.Checked, ctx.SourceNode.CheckState);
+        Assert.Equal(CheckState.Checked, file.CheckState);
     }
 
     [Fact]
     public async Task InvertSelectionStep_ApplyAsync_TogglesChecked()
     {
         var step = new InvertSelectionStep();
-        var ctx = await MakeContext(CheckState.Checked);
+        var (root, file, provider) = await MakeTree(CheckState.Checked);
+        var ctx = new TestStepContext(root, provider);
 
-        await step.ApplyAsync(ctx, CancellationToken.None);
+        await foreach (var _ in step.ApplyAsync(ctx, CancellationToken.None)) { }
 
-        Assert.Equal(CheckState.Unchecked, ctx.SourceNode.CheckState);
+        Assert.Equal(CheckState.Unchecked, file.CheckState);
     }
 
     [Fact]
     public async Task InvertSelectionStep_ApplyAsync_TogglesUnchecked()
     {
         var step = new InvertSelectionStep();
-        var ctx = await MakeContext(CheckState.Unchecked);
+        var (root, file, provider) = await MakeTree(CheckState.Unchecked);
+        var ctx = new TestStepContext(root, provider);
 
-        await step.ApplyAsync(ctx, CancellationToken.None);
+        await foreach (var _ in step.ApplyAsync(ctx, CancellationToken.None)) { }
 
-        Assert.Equal(CheckState.Checked, ctx.SourceNode.CheckState);
+        Assert.Equal(CheckState.Checked, file.CheckState);
     }
 
     [Fact]
     public void InvertSelectionStep_Validate_SetsSourceExistsTrue()
     {
         var step = new InvertSelectionStep();
-        // Start with SourceExists = false (as if a prior Delete step ran)
         var ctx = MakeValidationContext(sourceExists: false);
 
         step.Validate(ctx);

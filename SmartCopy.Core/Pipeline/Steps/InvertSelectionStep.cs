@@ -1,4 +1,6 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
+using System.Threading;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.Pipeline.Validation;
 
@@ -9,7 +11,6 @@ public sealed class InvertSelectionStep : ITransformStep
     public StepKind StepType => StepKind.InvertSelection;
     public bool IsExecutable => false;
     public bool IsConfigurable => false;
-    public bool ProvidesInput => true;
 
     public TransformStepConfig Config => new(StepType, new JsonObject());
 
@@ -21,27 +22,39 @@ public sealed class InvertSelectionStep : ITransformStep
         context.HasSelectedIncludedInputs = true;
     }
 
-    public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    public async IAsyncEnumerable<TransformResult> PreviewAsync(
+        IStepContext ctx, [EnumeratorCancellation] CancellationToken ct)
     {
         await Task.Yield();
-        context.SourceNode.CheckState = context.SourceNode.CheckState == CheckState.Checked
-            ? CheckState.Unchecked
-            : CheckState.Checked;
-        yield return new TransformResult(
-            IsSuccess: true,
-            SourcePath: context.SourceNode.FullPath,
-            SourcePathResult: SourcePathResult.None);
+        foreach (var node in ctx.RootNode.GetFilterIncludedDescendants())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!node.IsDirectory)
+                node.CheckState = node.CheckState == CheckState.Checked
+                    ? CheckState.Unchecked
+                    : CheckState.Checked;
+            yield return new TransformResult(
+                IsSuccess: true,
+                SourcePath: node.FullPath,
+                SourcePathResult: SourcePathResult.None);
+        }
     }
 
-    public Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)
+    public async IAsyncEnumerable<TransformResult> ApplyAsync(
+        IStepContext ctx, [EnumeratorCancellation] CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        context.SourceNode.CheckState = context.SourceNode.CheckState == CheckState.Checked
-            ? CheckState.Unchecked
-            : CheckState.Checked;
-        return Task.FromResult(new TransformResult(
-            IsSuccess: true,
-            SourcePath: context.SourceNode.FullPath,
-            SourcePathResult: SourcePathResult.None));
+        await Task.Yield();
+        foreach (var node in ctx.RootNode.GetFilterIncludedDescendants())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!node.IsDirectory)
+                node.CheckState = node.CheckState == CheckState.Checked
+                    ? CheckState.Unchecked
+                    : CheckState.Checked;
+            yield return new TransformResult(
+                IsSuccess: true,
+                SourcePath: node.FullPath,
+                SourcePathResult: SourcePathResult.None);
+        }
     }
 }

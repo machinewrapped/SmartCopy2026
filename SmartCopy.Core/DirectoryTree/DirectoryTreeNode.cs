@@ -138,6 +138,27 @@ public sealed class DirectoryTreeNode(FileSystemNode _filesystemNode, DirectoryT
         }
     }
 
+    /// <summary>
+    /// Returns all non-excluded descendants (files and subdirectories) where
+    /// <see cref="FilterResult"/> != <see cref="FilterResult.Excluded"/>.
+    /// Used by selection steps to avoid touching filter-excluded nodes' CheckState.
+    /// </summary>
+    public IEnumerable<DirectoryTreeNode> GetFilterIncludedDescendants()
+    {
+        foreach (var file in Files)
+            if (file.IsFilterIncluded)
+                yield return file;
+
+        foreach (var child in Children)
+        {
+            if (child.IsFilterIncluded)
+                yield return child;
+
+            foreach (var desc in child.GetFilterIncludedDescendants())
+                yield return desc;
+        }
+    }
+
     public DirectoryTreeNode? FindNodeByPathSegments(string[] pathSegments)
     {
         var currentNode = this;

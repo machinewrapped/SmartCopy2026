@@ -1,8 +1,9 @@
 using System;
-using System.IO;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using System.Threading;
-using System.Threading.Tasks;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
@@ -29,100 +30,166 @@ public sealed class MoveStep : ITransformStep
         {
             context.AddBlockingIssue("Step.MissingDestination", "Move requires a destination path.");
         }
-        // Post-condition: move consumes the source.
         context.SourceExists = false;
     }
 
-    public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    public async IAsyncEnumerable<TransformResult> PreviewAsync(
+        IStepContext ctx, [EnumeratorCancellation] CancellationToken ct)
     {
-        var targetProvider = context.TargetProvider
-                             ?? throw new InvalidOperationException("TargetProvider must be set for MoveStep.");
+        var targetProvider = ctx.TargetProvider
+            ?? throw new InvalidOperationException("TargetProvider must be set for MoveStep.");
 
-        var destination = StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, context.PathSegments);
-        var destResult = await targetProvider.ExistsAsync(destination, ct)
-            ? DestinationPathResult.Overwritten
-            : DestinationPathResult.Created;
+        foreach (var node in ctx.RootNode.GetSelectedDescendants())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (ctx.IsNodeFailed(node)) continue;
+            // Only preview top-level selected nodes (parent not selected) to avoid duplicate entries.
+            if (node.Parent?.IsSelected == true) continue;
 
-        yield return new TransformResult(
-            IsSuccess: true,
-            SourcePath: context.SourceNode.FullPath,
-            SourcePathResult: SourcePathResult.Moved,
-            DestinationPath: destination,
-            DestinationPathResult: destResult,
-            NumberOfFilesAffected: context.SourceNode.CountSelectedFiles(),
-            NumberOfFoldersAffected: context.SourceNode.CountSelectedFolders(),
-            InputBytes: context.SourceNode.Size,
-            OutputBytes: context.SourceNode.Size);
+            var nodeCtx = ctx.GetNodeContext(node);
+            var destination = StepPathHelper.BuildDestinationPath(DestinationPath, nodeCtx.PathSegments);
+            var destResult = await targetProvider.ExistsAsync(
+                StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, nodeCtx.PathSegments), ct)
+                ? DestinationPathResult.Overwritten
+                : DestinationPathResult.Created;
+
+            yield return new TransformResult(
+                IsSuccess: true,
+                SourcePath: node.FullPath,
+                SourcePathResult: SourcePathResult.Moved,
+                DestinationPath: destination,
+                DestinationPathResult: destResult,
+                NumberOfFilesAffected: node.CountSelectedFiles(),
+                NumberOfFoldersAffected: node.CountSelectedFolders(),
+                InputBytes: node.Size,
+                OutputBytes: node.Size);
+        }
     }
 
-    public async Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)
+    public async IAsyncEnumerable<TransformResult> ApplyAsync(
+        IStepContext ctx, [EnumeratorCancellation] CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        var targetProvider = context.TargetProvider
-                             ?? throw new InvalidOperationException("TargetProvider must be set for MoveStep.");
-        var destination = StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, context.PathSegments);
+        var targetProvider = ctx.TargetProvider
+            ?? throw new InvalidOperationException("TargetProvider must be set for MoveStep.");
 
-        if (context.SourceNode.IsDirectory)
+        var sameProvider = ReferenceEquals(targetProvider, ctx.SourceProvider);
+        var canAtomicMove = targetProvider.Capabilities.CanAtomicMove;
+
+        // Nodes covered by an earlier atomic directory move are skipped.
+        var handledNodes = new HashSet<DirectoryTreeNode>();
+
+        foreach (var node in ctx.RootNode.GetSelectedDescendants())
         {
-            if (!ReferenceEquals(targetProvider, context.SourceProvider) || !targetProvider.Capabilities.CanAtomicMove)
+            ct.ThrowIfCancellationRequested();
+            if (ctx.IsNodeFailed(node)) continue;
+            if (handledNodes.Contains(node)) continue;
+
+            if (node.IsDirectory)
             {
-                return new TransformResult(
-                    IsSuccess: false,
-                    SourcePath: context.SourceNode.FullPath,
-                    SourcePathResult: SourcePathResult.None);
+                if (sameProvider && canAtomicMove && CanMoveEntireSubtree(node))
+                {
+                    var nodeCtx = ctx.GetNodeContext(node);
+                    var destination = StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, nodeCtx.PathSegments);
+                    var destExists = await targetProvider.ExistsAsync(destination, ct);
+
+                    if (destExists && ctx.OverwriteMode == OverwriteMode.Skip)
+                    {
+                        MarkDescendantsHandled(node, handledNodes);
+                        yield return new TransformResult(
+                            IsSuccess: true,
+                            SourcePath: node.FullPath,
+                            SourcePathResult: SourcePathResult.None,
+                            DestinationPath: destination,
+                            InputBytes: node.Size);
+                        continue;
+                    }
+
+                    await ctx.SourceProvider.MoveAsync(node.FullPath, destination, ct);
+                    MarkDescendantsHandled(node, handledNodes);
+                    yield return new TransformResult(
+                        IsSuccess: true,
+                        SourcePath: node.FullPath,
+                        SourcePathResult: SourcePathResult.Moved,
+                        DestinationPath: destination,
+                        DestinationPathResult: destExists ? DestinationPathResult.Overwritten : DestinationPathResult.Created,
+                        NumberOfFilesAffected: node.CountAllFiles(),
+                        NumberOfFoldersAffected: node.CountAllFolders(),
+                        InputBytes: node.Size,
+                        OutputBytes: node.Size);
+                }
+                else
+                {
+                    // Directory cannot be moved atomically (cross-provider or partial subtree).
+                    ctx.MarkFailed(node);
+                    MarkDescendantsHandled(node, handledNodes);
+                    yield return new TransformResult(
+                        IsSuccess: false,
+                        SourcePath: node.FullPath,
+                        SourcePathResult: SourcePathResult.None);
+                }
+                continue;
             }
 
-            await context.SourceProvider.MoveAsync(context.SourceNode.FullPath, destination, ct);
-            return new TransformResult(
-                IsSuccess: true,
-                SourcePath: context.SourceNode.FullPath,
-                SourcePathResult: SourcePathResult.Moved,
-                DestinationPath: destination,
-                DestinationPathResult: DestinationPathResult.Created,
-                NumberOfFoldersAffected: 1,
-                InputBytes: context.SourceNode.Size,
-                OutputBytes: context.SourceNode.Size);
-        }
+            // File node
+            var fileCtx = ctx.GetNodeContext(node);
+            var fileDest = StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, fileCtx.PathSegments);
+            var fileDestExists = await targetProvider.ExistsAsync(fileDest, ct);
 
-        var destinationExists = await targetProvider.ExistsAsync(destination, ct);
-        if (destinationExists && context.OverwriteMode == OverwriteMode.Skip)
-        {
-            return new TransformResult(
-                IsSuccess: true,
-                SourcePath: context.SourceNode.FullPath,
-                SourcePathResult: SourcePathResult.None,
-                DestinationPath: destination,
-                InputBytes: context.SourceNode.Size);
-        }
+            if (fileDestExists && ctx.OverwriteMode == OverwriteMode.Skip)
+            {
+                yield return new TransformResult(
+                    IsSuccess: true,
+                    SourcePath: node.FullPath,
+                    SourcePathResult: SourcePathResult.None,
+                    DestinationPath: fileDest,
+                    InputBytes: node.Size);
+                continue;
+            }
 
-        if (ReferenceEquals(targetProvider, context.SourceProvider) && targetProvider.Capabilities.CanAtomicMove)
-        {
-            await context.SourceProvider.MoveAsync(context.SourceNode.FullPath, destination, ct);
-            return new TransformResult(
+            if (sameProvider && canAtomicMove)
+            {
+                await ctx.SourceProvider.MoveAsync(node.FullPath, fileDest, ct);
+            }
+            else
+            {
+                await using var stream = await ctx.SourceProvider.OpenReadAsync(node.FullPath, ct);
+                await targetProvider.WriteAsync(fileDest, stream, progress: null, ct);
+                await ctx.SourceProvider.DeleteAsync(node.FullPath, ct);
+            }
+
+            yield return new TransformResult(
                 IsSuccess: true,
-                SourcePath: context.SourceNode.FullPath,
+                SourcePath: node.FullPath,
                 SourcePathResult: SourcePathResult.Moved,
-                DestinationPath: destination,
-                DestinationPathResult: destinationExists ? DestinationPathResult.Overwritten : DestinationPathResult.Created,
+                DestinationPath: fileDest,
+                DestinationPathResult: fileDestExists ? DestinationPathResult.Overwritten : DestinationPathResult.Created,
                 NumberOfFilesAffected: 1,
-                InputBytes: context.SourceNode.Size,
-                OutputBytes: context.SourceNode.Size);
+                InputBytes: node.Size,
+                OutputBytes: node.Size);
         }
+    }
 
-        await using var sourceStream = context.ContentStream
-                                       ?? await context.SourceProvider.OpenReadAsync(context.SourceNode.FullPath, ct);
+    /// <summary>
+    /// Returns true when an entire directory subtree is fully checked and all files
+    /// are filter-included, making it safe to move atomically as a unit.
+    /// </summary>
+    private static bool CanMoveEntireSubtree(DirectoryTreeNode node)
+    {
+        if (node.CheckState != CheckState.Checked) return false;
+        if (!node.Files.All(f => f.FilterResult == FilterResult.Included)) return false;
+        foreach (var child in node.Children)
+            if (!CanMoveEntireSubtree(child)) return false;
+        return true;
+    }
 
-        await targetProvider.WriteAsync(destination, sourceStream, progress: null, ct);
-        await context.SourceProvider.DeleteAsync(context.SourceNode.FullPath, ct);
-
-        return new TransformResult(
-            IsSuccess: true,
-            SourcePath: context.SourceNode.FullPath,
-            SourcePathResult: SourcePathResult.Moved,
-            DestinationPath: destination,
-            DestinationPathResult: destinationExists ? DestinationPathResult.Overwritten : DestinationPathResult.Created,
-            NumberOfFilesAffected: 1,
-            InputBytes: context.SourceNode.Size,
-            OutputBytes: context.SourceNode.Size);
+    private static void MarkDescendantsHandled(DirectoryTreeNode node, HashSet<DirectoryTreeNode> handled)
+    {
+        foreach (var file in node.Files)
+            handled.Add(file);
+        foreach (var child in node.Children)
+        {
+            handled.Add(child);
+            MarkDescendantsHandled(child, handled);
+        }
     }
 }

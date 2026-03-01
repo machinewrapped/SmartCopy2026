@@ -1,8 +1,8 @@
 using System;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using System.Threading;
-using System.Threading.Tasks;
 using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
@@ -52,34 +52,44 @@ public sealed class RebaseStep : ITransformStep
         if (string.IsNullOrWhiteSpace(StripPrefix) && string.IsNullOrWhiteSpace(AddPrefix))
             context.AddBlockingIssue("Step.RebaseConfigRequired",
                 "Rebase requires StripPrefix or AddPrefix.");
-        // Post-condition: source is unchanged.
     }
 
-    public async IAsyncEnumerable<TransformResult> PreviewAsync(TransformContext context, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    public async IAsyncEnumerable<TransformResult> PreviewAsync(
+        IStepContext ctx, [EnumeratorCancellation] CancellationToken ct)
     {
         await Task.Yield();
-        Apply(context);
-        yield return new TransformResult(
-            IsSuccess: true,
-            SourcePath: context.SourceNode.FullPath,
-            SourcePathResult: SourcePathResult.None);
+        foreach (var node in ctx.RootNode.GetSelectedDescendants())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (ctx.IsNodeFailed(node)) continue;
+            ApplyToContext(ctx.GetNodeContext(node));
+            yield return new TransformResult(
+                IsSuccess: true,
+                SourcePath: node.FullPath,
+                SourcePathResult: SourcePathResult.None);
+        }
     }
 
-    public Task<TransformResult> ApplyAsync(TransformContext context, CancellationToken ct)
+    public async IAsyncEnumerable<TransformResult> ApplyAsync(
+        IStepContext ctx, [EnumeratorCancellation] CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        Apply(context);
-        return Task.FromResult(new TransformResult(
-            IsSuccess: true,
-            SourcePath: context.SourceNode.FullPath,
-            SourcePathResult: SourcePathResult.None));
+        await Task.Yield();
+        foreach (var node in ctx.RootNode.GetSelectedDescendants())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (ctx.IsNodeFailed(node)) continue;
+            ApplyToContext(ctx.GetNodeContext(node));
+            yield return new TransformResult(
+                IsSuccess: true,
+                SourcePath: node.FullPath,
+                SourcePathResult: SourcePathResult.None);
+        }
     }
 
-    private void Apply(TransformContext context)
+    private void ApplyToContext(TransformContext context)
     {
         var segments = context.PathSegments;
 
-        // Strip leading segments that match the strip prefix (case-insensitive)
         if (_stripSegments.Length > 0
             && segments.Length >= _stripSegments.Length
             && segments.Take(_stripSegments.Length)
@@ -88,11 +98,8 @@ public sealed class RebaseStep : ITransformStep
             segments = segments[_stripSegments.Length..];
         }
 
-        // Prepend add-prefix segments
         if (_addSegments.Length > 0)
-        {
             segments = [.. _addSegments, .. segments];
-        }
 
         context.PathSegments = segments;
     }

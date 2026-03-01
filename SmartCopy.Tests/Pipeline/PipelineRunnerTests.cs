@@ -30,12 +30,11 @@ public sealed class PipelineRunnerTests
 
         var job = new PipelineJob
         {
-            FilterIncludedFiles = [sourceNode],
-            SelectedFiles       = [sourceNode],
-            SourceProvider      = sourceProvider,
-            TargetProvider      = targetProvider,
-            OverwriteMode       = OverwriteMode.IfNewer,
-            DeleteMode          = DeleteMode.Trash,
+            RootNode       = sourceRoot,
+            SourceProvider = sourceProvider,
+            TargetProvider = targetProvider,
+            OverwriteMode  = OverwriteMode.IfNewer,
+            DeleteMode     = DeleteMode.Trash,
         };
 
         var plan = await runner.PreviewAsync(job, CancellationToken.None);
@@ -65,12 +64,11 @@ public sealed class PipelineRunnerTests
 
         var job = new PipelineJob
         {
-            FilterIncludedFiles = [node],
-            SelectedFiles       = [node],
-            SourceProvider      = provider,
-            TargetProvider      = null,
-            OverwriteMode       = OverwriteMode.Always,
-            DeleteMode          = DeleteMode.Permanent,
+            RootNode       = root,
+            SourceProvider = provider,
+            TargetProvider = null,
+            OverwriteMode  = OverwriteMode.Always,
+            DeleteMode     = DeleteMode.Permanent,
         };
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -92,12 +90,11 @@ public sealed class PipelineRunnerTests
 
         var job = new PipelineJob
         {
-            FilterIncludedFiles = [node],
-            SelectedFiles       = [node],
-            SourceProvider      = provider,
-            TargetProvider      = null,
-            OverwriteMode       = OverwriteMode.Always,
-            DeleteMode          = DeleteMode.Permanent,
+            RootNode       = root,
+            SourceProvider = provider,
+            TargetProvider = null,
+            OverwriteMode  = OverwriteMode.Always,
+            DeleteMode     = DeleteMode.Permanent,
         };
 
         await runner.PreviewAsync(job, ct: CancellationToken.None);
@@ -126,12 +123,11 @@ public sealed class PipelineRunnerTests
 
         var job = new PipelineJob
         {
-            FilterIncludedFiles = treeViewModel.CollectAllIncludedFiles(),
-            SelectedFiles       = treeViewModel.CollectSelectedFiles(),
-            SourceProvider      = provider,
-            TargetProvider      = null,
-            OverwriteMode       = OverwriteMode.Always,
-            DeleteMode          = DeleteMode.Permanent,
+            RootNode       = rootNode,
+            SourceProvider = provider,
+            TargetProvider = null,
+            OverwriteMode  = OverwriteMode.Always,
+            DeleteMode     = DeleteMode.Permanent,
         };
 
         var plan = await runner.PreviewAsync(job, CancellationToken.None);
@@ -168,12 +164,11 @@ public sealed class PipelineRunnerTests
         await runner.ExecuteAsync(
             new PipelineJob
             {
-                FilterIncludedFiles = [node],
-                SelectedFiles       = [node],
-                SourceProvider      = sourceProvider,
-                TargetProvider      = targetProvider,
-                OverwriteMode       = OverwriteMode.Always,
-                DeleteMode          = DeleteMode.Trash,
+                RootNode       = sourceRoot,
+                SourceProvider = sourceProvider,
+                TargetProvider = targetProvider,
+                OverwriteMode  = OverwriteMode.Always,
+                DeleteMode     = DeleteMode.Trash,
             },
             progress: null,
             ct: CancellationToken.None);
@@ -203,12 +198,11 @@ public sealed class PipelineRunnerTests
         var plan = await runner.PreviewAsync(
             new PipelineJob
             {
-                FilterIncludedFiles = [node],
-                SelectedFiles       = [node],
-                SourceProvider      = sourceProvider,
-                TargetProvider      = targetProvider,
-                OverwriteMode       = OverwriteMode.Always,
-                DeleteMode          = DeleteMode.Trash,
+                RootNode       = sourceRoot,
+                SourceProvider = sourceProvider,
+                TargetProvider = targetProvider,
+                OverwriteMode  = OverwriteMode.Always,
+                DeleteMode     = DeleteMode.Trash,
             },
             CancellationToken.None);
 
@@ -234,12 +228,11 @@ public sealed class PipelineRunnerTests
         var results = await runner.ExecuteAsync(
             new PipelineJob
             {
-                FilterIncludedFiles = [node],
-                SelectedFiles       = [node],
-                SourceProvider      = provider,
-                TargetProvider      = provider,
-                OverwriteMode       = OverwriteMode.Skip,
-                DeleteMode          = DeleteMode.Trash,
+                RootNode       = sourceRoot,
+                SourceProvider = provider,
+                TargetProvider = provider,
+                OverwriteMode  = OverwriteMode.Skip,
+                DeleteMode     = DeleteMode.Trash,
             },
             progress: null,
             ct: CancellationToken.None);
@@ -260,16 +253,16 @@ public sealed class PipelineRunnerTests
         var provider = MemoryFileSystemFixtures.Create(fixture => fixture
             .WithDirectory("/source")
             .WithDirectory("/dest"));
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
         var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/dest")]));
 
         var emptyJob = new PipelineJob
         {
-            FilterIncludedFiles = [],
-            SelectedFiles       = [],
-            SourceProvider      = provider,
-            TargetProvider      = provider,
-            OverwriteMode       = OverwriteMode.Always,
-            DeleteMode          = DeleteMode.Trash,
+            RootNode       = root,
+            SourceProvider = provider,
+            TargetProvider = provider,
+            OverwriteMode  = OverwriteMode.Always,
+            DeleteMode     = DeleteMode.Trash,
         };
 
         var previewError = await Assert.ThrowsAsync<InvalidOperationException>(() =>
