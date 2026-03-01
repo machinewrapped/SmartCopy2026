@@ -39,6 +39,7 @@ public sealed class DeleteStep : IPipelineStep
             yield return MakePreviewResult(ctx.RootNode, pathResult);
         }
 
+        // Yield all affected nodes for preview so the user sees exactly what will be deleted
         foreach (var node in ctx.RootNode.GetSelectedDescendants())
         {
             ct.ThrowIfCancellationRequested();
