@@ -19,7 +19,7 @@ public sealed class DirectoryTreeNode(FileSystemNode _filesystemNode, DirectoryT
     public DateTime ModifiedAt => _filesystemNode.ModifiedAt;
     public FileAttributes Attributes => _filesystemNode.Attributes;
 
-    public string[] RelativePathSegments {get; init; } = _parent is null ? Array.Empty<string>() : _parent.RelativePathSegments.Append(_filesystemNode.Name).ToArray();
+    public string[] RelativePathSegments {get; init; } = _parent is null ? Array.Empty<string>() : [.. _parent.RelativePathSegments.Append(_filesystemNode.Name)];
     public string CanonicalRelativePath => string.Join("/", RelativePathSegments);
 
     public override string ToString() => CanonicalRelativePath + (IsDirectory ? "/" : "");
@@ -140,26 +140,27 @@ public sealed class DirectoryTreeNode(FileSystemNode _filesystemNode, DirectoryT
 
     public DirectoryTreeNode? FindNodeByPathSegments(string[] pathSegments)
     {
-        if (pathSegments.Length == 0)
-            return this;
-
-        var segment = pathSegments[0];
-        var nextNode = Children.FirstOrDefault(c => string.Equals(c.Name, segment, StringComparison.OrdinalIgnoreCase));
-        if (nextNode is null)
+        var currentNode = this;
+        for (int i = 0; i < pathSegments.Length; i++)
         {
-            var fileNode = Files.FirstOrDefault(f => string.Equals(f.Name, segment, StringComparison.OrdinalIgnoreCase));
-            if (fileNode != null)
+            var segment = pathSegments[i];
+            var nextNode = currentNode.Children.FirstOrDefault(c => string.Equals(c.Name, segment, StringComparison.OrdinalIgnoreCase));
+
+            if (nextNode is null)
             {
-                Debug.Assert(pathSegments.Length == 1, "Path segments after matching file node.");
-                return fileNode;
+                // If we can't find a directory, check for a file, but only if it's the last segment.
+                if (i == pathSegments.Length - 1)
+                {
+                    return currentNode.Files.FirstOrDefault(f => string.Equals(f.Name, segment, StringComparison.OrdinalIgnoreCase));
+                }
+                // A directory segment in the middle of the path was not found.
+                return null;
             }
-
-            return null;
+            currentNode = nextNode;
         }
-
-        return nextNode.FindNodeByPathSegments(pathSegments.Skip(1).ToArray());
+        return currentNode;
     }
-
+    
     internal int CountSelectedFiles() =>
         (IsSelected && !IsDirectory ? 1 : 0) + (IsDirectory ? Children.Sum(c => c.CountSelectedFiles()) + Files.Count(f => f.IsSelected) : 0);
 
