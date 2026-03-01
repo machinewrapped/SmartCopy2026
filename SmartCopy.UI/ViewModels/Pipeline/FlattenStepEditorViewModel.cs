@@ -14,7 +14,7 @@ public partial class FlattenStepEditorViewModel : StepEditorViewModelBase
 
     public override bool IsValid => true;
 
-    public override ITransformStep BuildStep() => new FlattenStep(ConflictStrategy);
+    public override IPipelineStep BuildStep() => new FlattenStep(ConflictStrategy);
 
     public override void LoadFrom(PipelineStepViewModel stepViewModel)
     {

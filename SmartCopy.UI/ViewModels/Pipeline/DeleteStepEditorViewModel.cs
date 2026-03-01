@@ -13,7 +13,7 @@ public partial class DeleteStepEditorViewModel : StepEditorViewModelBase
 
     public override bool IsValid => true;
 
-    public override ITransformStep BuildStep() => new DeleteStep(DeleteMode);
+    public override IPipelineStep BuildStep() => new DeleteStep(DeleteMode);
 
     public override void LoadFrom(PipelineStepViewModel stepViewModel)
     {

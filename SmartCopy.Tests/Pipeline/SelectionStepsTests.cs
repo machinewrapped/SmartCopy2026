@@ -20,7 +20,7 @@ public sealed class SelectionStepsTests
     /// </summary>
     private sealed class TestStepContext : IStepContext
     {
-        private readonly Dictionary<DirectoryTreeNode, TransformContext> _contexts = new();
+        private readonly Dictionary<DirectoryTreeNode, PipelineContext> _contexts = new();
         private readonly HashSet<DirectoryTreeNode> _failed = new();
 
         public DirectoryTreeNode RootNode { get; }
@@ -35,11 +35,11 @@ public sealed class SelectionStepsTests
             SourceProvider = provider;
         }
 
-        public TransformContext GetNodeContext(DirectoryTreeNode node)
+        public PipelineContext GetNodeContext(DirectoryTreeNode node)
         {
             if (!_contexts.TryGetValue(node, out var ctx))
             {
-                ctx = new TransformContext
+                ctx = new PipelineContext
                 {
                     SourceNode = node,
                     SourceProvider = SourceProvider,

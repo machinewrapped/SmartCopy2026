@@ -6,7 +6,7 @@ using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
-public sealed class DeleteStep : ITransformStep
+public sealed class DeleteStep : IPipelineStep
 {
     public DeleteStep(DeleteMode mode = DeleteMode.Trash)
     {

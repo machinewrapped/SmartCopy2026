@@ -6,7 +6,7 @@ using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
-public sealed class SelectAllStep : ITransformStep
+public sealed class SelectAllStep : IPipelineStep
 {
     public StepKind StepType => StepKind.SelectAll;
     public bool IsExecutable => false;

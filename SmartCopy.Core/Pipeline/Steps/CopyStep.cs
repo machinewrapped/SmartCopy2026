@@ -6,7 +6,7 @@ using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
-public sealed class CopyStep : ITransformStep
+public sealed class CopyStep : IPipelineStep
 {
     public CopyStep(string destinationPath)
     {

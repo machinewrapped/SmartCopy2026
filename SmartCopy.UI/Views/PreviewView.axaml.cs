@@ -56,7 +56,7 @@ public partial class PreviewView : Window
         Avalonia.Threading.Dispatcher.UIThread.Post(() => Close(false));
     }
 
-    private async System.Threading.Tasks.Task OnSaveReportRequested(string markdown)
+    private async Task OnSaveReportRequested(string markdown)
     {
         var topLevel = TopLevel.GetTopLevel(this);
         if (topLevel is null) return;

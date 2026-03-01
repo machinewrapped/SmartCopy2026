@@ -8,7 +8,7 @@ using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
-public sealed class MoveStep : ITransformStep
+public sealed class MoveStep : IPipelineStep
 {
     public MoveStep(string destinationPath)
     {

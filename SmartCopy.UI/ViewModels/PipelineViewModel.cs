@@ -23,18 +23,18 @@ public enum StepCategory
 
 public partial class PipelineStepViewModel : ViewModelBase
 {
-    private ITransformStep _step;
+    private IPipelineStep _step;
     private string _customName;
     private string? _validationMessage;
     private bool _hasValidationError;
 
-    public PipelineStepViewModel(ITransformStep step, string? customName = null)
+    public PipelineStepViewModel(IPipelineStep step, string? customName = null)
     {
         _step = step;
         _customName = PipelineStepDisplay.NormalizeCustomName(customName);
     }
 
-    public ITransformStep Step => _step;
+    public IPipelineStep Step => _step;
 
     public StepKind Kind => _step.StepType;
 
@@ -135,7 +135,7 @@ public partial class PipelineStepViewModel : ViewModelBase
 
     public event EventHandler? StepChanged;
 
-    public void ReplaceStep(ITransformStep newStep, string? customName = null)
+    public void ReplaceStep(IPipelineStep newStep, string? customName = null)
     {
         _step = newStep;
         _customName = PipelineStepDisplay.NormalizeCustomName(customName);
@@ -307,14 +307,14 @@ public partial class PipelineViewModel : ViewModelBase
         return new TransformPipeline(Steps.Select(step => step.Step));
     }
 
-    public void AddStepFromResult(StepKind kind, ITransformStep step, string? customName = null)
+    public void AddStepFromResult(StepKind kind, IPipelineStep step, string? customName = null)
     {
         _ = kind;
         Steps.Add(new PipelineStepViewModel(step, customName));
         Revalidate();
     }
 
-    public void ReplaceStep(PipelineStepViewModel existing, ITransformStep replacement, string? customName = null)
+    public void ReplaceStep(PipelineStepViewModel existing, IPipelineStep replacement, string? customName = null)
     {
         existing.ReplaceStep(replacement, customName);
         Revalidate();
@@ -539,7 +539,7 @@ public partial class PipelineViewModel : ViewModelBase
         return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 
-    private static ITransformStep CreateDefaultStep(StepKind kind)
+    private static IPipelineStep CreateDefaultStep(StepKind kind)
     {
         return kind switch
         {

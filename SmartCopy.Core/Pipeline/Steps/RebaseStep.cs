@@ -7,7 +7,7 @@ using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
-public sealed class RebaseStep : ITransformStep
+public sealed class RebaseStep : IPipelineStep
 {
     private string _stripPrefix = string.Empty;
     private string _addPrefix = string.Empty;
@@ -86,7 +86,7 @@ public sealed class RebaseStep : ITransformStep
         }
     }
 
-    private void ApplyToContext(TransformContext context)
+    private void ApplyToContext(PipelineContext context)
     {
         var segments = context.PathSegments;
 

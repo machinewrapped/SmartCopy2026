@@ -8,14 +8,14 @@ namespace SmartCopy.Core.Pipeline;
 
 public sealed class TransformPipeline
 {
-    private readonly List<ITransformStep> _steps = [];
+    private readonly List<IPipelineStep> _steps = [];
 
-    public TransformPipeline(IEnumerable<ITransformStep> steps)
+    public TransformPipeline(IEnumerable<IPipelineStep> steps)
     {
         _steps.AddRange(steps);
     }
 
-    public IReadOnlyList<ITransformStep> Steps => _steps;
+    public IReadOnlyList<IPipelineStep> Steps => _steps;
 
     public bool HasDeleteStep => _steps.Any(step => step.StepType == StepKind.Delete);
 

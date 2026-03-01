@@ -6,7 +6,7 @@ using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
-public sealed class InvertSelectionStep : ITransformStep
+public sealed class InvertSelectionStep : IPipelineStep
 {
     public StepKind StepType => StepKind.InvertSelection;
     public bool IsExecutable => false;

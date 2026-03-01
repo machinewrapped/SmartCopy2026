@@ -16,9 +16,9 @@ public interface IStepContext
     OverwriteMode OverwriteMode { get; }
     DeleteMode DeleteMode { get; }
 
-    /// <summary>Returns the cached (or newly created) <see cref="TransformContext"/> for a node.
+    /// <summary>Returns the cached (or newly created) <see cref="PipelineContext"/> for a node.
     /// PathSegments mutations persist across all steps in the run.</summary>
-    TransformContext GetNodeContext(DirectoryTreeNode node);
+    PipelineContext GetNodeContext(DirectoryTreeNode node);
 
     bool IsNodeFailed(DirectoryTreeNode node);
     void MarkFailed(DirectoryTreeNode node);

@@ -3,7 +3,7 @@ using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Core.Pipeline;
 
-public sealed class TransformContext
+public sealed class PipelineContext
 {
     public required DirectoryTreeNode SourceNode { get; init; }
     public required IFileSystemProvider SourceProvider { get; init; }

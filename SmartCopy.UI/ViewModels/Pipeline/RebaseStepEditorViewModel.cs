@@ -17,7 +17,7 @@ public partial class RebaseStepEditorViewModel : StepEditorViewModelBase
     public override bool IsValid =>
         !string.IsNullOrWhiteSpace(StripPrefix) || !string.IsNullOrWhiteSpace(AddPrefix);
 
-    public override ITransformStep BuildStep() =>
+    public override IPipelineStep BuildStep() =>
         new RebaseStep(StripPrefix.Trim(), AddPrefix.Trim());
 
     public override void LoadFrom(PipelineStepViewModel stepViewModel)

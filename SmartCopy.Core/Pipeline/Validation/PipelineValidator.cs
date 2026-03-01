@@ -5,7 +5,7 @@ namespace SmartCopy.Core.Pipeline.Validation;
 public sealed class PipelineValidator
 {
     public static PipelineValidationResult Validate(
-        IReadOnlyList<ITransformStep> steps,
+        IReadOnlyList<IPipelineStep> steps,
         PipelineValidationContext? context = null)
     {
         context ??= new PipelineValidationContext();

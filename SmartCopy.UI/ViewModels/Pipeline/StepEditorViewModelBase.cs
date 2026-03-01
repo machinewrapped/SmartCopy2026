@@ -7,7 +7,7 @@ public abstract partial class StepEditorViewModelBase : ObservableObject
 {
     public abstract bool IsValid { get; }
 
-    public abstract ITransformStep BuildStep();
+    public abstract IPipelineStep BuildStep();
 
     public abstract void LoadFrom(PipelineStepViewModel stepViewModel);
 }

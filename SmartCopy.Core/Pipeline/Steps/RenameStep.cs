@@ -7,7 +7,7 @@ using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
-public sealed class RenameStep : ITransformStep
+public sealed class RenameStep : IPipelineStep
 {
     public RenameStep(string pattern)
     {
@@ -62,7 +62,7 @@ public sealed class RenameStep : ITransformStep
         }
     }
 
-    private void ApplyToContext(TransformContext context)
+    private void ApplyToContext(PipelineContext context)
     {
         if (context.PathSegments.Length == 0) return;
 

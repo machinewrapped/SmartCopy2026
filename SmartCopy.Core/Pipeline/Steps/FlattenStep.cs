@@ -5,7 +5,7 @@ using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
-public sealed class FlattenStep : ITransformStep
+public sealed class FlattenStep : IPipelineStep
 {
     public FlattenStep(FlattenConflictStrategy conflictStrategy = FlattenConflictStrategy.AutoRenameCounter)
     {
@@ -56,7 +56,7 @@ public sealed class FlattenStep : ITransformStep
         }
     }
 
-    private static void ApplyToContext(TransformContext context)
+    private static void ApplyToContext(PipelineContext context)
     {
         if (context.PathSegments.Length > 0)
             context.PathSegments = [context.PathSegments[^1]];

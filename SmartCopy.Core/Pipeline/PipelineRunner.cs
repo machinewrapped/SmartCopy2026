@@ -148,7 +148,7 @@ public sealed class PipelineRunner
 
     private sealed class StepContext : IStepContext
     {
-        private readonly Dictionary<DirectoryTreeNode, TransformContext> _contexts = new();
+        private readonly Dictionary<DirectoryTreeNode, PipelineContext> _contexts = new();
         private readonly HashSet<DirectoryTreeNode> _failedNodes = new();
 
         public DirectoryTreeNode RootNode { get; }
@@ -166,7 +166,7 @@ public sealed class PipelineRunner
             DeleteMode = job.DeleteMode;
         }
 
-        public TransformContext GetNodeContext(DirectoryTreeNode node)
+        public PipelineContext GetNodeContext(DirectoryTreeNode node)
         {
             if (_contexts.TryGetValue(node, out var ctx))
                 return ctx;
@@ -176,7 +176,7 @@ public sealed class PipelineRunner
                 ? node.RelativePathSegments
                 : [node.Name];
 
-            ctx = new TransformContext
+            ctx = new PipelineContext
             {
                 SourceNode = node,
                 SourceProvider = SourceProvider,

@@ -4,7 +4,7 @@ using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline;
 
-public interface ITransformStep
+public interface IPipelineStep
 {
     StepKind StepType { get; }
     bool IsExecutable { get; }
