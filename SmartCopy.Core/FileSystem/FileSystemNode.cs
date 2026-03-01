@@ -14,14 +14,9 @@ public sealed class FileSystemNode
     public string FullPath { get; init; } = string.Empty;
 
     /// <summary>
-    /// The path expressed as separator-free segments, set by the source provider at scan time.
+    /// The relative path as a canonical forward-slash string/>.
     /// </summary>
-    public string[] PathSegments { get; init; } = [];
-
-    /// <summary>
-    /// The relative path as a canonical forward-slash string, derived from <see cref="PathSegments"/>.
-    /// </summary>
-    public string CanonicalPath => string.Join("/", PathSegments);
+    public string CanonicalPath { get; init; } = string.Empty;
 
     public bool IsDirectory { get; init; }
     public long Size { get; init; }

@@ -273,27 +273,4 @@ public sealed class MirrorFilterTests
         Assert.Single(result);
         Assert.Equal("pain.mp3", result[0].Name);
     }
-
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
-
-    private static FileSystemNode MakeFile(string name, string relativePath, long size) =>
-        new()
-        {
-            Name = name,
-            FullPath = "/source/" + relativePath,
-            PathSegments = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries),
-            IsDirectory = false,
-            Size = size,
-        };
-
-    private static FileSystemNode MakeDirectory(string name, string relativePath) =>
-        new()
-        {
-            Name = name,
-            FullPath = "/source/" + relativePath,
-            PathSegments = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries),
-            IsDirectory = true,
-        };
 }

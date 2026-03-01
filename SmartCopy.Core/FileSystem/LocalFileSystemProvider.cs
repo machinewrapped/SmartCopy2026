@@ -271,7 +271,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         {
             Name = info.Name,
             FullPath = info.FullName,
-            PathSegments = SplitPath(relativePath),
+            CanonicalPath = GetCanonicalPath(relativePath),
             IsDirectory = true,
             Size = 0,
             CreatedAt = info.CreationTimeUtc,
@@ -288,12 +288,18 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         {
             Name = info.Name,
             FullPath = info.FullName,
-            PathSegments = SplitPath(relativePath),
+            CanonicalPath = GetCanonicalPath(relativePath),
             IsDirectory = false,
             Size = info.Length,
             CreatedAt = info.CreationTimeUtc,
             ModifiedAt = info.LastWriteTimeUtc,
             Attributes = info.Attributes,
         };
+    }
+
+    private string GetCanonicalPath(string path)
+    {
+        var segments = SplitPath(path);
+        return string.Join("/", segments);
     }
 }

@@ -7,33 +7,40 @@ namespace SmartCopy.Tests.DirectoryTree;
 public sealed class DirectoryTreeNodeSelectionTests
 {
     [Fact]
-    public void SettingDirectoryChecked_PropagatesToDescendants()
+    public async Task SettingDirectoryChecked_PropagatesToDescendants()
     {
-        var root = CreateDirectory("root", "/root", "root");
-        var childDirectory = CreateDirectory("albums", "/root/albums", "root/albums", root);
-        var nestedFile = CreateFile("track1.mp3", "/root/albums/track1.mp3", "root/albums/track1.mp3", childDirectory);
-        var rootFile = CreateFile("cover.jpg", "/root/cover.jpg", "root/cover.jpg", root);
-
-        root.Children.Add(childDirectory);
-        childDirectory.Files.Add(nestedFile);
-        root.Files.Add(rootFile);
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
+            .WithDirectory("/root")
+            .WithDirectory("/root/albums")
+            .WithFile("/root/albums/track1.mp3", "track1"u8)
+            .WithFile("/root/cover.jpg", "cover"u8));
 
         root.CheckState = CheckState.Checked;
 
+        var childDirectory = root.FindNodeByPathSegments(["root", "albums"]);
+        var nestedFile = root.FindNodeByPathSegments(["root", "albums", "track1.mp3"]);
+        var rootFile = root.FindNodeByPathSegments(["root", "cover.jpg"]);
+
         Assert.Equal(CheckState.Checked, root.CheckState);
-        Assert.Equal(CheckState.Checked, childDirectory.CheckState);
-        Assert.Equal(CheckState.Checked, nestedFile.CheckState);
-        Assert.Equal(CheckState.Checked, rootFile.CheckState);
+        Assert.Equal(CheckState.Checked, childDirectory?.CheckState);
+        Assert.Equal(CheckState.Checked, nestedFile?.CheckState);
+        Assert.Equal(CheckState.Checked, rootFile?.CheckState);
     }
 
     [Fact]
-    public void ChildTransitions_RecalculateParentCheckStateDeterministically()
+    public async Task ChildTransitions_RecalculateParentCheckStateDeterministically()
     {
-        var root = CreateDirectory("root", "/root", "root");
-        var fileA = CreateFile("a.mp3", "/root/a.mp3", "root/a.mp3", root);
-        var fileB = CreateFile("b.mp3", "/root/b.mp3", "root/b.mp3", root);
-        root.Files.Add(fileA);
-        root.Files.Add(fileB);
+        var rootNode = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
+            .WithDirectory("/root")
+            .WithFile("/root/a.mp3", "a"u8)
+            .WithFile("/root/b.mp3", "b"u8));
+            
+        var root = rootNode.FindNodeByPathSegments(["root"]);
+        var fileA = rootNode.FindNodeByPathSegments(["root", "a.mp3"]);
+        var fileB = rootNode.FindNodeByPathSegments(["root", "b.mp3"]);
+        Assert.NotNull(root);
+        Assert.NotNull(fileA);
+        Assert.NotNull(fileB);
 
         fileA.CheckState = CheckState.Checked;
         Assert.Equal(CheckState.Indeterminate, root.CheckState);
@@ -49,10 +56,15 @@ public sealed class DirectoryTreeNodeSelectionTests
     }
 
     [Fact]
-    public void IsSelected_RequiresCheckedAndIncluded()
+    public async Task IsSelected_RequiresCheckedAndIncluded()
     {
-        var node = CreateFile("song.flac", "/root/song.flac", "root/song.flac");
+        var rootNode = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
+            .WithDirectory("root")
+            .WithSimulatedFile("/root/song.flac", 1024));
 
+        var node = rootNode.FindNodeByPathSegments(["root", "song.flac"]);
+
+        Assert.NotNull(node);
         Assert.False(node.IsSelected);
 
         node.CheckState = CheckState.Checked;
@@ -60,31 +72,5 @@ public sealed class DirectoryTreeNodeSelectionTests
 
         node.FilterResult = FilterResult.Excluded;
         Assert.False(node.IsSelected);
-    }
-
-    private static DirectoryTreeNode CreateDirectory(string name, string fullPath, string relativePath, DirectoryTreeNode? parent = null)
-    {
-        FileSystemNode node = new()
-        {
-            Name = name,
-            FullPath = fullPath,
-            PathSegments = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries),
-            IsDirectory = true,
-        };
-
-        return new DirectoryTreeNode(node, parent);
-    }
-
-    private static DirectoryTreeNode CreateFile(string name, string fullPath, string relativePath, DirectoryTreeNode? parent = null)
-    {
-            FileSystemNode node = new()
-            {
-                Name = name,
-                FullPath = fullPath,
-                PathSegments = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries),
-                IsDirectory = false,
-            };
-
-            return new DirectoryTreeNode(node, parent);
     }
 }

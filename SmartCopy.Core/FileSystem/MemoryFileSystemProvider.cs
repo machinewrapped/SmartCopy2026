@@ -417,7 +417,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         {
             Name = name,
             FullPath = path,
-            PathSegments = SplitPath(relativePath),
+            CanonicalPath = GetCanonicalPath(relativePath),
             IsDirectory = entry.IsDirectory,
             Size = entry.IsDirectory ? 0 : entry.Size,
             CreatedAt = entry.CreatedAt,
@@ -435,6 +435,12 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         return path.StartsWith(root, StringComparison.OrdinalIgnoreCase)
             ? path[root.Length..]
             : path.TrimStart('/');
+    }
+
+    private string GetCanonicalPath(string path)
+    {
+        var segments = SplitPath(path);
+        return string.Join("/", segments);
     }
 
     private void TouchParentModifiedTime(string path, DateTime timestamp)
