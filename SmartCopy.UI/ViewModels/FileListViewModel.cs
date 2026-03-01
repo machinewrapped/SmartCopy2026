@@ -93,6 +93,14 @@ public class FileListViewModel : ViewModelBase
     {
         if (_currentDirectoryNode is null) return;
 
+        if (_currentDirectoryNode.IsMarkedForRemoval)
+        {
+            _files.Clear();
+            _currentDirectoryNode = null;
+            VisibleFiles = [];
+            return;
+        }
+
         _files.RemoveAll(f => f.IsMarkedForRemoval);
         RefreshVisibleFiles();
     }
