@@ -125,14 +125,13 @@ public class DirectoryTreeViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Removes the directory node at <paramref name="fullPath"/> from the tree.
-    /// Returns <c>true</c> if a node was found and removed; <c>false</c> if not found
-    /// (e.g. the path belongs to a file, which lives in FileListViewModel).
+    /// Removes the directory node at <paramref name="fullPath"/> from the tree and returns it,
+    /// or <c>null</c> if not found (e.g. the path belongs to a file, which lives in FileListViewModel).
     /// </summary>
-    public bool RemoveNode(string fullPath)
+    public DirectoryTreeNode? RemoveNode(string fullPath)
     {
         var node = FindByPath(fullPath);
-        if (node is null) return false;
+        if (node is null) return null;
 
         if (node.Parent is not null)
         {
@@ -145,7 +144,7 @@ public class DirectoryTreeViewModel : ViewModelBase
             RootNodes.Remove(node);
         }
 
-        return true;
+        return node;
     }
 
     private void OnRootNodePropertyChanged(object? sender, PropertyChangedEventArgs e)

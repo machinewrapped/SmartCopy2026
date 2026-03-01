@@ -1,17 +1,11 @@
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
 
 namespace SmartCopy.UI.ViewModels;
 
-public class FileListViewModel(IFileSystemProvider provider, string directoryPath) : ViewModelBase
+public class FileListViewModel : ViewModelBase
 {
-    private readonly IFileSystemProvider _provider = provider;
-    private string _directoryPath = directoryPath;
     private CancellationTokenSource? _loadCts;
 
     private FilterChain? _chain;
@@ -61,6 +55,10 @@ public class FileListViewModel(IFileSystemProvider provider, string directoryPat
         RefreshVisibleFiles();
     }
 
+    /// <summary>
+    /// Displays the files already scanned into <paramref name="directoryNode"/>,
+    /// then applies the current filter chain.
+    /// </summary>
     public async Task LoadFilesForNodeAsync(DirectoryTreeNode directoryNode)
     {
         _loadCts?.Cancel();
@@ -68,34 +66,7 @@ public class FileListViewModel(IFileSystemProvider provider, string directoryPat
         _loadCts = new CancellationTokenSource();
         var ct = _loadCts.Token;
 
-        _directoryPath = directoryNode.FullPath;
         _currentDirectoryNode = directoryNode;
-
-        if (directoryNode.Files.Count == 0)
-        {
-            var children = await _provider.GetChildrenAsync(_directoryPath, ct);
-            var files = new List<DirectoryTreeNode>();
-
-            foreach (FileSystemNode child in children)
-            {
-                ct.ThrowIfCancellationRequested();
-                if (child.IsDirectory)
-                    continue;
-
-                var checkState = directoryNode.CheckState == CheckState.Checked
-                    ? CheckState.Checked
-                    : CheckState.Unchecked;
-
-                DirectoryTreeNode item = new(_filesystemNode: child, _parent: directoryNode, _checkState: checkState);
-                files.Add(item);
-            }
-
-            if (ct.IsCancellationRequested) return;
-
-            foreach (var file in files)
-                directoryNode.Files.Add(file);
-        }
-
         _files = [.. directoryNode.Files];
 
         await ApplyChainToFilesAsync(ct);
@@ -113,13 +84,19 @@ public class FileListViewModel(IFileSystemProvider provider, string directoryPat
         RefreshVisibleFiles();
     }
 
-    public void ClearIfUnder(string dirFullPath)
+    public void ClearIfUnder(DirectoryTreeNode removedDirectory)
     {
-        if (_directoryPath.StartsWith(dirFullPath, StringComparison.OrdinalIgnoreCase))
+        var node = _currentDirectoryNode;
+        while (node is not null)
         {
-            _files.Clear();
-            _currentDirectoryNode = null;
-            RefreshVisibleFiles();
+            if (node == removedDirectory)
+            {
+                _files.Clear();
+                _currentDirectoryNode = null;
+                RefreshVisibleFiles();
+                return;
+            }
+            node = node.Parent;
         }
     }
 

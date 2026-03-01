@@ -121,7 +121,7 @@ public partial class MainViewModel : ViewModelBase
             await ApplySourcePathCoreAsync(path);
         };
 
-        FileList = new FileListViewModel(_memoryProvider, MockMemoryFileSystemFactory.DefaultFileListPath);
+        FileList = new FileListViewModel();
 
         WorkflowMenu = new WorkflowMenuViewModel(_workflowStore);
         WorkflowMenu.SaveRequested += async (_, _) => await SaveWorkflowAsync();
@@ -787,14 +787,21 @@ public partial class MainViewModel : ViewModelBase
 
     private void OnNodeCompleted(TransformResult result)
     {
-        if (!result.IsSuccess) return;
-        if (result.SourcePathResult is not (SourcePathResult.Moved or SourcePathResult.Trashed or SourcePathResult.Deleted)) return;
+        if (!result.IsSuccess)
+            return;
+
+        if (result.SourcePathResult is not (SourcePathResult.Moved or SourcePathResult.Trashed or SourcePathResult.Deleted))
+            return;
 
         var removedDir = DirectoryTree.RemoveNode(result.SourcePath);
-        if (removedDir)
-            FileList.ClearIfUnder(result.SourcePath);
+        if (removedDir is not null)
+        {
+            FileList.ClearIfUnder(removedDir);
+        }
         else
+        {
             FileList.RemoveFile(result.SourcePath);
+        }
     }
 
     private async Task SaveWorkflowAsync()
