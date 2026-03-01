@@ -17,7 +17,6 @@ using SmartCopy.Core.Progress;
 using SmartCopy.Core.Selection;
 using SmartCopy.Core.Settings;
 using SmartCopy.Core.Workflows;
-using SmartCopy.UI.Helpers;
 using SmartCopy.UI.Services;
 using SmartCopy.UI.ViewModels.Workflows;
 using SmartCopy.UI.Views;
@@ -641,7 +640,7 @@ public partial class MainViewModel : ViewModelBase
         var chain = FilterChain.BuildLiveChain();
         FileList.UpdateChain(chain, _memoryProvider);
 
-        await DirectoryTree.InitializeAsync(MockMemoryFileSystemFactory.DefaultFileListPath);
+        await DirectoryTree.InitializeAsync(ct: CancellationToken.None);
 
         // TODO: automatically reading the last used directory on startup could be expensive,
         // especially if it was a network drive or MTP. It should definitely be a setting that can be turned off.
@@ -757,25 +756,33 @@ public partial class MainViewModel : ViewModelBase
         {
             var results = await runner.ExecuteAsync(job, progress, nodeProgress, _runCts.Token);
 
-            await _operationJournal.WriteAsync(results.Where(r => r.SourcePathResult != SourcePathResult.None));
+            await _operationJournal.WriteAsync(results.Where(r => r.SourceNodeResult != SourceResult.None));
 
             foreach (var r in results)
             {
                 if (!r.IsSuccess)
                 {
-                    LogPanel.AddEntry($"Failed: {Path.GetFileName(r.SourcePath)}", LogLevel.Error);
+                    LogPanel.AddEntry($"Failed: {r.SourceNode.Name}", LogLevel.Error);
                 }
-                else if (r.SourcePathResult == SourcePathResult.Copied)
+                else if (r.SourceNodeResult == SourceResult.Copied)
                 {
-                    LogPanel.AddEntry($"Copied {Path.GetFileName(r.SourcePath)} → {r.DestinationPath} ({FileSizeFormatter.FormatBytes(r.OutputBytes)})");
+                    LogPanel.AddEntry($"Copied {r.SourceNode.Name} → {r.DestinationPath} ({FileSizeFormatter.FormatBytes(r.OutputBytes)})");
                 }
-                else if (r.SourcePathResult == SourcePathResult.Moved)
+                else if (r.SourceNodeResult == SourceResult.Moved)
                 {
-                    LogPanel.AddEntry($"Moved {Path.GetFileName(r.SourcePath)} → {r.DestinationPath}");
+                    LogPanel.AddEntry($"Moved {r.SourceNode.Name} → {r.DestinationPath} ({FileSizeFormatter.FormatBytes(r.OutputBytes)})");
                 }
-                else if (r.SourcePathResult is SourcePathResult.Trashed or SourcePathResult.Deleted)
+                else if (r.SourceNodeResult is SourceResult.Trashed or SourceResult.Deleted)
                 {
-                    LogPanel.AddEntry($"Deleted {Path.GetFileName(r.SourcePath)}");
+                    LogPanel.AddEntry($"Deleted {r.SourceNode.Name} ({FileSizeFormatter.FormatBytes(r.InputBytes)})");
+                }
+
+                if (r.DestinationResult != DestinationResult.None)
+                {
+                    if (r.DestinationResult == DestinationResult.Overwritten)
+                    {
+                        LogPanel.AddEntry($"Overwrote {r.DestinationPath ?? "(unknown)"}");
+                    }
                 }
             }
 
@@ -787,8 +794,8 @@ public partial class MainViewModel : ViewModelBase
         }
         finally
         {
-            DirectoryTree.RemoveAllMarkedForRemoval();
             FileList.RemoveAllMarkedForRemoval();
+            DirectoryTree.RemoveNodesMarkedForRemoval();
         }
     }
 
@@ -797,16 +804,9 @@ public partial class MainViewModel : ViewModelBase
         if (!result.IsSuccess)
             return;
 
-        if (result.SourcePathResult is SourcePathResult.Moved or SourcePathResult.Trashed or SourcePathResult.Deleted)
+        if (result.SourceNodeResult is SourceResult.Moved or SourceResult.Trashed or SourceResult.Deleted)
         {
-            DirectoryTreeNode? node = DirectoryTree.MarkForRemoval(result.SourcePath);
-            if (node is not null)
-            {
-                if (node.IsDirectory)
-                {
-                    FileList.ClearIfUnder(node);
-                }
-            }
+            result.SourceNode.MarkForRemoval();
         }
     }
 

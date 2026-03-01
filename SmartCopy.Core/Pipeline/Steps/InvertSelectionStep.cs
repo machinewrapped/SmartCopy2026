@@ -23,31 +23,31 @@ public sealed class InvertSelectionStep : IPipelineStep
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(
-        IStepContext ctx, [EnumeratorCancellation] CancellationToken ct)
+        IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
         await Task.Yield();
-        foreach (var node in ctx.RootNode.GetFilterIncludedDescendants())
+        foreach (var node in context.RootNode.GetFilterIncludedDescendants())
         {
             ct.ThrowIfCancellationRequested();
             if (!node.IsDirectory)
             {
-                var nodeCtx = ctx.GetNodeContext(node);
+                var nodeCtx = context.GetNodeContext(node);
                 nodeCtx.VirtualCheckState = nodeCtx.VirtualCheckState == CheckState.Checked
                     ? CheckState.Unchecked
                     : CheckState.Checked;
             }
             yield return new TransformResult(
                 IsSuccess: true,
-                SourcePath: node.FullPath,
-                SourcePathResult: SourcePathResult.None);
+                SourceNode: node,
+                SourceNodeResult: SourceResult.None);
         }
     }
 
     public async IAsyncEnumerable<TransformResult> ApplyAsync(
-        IStepContext ctx, [EnumeratorCancellation] CancellationToken ct)
+        IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
         await Task.Yield();
-        foreach (var node in ctx.RootNode.GetFilterIncludedDescendants())
+        foreach (var node in context.RootNode.GetFilterIncludedDescendants())
         {
             ct.ThrowIfCancellationRequested();
             if (!node.IsDirectory)
@@ -56,8 +56,8 @@ public sealed class InvertSelectionStep : IPipelineStep
                     : CheckState.Checked;
             yield return new TransformResult(
                 IsSuccess: true,
-                SourcePath: node.FullPath,
-                SourcePathResult: SourcePathResult.None);
+                SourceNode: node,
+                SourceNodeResult: SourceResult.None);
         }
     }
 }

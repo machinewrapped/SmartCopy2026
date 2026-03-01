@@ -25,34 +25,34 @@ public sealed class FlattenStep : IPipelineStep
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(
-        IStepContext ctx, [EnumeratorCancellation] CancellationToken ct)
+        IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
         await Task.Yield();
-        foreach (var node in ctx.RootNode.GetSelectedDescendants())
+        foreach (var node in context.RootNode.GetSelectedDescendants())
         {
             ct.ThrowIfCancellationRequested();
-            if (ctx.IsNodeFailed(node)) continue;
-            ApplyToContext(ctx.GetNodeContext(node));
+            if (context.IsNodeFailed(node)) continue;
+            ApplyToContext(context.GetNodeContext(node));
             yield return new TransformResult(
                 IsSuccess: true,
-                SourcePath: node.FullPath,
-                SourcePathResult: SourcePathResult.None);
+                SourceNode: node,
+                SourceNodeResult: SourceResult.None);
         }
     }
 
     public async IAsyncEnumerable<TransformResult> ApplyAsync(
-        IStepContext ctx, [EnumeratorCancellation] CancellationToken ct)
+        IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
         await Task.Yield();
-        foreach (var node in ctx.RootNode.GetSelectedDescendants())
+        foreach (var node in context.RootNode.GetSelectedDescendants())
         {
             ct.ThrowIfCancellationRequested();
-            if (ctx.IsNodeFailed(node)) continue;
-            ApplyToContext(ctx.GetNodeContext(node));
+            if (context.IsNodeFailed(node)) continue;
+            ApplyToContext(context.GetNodeContext(node));
             yield return new TransformResult(
                 IsSuccess: true,
-                SourcePath: node.FullPath,
-                SourcePathResult: SourcePathResult.None);
+                SourceNode: node,
+                SourceNodeResult: SourceResult.None);
         }
     }
 

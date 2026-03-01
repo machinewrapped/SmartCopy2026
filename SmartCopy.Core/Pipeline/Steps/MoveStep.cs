@@ -34,31 +34,31 @@ public sealed class MoveStep : IPipelineStep
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(
-        IStepContext ctx, [EnumeratorCancellation] CancellationToken ct)
+        IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
-        var targetProvider = ctx.TargetProvider
+        var targetProvider = context.TargetProvider
             ?? throw new InvalidOperationException("TargetProvider must be set for MoveStep.");
 
-        foreach (var node in ctx.GetVirtuallySelectedDescendants())
+        foreach (var node in context.GetPreviewSelectedDescendants())
         {
             ct.ThrowIfCancellationRequested();
-            if (ctx.IsNodeFailed(node)) continue;
+            if (context.IsNodeFailed(node)) continue;
             // Only preview top-level selected nodes (parent not selected) to avoid duplicate entries.
-            if (node.Parent is { } p && ctx.IsPreviewSelected(p)) continue;
+            if (node.Parent is { } p && context.IsPreviewSelected(p)) continue;
 
-            var nodeCtx = ctx.GetNodeContext(node);
+            var nodeCtx = context.GetNodeContext(node);
             var destination = StepPathHelper.BuildDestinationPath(DestinationPath, nodeCtx.PathSegments);
             var destResult = await targetProvider.ExistsAsync(
                 StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, nodeCtx.PathSegments), ct)
-                ? DestinationPathResult.Overwritten
-                : DestinationPathResult.Created;
+                ? DestinationResult.Overwritten
+                : DestinationResult.Created;
 
             yield return new TransformResult(
                 IsSuccess: true,
-                SourcePath: node.FullPath,
-                SourcePathResult: SourcePathResult.Moved,
+                SourceNode: node,
+                SourceNodeResult: SourceResult.Moved,
                 DestinationPath: destination,
-                DestinationPathResult: destResult,
+                DestinationResult: destResult,
                 NumberOfFilesAffected: node.CountSelectedFiles(),
                 NumberOfFoldersAffected: node.CountSelectedFolders(),
                 InputBytes: node.Size,
@@ -67,51 +67,51 @@ public sealed class MoveStep : IPipelineStep
     }
 
     public async IAsyncEnumerable<TransformResult> ApplyAsync(
-        IStepContext ctx, [EnumeratorCancellation] CancellationToken ct)
+        IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
-        var targetProvider = ctx.TargetProvider
+        var targetProvider = context.TargetProvider
             ?? throw new InvalidOperationException("TargetProvider must be set for MoveStep.");
 
-        var sameProvider = ReferenceEquals(targetProvider, ctx.SourceProvider);
+        var sameProvider = ReferenceEquals(targetProvider, context.SourceProvider);
         var canAtomicMove = targetProvider.Capabilities.CanAtomicMove;
 
         // Nodes covered by an earlier atomic directory move are skipped.
         var handledNodes = new HashSet<DirectoryTreeNode>();
 
-        foreach (var node in ctx.RootNode.GetSelectedDescendants())
+        foreach (var node in context.RootNode.GetSelectedDescendants())
         {
             ct.ThrowIfCancellationRequested();
-            if (ctx.IsNodeFailed(node)) continue;
+            if (context.IsNodeFailed(node)) continue;
             if (handledNodes.Contains(node)) continue;
 
             if (node.IsDirectory)
             {
                 if (sameProvider && canAtomicMove && CanMoveEntireSubtree(node))
                 {
-                    var nodeCtx = ctx.GetNodeContext(node);
+                    var nodeCtx = context.GetNodeContext(node);
                     var destination = StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, nodeCtx.PathSegments);
                     var destExists = await targetProvider.ExistsAsync(destination, ct);
 
-                    if (destExists && ctx.OverwriteMode == OverwriteMode.Skip)
+                    if (destExists && context.OverwriteMode == OverwriteMode.Skip)
                     {
                         MarkDescendantsHandled(node, handledNodes);
                         yield return new TransformResult(
                             IsSuccess: true,
-                            SourcePath: node.FullPath,
-                            SourcePathResult: SourcePathResult.None,
+                            SourceNode: node,
+                            SourceNodeResult: SourceResult.None,
                             DestinationPath: destination,
                             InputBytes: node.Size);
                         continue;
                     }
 
-                    await ctx.SourceProvider.MoveAsync(node.FullPath, destination, ct);
+                    await context.SourceProvider.MoveAsync(node.FullPath, destination, ct);
                     MarkDescendantsHandled(node, handledNodes);
                     yield return new TransformResult(
                         IsSuccess: true,
-                        SourcePath: node.FullPath,
-                        SourcePathResult: SourcePathResult.Moved,
+                        SourceNode: node,
+                        SourceNodeResult: SourceResult.Moved,
                         DestinationPath: destination,
-                        DestinationPathResult: destExists ? DestinationPathResult.Overwritten : DestinationPathResult.Created,
+                        DestinationResult: destExists ? DestinationResult.Overwritten : DestinationResult.Created,
                         NumberOfFilesAffected: node.CountAllFiles(),
                         NumberOfFoldersAffected: node.CountAllFolders(),
                         InputBytes: node.Size,
@@ -120,27 +120,27 @@ public sealed class MoveStep : IPipelineStep
                 else
                 {
                     // Directory cannot be moved atomically (cross-provider or partial subtree).
-                    ctx.MarkFailed(node);
+                    context.MarkFailed(node);
                     MarkDescendantsHandled(node, handledNodes);
                     yield return new TransformResult(
                         IsSuccess: false,
-                        SourcePath: node.FullPath,
-                        SourcePathResult: SourcePathResult.None);
+                        SourceNode: node,
+                        SourceNodeResult: SourceResult.None);
                 }
                 continue;
             }
 
             // File node
-            var fileCtx = ctx.GetNodeContext(node);
+            var fileCtx = context.GetNodeContext(node);
             var fileDest = StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, fileCtx.PathSegments);
             var fileDestExists = await targetProvider.ExistsAsync(fileDest, ct);
 
-            if (fileDestExists && ctx.OverwriteMode == OverwriteMode.Skip)
+            if (fileDestExists && context.OverwriteMode == OverwriteMode.Skip)
             {
                 yield return new TransformResult(
                     IsSuccess: true,
-                    SourcePath: node.FullPath,
-                    SourcePathResult: SourcePathResult.None,
+                    SourceNode: node,
+                    SourceNodeResult: SourceResult.None,
                     DestinationPath: fileDest,
                     InputBytes: node.Size);
                 continue;
@@ -148,21 +148,21 @@ public sealed class MoveStep : IPipelineStep
 
             if (sameProvider && canAtomicMove)
             {
-                await ctx.SourceProvider.MoveAsync(node.FullPath, fileDest, ct);
+                await context.SourceProvider.MoveAsync(node.FullPath, fileDest, ct);
             }
             else
             {
-                await using var stream = await ctx.SourceProvider.OpenReadAsync(node.FullPath, ct);
+                await using var stream = await context.SourceProvider.OpenReadAsync(node.FullPath, ct);
                 await targetProvider.WriteAsync(fileDest, stream, progress: null, ct);
-                await ctx.SourceProvider.DeleteAsync(node.FullPath, ct);
+                await context.SourceProvider.DeleteAsync(node.FullPath, ct);
             }
 
             yield return new TransformResult(
                 IsSuccess: true,
-                SourcePath: node.FullPath,
-                SourcePathResult: SourcePathResult.Moved,
+                SourceNode: node,
+                SourceNodeResult: SourceResult.Moved,
                 DestinationPath: fileDest,
-                DestinationPathResult: fileDestExists ? DestinationPathResult.Overwritten : DestinationPathResult.Created,
+                DestinationResult: fileDestExists ? DestinationResult.Overwritten : DestinationResult.Created,
                 NumberOfFilesAffected: 1,
                 InputBytes: node.Size,
                 OutputBytes: node.Size);

@@ -23,34 +23,34 @@ public sealed class SelectAllStep : IPipelineStep
     public TransformStepConfig Config => new(StepType, new JsonObject());
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(
-        IStepContext ctx, [EnumeratorCancellation] CancellationToken ct)
+        IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
         await Task.Yield();
-        foreach (var node in ctx.RootNode.GetFilterIncludedDescendants())
+        foreach (var node in context.RootNode.GetFilterIncludedDescendants())
         {
             ct.ThrowIfCancellationRequested();
             if (!node.IsDirectory)
-                ctx.GetNodeContext(node).VirtualCheckState = CheckState.Checked;
+                context.GetNodeContext(node).VirtualCheckState = CheckState.Checked;
             yield return new TransformResult(
                 IsSuccess: true,
-                SourcePath: node.FullPath,
-                SourcePathResult: SourcePathResult.None);
+                SourceNode: node,
+                SourceNodeResult: SourceResult.None);
         }
     }
 
     public async IAsyncEnumerable<TransformResult> ApplyAsync(
-        IStepContext ctx, [EnumeratorCancellation] CancellationToken ct)
+        IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
         await Task.Yield();
-        foreach (var node in ctx.RootNode.GetFilterIncludedDescendants())
+        foreach (var node in context.RootNode.GetFilterIncludedDescendants())
         {
             ct.ThrowIfCancellationRequested();
             if (!node.IsDirectory)
                 node.CheckState = CheckState.Checked;
             yield return new TransformResult(
                 IsSuccess: true,
-                SourcePath: node.FullPath,
-                SourcePathResult: SourcePathResult.None);
+                SourceNode: node,
+                SourceNodeResult: SourceResult.None);
         }
     }
 }

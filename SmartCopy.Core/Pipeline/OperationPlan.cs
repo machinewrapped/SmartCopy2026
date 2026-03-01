@@ -5,9 +5,9 @@ namespace SmartCopy.Core.Pipeline;
 
 public readonly record struct PlannedAction(
     string SourcePath,
-    SourcePathResult SourcePathResult,
+    SourceResult SourceResult,
     string? DestinationPath,
-    DestinationPathResult DestinationPathResult,
+    DestinationResult DestinationResult,
     int NumberOfFilesAffected,
     int NumberOfFoldersAffected,
     long InputBytes,

@@ -11,7 +11,6 @@ internal static class MockMemoryFileSystemFactory
     public const string RootPath = "/mem";
     public const string SourcePath = "/mem/Music";
     public const string TargetPath = "/mem/Mirror";
-    public const string DefaultFileListPath = "/mem/Music/Alternative/Pixies/1988 Surfer Rosa [SACD Remaster]";
 
     public static MemoryFileSystemProvider CreateSeeded(bool artificialDelay = false)
     {

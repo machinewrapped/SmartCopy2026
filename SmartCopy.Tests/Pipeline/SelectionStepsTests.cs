@@ -93,7 +93,7 @@ public sealed class SelectionStepsTests
 
         var result = results.Single();
         Assert.True(result.IsSuccess);
-        Assert.Equal(SourcePathResult.None, result.SourcePathResult);
+        Assert.Equal(SourceResult.None, result.SourceNodeResult);
         Assert.Null(result.DestinationPath);
         Assert.Equal(CheckState.Checked, context.GetNodeContext(file).VirtualCheckState);
         Assert.Equal(CheckState.Unchecked, file.CheckState); // real state unchanged
@@ -140,7 +140,7 @@ public sealed class SelectionStepsTests
 
         var result = results.Single();
         Assert.True(result.IsSuccess);
-        Assert.Equal(SourcePathResult.None, result.SourcePathResult);
+        Assert.Equal(SourceResult.None, result.SourceNodeResult);
         Assert.Null(result.DestinationPath);
         Assert.Equal(CheckState.Unchecked, context.GetNodeContext(file).VirtualCheckState);
         Assert.Equal(CheckState.Checked, file.CheckState); // real state unchanged
@@ -187,7 +187,7 @@ public sealed class SelectionStepsTests
 
         var result = results.Single();
         Assert.True(result.IsSuccess);
-        Assert.Equal(SourcePathResult.None, result.SourcePathResult);
+        Assert.Equal(SourceResult.None, result.SourceNodeResult);
         Assert.Null(result.DestinationPath);
         Assert.Equal(CheckState.Checked, context.GetNodeContext(file).VirtualCheckState);
         Assert.Equal(CheckState.Unchecked, file.CheckState); // real state unchanged
