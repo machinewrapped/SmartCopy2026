@@ -11,7 +11,7 @@ Reference:
 1. [What the Predecessor Got Right](#1-what-the-predecessor-got-right)
 2. [What to Fix and Improve](#2-what-to-fix-and-improve)
 3. [Technology Stack](#3-technology-stack)
-4. [UI Design](#4-ui-design)
+4. [UI Design Reference](#4-ui-design-reference)
 5. [Implementation Phases](#5-implementation-phases)
 6. [Open Questions](#6-open-questions)
 
@@ -101,6 +101,11 @@ it provides built-in column resizing and sort headers that would otherwise need 
 Use `net10.0` TFM. .NET 10 is LTS (supported until ~2028). If building on a machine with only .NET 9
 installed, `global.json` can pin the SDK version. Self-contained publish (`--self-contained true
 -p:PublishSingleFile=true`) bundles the runtime and ships a single executable per platform.
+
+---
+## 4. UI Design Reference
+
+Canonical UI/interaction behavior lives in `Docs/UI+UX.md`. This plan tracks implementation and validation only.
 
 ---
 ## 5. Implementation Phases
@@ -367,25 +372,138 @@ Verification:
 - [x] `dotnet build`
 - [x] `dotnet test`
 
-### Phase 2 — Filesystem Integration
+### 5.2 Phase 2 — Filesystem Integration
 
-Exercise `LocalFileSystemProvider` in real usage after UX/architecture is proven and tested using the memory-backed file system and validate that `IFileSystemProvider` abstractions hold under real file system behavior and limitations.
+*Goal: switch from memory-only interaction to real file systems without regressing UX guarantees established in Phase 1.*
 
-Scope:
-- [ ] Folder browser dialog using native dialogs
-- [ ] Bookmarks and MRU lists work with multiple drives and file systems
-- [ ] Local provider/scanner supports progressive scan
-- [ ] File system capabilities (e.g. atomic move/delete, trash can support) reported and respected
-- [ ] File system watcher (gated by provider capabilities)
-- [ ] Debounce/coalescing and subtree-only update tests
-- [ ] Incremental subtree rescan with selection preservation
-- [ ] Operations across different file systems (local, network)
-- [ ] `TrashService` adapters with timeout/fallback behavior
-- [ ] Drag-and-drop for source/destination fields
+Approach: front-load validation and risk burn-down. After each user-facing integration step, add or adapt automated coverage to lock behavior and avoid late regressions.
+
+#### 5.2.1 — Validation Harness and Capability Contract (first)
+
+Deliverables:
+- [x] Expand provider contract tests so they run against both `MemoryFileSystemProvider` and `LocalFileSystemProvider`
+- [x] Add targeted tests for path normalization/splitting/joining on Windows + POSIX-style inputs
+- [x] Add coverage for cross-volume move fallback behavior (copy+delete when atomic move is unavailable)
+- [x] Add explicit capability assertions (`CanSeek`, `CanAtomicMove`, path limits) per provider
+- [x] Define a Phase 2 smoke dataset for repeatable manual verification (small tree + large files + mixed attributes)
+
+Acceptance criteria:
+- [x] Provider contract suite passes for memory and local providers
+- [x] Capability-dependent code paths are covered by tests and do not depend on implicit platform assumptions
+- [x] Failures in local-provider behavior are caught by tests before UI wiring
+
+Verification:
+- [x] `dotnet build SmartCopy2026.slnx`
+- [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj`
+
+New files:
+- `SmartCopy.Tests/TestInfrastructure/CapabilityOverrideProvider.cs` — capability decorator for testing fallback paths
+- `SmartCopy.Tests/TestInfrastructure/SmokeDataset.cs` — canonical Phase 2 smoke dataset (`Seed` + `SeedTo`)
+- `SmartCopy.Tests/FileSystem/ProviderContractTests.cs` — 11-test abstract contract + Memory/Local subclasses
+- `SmartCopy.Tests/FileSystem/PathHandlingTests.cs` — 14 path normalization/splitting/joining tests
+- `SmartCopy.Tests/Pipeline/MoveStepFallbackTests.cs` — 4 tests for cross-provider and CanAtomicMove=false fallback paths
+
+Real filesystem test strategy (three tiers):
+1. **Hermetic** — `TempDirectory` + `MemoryFileSystemProvider`; always-on, no external deps; runs in CI
+2. **Smoke** — programmatic `SmokeDataset.Seed*()` into temp dirs; same dataset for both providers
+3. **Slow** (Phase 2.X) — opt-in via `SMARTCOPY_SLOW_TEST_PATH` env var; tagged `[Trait("Category", "Slow")]`; use for validation matrix items (100k nodes, large files, locked files, network paths)
+
+#### 5.2.2 — Source Acquisition UX (native browse + path commit)
+
+Deliverables:
+- [ ] Replace disabled Browse buttons with native folder picker wiring (source + destination contexts)
+- [ ] Keep editable `SourcePath` commit semantics (Enter/dropdown close) while allowing picker-driven path updates
+- [ ] Ensure bookmarks/MRU normalization works across multiple drives, UNC paths, and trailing-separator variations
+- [ ] Add validation/error messaging for inaccessible or missing paths without freezing UI
+
+Acceptance criteria:
+- [ ] User can pick a local folder and immediately scan it
+- [ ] MRU/bookmarks de-duplicate equivalent paths reliably
+- [ ] Invalid/unreachable path entry fails safely and preserves last good state
+
+Verification:
+- [ ] Automated tests for bookmark/MRU normalization edge cases
+- [ ] Manual smoke: local drive path, UNC/network path, disconnected path recovery
+
+#### 5.2.3 — Real Provider Runtime Integration (scanner + pipeline path)
+
+Deliverables:
+- [ ] Introduce runtime provider selection (memory for debug flows, local for real filesystem flows)
+- [ ] Wire `DirectoryTreeViewModel` and `FileListViewModel` to the active provider at root-change time
+- [ ] Ensure pipeline preview/run uses active source provider and correct destination provider
+- [ ] Preserve existing progress, cancellation, and log semantics when using local files
+
+Acceptance criteria:
+- [ ] Phase 1 workflows behave the same from a user perspective when pointed at real folders
+- [ ] No hard dependency on memory-only paths (`/mem`) remains in execution paths
+- [ ] Cancel/rescan remains responsive during large local scans
+
+Verification:
+- [ ] Automated tests around provider switching and pipeline execution provider routing
+- [ ] Manual smoke: scan/filter/preview/run on a real directory tree with at least 10k files
+
+#### 5.2.4 — Capability-Gated Delete/Trash and Move Semantics
+
+Deliverables:
+- [ ] Introduce `TrashService` abstraction/adapters with timeout and fallback behavior
+- [ ] Route delete behavior through capability/availability checks (trash when available, permanent when explicitly chosen or fallback required)
+- [ ] Handle non-atomic move scenarios explicitly and record outcome in operation journal
+- [ ] Surface capability-derived safety messaging in preview/run UX
+
+Acceptance criteria:
+- [ ] Delete operations are deterministic and journaled as `Trashed` vs `Deleted`
+- [ ] Cross-volume moves do not fail silently; fallback path is visible and tested
+- [ ] Destructive-operation guardrails from Phase 1 are preserved
+
+Verification:
+- [ ] Unit tests for trash fallback, timeout, and move fallback paths
+- [ ] Manual smoke: delete-to-trash and permanent delete on local files
+
+#### 5.2.5 — Watcher and Incremental Rescan (selection-preserving)
+
+Deliverables:
+- [ ] Gate watcher startup by provider capability and path suitability
+- [ ] Integrate `DirectoryWatcher` batching into directory tree update flow
+- [ ] Implement incremental subtree rescan for changed paths only
+- [ ] Preserve user selection/filter state across watcher-driven updates
+
+Acceptance criteria:
+- [ ] Burst filesystem changes are coalesced (debounced) without UI thrash
+- [ ] External create/rename/delete events update only impacted subtrees
+- [ ] Selection/check-state is stable after incremental updates
+
+Verification:
+- [ ] Automated tests for debounce/coalescing and subtree-only updates
+- [ ] Manual smoke with scripted file churn in nested directories
+
+#### 5.2.6 — Drag-and-Drop Integration and Hardening
+
+Deliverables:
+- [ ] Add drag-and-drop for source and destination path inputs
+- [ ] Validate dropped paths and reject unsupported payloads safely
+- [ ] Confirm keyboard-first behavior remains intact after DnD additions
+
+Acceptance criteria:
+- [ ] Dragging folders from OS shell updates source/destination fields reliably
+- [ ] DnD does not bypass validation/confirmation safeguards
+- [ ] Accessibility and keyboard workflows remain unchanged
+
+Verification:
+- [ ] UI-level smoke checks for DnD + keyboard navigation regression
+
+#### 5.2.X Phase 2 Validation Matrix (must pass before closing phase)
+
+- [ ] Large tree scan (>100k nodes) remains responsive with cancellable scan
+- [ ] Long-path and non-ASCII filename handling validated
+- [ ] Locked/in-use file behavior validated (copy/move/delete error reporting)
+- [ ] Cross-volume/local-network move/copy behavior validated
+- [ ] Watcher overflow/error path handled without app crash
+- [ ] Operation journal correctness validated for copy/move/delete/trash outcomes
 
 Exit criteria:
-- [ ] End-to-end flows validated against real file systems
-- [ ] Unit tests validate file system operations on Windows, Linux, and macOS
+- [ ] End-to-end scan/filter/preview/run flows validated against real file systems
+- [ ] Automated suites cover provider contract, watcher behavior, and capability-gated operations
+- [ ] Cross-platform CI execution validates local file system tests on Windows, Linux, and macOS
 
 ### Phase 3 — Modernisation
 
@@ -405,8 +523,12 @@ Exit criteria:
 
 Scope:
 - [ ] Theming, localization infrastructure, update checks
+- [ ] Confirm quit whilst operation is in progress
+- [ ] Disable Pipeline Run & Preview whilst scan is in progress
+- [ ] Open PreviewView and show a progress bar whilst OperationPlan is being prepared
 
 Exit criteria:
+- [ ] User acceptance test confirms ready to launch
 - [ ] Release candidate passes cross-platform smoke checklist
 
 ### Phase 5 — Pipeline Plug-Ins
@@ -414,7 +536,7 @@ Exit criteria:
 Scope:
 - [ ] `RenameStep` token engine (`{name}`, `{ext}`, `{date}`, `{artist}`, `{album}`, `{track:00}`, `{title}`)
 - [ ] `ConvertStep` + plugin loader + per-plugin settings UI
-- [ ] FFmpeg reference plugin and conversion-size preview
+- [ ] FFmpeg reference plugin
 - [ ] Public plugin SDK documentation
 
 Exit criteria:
@@ -422,7 +544,7 @@ Exit criteria:
 - [ ] Plugin isolation and loading failures handled without app crash
 - [ ] Plugin SDK docs are sufficient for a third party to build a basic plugin
 
-## 7. Open Questions
+## 6. Open Questions
 
 | Topic | Default for v1 | Target date | Status |
 |---|---|---|---|

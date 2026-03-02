@@ -273,27 +273,32 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         return CombinePath(basePath, string.Join("/", segments));
     }
 
-    public void SeedDirectory(string path)
+    public void SeedDirectory(string path,
+        FileAttributes attributes = FileAttributes.Directory)
     {
         var normalizedPath = Normalize(path);
         EnsureDirectoryExists(normalizedPath, createIfMissing: true);
+        if (attributes != FileAttributes.Directory && _entries.TryGetValue(normalizedPath, out var e))
+            _entries[normalizedPath] = e with { Attributes = attributes };
     }
 
-    public void SeedFile(string path, ReadOnlySpan<byte> content)
+    public void SeedFile(string path, ReadOnlySpan<byte> content,
+        FileAttributes attributes = FileAttributes.Normal)
     {
         var normalizedPath = Normalize(path);
         EnsureParentDirectoryExists(normalizedPath);
         var now = DateTime.UtcNow;
-        _entries[normalizedPath] = MemoryEntry.CreateFile(content.ToArray(), now);
+        _entries[normalizedPath] = MemoryEntry.CreateFile(content.ToArray(), now, attributes);
         TouchParentModifiedTime(normalizedPath, now);
     }
 
-    public void SeedSimulatedFile(string path, long size)
+    public void SeedSimulatedFile(string path, long size,
+        FileAttributes attributes = FileAttributes.Normal)
     {
         var normalizedPath = Normalize(path);
         EnsureParentDirectoryExists(normalizedPath);
         var now = DateTime.UtcNow;
-        _entries[normalizedPath] = MemoryEntry.CreateSimulatedFile(size, now);
+        _entries[normalizedPath] = MemoryEntry.CreateSimulatedFile(size, now, attributes);
         TouchParentModifiedTime(normalizedPath, now);
     }
 
@@ -470,7 +475,8 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
                 Attributes: FileAttributes.Directory);
         }
 
-        public static MemoryEntry CreateFile(byte[] content, DateTime timestamp)
+        public static MemoryEntry CreateFile(byte[] content, DateTime timestamp,
+            FileAttributes attributes = FileAttributes.Normal)
         {
             return new MemoryEntry(
                 IsDirectory: false,
@@ -478,10 +484,11 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
                 Size: content.Length,
                 CreatedAt: timestamp,
                 ModifiedAt: timestamp,
-                Attributes: FileAttributes.Normal);
+                Attributes: attributes);
         }
 
-        public static MemoryEntry CreateSimulatedFile(long size, DateTime timestamp)
+        public static MemoryEntry CreateSimulatedFile(long size, DateTime timestamp,
+            FileAttributes attributes = FileAttributes.Normal)
         {
             return new MemoryEntry(
                 IsDirectory: false,
@@ -489,7 +496,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
                 Size: size,
                 CreatedAt: timestamp,
                 ModifiedAt: timestamp,
-                Attributes: FileAttributes.Normal);
+                Attributes: attributes);
         }
     }
 }

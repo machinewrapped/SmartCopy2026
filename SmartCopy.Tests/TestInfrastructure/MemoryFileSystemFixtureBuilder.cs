@@ -9,27 +9,31 @@ public sealed class MemoryFileSystemFixtureBuilder
 {
     private readonly MemoryFileSystemProvider _provider = new();
 
-    public MemoryFileSystemFixtureBuilder WithDirectory(string path)
+    public MemoryFileSystemFixtureBuilder WithDirectory(string path,
+        FileAttributes attributes = FileAttributes.Directory)
     {
-        _provider.SeedDirectory(path);
+        _provider.SeedDirectory(path, attributes);
         return this;
     }
 
-    public MemoryFileSystemFixtureBuilder WithFile(string path, ReadOnlySpan<byte> content)
+    public MemoryFileSystemFixtureBuilder WithFile(string path, ReadOnlySpan<byte> content,
+        FileAttributes attributes = FileAttributes.Normal)
     {
-        _provider.SeedFile(path, content);
+        _provider.SeedFile(path, content, attributes);
         return this;
     }
 
-    public MemoryFileSystemFixtureBuilder WithTextFile(string path, string content)
+    public MemoryFileSystemFixtureBuilder WithTextFile(string path, string content,
+        FileAttributes attributes = FileAttributes.Normal)
     {
-        _provider.SeedFile(path, Encoding.UTF8.GetBytes(content));
+        _provider.SeedFile(path, Encoding.UTF8.GetBytes(content), attributes);
         return this;
     }
 
-    public MemoryFileSystemFixtureBuilder WithSimulatedFile(string path, long size)
+    public MemoryFileSystemFixtureBuilder WithSimulatedFile(string path, long size,
+        FileAttributes attributes = FileAttributes.Normal)
     {
-        _provider.SeedSimulatedFile(path, size);
+        _provider.SeedSimulatedFile(path, size, attributes);
         return this;
     }
 
