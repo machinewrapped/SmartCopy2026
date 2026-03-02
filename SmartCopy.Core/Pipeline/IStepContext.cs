@@ -20,6 +20,8 @@ public interface IStepContext
     /// PathSegments mutations persist across all steps in the run.</summary>
     PipelineContext GetNodeContext(DirectoryTreeNode node);
 
+    FileSystemProviderRegistry? ProviderRegistry { get; }
+
     bool IsNodeFailed(DirectoryTreeNode node);
     void MarkFailed(DirectoryTreeNode node);
 }

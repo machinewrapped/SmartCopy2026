@@ -215,7 +215,7 @@ public sealed class PipelineIntegrationTests
         Assert.Equal("ok", columns[1]);
         Assert.Equal("copy", columns[2]);
         Assert.Equal("src/song.mp3", columns[3]);
-        Assert.Equal("/dest/src/song.mp3", columns[4]);
+        Assert.Equal("/mem/dest/src/song.mp3", columns[4]);
         Assert.Equal("256.0KB", columns[5]);
     }
 }

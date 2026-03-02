@@ -28,6 +28,7 @@ public sealed class SelectionStepsTests
         public IFileSystemProvider? TargetProvider => null;
         public OverwriteMode OverwriteMode => OverwriteMode.Always;
         public DeleteMode DeleteMode => DeleteMode.Trash;
+        public FileSystemProviderRegistry? ProviderRegistry => null;
 
         public TestStepContext(DirectoryTreeNode root, IFileSystemProvider provider)
         {

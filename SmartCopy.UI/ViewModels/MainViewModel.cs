@@ -75,7 +75,8 @@ public partial class MainViewModel : ViewModelBase
     private bool _addArtificialDelay = false;
 
     private readonly MemoryFileSystemProvider _memoryProvider;
-    private readonly LocalFileSystemProvider _localProvider;
+    private readonly FileSystemProviderRegistry _providerRegistry = new();
+    private readonly FilterContext _filterContext;
     private readonly AppSettings _settings = new();
     private readonly AppSettingsStore _settingsStore = new();
     private readonly SessionStore _sessionStore = new();
@@ -104,9 +105,11 @@ public partial class MainViewModel : ViewModelBase
     {
         var presetStore = new FilterPresetStore();
 
-        _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: true);
-        _localProvider = new LocalFileSystemProvider(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+        // Create an in-memory virtual file system for testing. TODO: make this a debug option.
+        _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: _settings.AddArtificialDelay);
         _memoryProvider.SeedDirectory(MockMemoryFileSystemFactory.TargetPath);
+        _providerRegistry.Register(_memoryProvider);
+        _filterContext = new FilterContext(_providerRegistry);
         SourcePath = MockMemoryFileSystemFactory.SourcePath;
         _lastCommittedSourcePath = SourcePath;
         _activeSourceProvider = _memoryProvider;
@@ -115,6 +118,7 @@ public partial class MainViewModel : ViewModelBase
         Pipeline = new PipelineViewModel(
             presetStore: new PipelinePresetStore());
 
+        // TODO: we will need to be able to init the viewmodel without a source path or provider
         DirectoryTree = new DirectoryTreeViewModel(_activeSourceProvider, MockMemoryFileSystemFactory.RootPath)
         {
             ShowFilteredNodesInTree = _settings.ShowFilteredNodesInTree
@@ -132,6 +136,7 @@ public partial class MainViewModel : ViewModelBase
         };
 
         FileList = new FileListViewModel();
+        FileList.UpdateFilterContext(_filterContext);
 
         WorkflowMenu = new WorkflowMenuViewModel(_workflowStore);
         WorkflowMenu.SaveRequested += async (_, _) => await SaveWorkflowAsync();
@@ -619,18 +624,9 @@ public partial class MainViewModel : ViewModelBase
         return removed;
     }
 
-    private IFileSystemProvider ResolveSourceProvider(string normalizedPath)
-    {
-        return IsMemoryProviderPath(normalizedPath)
-            ? _memoryProvider
-            : _localProvider;
-    }
-
-    private static bool IsMemoryProviderPath(string path)
-    {
-        return path.Equals("/mem", StringComparison.OrdinalIgnoreCase) ||
-               path.StartsWith("/mem/", StringComparison.OrdinalIgnoreCase);
-    }
+    private IFileSystemProvider ResolveSourceProvider(string normalizedPath) =>
+        _providerRegistry.Resolve(normalizedPath)
+        ?? throw new NotSupportedException($"No provider for path: {normalizedPath}");
 
     private static string BuildSourcePathValidationMessage(string path, Exception ex)
     {
@@ -664,9 +660,9 @@ public partial class MainViewModel : ViewModelBase
     private async Task ApplyFiltersAsync(CancellationToken ct = default)
     {
         var chain = FilterChain.BuildLiveChain();
-        FileList.UpdateChain(chain, _activeSourceProvider);
+        FileList.UpdateChain(chain);
 
-        await DirectoryTree.ApplyFiltersAsync(chain, _activeSourceProvider, ct);
+        await DirectoryTree.ApplyFiltersAsync(chain, _filterContext, ct);
         await FileList.ReapplyFiltersAsync(ct);
         RefreshIdleStats();
     }
@@ -784,7 +780,7 @@ public partial class MainViewModel : ViewModelBase
         var chain = FilterChain.BuildLiveChain();
         _activeSourceProvider = ResolveSourceProvider(PathHelper.NormalizeUserPath(SourcePath));
         DirectoryTree.SetProvider(_activeSourceProvider);
-        FileList.UpdateChain(chain, _activeSourceProvider);
+        FileList.UpdateChain(chain);
 
         // TODO: automatically reading the last used directory on startup could be expensive,
         // especially if it was a network drive or MTP. It should definitely be a setting that can be turned off.
@@ -834,11 +830,12 @@ public partial class MainViewModel : ViewModelBase
         var targetProvider = ResolveTargetProvider(pipeline);
         var job = new PipelineJob
         {
-            RootNode       = rootNode,
-            SourceProvider = _activeSourceProvider,
-            TargetProvider = targetProvider,
-            OverwriteMode  = ParseOverwriteMode(_settings.DefaultOverwriteMode),
-            DeleteMode     = ParseDeleteMode(_settings.DefaultDeleteMode),
+            RootNode         = rootNode,
+            SourceProvider   = _activeSourceProvider,
+            TargetProvider   = targetProvider,
+            ProviderRegistry = _providerRegistry,
+            OverwriteMode    = ParseOverwriteMode(_settings.DefaultOverwriteMode),
+            DeleteMode       = ParseDeleteMode(_settings.DefaultDeleteMode),
         };
 
         var plan = await runner.PreviewAsync(job, CancellationToken.None);
@@ -881,11 +878,12 @@ public partial class MainViewModel : ViewModelBase
         var targetProvider = ResolveTargetProvider(pipeline);
         var job = new PipelineJob
         {
-            RootNode       = rootNode,
-            SourceProvider = _activeSourceProvider,
-            TargetProvider = targetProvider,
-            OverwriteMode  = ParseOverwriteMode(_settings.DefaultOverwriteMode),
-            DeleteMode     = ParseDeleteMode(_settings.DefaultDeleteMode),
+            RootNode         = rootNode,
+            SourceProvider   = _activeSourceProvider,
+            TargetProvider   = targetProvider,
+            ProviderRegistry = _providerRegistry,
+            OverwriteMode    = ParseOverwriteMode(_settings.DefaultOverwriteMode),
+            DeleteMode       = ParseDeleteMode(_settings.DefaultDeleteMode),
         };
         await ExecutePipelineAsync(runner, job);
     }

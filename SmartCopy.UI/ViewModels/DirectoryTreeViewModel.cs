@@ -63,10 +63,10 @@ public class DirectoryTreeViewModel : ViewModelBase
     /// </summary>
     public async Task ApplyFiltersAsync(
         FilterChain chain,
-        IFileSystemProvider? comparisonProvider,
+        IFilterContext? context = null,
         CancellationToken ct = default)
     {
-        await chain.ApplyToTreeAsync(RootNodes, comparisonProvider, ct);
+        await chain.ApplyToTreeAsync(RootNodes, context, ct);
     }
 
     public async Task InitializeAsync(CancellationToken ct = default)

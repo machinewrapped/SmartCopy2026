@@ -10,7 +10,10 @@ using SmartCopy.Core.Filters;
 
 namespace SmartCopy.Core.DirectoryTree;
 
-public sealed class DirectoryTreeNode(FileSystemNode _filesystemNode, DirectoryTreeNode? _parent, CheckState _checkState = CheckState.Unchecked) : INotifyPropertyChanged
+public sealed class DirectoryTreeNode(
+    FileSystemNode _filesystemNode,
+    DirectoryTreeNode? _parent,
+    CheckState _checkState = CheckState.Unchecked) : INotifyPropertyChanged
 {
     public string Name => _filesystemNode.Name;
     public string FullPath => _filesystemNode.FullPath;

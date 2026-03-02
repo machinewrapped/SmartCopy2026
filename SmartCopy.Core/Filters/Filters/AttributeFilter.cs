@@ -3,7 +3,6 @@ using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using SmartCopy.Core.DirectoryTree;
-using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Core.Filters.Filters;
 
@@ -22,7 +21,7 @@ public sealed class AttributeFilter : FilterBase
 
     public override ValueTask<bool> MatchesAsync(
         DirectoryTreeNode node,
-        IFileSystemProvider? comparisonProvider,
+        IFilterContext context,
         CancellationToken ct = default)
     {
         return ValueTask.FromResult((node.Attributes & RequiredAttributes) == RequiredAttributes);
