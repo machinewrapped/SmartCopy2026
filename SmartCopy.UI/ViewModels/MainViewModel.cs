@@ -116,7 +116,8 @@ public partial class MainViewModel : ViewModelBase
 
         FilterChain = new FilterChainViewModel(presetStore, _settings);
         Pipeline = new PipelineViewModel(
-            presetStore: new PipelinePresetStore());
+            presetStore: new PipelinePresetStore(),
+            appSettings: _settings);
 
         // TODO: we will need to be able to init the viewmodel without a source path or provider
         DirectoryTree = new DirectoryTreeViewModel(_activeSourceProvider, MockMemoryFileSystemFactory.RootPath)
