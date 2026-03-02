@@ -48,7 +48,7 @@ public sealed class FilterLiveWiringTests
 
         // Include only mp3 — jpg should be excluded
         var chain = new FilterChain([new ExtensionFilter(["mp3"], FilterMode.Only)]);
-        vm.UpdateChain(chain, null);
+        vm.UpdateChain(chain);
 
         await vm.LoadFilesForNodeAsync(dirNode);
 
@@ -77,7 +77,7 @@ public sealed class FilterLiveWiringTests
         ]);
 
         var vm = new FileListViewModel();
-        vm.UpdateChain(chain, null);
+        vm.UpdateChain(chain);
         await vm.LoadFilesForNodeAsync(dirNode);
 
         var small = vm.VisibleFiles.First(f => f.Name == "small.mp3");
@@ -96,7 +96,7 @@ public sealed class FilterLiveWiringTests
         var chain = new FilterChain([new ExtensionFilter(["mp3"], FilterMode.Only)]);
 
         var vm = new FileListViewModel();
-        vm.UpdateChain(chain, null);
+        vm.UpdateChain(chain);
         await vm.LoadFilesForNodeAsync(dirNode);
 
         vm.ShowFilteredFiles = false;
@@ -112,7 +112,7 @@ public sealed class FilterLiveWiringTests
         var chain = new FilterChain([new ExtensionFilter(["mp3"], FilterMode.Only)]);
 
         var vm = new FileListViewModel();
-        vm.UpdateChain(chain, null);
+        vm.UpdateChain(chain);
         await vm.LoadFilesForNodeAsync(dirNode);
 
         // Default is true
@@ -130,7 +130,7 @@ public sealed class FilterLiveWiringTests
         var activeChain = new FilterChain([activeFilter]);
 
         var vm = new FileListViewModel();
-        vm.UpdateChain(activeChain, null);
+        vm.UpdateChain(activeChain);
         await vm.LoadFilesForNodeAsync(dirNode);
 
         // Confirm jpg is excluded
@@ -140,7 +140,7 @@ public sealed class FilterLiveWiringTests
         // Now replace the chain with a disabled version of the same filter
         var disabledFilter = new ExtensionFilter(["mp3"], FilterMode.Only, isEnabled: false);
         var disabledChain = new FilterChain([disabledFilter]);
-        vm.UpdateChain(disabledChain, null);
+        vm.UpdateChain(disabledChain);
         await vm.ReapplyFiltersAsync();
 
         // With filter disabled, every file should now be Included
@@ -160,7 +160,7 @@ public sealed class FilterLiveWiringTests
 
         // Now apply a chain that excludes jpg
         var chain = new FilterChain([new ExtensionFilter(["mp3"], FilterMode.Only)]);
-        vm.UpdateChain(chain, null);
+        vm.UpdateChain(chain);
         await vm.ReapplyFiltersAsync();
 
         var jpg = vm.VisibleFiles.First(f => f.Name == "photo.jpg");
@@ -184,7 +184,7 @@ public sealed class FilterLiveWiringTests
         await vm.InitializeAsync();
 
         var chain = new FilterChain([new ExtensionFilter(["mp3"], FilterMode.Only)]);
-        await vm.ApplyFiltersAsync(chain, null);
+        await vm.ApplyFiltersAsync(chain);
 
         var rootNode = vm.RootNodes.First(n => n.Name == "root");
 

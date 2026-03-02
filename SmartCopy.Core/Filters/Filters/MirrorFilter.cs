@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
@@ -35,9 +36,9 @@ public sealed class MirrorFilter : FilterBase
 
     public override async ValueTask<bool> MatchesAsync(
         DirectoryTreeNode node,
-        IFileSystemProvider? comparisonProvider,
         CancellationToken ct = default)
     {
+        var comparisonProvider = ResolveComparisonProvider(node);
         if (comparisonProvider is null)
         {
             return false;
@@ -79,6 +80,36 @@ public sealed class MirrorFilter : FilterBase
         var targetNode = await comparisonProvider.GetNodeAsync(comparePath, ct);
         return string.Equals(targetNode.Name, node.Name, StringComparison.OrdinalIgnoreCase)
                && targetNode.Size == node.Size;
+    }
+
+    private IFileSystemProvider? ResolveComparisonProvider(DirectoryTreeNode node)
+    {
+        if (string.IsNullOrWhiteSpace(ComparisonPath))
+            return null;
+
+        if (FileSystemProviderRegistry.TryResolveRegistered(ComparisonPath, out var registered))
+            return registered;
+
+        if (LooksLikeMemoryProviderPath(ComparisonPath))
+        {
+            return node.Provider is MemoryFileSystemProvider
+                ? node.Provider
+                : null;
+        }
+
+        if (Path.IsPathFullyQualified(ComparisonPath))
+        {
+            return FileSystemProviderRegistry.GetOrCreateLocalProvider(ComparisonPath);
+        }
+
+        return node.Provider;
+    }
+
+    private static bool LooksLikeMemoryProviderPath(string path)
+    {
+        var canonical = path.Replace('\\', '/').Trim();
+        return canonical.Equals("/mem", StringComparison.OrdinalIgnoreCase) ||
+               canonical.StartsWith("/mem/", StringComparison.OrdinalIgnoreCase);
     }
 
     protected override JsonObject BuildParameters() =>

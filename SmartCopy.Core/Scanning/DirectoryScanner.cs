@@ -19,7 +19,10 @@ public sealed class DirectoryScanner
         IProgress<ScanProgress>? progress = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        var rootNode = new DirectoryTreeNode(await _provider.GetNodeAsync(rootPath, ct), _parent: null);
+        var rootNode = new DirectoryTreeNode(
+            await _provider.GetNodeAsync(rootPath, ct),
+            _parent: null,
+            _provider: _provider);
         yield return rootNode;
 
         // visited guards against circular symbolic links re-enqueueing an already-processed path.

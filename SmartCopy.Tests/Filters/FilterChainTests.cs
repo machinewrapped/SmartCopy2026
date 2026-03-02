@@ -189,15 +189,17 @@ public sealed class FilterChainTests
     }
 
     [Fact]
-    public async Task ApplyToTree_MirrorFilter_ExcludesDirectoryWithNullProvider()
+    public async Task ApplyToTree_MirrorFilter_ExcludesDirectoryWhenMirrorPathMissing()
     {
         DirectoryTreeNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
-            .WithDirectory("/root/Music")
-            .WithSimulatedFile("/root/Music/song.mp3", size: 100));
+            .WithDirectory("/source/Music")
+            .WithSimulatedFile("/source/Music/song.mp3", size: 100));
 
-        var dir = root.Children.Single(c => c.Name == "root").Children.Single(c => c.Name == "Music");
-        var chain = new FilterChain([new MirrorFilter("/Mirror", MirrorCompareMode.NameOnly, FilterMode.Only)]);
-        await chain.ApplyToTreeAsync([dir]); // null comparisonProvider → MirrorFilter returns false
+        var dir = root
+            .Children.Single(c => c.Name == "source")
+            .Children.Single(c => c.Name == "Music");
+        var chain = new FilterChain([new MirrorFilter("/mem/Mirror", MirrorCompareMode.NameOnly, FilterMode.Only)]);
+        await chain.ApplyToTreeAsync([dir]);
 
         Assert.Equal(FilterResult.Excluded, dir.FilterResult);
     }
@@ -211,15 +213,15 @@ public sealed class FilterChainTests
             .WithDirectory("/source/Alternative")
             .WithSimulatedFile("/source/Alternative/mirrored.flac", size: 1000)
             .WithSimulatedFile("/source/Alternative/new.flac", size: 800)
-            .WithDirectory("/mirror/Alternative")
-            .WithSimulatedFile("/mirror/Alternative/mirrored.flac", size: 1000));
+            .WithDirectory("/Mirror/Alternative")
+            .WithSimulatedFile("/Mirror/Alternative/mirrored.flac", size: 1000));
 
         // "new.flac" is NOT in the mirror
 
-        DirectoryTreeNode source = await MemoryFileSystemFixtures.BuildDirectoryTree(provider, "source");
+        DirectoryTreeNode source = await MemoryFileSystemFixtures.BuildDirectoryTree(provider, "/source");
 
-        var chain = new FilterChain([new MirrorFilter("/mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude)]);
-        await chain.ApplyToTreeAsync([source], comparisonProvider: provider);
+        var chain = new FilterChain([new MirrorFilter("/mem/Mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude)]);
+        await chain.ApplyToTreeAsync([source]);
 
         // Directory has a non-mirrored file → must stay visible (Mixed: some included, some excluded)
         DirectoryTreeNode alt = source.Children.Single(c => c.Name == "Alternative");
@@ -239,13 +241,13 @@ public sealed class FilterChainTests
         var provider = MemoryFileSystemFixtures.Create(f => f
             .WithDirectory("/source/Alternative")
             .WithSimulatedFile("/source/Alternative/song.flac", size: 1000)
-            .WithDirectory("/mirror/Alternative")
-            .WithSimulatedFile("/mirror/Alternative/song.flac", size: 1000));
+            .WithDirectory("/Mirror/Alternative")
+            .WithSimulatedFile("/Mirror/Alternative/song.flac", size: 1000));
 
-        DirectoryTreeNode source = await MemoryFileSystemFixtures.BuildDirectoryTree(provider, "source");
+        DirectoryTreeNode source = await MemoryFileSystemFixtures.BuildDirectoryTree(provider, "/source");
 
-        var chain = new FilterChain([new MirrorFilter("/mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude)]);
-        await chain.ApplyToTreeAsync([source], comparisonProvider: provider);
+        var chain = new FilterChain([new MirrorFilter("/mem/Mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude)]);
+        await chain.ApplyToTreeAsync([source]);
 
         // All content is mirrored → directory should be Excluded
         Assert.Equal(FilterResult.Excluded, source.FilterResult);

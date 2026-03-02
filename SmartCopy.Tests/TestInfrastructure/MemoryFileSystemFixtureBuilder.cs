@@ -88,7 +88,7 @@ public static class MemoryFileSystemFixtures
 
     private static async Task<DirectoryTreeNode> BuildDirectoryTreeNode(MemoryFileSystemProvider provider, FileSystemNode entry, DirectoryTreeNode? parent)
     {
-        var node = new DirectoryTreeNode(entry, parent);
+        var node = new DirectoryTreeNode(entry, parent, _provider: parent is null ? provider : null);
 
         if (!entry.IsDirectory)
             return node;

@@ -10,7 +10,7 @@ namespace SmartCopy.Core.FileSystem;
 
 public sealed class MemoryFileSystemProvider : IFileSystemProvider
 {
-    private const string Root = "/";
+    private const string Root = "/mem";
     private readonly ConcurrentDictionary<string, MemoryEntry> _entries = new(StringComparer.OrdinalIgnoreCase);
     // SemaphoreSlim(1,1) provides async-compatible exclusive locking for all mutation operations.
     private readonly SemaphoreSlim _mutationSemaphore = new(1, 1);
@@ -38,7 +38,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         EnsureDirectoryExists(normalizedPath);
 
         // GetParentPath(kv.Key) == normalizedPath selects direct children.
-        // The extra inequality guard is only needed for root ("/"), where GetParentPath("/") == "/".
+        // The extra inequality guard is only needed for root, where GetParentPath(Root) == Root.
         var children = _entries
             .Where(kv => GetParentPath(kv.Key).Equals(normalizedPath, StringComparison.OrdinalIgnoreCase)
                          && !kv.Key.Equals(normalizedPath, StringComparison.OrdinalIgnoreCase))
@@ -256,14 +256,16 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         var prefix = root.EndsWith('/') ? root : root + '/';
         return full.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
             ? full[prefix.Length..]
-            : full.TrimStart('/');
+            : GetRelativeToRoot(full);
     }
 
     public string[] SplitPath(string path)
     {
-        if (string.IsNullOrWhiteSpace(path))
+        var normalized = Normalize(path);
+        var relative = GetRelativeToRoot(normalized);
+        if (string.IsNullOrWhiteSpace(relative))
             return [];
-        return path.Replace('\\', '/').Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        return relative.Split('/', StringSplitOptions.RemoveEmptyEntries);
     }
 
     public string JoinPath(string basePath, IReadOnlyList<string> segments)
@@ -386,7 +388,18 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
             normalized = normalized.TrimEnd('/');
         }
 
-        return normalized;
+        if (normalized.Equals("/", StringComparison.Ordinal))
+        {
+            return Root;
+        }
+
+        if (normalized.Equals(Root, StringComparison.OrdinalIgnoreCase) ||
+            normalized.StartsWith(Root + "/", StringComparison.OrdinalIgnoreCase))
+        {
+            return normalized;
+        }
+
+        return Root + normalized;
     }
 
     private static string GetParentPath(string path)

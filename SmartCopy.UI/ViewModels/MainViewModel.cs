@@ -106,6 +106,7 @@ public partial class MainViewModel : ViewModelBase
 
         _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: true);
         _localProvider = new LocalFileSystemProvider(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+        FileSystemProviderRegistry.Register(MockMemoryFileSystemFactory.RootPath, _memoryProvider);
         _memoryProvider.SeedDirectory(MockMemoryFileSystemFactory.TargetPath);
         SourcePath = MockMemoryFileSystemFactory.SourcePath;
         _lastCommittedSourcePath = SourcePath;
@@ -664,9 +665,9 @@ public partial class MainViewModel : ViewModelBase
     private async Task ApplyFiltersAsync(CancellationToken ct = default)
     {
         var chain = FilterChain.BuildLiveChain();
-        FileList.UpdateChain(chain, _activeSourceProvider);
+        FileList.UpdateChain(chain);
 
-        await DirectoryTree.ApplyFiltersAsync(chain, _activeSourceProvider, ct);
+        await DirectoryTree.ApplyFiltersAsync(chain, ct);
         await FileList.ReapplyFiltersAsync(ct);
         RefreshIdleStats();
     }
@@ -784,7 +785,7 @@ public partial class MainViewModel : ViewModelBase
         var chain = FilterChain.BuildLiveChain();
         _activeSourceProvider = ResolveSourceProvider(PathHelper.NormalizeUserPath(SourcePath));
         DirectoryTree.SetProvider(_activeSourceProvider);
-        FileList.UpdateChain(chain, _activeSourceProvider);
+        FileList.UpdateChain(chain);
 
         // TODO: automatically reading the last used directory on startup could be expensive,
         // especially if it was a network drive or MTP. It should definitely be a setting that can be turned off.

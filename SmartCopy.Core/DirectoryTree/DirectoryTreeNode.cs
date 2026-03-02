@@ -10,7 +10,11 @@ using SmartCopy.Core.Filters;
 
 namespace SmartCopy.Core.DirectoryTree;
 
-public sealed class DirectoryTreeNode(FileSystemNode _filesystemNode, DirectoryTreeNode? _parent, CheckState _checkState = CheckState.Unchecked) : INotifyPropertyChanged
+public sealed class DirectoryTreeNode(
+    FileSystemNode _filesystemNode,
+    DirectoryTreeNode? _parent,
+    IFileSystemProvider? _provider = null,
+    CheckState _checkState = CheckState.Unchecked) : INotifyPropertyChanged
 {
     public string Name => _filesystemNode.Name;
     public string FullPath => _filesystemNode.FullPath;
@@ -22,6 +26,7 @@ public sealed class DirectoryTreeNode(FileSystemNode _filesystemNode, DirectoryT
 
     public string[] RelativePathSegments {get; init; } = _parent is null ? Array.Empty<string>() : [.. _parent.RelativePathSegments.Append(_filesystemNode.Name)];
     public string CanonicalRelativePath => string.Join("/", RelativePathSegments);
+    public IFileSystemProvider? Provider { get; } = _parent?.Provider ?? _provider;
 
     public override string ToString() => CanonicalRelativePath + (IsDirectory ? "/" : "");
 

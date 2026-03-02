@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.DirectoryTree;
 
 namespace SmartCopy.Core.Filters;
@@ -22,14 +21,13 @@ public sealed class FilterChain
 
     public async Task<IReadOnlyList<DirectoryTreeNode>> ApplyAsync(
         IEnumerable<DirectoryTreeNode> nodes,
-        IFileSystemProvider? comparisonProvider = null,
         CancellationToken ct = default)
     {
         var result = new List<DirectoryTreeNode>();
         foreach (var node in nodes)
         {
             ct.ThrowIfCancellationRequested();
-            var evaluation = await EvaluateNodeAsync(node, comparisonProvider, ct);
+            var evaluation = await EvaluateNodeAsync(node, ct);
             if (evaluation.IsIncluded)
             {
                 result.Add(node);
@@ -41,7 +39,6 @@ public sealed class FilterChain
 
     public async Task ApplyToTreeAsync(
         IEnumerable<DirectoryTreeNode> roots,
-        IFileSystemProvider? comparisonProvider = null,
         CancellationToken ct = default)
     {
         var stack = new Stack<DirectoryTreeNode>(roots);
@@ -53,7 +50,7 @@ public sealed class FilterChain
             var node = stack.Pop();
             postOrderList.Add(node);
 
-            var evaluation = await EvaluateNodeAsync(node, comparisonProvider, ct);
+            var evaluation = await EvaluateNodeAsync(node, ct);
             using (node.BeginBatchUpdate())
             {
                 node.FilterResult = evaluation.IsIncluded ? FilterResult.Included : FilterResult.Excluded;
@@ -69,7 +66,7 @@ public sealed class FilterChain
             // parent exclusion recalculation can see their correct state.
             foreach (var file in node.Files)
             {
-                var fileEval = await EvaluateNodeAsync(file, comparisonProvider, ct);
+                var fileEval = await EvaluateNodeAsync(file, ct);
                 using (file.BeginBatchUpdate())
                 {
                     file.FilterResult = fileEval.IsIncluded ? FilterResult.Included : FilterResult.Excluded;
@@ -145,7 +142,6 @@ public sealed class FilterChain
 
     private async Task<NodeEvaluation> EvaluateNodeAsync(
         DirectoryTreeNode node,
-        IFileSystemProvider? comparisonProvider,
         CancellationToken ct)
     {
         bool inSet = true;
@@ -158,7 +154,7 @@ public sealed class FilterChain
                 continue;
 
             ct.ThrowIfCancellationRequested();
-            var matches = await filter.MatchesAsync(node, comparisonProvider, ct);
+            var matches = await filter.MatchesAsync(node, ct);
 
             switch (filter.Mode)
             {
