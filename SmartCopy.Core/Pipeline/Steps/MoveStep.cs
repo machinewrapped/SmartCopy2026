@@ -36,9 +36,6 @@ public sealed class MoveStep : IPipelineStep
     public async IAsyncEnumerable<TransformResult> PreviewAsync(
         IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
-        var targetProvider = context.TargetProvider
-            ?? throw new InvalidOperationException("TargetProvider must be set for MoveStep.");
-
         foreach (var node in context.GetPreviewSelectedDescendants())
         {
             ct.ThrowIfCancellationRequested();
@@ -47,9 +44,11 @@ public sealed class MoveStep : IPipelineStep
             if (node.Parent is { } p && context.IsPreviewSelected(p)) continue;
 
             var nodeCtx = context.GetNodeContext(node);
-            var destination = StepPathHelper.BuildDestinationPath(DestinationPath, nodeCtx.PathSegments);
-            var destResult = await targetProvider.ExistsAsync(
-                StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, nodeCtx.PathSegments), ct)
+            var targetProvider = nodeCtx.ResolveProvider(DestinationPath)
+                ?? throw new InvalidOperationException("TargetProvider must be set for MoveStep.");
+
+            var destination = targetProvider.JoinPath(DestinationPath, nodeCtx.PathSegments);
+            var destResult = await targetProvider.ExistsAsync(destination, ct)
                 ? DestinationResult.Overwritten
                 : DestinationResult.Created;
 
@@ -69,12 +68,6 @@ public sealed class MoveStep : IPipelineStep
     public async IAsyncEnumerable<TransformResult> ApplyAsync(
         IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
-        var targetProvider = context.TargetProvider
-            ?? throw new InvalidOperationException("TargetProvider must be set for MoveStep.");
-
-        var sameProvider = ReferenceEquals(targetProvider, context.SourceProvider);
-        var canAtomicMove = targetProvider.Capabilities.CanAtomicMove;
-
         // Nodes covered by an earlier atomic directory move are skipped.
         var handledNodes = new HashSet<DirectoryTreeNode>();
 
@@ -84,12 +77,18 @@ public sealed class MoveStep : IPipelineStep
             if (context.IsNodeFailed(node)) continue;
             if (handledNodes.Contains(node)) continue;
 
+            var nodeCtx = context.GetNodeContext(node);
+            var targetProvider = nodeCtx.ResolveProvider(DestinationPath)
+                ?? throw new InvalidOperationException("TargetProvider must be set for MoveStep.");
+
+            var sameProvider = ReferenceEquals(targetProvider, context.SourceProvider);
+            var canAtomicMove = targetProvider.Capabilities.CanAtomicMove;
+
             if (node.IsDirectory)
             {
                 if (sameProvider && canAtomicMove && CanMoveEntireSubtree(node))
                 {
-                    var nodeCtx = context.GetNodeContext(node);
-                    var destination = StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, nodeCtx.PathSegments);
+                    var destination = targetProvider.JoinPath(DestinationPath, nodeCtx.PathSegments);
                     var destExists = await targetProvider.ExistsAsync(destination, ct);
 
                     if (destExists && context.OverwriteMode == OverwriteMode.Skip)
@@ -120,6 +119,7 @@ public sealed class MoveStep : IPipelineStep
                 else
                 {
                     // Directory cannot be moved atomically (cross-provider or partial subtree).
+                    // TODO: This is not a failure, we just have to move it piecewise
                     context.MarkFailed(node);
                     MarkDescendantsHandled(node, handledNodes);
                     yield return new TransformResult(
@@ -132,7 +132,7 @@ public sealed class MoveStep : IPipelineStep
 
             // File node
             var fileCtx = context.GetNodeContext(node);
-            var fileDest = StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, fileCtx.PathSegments);
+            var fileDest = targetProvider.JoinPath(DestinationPath, fileCtx.PathSegments);
             var fileDestExists = await targetProvider.ExistsAsync(fileDest, ct);
 
             if (fileDestExists && context.OverwriteMode == OverwriteMode.Skip)

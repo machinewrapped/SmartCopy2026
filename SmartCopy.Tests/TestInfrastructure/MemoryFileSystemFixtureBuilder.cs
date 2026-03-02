@@ -50,17 +50,11 @@ public static class MemoryFileSystemFixtures
         return builder.Build();
     }
 
-    public static (MemoryFileSystemProvider Source, MemoryFileSystemProvider Target) CreatePair(
-        Action<MemoryFileSystemFixtureBuilder> configureSource,
-        Action<MemoryFileSystemFixtureBuilder>? configureTarget = null)
+    public static FileSystemProviderRegistry CreateRegistry(MemoryFileSystemProvider provider)
     {
-        var sourceBuilder = new MemoryFileSystemFixtureBuilder();
-        configureSource(sourceBuilder);
-
-        var targetBuilder = new MemoryFileSystemFixtureBuilder();
-        configureTarget?.Invoke(targetBuilder);
-
-        return (sourceBuilder.Build(), targetBuilder.Build());
+        var registry = new FileSystemProviderRegistry();
+        registry.Register(provider);
+        return registry;
     }
 
     internal static async Task<DirectoryTreeNode> BuildDirectoryTree(Action<MemoryFileSystemFixtureBuilder> configure)
@@ -75,11 +69,8 @@ public static class MemoryFileSystemFixtures
     {
         path ??= provider.RootPath;
 
-        FileSystemNode rootNode = await provider.GetNodeAsync(path, CancellationToken.None);
-        if (rootNode is null)
-        {
-            throw new InvalidOperationException($"Root path '{path}' does not exist in the file system fixture.");
-        }
+        FileSystemNode rootNode = await provider.GetNodeAsync(path, CancellationToken.None)
+            ?? throw new InvalidOperationException($"Root path '{path}' does not exist in the file system fixture.");
 
         return await BuildDirectoryTreeNode(provider, rootNode, parent: null);
     }

@@ -33,9 +33,6 @@ public sealed class CopyStep : IPipelineStep
     public async IAsyncEnumerable<TransformResult> PreviewAsync(
         IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
-        var targetProvider = context.TargetProvider
-            ?? throw new InvalidOperationException("TargetProvider must be set for CopyStep.");
-
         foreach (var node in context.GetPreviewSelectedDescendants())
         {
             ct.ThrowIfCancellationRequested();
@@ -51,9 +48,12 @@ public sealed class CopyStep : IPipelineStep
             }
 
             var nodeCtx = context.GetNodeContext(node);
-            var destination = StepPathHelper.BuildDestinationPath(DestinationPath, nodeCtx.PathSegments);
-            var destResult = await targetProvider.ExistsAsync(
-                StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, nodeCtx.PathSegments), ct)
+            var targetProvider = nodeCtx.ResolveProvider(DestinationPath)
+                ?? throw new InvalidOperationException($"No IFileSystemProvider for path {DestinationPath}");
+
+            var destination = targetProvider.JoinPath(DestinationPath, nodeCtx.PathSegments);
+
+            var destResult = await targetProvider.ExistsAsync(destination, ct)
                 ? DestinationResult.Overwritten
                 : DestinationResult.Created;
 
@@ -72,9 +72,6 @@ public sealed class CopyStep : IPipelineStep
     public async IAsyncEnumerable<TransformResult> ApplyAsync(
         IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
-        var targetProvider = context.TargetProvider
-            ?? throw new InvalidOperationException("TargetProvider must be set for CopyStep.");
-
         foreach (var node in context.RootNode.GetSelectedDescendants())
         {
             ct.ThrowIfCancellationRequested();
@@ -90,7 +87,10 @@ public sealed class CopyStep : IPipelineStep
             }
 
             var nodeCtx = context.GetNodeContext(node);
-            var destination = StepPathHelper.BuildDestinationPath(targetProvider, DestinationPath, nodeCtx.PathSegments);
+            var targetProvider = nodeCtx.ResolveProvider(DestinationPath)
+                ?? throw new InvalidOperationException("TargetProvider must be set for CopyStep.");
+
+            var destination = targetProvider.JoinPath(DestinationPath, nodeCtx.PathSegments);
             var destinationExists = await targetProvider.ExistsAsync(destination, ct);
 
             if (destinationExists && context.OverwriteMode == OverwriteMode.Skip)

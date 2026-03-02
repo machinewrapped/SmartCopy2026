@@ -19,7 +19,7 @@ public sealed class FileSystemProviderRegistry
     /// <summary>A shared empty registry for local-path-only resolution.</summary>
     public static FileSystemProviderRegistry Empty { get; } = new();
 
-    // <summary>Register a file system provider for a given root
+    /// <summary>Register a file system provider for a given root.</summary>
     public void Register(IFileSystemProvider provider)
     {
         string rootPath = provider.RootPath;
@@ -28,14 +28,14 @@ public sealed class FileSystemProviderRegistry
         
         lock (_lock)
         {
-            if (_registered.Keys.Contains(rootPath))
+            if (_registered.ContainsKey(rootPath))
                 throw new InvalidOperationException($"Provider already registered for this root path: {rootPath}");
 
             _registered[rootPath] = provider;
         }
     }
 
-    // <summary>Register a file system provider
+    /// <summary>Unregister a file system provider.</summary>
     public void Unregister(IFileSystemProvider provider)
     {
         string rootPath = provider.RootPath;

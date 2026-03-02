@@ -21,14 +21,14 @@ public sealed class PipelineIntegrationTests
         Assert.NotNull(node);
 
         node.CheckState = CheckState.Checked;
-        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/dest")]));
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/mem/dest")]));
 
         await runner.ExecuteAsync(
             new PipelineJob
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                TargetProvider = provider,
+                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -53,7 +53,7 @@ public sealed class PipelineIntegrationTests
         var runner = new PipelineRunner(new TransformPipeline(
         [
             new FlattenStep(),
-            new CopyStep("/dest"),
+            new CopyStep("/mem/dest"),
         ]));
 
         await runner.ExecuteAsync(
@@ -61,7 +61,7 @@ public sealed class PipelineIntegrationTests
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                TargetProvider = provider,
+                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -90,7 +90,7 @@ public sealed class PipelineIntegrationTests
                 {
                     RootNode       = root,
                     SourceProvider = provider,
-                    TargetProvider = null,
+                    ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
                     OverwriteMode  = OverwriteMode.Always,
                     DeleteMode     = DeleteMode.Permanent,
                 },
@@ -111,14 +111,14 @@ public sealed class PipelineIntegrationTests
         var node = root.FindNodeByPathSegments(["src", "song.mp3"]);
         Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
-        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/dest")]));
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/mem/dest")]));
 
         var skipResults = await runner.ExecuteAsync(
             new PipelineJob
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                TargetProvider = provider,
+                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
                 OverwriteMode  = OverwriteMode.Skip,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -132,7 +132,7 @@ public sealed class PipelineIntegrationTests
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                TargetProvider = provider,
+                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -150,14 +150,15 @@ public sealed class PipelineIntegrationTests
             .WithDirectory("/backup")
             .WithDirectory("/archive")
             .WithFile("/src/song.mp3", "audio"u8));
+
         var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
         var node = root.FindNodeByPathSegments(["src", "song.mp3"]);
         Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
         var runner = new PipelineRunner(new TransformPipeline(
         [
-            new CopyStep("/backup"),
-            new MoveStep("/archive"),
+            new CopyStep("/mem/backup"),
+            new MoveStep("/mem/archive"),
         ]));
 
         await runner.ExecuteAsync(
@@ -165,7 +166,7 @@ public sealed class PipelineIntegrationTests
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                TargetProvider = provider,
+                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -190,14 +191,14 @@ public sealed class PipelineIntegrationTests
         Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
 
-        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/dest")]));
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/mem/dest")]));
 
         var results = await runner.ExecuteAsync(
             new PipelineJob
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                TargetProvider = provider,
+                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -211,7 +212,7 @@ public sealed class PipelineIntegrationTests
         Assert.True(File.Exists(path));
         var line = Assert.Single(await File.ReadAllLinesAsync(path));
         var columns = line.Split('\t');
-        Assert.True(columns.Length == 6);
+        Assert.Equal(6, columns.Length);
         Assert.Equal("ok", columns[1]);
         Assert.Equal("copy", columns[2]);
         Assert.Equal("src/song.mp3", columns[3]);

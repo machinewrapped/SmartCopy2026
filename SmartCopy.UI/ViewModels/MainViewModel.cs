@@ -828,12 +828,10 @@ public partial class MainViewModel : ViewModelBase
             return;
 
         var runner = new PipelineRunner(pipeline);
-        var targetProvider = ResolveTargetProvider(pipeline);
         var job = new PipelineJob
         {
             RootNode         = rootNode,
             SourceProvider   = _activeSourceProvider,
-            TargetProvider   = targetProvider,
             ProviderRegistry = _providerRegistry,
             OverwriteMode    = ParseOverwriteMode(_settings.DefaultOverwriteMode),
             DeleteMode       = ParseDeleteMode(_settings.DefaultDeleteMode),
@@ -876,12 +874,10 @@ public partial class MainViewModel : ViewModelBase
             return;
 
         var runner = new PipelineRunner(pipeline);
-        var targetProvider = ResolveTargetProvider(pipeline);
         var job = new PipelineJob
         {
             RootNode         = rootNode,
             SourceProvider   = _activeSourceProvider,
-            TargetProvider   = targetProvider,
             ProviderRegistry = _providerRegistry,
             OverwriteMode    = ParseOverwriteMode(_settings.DefaultOverwriteMode),
             DeleteMode       = ParseDeleteMode(_settings.DefaultDeleteMode),
@@ -1115,22 +1111,5 @@ public partial class MainViewModel : ViewModelBase
     {
         var deleteStep = pipeline.Steps.OfType<DeleteStep>().FirstOrDefault();
         return deleteStep?.Mode ?? fallback;
-    }
-
-    private IFileSystemProvider ResolveTargetProvider(TransformPipeline pipeline)
-    {
-        var destinationPath = pipeline.Steps
-            .OfType<CopyStep>()
-            .Select(step => step.DestinationPath)
-            .Concat(pipeline.Steps.OfType<MoveStep>().Select(step => step.DestinationPath))
-            .FirstOrDefault(path => !string.IsNullOrWhiteSpace(path));
-
-        if (string.IsNullOrWhiteSpace(destinationPath))
-        {
-            return _activeSourceProvider;
-        }
-
-        var normalizedPath = PathHelper.NormalizeUserPath(destinationPath);
-        return ResolveSourceProvider(normalizedPath);
     }
 }

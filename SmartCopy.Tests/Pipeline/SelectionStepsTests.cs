@@ -25,15 +25,16 @@ public sealed class SelectionStepsTests
 
         public DirectoryTreeNode RootNode { get; }
         public IFileSystemProvider SourceProvider { get; }
-        public IFileSystemProvider? TargetProvider => null;
         public OverwriteMode OverwriteMode => OverwriteMode.Always;
         public DeleteMode DeleteMode => DeleteMode.Trash;
-        public FileSystemProviderRegistry? ProviderRegistry => null;
+        public FileSystemProviderRegistry ProviderRegistry { get; } = new();
 
         public TestStepContext(DirectoryTreeNode root, IFileSystemProvider provider)
         {
             RootNode = root;
             SourceProvider = provider;
+            ProviderRegistry = new FileSystemProviderRegistry();
+            ProviderRegistry.Register(provider);
         }
 
         public PipelineContext GetNodeContext(DirectoryTreeNode node)
@@ -44,6 +45,7 @@ public sealed class SelectionStepsTests
                 {
                     SourceNode = node,
                     SourceProvider = SourceProvider,
+                    ProviderRegistry = ProviderRegistry,
                     PathSegments = node.RelativePathSegments.Length > 0
                         ? node.RelativePathSegments
                         : [node.Name],

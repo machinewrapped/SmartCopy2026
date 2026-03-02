@@ -12,15 +12,13 @@ public interface IStepContext
 {
     DirectoryTreeNode RootNode { get; }
     IFileSystemProvider SourceProvider { get; }
-    IFileSystemProvider? TargetProvider { get; }
+    FileSystemProviderRegistry ProviderRegistry { get; }
     OverwriteMode OverwriteMode { get; }
     DeleteMode DeleteMode { get; }
 
     /// <summary>Returns the cached (or newly created) <see cref="PipelineContext"/> for a node.
     /// PathSegments mutations persist across all steps in the run.</summary>
     PipelineContext GetNodeContext(DirectoryTreeNode node);
-
-    FileSystemProviderRegistry? ProviderRegistry { get; }
 
     bool IsNodeFailed(DirectoryTreeNode node);
     void MarkFailed(DirectoryTreeNode node);
