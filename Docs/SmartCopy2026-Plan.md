@@ -411,18 +411,18 @@ Real filesystem test strategy (three tiers):
 #### 5.2.2 — Source Acquisition UX (native browse + path commit)
 
 Deliverables:
-- [ ] Replace disabled Browse buttons with native folder picker wiring (source + destination contexts)
-- [ ] Keep editable `SourcePath` commit semantics (Enter/dropdown close) while allowing picker-driven path updates
-- [ ] Ensure bookmarks/MRU normalization works across multiple drives, UNC paths, and trailing-separator variations
+- [X] Replace disabled Browse buttons with native folder picker wiring (source + destination contexts)
+- [X] Keep editable `SourcePath` commit semantics (Enter/dropdown close) while allowing picker-driven path updates
+- [X] Ensure bookmarks/MRU normalization works across multiple drives, UNC paths, and trailing-separator variations
 - [ ] Add validation/error messaging for inaccessible or missing paths without freezing UI
 
 Acceptance criteria:
-- [ ] User can pick a local folder and immediately scan it
+- [X] User can pick a local folder and immediately scan it
 - [ ] MRU/bookmarks de-duplicate equivalent paths reliably
 - [ ] Invalid/unreachable path entry fails safely and preserves last good state
 
 Verification:
-- [ ] Automated tests for bookmark/MRU normalization edge cases
+- [X] Automated tests for bookmark/MRU normalization edge cases
 - [ ] Manual smoke: local drive path, UNC/network path, disconnected path recovery
 
 #### 5.2.3 — Real Provider Runtime Integration (scanner + pipeline path)
