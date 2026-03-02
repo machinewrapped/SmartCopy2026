@@ -225,9 +225,10 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     {
         if (string.IsNullOrWhiteSpace(path))
             return [];
-        // Normalise to canonical forward-slash before splitting so mixed-separator paths work
-        var normalised = path.Replace('\\', '/').Trim('/');
-        return normalised.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        // Split on OS-native separators only.
+        // On Linux '\' is a valid filename character, not a separator.
+        var sep = new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar };
+        return path.Trim(sep).Split(sep, StringSplitOptions.RemoveEmptyEntries);
     }
 
     public string JoinPath(string basePath, IReadOnlyList<string> segments)

@@ -5,7 +5,8 @@ namespace SmartCopy.Tests.FileSystem;
 
 /// <summary>
 /// Verifies path normalization, splitting, joining, and GetRelativePath for both providers.
-/// Both providers accept forward-slash and backslash inputs; each normalizes to its own convention.
+/// MemoryFileSystemProvider accepts both forward-slash and backslash inputs.
+/// LocalFileSystemProvider splits on OS-native separators only.
 /// </summary>
 public sealed class PathHandlingTests : IDisposable
 {
@@ -79,22 +80,9 @@ public sealed class PathHandlingTests : IDisposable
     // -------------------------------------------------------------------------
 
     [Fact]
-    public void Local_SplitPath_BackslashRelativePath()
-    {
-        Assert.Equal(["albums", "track1.txt"], _local.SplitPath(@"albums\track1.txt"));
-    }
-
-    [Fact]
     public void Local_SplitPath_ForwardSlashRelativePath()
     {
         Assert.Equal(["albums", "track1.txt"], _local.SplitPath("albums/track1.txt"));
-    }
-
-    [Fact]
-    public void Local_SplitPath_UncStyleInput()
-    {
-        // UNC-style: \\server\share\file.txt → backslashes normalised → server/share/file.txt
-        Assert.Equal(["server", "share", "file.txt"], _local.SplitPath(@"\\server\share\file.txt"));
     }
 
     [Theory]
