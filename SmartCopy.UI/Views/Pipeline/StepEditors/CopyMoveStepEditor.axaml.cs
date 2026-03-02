@@ -32,15 +32,9 @@ public partial class CopyMoveStepEditor : UserControl
 
         var selectedPath = selectedUri.LocalPath;
 
-        if (DataContext is CopyStepEditorViewModel copyVm)
+        if (DataContext is IHasDestinationPath destinationPathVm)
         {
-            copyVm.DestinationPath = selectedPath;
-            return;
-        }
-
-        if (DataContext is MoveStepEditorViewModel moveVm)
-        {
-            moveVm.DestinationPath = selectedPath;
+            destinationPathVm.DestinationPath = selectedPath;
         }
     }
 }
