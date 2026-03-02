@@ -1,15 +1,11 @@
-# SmartCopy2026 — Design & Implementation Plan (Revised)
+# SmartCopy2026 — Design & Implementation Plan
 
 **Prepared:** 2026-02-18
-**Author:** Simon Booth
-**License:** MIT
 **Predecessor:** SmartCopy 2015 (GPL v3, .NET 4.8 WinForms, SourceForge)
 
-This document is the execution plan for the SmartCopyTool rewrite: sequencing, delivery scope, acceptance criteria, and verification.
+This document is the execution plan for the SmartCopyTool rewrite.
 
-Implementation-oriented architecture, contracts, algorithms, UI behavior, and data schemas now can be found in `Docs/SmartCopy2026-Architecture.md`.
-
----
+Architecture, contracts, UI behavior and data schemas are documented in `Docs/SmartCopy2026-Architecture.md`.
 
 ## Table of Contents
 
@@ -17,14 +13,9 @@ Reference:
 1. [What the Predecessor Got Right](#1-what-the-predecessor-got-right)
 2. [What to Fix and Improve](#2-what-to-fix-and-improve)
 3. [Technology Stack](#3-technology-stack)
-4. [Architecture Design](#4-architecture-design)
-5. [Key Technical Designs](#5-key-technical-designs)
-6. [Algorithms and Implementation Notes](#6-algorithms-and-implementation-notes)
-7. [UI Design](#7-ui-design)
-8. [Phase 1 — Core Workflows](#8-phase-1--core-workflows)
-9. [Remaining Phases](#9-remaining-phases)
-10. [Data Models](#10-data-models)
-11. [Open Questions](#11-open-questions)
+4. [UI Design](#4-ui-design)
+5. [Implementation Phases](#5-implementation-phases)
+6. [Open Questions](#6-open-questions)
 
 ---
 
@@ -114,27 +105,15 @@ installed, `global.json` can pin the SDK version. Self-contained publish (`--sel
 -p:PublishSingleFile=true`) bundles the runtime and ships a single executable per platform.
 
 ---
+## 5. Implementation Phases
 
-## 8. Phase 1 — Core Workflows (COMPLETE)
+### 5.1 Phase 1: Core Workflows (COMPLETE)
 
 *Goal: ship a v1 prototype that can scan, select, filter, preview, copy/move/delete to validate architecture and UX.*
 
-### Phase 1 sequencing principle
+Prove and refine UX using a mock file system (`MemoryFileSystemProvider`) first; seeded `/mem` remains the default integration source until the end-to-end flow is proven.
 
-1. Prove and refine UX using `MemoryFileSystemProvider` first; seeded `/mem` remains the default integration source until the end-to-end flow is demoable.
-2. Treat the UX loop as the primary critical path: scan/seed -> select -> filter -> preview -> run -> verify.
-3. `LocalFileSystemProvider` remains in-repo during Phase 1 as a design reference for `IFileSystemProvider` flexibility, but is not exercised as a delivery gate in this phase.
-4. All real local-filesystem integration tasks (scanner wiring, trash adapters, watcher-driven rescans) are deferred to standalone Phase 2.
-5. "Done" means deliverables shipped, acceptance criteria met, verification commands pass, and UX-loop tests run on memory fixtures first.
-6. Any UX/safety requirement marked "mandatory" in this plan blocks step completion.
-
-### Phase 1 delivery order (UX-first, memory-backed)
-
-1. UX loop track (blocking for feature-complete v1 demo)
-2. Validation-first hardening track (prioritised while behaviour is still fresh)
-3. UX polish track (after end-to-end flow is proven)
-
-### Phase 1 status (complete as of 2026-02-28)
+**Phase 1 status (complete as of 2026-02-28)**
 
 | Workstream item | Status | Next action |
 |---|---|---|
@@ -149,9 +128,7 @@ installed, `global.json` can pin the SDK version. Self-contained publish (`--sel
 | Polish-1 (Step 9): Shell observability + status | Complete | — |
 | Polish-2 (Step 10): Keyboard + accessibility | Complete |
 
-### UI/UX Validation (Phase 1)
-
-The UI must be built first with test data to validate the layout and UX.
+#### UI/UX Validation
 
 UI/UX checklist:
 - [x] Main window with correct proportions, resizable split panes (3-column: Filters/Folders/Files)
@@ -159,29 +136,25 @@ UI/UX checklist:
       `%LOCALAPPDATA%/SmartCopy2026/window.json`; restored on next open with off-screen safety guard
 - [x] Source field with browse button (no real browsing yet)
 - [x] Bookmarks/favorites for source field; editable ComboBox with `RecentSources`/`FavouritePaths` persistence
-- [x] TreeView with tri-state checkbox behaviour fully working
-- [x] FileListView with all columns (Name/Size/Modified), column resizing, click-to-sort
+- [x] TreeView with tri-state checkbox behaviour
+- [x] FileListView with column resizing
 - [x] Filter chain area: filter cards with human-readable summary + technical subtitle,
-      enable/disable checkbox, edit (pencil) button, remove button, inline "+ Add filter" ghost card,
-      Save/Load buttons pinned to bottom of column
-- [X] Filter chain save/load (`.sc2filter`) + preset library UI
-- [x] Pipeline area: horizontal scrollable step chain with → connectors; + Add step flyout
-      (Executable / Path / Content step categories); Run and Preview buttons stacked on the right;
-      step cards show summary + technical subtitle and edit/remove actions
-- [X] Pipeline save/load (`.sc2pipe`) + preset library UI
+      enable/disable checkbox, edit button, remove button, "+ Add filter" card
+- [X] Filter chain save/load (`.sc2filter`) + preset library
+- [x] Pipeline area: horizontal scrollable step chain with + Add step flyout + Run and Preview buttons
+- [X] Pipeline save/load (`.sc2pipe`) + preset library
 - [x] Status bar: file count, size, filtered count, progress bar, time remaining, current file
-- [ ] Operation progress overlay: progress bars, pause/cancel buttons, status labels — no real operation
-- [x] Log panel: collapsible, scrollable, a few placeholder log entries
-- [ ] Full keyboard navigation: Tab order, arrow keys in tree/list, Space to toggle, focus indicators
-- [ ] Automation properties on all interactive controls (screen-reader baseline)
+- [x] Operation progress overlay: progress bars, pause/cancel buttons, status labels
+- [x] Log panel: collapsible, scrollable, log entries
+- [x] Full keyboard navigation: Tab order, arrow keys in tree/list, focus indicators
+- [x] Automation properties on all interactive controls
 
-### Step 1 — Project Scaffold + Baseline UI Shell (UX Loop Track)
+#### 5.1.1 — Project Scaffold + Baseline UI Shell
 
 Deliverables:
 - [x] Solution and projects exist: `SmartCopy.Core`, `SmartCopy.App`, `SmartCopy.UI`, `SmartCopy.Tests`
 - [x] DI bootstrapping in `AppServiceProvider.cs`
 - [x] UI shell layout and persisted window/column state
-- [x] Operation progress overlay placeholder (no real operations yet)
 - [x] CI workflow runs build + tests on Windows and Linux
 
 Acceptance criteria:
@@ -192,16 +165,15 @@ Verification:
 - [x] `dotnet build SmartCopy.App/SmartCopy.App.csproj`
 - [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj`
 
-### Step 2 — Core Models + MemoryFileSystemProvider (Memory-Backed Hardening Track, test-first foundation)
+#### 5.1.2 — Core Models + MemoryFileSystemProvider (test-first foundation)
 
 Deliverables:
 - [x] Implement `FileSystemNode` full model contract from Architecture `Data Models`
 - [x] Implement `IFileSystemProvider` + `ProviderCapabilities`
 - [x] Implement `MemoryFileSystemProvider` for fast hermetic tests
-- [x] Create shared test fixtures/builders that default to `MemoryFileSystemProvider`
+- [x] Create shared test fixtures/builders
 
 Acceptance criteria:
-- [x] No hard dependency on real filesystem for shell startup
 - [x] Memory provider supports filesystem contract without disk I/O
 - [x] Scanner/filter/pipeline core tests in this step run against `MemoryFileSystemProvider`
 
@@ -209,10 +181,10 @@ Verification:
 - [x] Unit tests for `MemoryFileSystemProvider`
 - [x] Contract tests for enumerate/read/write/move/delete/create/exists on in-memory trees
 
-### Step 3 — Node Selection Logic (UX Loop Track, validation-priority)
+#### 5.1.3 — Node Selection Logic
 
 Deliverables:
-- [x] Tri-state propagation algorithm from Architecture `Tri-State Checkbox Propagation` in production nodes/view models
+- [x] Tri-state propagation algorithm from Architecture `Tri-State Checkbox Propagation`
 - [x] `IsSelected` wiring (`CheckState == Checked && FilterResult == Included`)
 
 Acceptance criteria:
@@ -222,315 +194,243 @@ Acceptance criteria:
 Verification:
 - [x] Unit tests for checked/unchecked/indeterminate transitions
 
-### Step 4 — Filter Chain (UX Loop Track) ✓
+#### 5.1.4 — Filter Chain
 
-**Completed 2026-02-23.** Full filter chain implementation delivered across six sub-steps (4a–4f).
-Implementation details for contracts, UI flows, and filter types are in Architecture `IFilter and FilterChain` and UIUX documentation.
+Full filter chain implementation delivered across six sub-steps. Implementation details and UI flows are in Architecture and UIUX documentation.
 
 Delivered:
 - [x] Core filter engine: `IFilter`, `FilterChain`, `FilterConfig`, `FilterChainConfig`
 - [x] All Phase 1 filter types: Wildcard, Extension, Mirror, DateRange, SizeRange, Attribute
 - [x] `Only | Add | Exclude` ordered set-based evaluation semantics
 - [x] `FilterPresetStore` with built-in presets (Audio, Images, Documents, Log files, Temp files)
-- [x] `FilterFactory` — `FromConfig(FilterConfig) → IFilter` for all 6 types
 - [x] `FilterEditorViewModel` hierarchy — one editor per type with `BuildFilter`/`LoadFrom` round-trips
 - [x] Add-Filter two-level drill-down flyout (type → preset/MRU picker)
 - [x] `EditFilterDialog` modal with mode toggle, type-specific editors, save-as-preset
-- [x] `FilterChainViewModel` live wiring: `BuildLiveChain()`, `ChainChanged`, drag reorder
-- [x] Live filter application to tree + file list via debounced `ApplyFiltersAsync`
+- [x] `FilterChainViewModel` live wiring
+- [x] Live filter application to tree + file list
 - [x] `FilterResultOpacityConverter`, `ShowFilteredFiles` toggle, excluded-node checkbox disabling
-
-Remaining follow-up:
-- [ ] Save/Load chain file-picker integration (`.sc2filter` JSON round-trip wiring in the shell)
 
 Acceptance criteria — all met:
 - [x] `Only`/`Add`/`Exclude` semantics match Architecture `IFilter and FilterChain`
-- [x] Disabled filters have zero effect; parent excluded when all children excluded
+- [x] Disabled filters have zero effect
 - [x] Excluded nodes non-selectable; tree toggle hides/shows excluded nodes
 - [x] Mirror filter comparison path suggestion derives from pipeline destination
 - [x] Full add/edit/toggle/reorder/preset workflow operational end-to-end
 - [x] `VisibleFiles` respects `ShowFilteredFiles` toggle
 - [x] MirrorFilter evaluated with comparison provider in memory-backed flow
 
-Verification — all automated suites passing:
-- [x] `FilterPresetStore` (≥5), `FilterEditorViewModel` (≥6), `AddFilterViewModel` (≥5)
-- [x] `EditFilterDialogViewModel` (≥6), `FilterChainViewModel` (≥6), `FilterLiveWiring` (≥6)
+Verification:
+- [x] all automated suites passing
 - [x] Manual: built-in preset adds filter and updates tree/file-list
 - [x] Manual: new Extension filter via dialog, save as preset, persists across restart
 
-### Step 5 — Transform Pipeline (UX Loop Track, built-in steps)
+#### 5.1.5 — Transform Pipeline
 
-#### Delivered
+Delivered:
 - [x] Core pipeline extension and validation layer:
-  `PipelinePresetStore`, `PipelinePreset`, `PipelineStepFactory`, `UnknownStepTypeException`,
-  `PipelineValidator`, `PipelineValidationResult`, `PipelineValidationIssue`,
-  `PipelineStepContracts`
-- [x] Built-in standard presets:
-  Copy only, Move only, Delete to Trash, Flatten -> Copy
 - [x] Step model expansion:
-  `RenameStep`, `RebaseStep`, `FlattenConflictStrategy`; `DeleteStep` mode-aware;
-  mutable destination paths on `CopyStep`/`MoveStep`
 - [x] Step editor VM hierarchy:
-  `StepEditorViewModelBase`, Copy/Move/Delete/Flatten/Rename/Rebase editors +
-  `StepEditorViewModelFactory`
 - [x] Add Step flyout (two-level category -> type):
-  `AddStepViewModel`, `Views/Pipeline/AddStepFlyout.axaml`
-- [x] Edit Step dialog:
-  `EditStepDialogViewModel`, `Views/Pipeline/EditStepDialog.axaml`,
-  step-editor views under `Views/Pipeline/StepEditors/`
-- [x] `PipelineViewModel` rewrite:
-  live `IPipelineStep` wrapping, validation state, blocking reason, preset integration,
-  first-destination tracking, add/replace/remove wiring, run/preview events
-- [x] `PipelineView` rewrite:
-  popup flyout integration, step edit pencil wiring, validation feedback, delete badge,
-  dynamic run button label
-- [x] Preview workflow:
-  new `PreviewViewModel` grouping by warning type, delete confirmation gating,
-  `PreviewView` modal dialog
-- [x] Run/progress/journal wiring:
-  `MainViewModel` preview->run flow (delete preview mandatory), pipeline execution path,
-  selection collection from tree, progress callback integration;
-  `OperationProgressViewModel` (begin/update/complete/cancel);
-  `OperationJournal` write + retention rotation
+- [x] Edit Step dialog
+- [x] validation feedback, delete badge, dynamic run button label
+- [x] Preview workflow
+- [x] Run/progress/journal wiring
 
-#### Acceptance criteria status
+Acceptance criteria status:
 - [x] Run disabled until at least one valid executable step exists
 - [x] Multiple executable steps are allowed and execute in sequence
-- [x] Delete remains preview-mandatory and delete-final validated
-- [x] Declarative validator rejects invalid sequences (`Delete -> Copy`, `Move -> Delete`)
+- [x] Delete operations trigger preview
+- [x] Validator rejects invalid sequences (`Delete -> Copy`, `Move -> Delete`)
 - [x] Invalid step cards surface blocking validation text
-- [x] Run button exposes first blocking validation reason (tooltip text binding)
 - [x] Add Step flyout uses two-level category -> type drill-down
 - [x] Edit pencil opens `EditStepDialog` with pre-populated values
 - [x] `EditStepDialog` OK is validity-gated (Copy/Move destination, Rename pattern, Rebase fields)
 - [x] Delete step shows badge (`Trash` or `⚠ Permanent`)
-- [x] Standard presets load via preset menu integration
 - [x] User pipelines save/load as `.sc2pipe` via preset store-backed commands
-- [x] `FirstDestinationPath` updates and is propagated to filter-chain mirror suggestion wiring
-- [x] Preview dialog groups by warning type and supports delete confirmation mode
-- [x] Delete pipelines require explicit preview confirmation; non-delete can run directly
-- [~] Overwrite behavior: `Skip` and `Always` are covered by tests; `IfNewer` still behaves as prior baseline
-- [x] Progress overlay receives live `OperationProgress` updates during execution
-- [x] Operation journal writes source/destination/action/bytes entries after runs
 
-#### Validation performed
-- [x] `dotnet build SmartCopy.Core/SmartCopy.Core.csproj --no-restore` (passes)
-- [x] Added new pipeline test suites:
-  `PipelinePresetStoreTests`, `PipelineValidatorTests`, `StepEditorViewModelTests`,
-  `AddStepViewModelTests`, `EditStepDialogViewModelTests`, `PipelineViewModelTests`,
-  `PreviewViewModelTests`, `PipelineIntegrationTests`
+Validation performed:
+- [x] Added new pipeline test suites
 - [X] `dotnet test` execution
 - [X] Manual UI scenario checks for preview/delete/progress/journal flows
 
-### Step 6 — Workflow Presets and Menu (UX Loop Track) ✓
+#### 5.1.6 — Workflow Presets and Menu
 
-**Completed 2026-02-25.** Entire workflow (source path + filter chain + pipeline) persists as `.sc2workflow` JSON via a dedicated store, with save/load/rename/delete UX wired into the main menu.
+Entire workflow (source path + filter chain + pipeline) persists as `.sc2workflow`, with UX wired into the main menu.
 
 Delivered:
-- [x] `WorkflowPreset`, `WorkflowConfig`, `WorkflowPresetStore` (Core layer)
-- [x] `WorkflowMenuViewModel` — save/load/manage commands, `SavedWorkflows` collection, `CanSave` gate
-- [x] `SaveWorkflowDialogViewModel` + `SaveWorkflowDialog` (name entry, overwrite confirmation)
-- [x] `ManageWorkflowsDialogViewModel` + `ManageWorkflowsDialog` (rename + delete with confirmation)
+- [x] `WorkflowPreset`, `WorkflowConfig`, `WorkflowPresetStore`
+- [x] `WorkflowMenuViewModel` — save/load/manage commands
+- [x] `SaveWorkflowDialogViewModel` + `SaveWorkflowDialog`
+- [x] `ManageWorkflowsDialogViewModel` + `ManageWorkflowsDialog`
 - [x] `RenameInputViewModel` + `RenameInputDialog`
-- [x] `MainWindow` Workflows menu wired via code-behind: static Save/Manage items + dynamic loaded-workflow items rebuilt on collection change
 
 Acceptance criteria — all met:
-- [x] Entire workflow can be persisted as `.sc2workflow` via preset store-backed commands
+- [x] Entire workflow can be persisted as `.sc2workflow`
 - [x] Workflow presets load via preset menu integration
 - [x] Workflow presets can be renamed and deleted via Manage Workflows dialog
-- [x] Unit tests for `WorkflowPresetStore` (8 tests) and `WorkflowMenuViewModel` (7 tests)
 
 Verification:
 - [x] `dotnet build SmartCopy.App/SmartCopy.App.csproj`
-- [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj` (165/165 passing)
-- [ ] Manual UI scenario checks for workflow menu integration
+- [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj`
+- [X] Manual UI scenario checks for workflow menu integration
 
-### Step 7 — Selection management (UX Loop Track / Memory-Backed Hardening Track) ✓
+#### 5.1.7 — Selection management
 
-**Completed 2026-02-25.** Full selection save/load and bulk selection operations delivered; Selection menu wired via code-behind following the workflow menu pattern.
+Full selection save/load and bulk selection operations via Selection menu.
 
 Delivered:
 - [x] `SelectionSerializer` for `.txt`, `.m3u`, `.sc2sel`
 - [x] `SelectionSerializer` for `.m3u8` (UTF-8 playlist format)
-- [x] `SelectionRestoreResult` — `MatchedCount`, `UnmatchedPaths`, `HasUnmatched`
-- [x] `SelectionManager.Restore` returns `SelectionRestoreResult`; accepts both relative and absolute-path snapshots
+- [x] `SelectionManager.Restore` accepts both relative and absolute-path snapshots
 - [x] `SelectionManager.Capture` — `useAbsolutePaths` opt-in parameter
 - [x] `SelectionManager` bulk ops: `SelectAll`, `ClearAll`, `InvertAll`
-- [x] `SelectionSerializer` unified `LoadAsync`/`SaveAsync` dispatchers (route by extension)
-- [x] `AppSettings.UseAbsolutePathsForSelectionSave` persisted
-- [x] `MainViewModel`: 6 new commands (`SelectAll`, `ClearSelection`, `InvertSelection`, `SaveSelectionAsText`, `SaveSelectionAsPlaylist`, `RestoreSelection`) + `UseAbsolutePathsForSelection` observable property
-- [x] Selection menu wired in `MainWindow.axaml.cs` code-behind with separators, input gestures, and a checkable "Save With Absolute Paths" item
+- [x] Selection menu wired in `MainWindow.axaml.cs` code-behind
 - [x] Window-level `Ctrl+A` / `Ctrl+Shift+A` / `Ctrl+I` key bindings
-- [x] Bug fix: root nodes no longer collapse when unchecked (`FileSystemNode.CheckState` setter guards on `Parent is not null`)
-- [x] `Traverse` extended to yield `node.Files` in addition to `node.Children`
 
 Acceptance criteria:
-- [x] Save and restore works with non-ASCII characters (as long as they are valid paths)
+- [x] Save and restore works with non-ASCII characters
 - [x] Relative path portability works across machines
-- [x] Missing/unmatched paths are reported and skipped without aborting restore
+- [x] Missing/unmatched paths are reported and skipped
 
 Verification:
 - [x] Round-trip tests for all formats (including M3U8)
 - [x] Regression tests for mixed path separators and case differences
 - [x] Non-ASCII path round-trip tests across `.txt`, `.m3u8`, `.sc2sel`
-- [x] `Restore_ReturnsMatchedCount`, `Restore_ReturnsUnmatchedPaths`, `Capture_AbsolutePaths_UsesFullPath`, `SelectAll`, `ClearAll`, `InvertAll` unit tests
 - [x] `dotnet build SmartCopy.App/SmartCopy.App.csproj`
-- [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj` (175/175 passing)
+- [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj`
 - [X] Manual UI smoke scenarios for save/restore/bulk-selection flows
 
-### Step 8 — Settings Persistence (Memory-Backed Hardening Track)
+#### 5.1.8 — Settings Persistence
 
 Deliverables:
 - [x] `AppSettings` load/save + schema version
 - [x] Cross-platform settings paths (`%APPDATA%` / `~/.config`)
-- [x] Source path persistence: `LastSourcePath` restored on startup; `RecentSources`/`FavouritePaths` populate source ComboBox and save on change
+- [x] `LastSourcePath`, `RecentSources`, `FavouritePaths` 
 
 Acceptance criteria:
-- [x] Missing/corrupt settings file falls back to defaults without crash
-- [x] Forward-compatible migration path exists for schema changes (`SchemaVersion` field + `System.Text.Json` tolerates unknown/missing fields by design)
+- [x] Settings are persisted across restarts
+- [x] Missing/corrupt settings file falls back to defaults
 
 Verification:
-- [x] Unit tests for serialization and error fallback (`SaveAndLoad_RoundTripsSettings`, `Load_WithCorruptJson_ReturnsDefaults`)
-- [x] Manual smoke test across restart on Windows
+- [x] Unit tests for serialization and error fallback
+- [x] Manual smoke test across restart
 
-### Step 9 — Shell Observability and Status Feedback (UX Polish Track)
+#### 5.1.9 — Shell Observability and Status Feedback
 
 Deliverables:
-- [x] Status bar live counts/size from Architecture `Status Bar Statistics`
-- [x] Cross-check status-bar values against selected/filter states under `/mem` fixtures
-- [x] Collapsible log panel with placeholder entries in the shell layout
-- [x] "Scanning..." indicator in status bar (via `DirectoryTreeViewModel.IsLoading`)
+- [x] Status bar live counts/size
+- [x] Cross-check status-bar values against selected/filter states
+- [x] Collapsible log panel
+- [x] "Scanning..." indicator in status bar
 - [x] "Ready" indicator on right side of status bar when idle
 - [x] Log panel wired: startup entry, pipeline results, expand-on-run
 
 Acceptance criteria:
-- [x] Users can see deterministic selected/file-size/count feedback while changing selection and filters
-- [x] Log panel does not interfere with core tree/list/filter/pipeline interactions
+- [x] selected/file-size/count feedback while changing selection and filters
+- [x] Log panel reports pipeline operations
 
 Verification:
-- [x] `dotnet build` passes
-- [x] All 183 tests pass (7 new: 4 LogPanelViewModelTests + 3 SelectionViewModelTests)
-- [X] UI smoke test: selection/filter changes update status-bar counts correctly
-- [X] UI smoke test: log panel expand/collapse persists and restores correctly
+- [x] All tests pass
+- [x] selection/filter changes update status-bar counts correctly
+- [x] log panel expand/collapse persists and restores correctly
 
-### Step 10 — Keyboard Navigation and Accessibility Baseline (UX Polish Track)
+#### 5.1.10 — Keyboard Navigation and Accessibility Baseline
 
 Deliverables:
-- [X] Full keyboard baseline (`Tab`, arrows, `Space`, `Ctrl+A`, `Delete`/`Ctrl+D`, `F5`, `Escape`)
-- [X] `AutomationProperties.Name` on all interactive controls
-- [X] Focus-visibility pass for tree, list, filter cards, and pipeline step cards
+- [x] Full keyboard baseline (`Tab`, arrows, `Space`, `Ctrl+A`, `Delete`/`Ctrl+D`, `F5`, `Escape`)
+- [x] `AutomationProperties.Name` on all interactive controls
+- [x] Focus-visibility pass for tree, list, filter cards, and pipeline step cards
 
 Acceptance criteria:
-- [X] Core memory-backed workflow is operable without mouse input
-- [X] Screen-reader baseline metadata is present on primary interactive controls
+- [x] Core memory-backed workflow is operable without mouse input
+- [x] Screen-reader baseline metadata is present on primary interactive controls
 
 Verification:
-- [X] Keyboard-only smoke test for scan/selection/filter/pipeline-preview path
+- [x] Keyboard-only smoke test for scan/selection/filter/pipeline-preview path
 
-### Step 11 - User Options and usability tweaks (UX Polish Track) ✓
+#### 5.1.11 — User Options and usability tweaks
 
-**Completed 2026-02-26.** Seven new user-configurable options added, persisted in `AppSettings`, and grouped into four categories in the Options menu.
+New options added, persisted, and grouped into categories in the Options menu.
 
 Deliverables:
-- [x] Startup option: restore last used workflow on startup
-- [x] Startup option: restore last used source path on startup (disabled when last used workflow is restored)
-- [x] Pipeline option: disable destructive preview (run delete/overwrite pipelines without confirmation)
-- [x] Pipeline option: default overwrite mode (skip, always, if newer) — submenu
-- [x] Pipeline option: delete to recycle bin (if available)
-- [x] Scan option: perform full scan instead of progressive scan
-- [x] Scan option: perform lazy scan (only scan inspected or selected paths)
+- [x] Startup: restore last used workflow on startup
+- [x] Startup: restore last used source path on startup
+- [x] Pipeline: disable destructive preview (run delete/overwrite without preview)
+- [x] Pipeline: default overwrite mode (skip, always, if newer)
+- [x] Pipeline: delete to recycle bin (if available)
+- [x] Scan: perform full scan instead of progressive scan
+- [x] Scan: perform lazy scan (only scan inspected or selected paths)
 
 Acceptance criteria:
+- [x] All options are accessible from the Options menu
 - [x] All options are persisted across application restarts
-- [x] All options are accessible from the Options menu (grouped: Startup / Display / Pipeline / Scan)
 
 Verification:
-- [x] `dotnet build SmartCopy.UI/SmartCopy.UI.csproj /tl:off /clp:ErrorsOnly` — 0 warnings, 0 errors
-- [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj` — 184/184 passing (1 new: `SaveAndLoad_RoundTripsNewOptions`)
+- [x] `dotnet build`
+- [x] `dotnet test`
 
----
+### Phase 2 — Filesystem Integration
 
-## 9. Remaining Phases
-
-### Phase 2 — Real Filesystem Integration (standalone)
-
-Goal:
-- Exercise `LocalFileSystemProvider` in real usage after memory-backed UX/architecture is proven.
-- Validate that `IFileSystemProvider` abstractions hold under real disk behavior without forcing
-  early UX compromises.
+Exercise `LocalFileSystemProvider` in real usage after UX/architecture is proven and tested using the memory-backed file system and validate that `IFileSystemProvider` abstractions hold under real file system behavior and limitations.
 
 Scope:
-- [ ] Local provider/scanner integration in `DirectoryTreeViewModel` via progressive streams
-- [ ] Platform `TrashService` adapters with timeout/fallback behavior
-- [ ] Real-disk cancellation and scan-options validation coverage
-- [ ] Incremental subtree rescan with selection preservation (Architecture `Tree Rescan with Selection Preservation`)
-- [ ] Watcher enable/disable settings, including provider capability gating
+- [ ] Folder browser dialog using native dialogs
+- [ ] Bookmarks and MRU lists work with multiple drives and file systems
+- [ ] Local provider/scanner supports progressive scan
+- [ ] File system capabilities (e.g. atomic move/delete, trash can support) reported and respected
+- [ ] File system watcher (gated by provider capabilities)
 - [ ] Debounce/coalescing and subtree-only update tests
-- [ ] Add provider parity checks so memory and local providers are exercised against the same
-      contract/integration scenarios where feasible
+- [ ] Incremental subtree rescan with selection preservation
+- [ ] Operations across different file systems (local, network)
+- [ ] `TrashService` adapters with timeout/fallback behavior
+- [ ] Drag-and-drop for source/destination fields
 
 Exit criteria:
-- [ ] End-to-end flow runs in UI against real local paths: scan -> select -> filter -> preview -> execute
-- [ ] Local-provider failure-path tests and watcher tests are stable in CI
-- [ ] No Phase 1 UX behavior regresses when switching source from `/mem` to a real directory
+- [ ] End-to-end flows validated against real file systems
+- [ ] Unit tests validate file system operations on Windows, Linux, and macOS
 
-### Phase 3 — Modern Features (post-local-integration hardening)
+### Phase 3 — Modernisation
+
+Add modern features that extend the capabilities of the application compared to the original SmartCopy.
 
 Scope:
-- [ ] Drag-and-drop for source/destination fields; bookmarks for pipeline destination field
-- [ ] Windows MTP provider (`MtpFileSystemProvider`) + WPD device picker integration
+- [ ] Windows MTP provider (`MtpFileSystemProvider`) + device picker integration
+- [ ] SMB/Network share provider-aware operations
+- [ ] Multi-source merge workflow
 
 Exit criteria:
-- [ ] MTP copy round-trip validated on at least two physical devices
+- [ ] MTP copy round-trip validated
+- [ ] SMB/Network share provider-aware operations validated
+- [ ] Operations across file systems (local, network, MTP) validated
 
-### Phase 4 — Advanced Pipeline Steps
-
-Scope:
-- [ ] `RenameStep` token engine (`{name}`, `{ext}`, `{date}`, `{artist}`, `{album}`, `{track:00}`, `{title}`)
-- [ ] `RebaseStep`
-- [ ] `ConvertStep` + plugin loader + per-plugin settings UI
-- [ ] FFmpeg reference plugin and conversion-size preview
-
-Exit criteria:
-- [ ] Plugin isolation and loading failures handled without app crash
-- [ ] At least one conversion plugin ships with tests and docs
-
-### Phase 5 — Polish and Extensibility
+### Phase 4 — Polish and Extensibility
 
 Scope:
 - [ ] Theming, localization infrastructure, update checks
-- [ ] Multi-source merge workflow
-- [ ] Public plugin SDK documentation
 
 Exit criteria:
 - [ ] Release candidate passes cross-platform smoke checklist
+
+### Phase 5 — Pipeline Plug-Ins
+
+Scope:
+- [ ] `RenameStep` token engine (`{name}`, `{ext}`, `{date}`, `{artist}`, `{album}`, `{track:00}`, `{title}`)
+- [ ] `ConvertStep` + plugin loader + per-plugin settings UI
+- [ ] FFmpeg reference plugin and conversion-size preview
+- [ ] Public plugin SDK documentation
+
+Exit criteria:
+- [ ] At least one conversion plugin with tests
+- [ ] Plugin isolation and loading failures handled without app crash
 - [ ] Plugin SDK docs are sufficient for a third party to build a basic plugin
 
----
+## 7. Open Questions
 
-## 10. Data Models
-
-Canonical data model and persistence schemas now live in:
-- `Docs/SmartCopy2026-Architecture.md#4-data-models`
-
-Plan-level rule: schema changes should be authored in the architecture reference and then referenced from the relevant implementation step checklists.
-
----
-
-## 11. Open Questions
-
-Track these as explicit decision records. If no decision is made by the target date, use the
-default and continue.
-
-| Topic | Default for v1 | Owner | Target date | Status |
-|---|---|---|---|---|
-| Packaging/distribution | Ship self-contained binaries first; add `winget` manifest next | Maintainer | 2026-03-15 | Open |
-| Plugin trust model | Prompt on first load; remember user choice per plugin hash | Maintainer | 2026-03-20 | Open |
-| Session snapshot size | Keep uncompressed; add optional `GZipStream` when file > 4 MB | Maintainer | 2026-04-01 | Open |
-| Trash on network drives | Detect unsupported trash and require explicit permanent-delete confirmation | Maintainer | 2026-03-01 | Resolved |
+| Topic | Default for v1 | Target date | Status |
+|---|---|---|---|
+| Packaging/distribution | Ship self-contained binaries first; add `winget` manifest next | 2026-03-15 | Open |
+| Plugin trust model | Prompt on first load; remember user choice per plugin hash | 2026-03-20 | Open |
 
 Decision notes:
 1. Packaging: installer is optional for v1; prioritize reliable portable binaries.
 2. Plugin trust: code-signing and central registry are deferred until plugin ecosystem justifies complexity.
-3. Snapshot size: optimize only when measured data shows real UX/storage pain.
-4. Network trash behavior is defined in Architecture `Safety Defaults for Destructive Operations` and should be implemented as a hard safety rule.
