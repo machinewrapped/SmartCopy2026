@@ -604,7 +604,7 @@ public partial class MainViewModel : ViewModelBase
         SourcePath = currentPath;
     }
 
-    private static bool RemoveEquivalentPath(ICollection<string> list, string path)
+    private static bool RemoveEquivalentPath(List<string> list, string path)
     {
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -612,17 +612,7 @@ public partial class MainViewModel : ViewModelBase
         }
 
         var normalizedPath = PathHelper.NormalizeUserPath(path);
-        var matches = list
-            .Where(existing => PathHelper.AreEquivalentUserPaths(existing, normalizedPath))
-            .ToList();
-
-        var removed = false;
-        foreach (var match in matches)
-        {
-            removed |= list.Remove(match);
-        }
-
-        return removed;
+        return list.RemoveAll(existing => PathHelper.AreEquivalentUserPaths(existing, normalizedPath)) > 0;
     }
 
     private IFileSystemProvider ResolveSourceProvider(string normalizedPath) =>
