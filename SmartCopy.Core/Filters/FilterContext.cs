@@ -13,16 +13,14 @@ public sealed class FilterContext : IFilterContext
     public FilterContext(FileSystemProviderRegistry registry) => _registry = registry;
 
     /// <summary>Creates a context with an explicit set of prefix→provider mappings.</summary>
-    public FilterContext(IEnumerable<(string Prefix, IFileSystemProvider Provider)> providers)
+    public FilterContext(IFileSystemProvider provider)
     {
         _registry = new FileSystemProviderRegistry();
-        foreach (var (prefix, provider) in providers)
-            _registry.Register(prefix, provider);
+        _registry.Register(provider);
     }
 
     /// <summary>Convenience: register a single provider under its own RootPath.</summary>
-    public static FilterContext FromProvider(IFileSystemProvider provider)
-        => new([(provider.RootPath, provider)]);
+    public static FilterContext FromProvider(IFileSystemProvider provider) => new(provider);
 
     /// <summary>Convenience: local paths only, no explicit registrations.</summary>
     public static FilterContext LocalOnly { get; } = new();

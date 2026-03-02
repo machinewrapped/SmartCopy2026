@@ -108,7 +108,7 @@ public partial class MainViewModel : ViewModelBase
         // Create an in-memory virtual file system for testing. TODO: make this a debug option.
         _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: _settings.AddArtificialDelay);
         _memoryProvider.SeedDirectory(MockMemoryFileSystemFactory.TargetPath);
-        _providerRegistry.Register(_memoryProvider.RootPath, _memoryProvider);
+        _providerRegistry.Register(_memoryProvider);
         _filterContext = new FilterContext(_providerRegistry);
         SourcePath = MockMemoryFileSystemFactory.SourcePath;
         _lastCommittedSourcePath = SourcePath;

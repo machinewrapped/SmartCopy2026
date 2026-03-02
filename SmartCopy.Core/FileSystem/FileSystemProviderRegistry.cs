@@ -19,18 +19,33 @@ public sealed class FileSystemProviderRegistry
     /// <summary>A shared empty registry for local-path-only resolution.</summary>
     public static FileSystemProviderRegistry Empty { get; } = new();
 
-    public void Register(string pathPrefix, IFileSystemProvider provider)
+    // <summary>Register a file system provider for a given root
+    public void Register(IFileSystemProvider provider)
     {
-        var key = CanonicalizePath(pathPrefix);
+        string rootPath = provider.RootPath;
+        if (string.IsNullOrEmpty(rootPath))
+            throw new ArgumentException("Registering a provider without a root path");
+        
         lock (_lock)
-            _registered[key] = provider;
+        {
+            if (_registered.Keys.Contains(rootPath))
+                throw new InvalidOperationException($"Provider already registered for this root path: {rootPath}");
+
+            _registered[rootPath] = provider;
+        }
     }
 
-    public void Unregister(string pathPrefix)
+    // <summary>Register a file system provider
+    public void Unregister(IFileSystemProvider provider)
     {
-        var key = CanonicalizePath(pathPrefix);
+        string rootPath = provider.RootPath;
+        if (string.IsNullOrEmpty(rootPath))
+            throw new ArgumentException("Registering a provider without a root path");
+        
         lock (_lock)
-            _registered.Remove(key);
+        {
+            _registered.Remove(rootPath);
+        }
     }
 
     /// <summary>
@@ -40,23 +55,58 @@ public sealed class FileSystemProviderRegistry
     /// </summary>
     public IFileSystemProvider? Resolve(string path)
     {
-        if (string.IsNullOrWhiteSpace(path)) return null;
-
-        var canonical = CanonicalizePath(path);
+        if (string.IsNullOrWhiteSpace(path))
+            return null;
 
         // Snapshot under lock, then search outside lock
         KeyValuePair<string, IFileSystemProvider>[] snapshot;
         lock (_lock)
             snapshot = [.. _registered];
 
-        (string Prefix, IFileSystemProvider Provider)? best = null;
+        IFileSystemProvider? best = null;
         foreach (var entry in snapshot)
         {
-            if (!IsPrefixMatch(canonical, entry.Key)) continue;
-            if (best is null || entry.Key.Length > best.Value.Prefix.Length)
-                best = (entry.Key, entry.Value);
+            IFileSystemProvider provider = entry.Value;
+
+            var rootSegments = provider.SplitPath(entry.Key);
+
+            // Some providers represent their own root as zero segments (e.g. "/mem").
+            // Keep a fast textual check for that case.
+            if (rootSegments.Length == 0)
+            {
+                if (!IsPrefixMatch(path, entry.Key))
+                    continue;
+            }
+            else
+            {
+                var pathSegments = provider.SplitPath(path);
+                if (pathSegments.Length < rootSegments.Length)
+                    continue;
+
+                bool matches = true;
+                for (int i = 0; i < rootSegments.Length; i++)
+                {
+                    if (!string.Equals(pathSegments[i], rootSegments[i], StringComparison.OrdinalIgnoreCase))
+                    {
+                        matches = false;
+                        break;
+                    }
+                }
+
+                if (!matches)
+                    continue;
+            }
+
+            if (best is null || entry.Key.Length > best.RootPath.Length)
+            {
+                best = provider;
+            }
         }
-        if (best is not null) return best.Value.Provider;
+
+        if (best is not null)
+        {
+            return best;
+        }
 
         return GetOrCreateLocalProvider(path);
     }
@@ -67,7 +117,8 @@ public sealed class FileSystemProviderRegistry
     /// </summary>
     public static IFileSystemProvider? GetOrCreateLocalProvider(string path)
     {
-        if (!Path.IsPathFullyQualified(path)) return null;
+        if (!Path.IsPathFullyQualified(path)) 
+            return null;
 
         var fullPath = Path.GetFullPath(path);
         var root = Path.GetPathRoot(fullPath);
@@ -76,41 +127,22 @@ public sealed class FileSystemProviderRegistry
         lock (LocalSync)
         {
             if (!LocalProviders.TryGetValue(providerRoot, out var provider))
+            {
                 LocalProviders[providerRoot] = provider = new LocalFileSystemProvider(providerRoot);
+            }
+
             return provider;
         }
     }
 
-    internal static string CanonicalizePath(string path)
+    internal static bool IsPrefixMatch(string path, string prefix)
     {
-        var canonical = path.Trim().Replace('\\', '/');
-        while (canonical.Contains("//", StringComparison.Ordinal))
-            canonical = canonical.Replace("//", "/", StringComparison.Ordinal);
-
-        if (canonical.Length == 0)
-            return "/";
-
-        if (canonical.Length == 1 && canonical[0] == '/')
-            return canonical;
-
-        if (canonical.Length == 3 && char.IsLetter(canonical[0]) && canonical[1] == ':' && canonical[2] == '/')
-            return canonical;
-
-        return canonical.TrimEnd('/');
-    }
-
-    internal static bool IsPrefixMatch(string canonicalPath, string canonicalPrefix)
-    {
-        if (canonicalPath.Equals(canonicalPrefix, StringComparison.OrdinalIgnoreCase))
+        if (path.Equals(prefix, StringComparison.OrdinalIgnoreCase))
             return true;
 
-        if (!canonicalPath.StartsWith(canonicalPrefix, StringComparison.OrdinalIgnoreCase))
+        if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             return false;
 
-        if (canonicalPrefix.EndsWith("/", StringComparison.Ordinal))
-            return true;
-
-        return canonicalPath.Length > canonicalPrefix.Length
-               && canonicalPath[canonicalPrefix.Length] == '/';
+        return path.Length > prefix.Length;
     }
 }
