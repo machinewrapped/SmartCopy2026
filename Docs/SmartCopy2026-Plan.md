@@ -536,7 +536,6 @@ Exit criteria:
 Scope:
 - [ ] `RenameStep` token engine (`{name}`, `{ext}`, `{date}`, `{artist}`, `{album}`, `{track:00}`, `{title}`)
 - [ ] `ConvertStep` + plugin loader + per-plugin settings UI
-- [ ] FLAC and LAME plugin 
 - [ ] FFmpeg reference plugin
 - [ ] Public plugin SDK documentation
 
