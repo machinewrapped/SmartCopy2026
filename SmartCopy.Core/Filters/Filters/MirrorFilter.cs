@@ -87,29 +87,7 @@ public sealed class MirrorFilter : FilterBase
         if (string.IsNullOrWhiteSpace(ComparisonPath))
             return null;
 
-        if (FileSystemProviderRegistry.TryResolveRegistered(ComparisonPath, out var registered))
-            return registered;
-
-        if (LooksLikeMemoryProviderPath(ComparisonPath))
-        {
-            return node.Provider is MemoryFileSystemProvider
-                ? node.Provider
-                : null;
-        }
-
-        if (Path.IsPathFullyQualified(ComparisonPath))
-        {
-            return FileSystemProviderRegistry.GetOrCreateLocalProvider(ComparisonPath);
-        }
-
-        return node.Provider;
-    }
-
-    private static bool LooksLikeMemoryProviderPath(string path)
-    {
-        var canonical = path.Replace('\\', '/').Trim();
-        return canonical.Equals("/mem", StringComparison.OrdinalIgnoreCase) ||
-               canonical.StartsWith("/mem/", StringComparison.OrdinalIgnoreCase);
+        return FileSystemProviderRegistry.Resolve(ComparisonPath) ?? node.Provider;
     }
 
     protected override JsonObject BuildParameters() =>

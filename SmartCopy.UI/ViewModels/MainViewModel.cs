@@ -75,7 +75,6 @@ public partial class MainViewModel : ViewModelBase
     private bool _addArtificialDelay = false;
 
     private readonly MemoryFileSystemProvider _memoryProvider;
-    private readonly LocalFileSystemProvider _localProvider;
     private readonly AppSettings _settings = new();
     private readonly AppSettingsStore _settingsStore = new();
     private readonly SessionStore _sessionStore = new();
@@ -104,8 +103,8 @@ public partial class MainViewModel : ViewModelBase
     {
         var presetStore = new FilterPresetStore();
 
-        _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: true);
-        _localProvider = new LocalFileSystemProvider(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+        // Create an in-memory virtual file system for testing. TODO: make this a debug option.
+        _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: _settings.AddArtificialDelay);
         FileSystemProviderRegistry.Register(MockMemoryFileSystemFactory.RootPath, _memoryProvider);
         _memoryProvider.SeedDirectory(MockMemoryFileSystemFactory.TargetPath);
         SourcePath = MockMemoryFileSystemFactory.SourcePath;
@@ -116,6 +115,7 @@ public partial class MainViewModel : ViewModelBase
         Pipeline = new PipelineViewModel(
             presetStore: new PipelinePresetStore());
 
+        // TODO: we will need to be able to init the viewmodel without a source path or provider
         DirectoryTree = new DirectoryTreeViewModel(_activeSourceProvider, MockMemoryFileSystemFactory.RootPath)
         {
             ShowFilteredNodesInTree = _settings.ShowFilteredNodesInTree
@@ -620,18 +620,9 @@ public partial class MainViewModel : ViewModelBase
         return removed;
     }
 
-    private IFileSystemProvider ResolveSourceProvider(string normalizedPath)
-    {
-        return IsMemoryProviderPath(normalizedPath)
-            ? _memoryProvider
-            : _localProvider;
-    }
-
-    private static bool IsMemoryProviderPath(string path)
-    {
-        return path.Equals("/mem", StringComparison.OrdinalIgnoreCase) ||
-               path.StartsWith("/mem/", StringComparison.OrdinalIgnoreCase);
-    }
+    private static IFileSystemProvider ResolveSourceProvider(string normalizedPath) =>
+        FileSystemProviderRegistry.Resolve(normalizedPath)
+        ?? throw new NotSupportedException($"No provider registered for path: {normalizedPath}");
 
     private static string BuildSourcePathValidationMessage(string path, Exception ex)
     {

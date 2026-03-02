@@ -35,6 +35,25 @@ public static class FileSystemProviderRegistry
         }
     }
 
+    /// <summary>
+    /// Returns the best-matching registered provider, or a lazily-created
+    /// <see cref="LocalFileSystemProvider"/> for any fully-qualified local path.
+    /// Returns <see langword="null"/> for relative or unrecognised paths.
+    /// </summary>
+    public static IFileSystemProvider? Resolve(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return null;
+
+        if (TryResolveRegistered(path, out var registered))
+            return registered;
+
+        if (Path.IsPathFullyQualified(path))
+            return GetOrCreateLocalProvider(path);
+
+        return null;
+    }
+
     public static bool TryResolveRegistered(string path, out IFileSystemProvider provider)
     {
         provider = null!;
