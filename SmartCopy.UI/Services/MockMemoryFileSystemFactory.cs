@@ -8,15 +8,14 @@ namespace SmartCopy.UI.Services;
 
 internal static class MockMemoryFileSystemFactory
 {
-    public const string RootPath = "/mem";
     public const string SourcePath = "/mem/Music";
     public const string TargetPath = "/mem/Mirror";
 
-    public static MemoryFileSystemProvider CreateSeeded(bool artificialDelay = false)
+    public static MemoryFileSystemProvider CreateSeeded(bool artificialDelay = false, string? rootPathOverride = null)
     {
-        var provider = new MemoryFileSystemProvider(artificialDelay);
+        var provider = new MemoryFileSystemProvider(artificialDelay, rootPathOverride);
 
-        provider.SeedDirectory(RootPath);
+        provider.SeedDirectory(provider.RootPath);
 
         using var stream = typeof(MockMemoryFileSystemFactory).Assembly.GetManifestResourceStream("sample_directory_structure.txt");
         if (stream != null)
@@ -29,7 +28,7 @@ internal static class MockMemoryFileSystemFactory
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
                 
-                var path = $"{RootPath}/{line.Replace('\\', '/')}";
+                var path = $"{provider.RootPath}/{line.Replace('\\', '/')}";
                 var lastSlash = path.LastIndexOf('/');
                 if (lastSlash > 0)
                 {

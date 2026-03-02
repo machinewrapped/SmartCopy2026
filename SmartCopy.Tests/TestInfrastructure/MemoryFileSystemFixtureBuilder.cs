@@ -3,9 +3,9 @@ using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Tests.TestInfrastructure;
 
-public sealed class MemoryFileSystemFixtureBuilder
+public sealed class MemoryFileSystemFixtureBuilder(string? customRootPath = null)
 {
-    private readonly MemoryFileSystemProvider _provider = new();
+    private readonly MemoryFileSystemProvider _provider = new(customRootPath: customRootPath);
 
     public MemoryFileSystemFixtureBuilder WithDirectory(string path,
         FileAttributes attributes = FileAttributes.Directory)
@@ -43,23 +43,27 @@ public sealed class MemoryFileSystemFixtureBuilder
 
 public static class MemoryFileSystemFixtures
 {
-    public static MemoryFileSystemProvider Create(Action<MemoryFileSystemFixtureBuilder> configure)
+    public static MemoryFileSystemProvider Create(Action<MemoryFileSystemFixtureBuilder> configure, string? customRootPath = null)
     {
-        var builder = new MemoryFileSystemFixtureBuilder();
+        var builder = new MemoryFileSystemFixtureBuilder(customRootPath);
         configure(builder);
         return builder.Build();
     }
 
-    public static FileSystemProviderRegistry CreateRegistry(MemoryFileSystemProvider provider)
+    public static FileSystemProviderRegistry CreateRegistry(params MemoryFileSystemProvider[] providers)
     {
         var registry = new FileSystemProviderRegistry();
-        registry.Register(provider);
+        var distinctProviders = providers.DistinctBy(x => x.RootPath);
+        foreach (var provider in distinctProviders)
+        {
+            registry.Register(provider);
+        }
         return registry;
     }
 
-    internal static async Task<DirectoryTreeNode> BuildDirectoryTree(Action<MemoryFileSystemFixtureBuilder> configure)
+    internal static async Task<DirectoryTreeNode> BuildDirectoryTree(Action<MemoryFileSystemFixtureBuilder> configure, string? customRootPath = null)
     {
-        var builder = new MemoryFileSystemFixtureBuilder();
+        var builder = new MemoryFileSystemFixtureBuilder(customRootPath);
         configure(builder);
         MemoryFileSystemProvider provider = builder.Build();
         return await BuildDirectoryTree(provider);

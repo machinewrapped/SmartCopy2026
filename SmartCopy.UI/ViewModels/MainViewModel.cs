@@ -107,20 +107,22 @@ public partial class MainViewModel : ViewModelBase
 
         // Create an in-memory virtual file system for testing. TODO: make this a debug option.
         _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: _settings.AddArtificialDelay);
-        _memoryProvider.SeedDirectory(MockMemoryFileSystemFactory.TargetPath);
         _providerRegistry.Register(_memoryProvider);
-        _filterContext = new FilterContext(_providerRegistry);
+        _activeSourceProvider = _memoryProvider;
         SourcePath = MockMemoryFileSystemFactory.SourcePath;
         _lastCommittedSourcePath = SourcePath;
-        _activeSourceProvider = _memoryProvider;
 
+        // Create the context and ViewModel for the filter chain
+        _filterContext = new FilterContext(_providerRegistry);
         FilterChain = new FilterChainViewModel(presetStore, _settings);
+        
+        // Create the pipeline view model
         Pipeline = new PipelineViewModel(
             presetStore: new PipelinePresetStore(),
             appSettings: _settings);
 
         // TODO: we will need to be able to init the viewmodel without a source path or provider
-        DirectoryTree = new DirectoryTreeViewModel(_activeSourceProvider, MockMemoryFileSystemFactory.RootPath)
+        DirectoryTree = new DirectoryTreeViewModel(_activeSourceProvider, _activeSourceProvider.RootPath)
         {
             ShowFilteredNodesInTree = _settings.ShowFilteredNodesInTree
         };
