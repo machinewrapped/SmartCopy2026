@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
@@ -35,9 +36,10 @@ public sealed class MirrorFilter : FilterBase
 
     public override async ValueTask<bool> MatchesAsync(
         DirectoryTreeNode node,
-        IFileSystemProvider? comparisonProvider,
+        IFilterContext context,
         CancellationToken ct = default)
     {
+        var comparisonProvider = ResolveComparisonProvider(context);
         if (comparisonProvider is null)
         {
             return false;
@@ -79,6 +81,14 @@ public sealed class MirrorFilter : FilterBase
         var targetNode = await comparisonProvider.GetNodeAsync(comparePath, ct);
         return string.Equals(targetNode.Name, node.Name, StringComparison.OrdinalIgnoreCase)
                && targetNode.Size == node.Size;
+    }
+
+    private IFileSystemProvider? ResolveComparisonProvider(IFilterContext context)
+    {
+        if (string.IsNullOrWhiteSpace(ComparisonPath))
+            return null;
+
+        return context.ResolveProvider(ComparisonPath);
     }
 
     protected override JsonObject BuildParameters() =>

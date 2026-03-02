@@ -37,9 +37,10 @@
 
         <!-- Source Field -->
         <Border Grid.Row="1" Background="#252526" BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="6" Margin="10,10,10,5" Padding="10">
-            <Grid ColumnDefinitions="Auto, *, Auto, Auto">
-                <TextBlock Grid.Column="0" Text="Source" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold"/>
+            <Grid RowDefinitions="Auto, Auto" ColumnDefinitions="Auto, *, Auto, Auto">
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Source" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold"/>
                 <ComboBox x:Name="SourceComboBox"
+                          Grid.Row="0"
                           Grid.Column="1"
                           IsEditable="True"
                           ItemsSource="{Binding SourceBookmarks}"
@@ -69,19 +70,29 @@
                         </DataTemplate>
                     </ComboBox.ItemTemplate>
                 </ComboBox>
-                <Button Grid.Column="2"
+                <Button Grid.Row="0"
+                        Grid.Column="2"
                         Content="★"
                         Command="{Binding BookmarkCurrentPathCommand}"
                         ToolTip.Tip="Bookmark this path"
                         AutomationProperties.Name="Bookmark this path"
                         CornerRadius="4"
                         Margin="0,0,5,0"/>
-                <Button Grid.Column="3"
+                <Button Grid.Row="0"
+                        Grid.Column="3"
                         Content="📁 Browse"
-                        IsEnabled="False"
+                        Command="{Binding BrowseSourcePathCommand}"
                         CornerRadius="4"
-                        ToolTip.Tip="Browse (Phase 2)"
+                        ToolTip.Tip="Browse for source folder"
                         AutomationProperties.Name="Browse for source folder"/>
+                <TextBlock Grid.Row="1"
+                           Grid.Column="1"
+                           Grid.ColumnSpan="3"
+                           Text="{Binding SourcePathValidationMessage}"
+                           IsVisible="{Binding HasSourcePathValidationMessage}"
+                           Foreground="#f48771"
+                           Margin="0,6,0,0"
+                           TextWrapping="Wrap" />
             </Grid>
         </Border>
 

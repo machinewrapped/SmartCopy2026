@@ -1,13 +1,11 @@
-using System;
-using System.Text;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Tests.TestInfrastructure;
 
-public sealed class MemoryFileSystemFixtureBuilder
+public sealed class MemoryFileSystemFixtureBuilder(string? customRootPath = null)
 {
-    private readonly MemoryFileSystemProvider _provider = new();
+    private readonly MemoryFileSystemProvider _provider = new(customRootPath: customRootPath);
 
     public MemoryFileSystemFixtureBuilder WithDirectory(string path,
         FileAttributes attributes = FileAttributes.Directory)
@@ -26,7 +24,7 @@ public sealed class MemoryFileSystemFixtureBuilder
     public MemoryFileSystemFixtureBuilder WithTextFile(string path, string content,
         FileAttributes attributes = FileAttributes.Normal)
     {
-        _provider.SeedFile(path, Encoding.UTF8.GetBytes(content), attributes);
+        _provider.SeedFile(path, System.Text.Encoding.UTF8.GetBytes(content), attributes);
         return this;
     }
 
@@ -45,29 +43,27 @@ public sealed class MemoryFileSystemFixtureBuilder
 
 public static class MemoryFileSystemFixtures
 {
-    public static MemoryFileSystemProvider Create(Action<MemoryFileSystemFixtureBuilder> configure)
+    public static MemoryFileSystemProvider Create(Action<MemoryFileSystemFixtureBuilder> configure, string? customRootPath = null)
     {
-        var builder = new MemoryFileSystemFixtureBuilder();
+        var builder = new MemoryFileSystemFixtureBuilder(customRootPath);
         configure(builder);
         return builder.Build();
     }
 
-    public static (MemoryFileSystemProvider Source, MemoryFileSystemProvider Target) CreatePair(
-        Action<MemoryFileSystemFixtureBuilder> configureSource,
-        Action<MemoryFileSystemFixtureBuilder>? configureTarget = null)
+    public static FileSystemProviderRegistry CreateRegistry(params MemoryFileSystemProvider[] providers)
     {
-        var sourceBuilder = new MemoryFileSystemFixtureBuilder();
-        configureSource(sourceBuilder);
-
-        var targetBuilder = new MemoryFileSystemFixtureBuilder();
-        configureTarget?.Invoke(targetBuilder);
-
-        return (sourceBuilder.Build(), targetBuilder.Build());
+        var registry = new FileSystemProviderRegistry();
+        var distinctProviders = providers.DistinctBy(x => x.RootPath);
+        foreach (var provider in distinctProviders)
+        {
+            registry.Register(provider);
+        }
+        return registry;
     }
 
-    internal static async Task<DirectoryTreeNode> BuildDirectoryTree(Action<MemoryFileSystemFixtureBuilder> configure)
+    internal static async Task<DirectoryTreeNode> BuildDirectoryTree(Action<MemoryFileSystemFixtureBuilder> configure, string? customRootPath = null)
     {
-        var builder = new MemoryFileSystemFixtureBuilder();
+        var builder = new MemoryFileSystemFixtureBuilder(customRootPath);
         configure(builder);
         MemoryFileSystemProvider provider = builder.Build();
         return await BuildDirectoryTree(provider);
@@ -77,11 +73,8 @@ public static class MemoryFileSystemFixtures
     {
         path ??= provider.RootPath;
 
-        FileSystemNode rootNode = await provider.GetNodeAsync(path, CancellationToken.None);
-        if (rootNode is null)
-        {
-            throw new InvalidOperationException($"Root path '{path}' does not exist in the file system fixture.");
-        }
+        FileSystemNode rootNode = await provider.GetNodeAsync(path, CancellationToken.None)
+            ?? throw new InvalidOperationException($"Root path '{path}' does not exist in the file system fixture.");
 
         return await BuildDirectoryTreeNode(provider, rootNode, parent: null);
     }

@@ -32,6 +32,10 @@ public partial class MainViewModel : ViewModelBase
     private string _sourcePath = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSourcePathValidationMessage))]
+    private string _sourcePathValidationMessage = string.Empty;
+
+    [ObservableProperty]
     private SourceBookmarkItem? _selectedSourceBookmark;
 
     [ObservableProperty]
@@ -71,6 +75,8 @@ public partial class MainViewModel : ViewModelBase
     private bool _addArtificialDelay = false;
 
     private readonly MemoryFileSystemProvider _memoryProvider;
+    private readonly FileSystemProviderRegistry _providerRegistry = new();
+    private readonly FilterContext _filterContext;
     private readonly AppSettings _settings = new();
     private readonly AppSettingsStore _settingsStore = new();
     private readonly SessionStore _sessionStore = new();
@@ -80,8 +86,11 @@ public partial class MainViewModel : ViewModelBase
     private readonly SelectionSerializer _selectionSerializer = new();
     private CancellationTokenSource? _filterCts;
     private CancellationTokenSource? _runCts;
+    private IFileSystemProvider _activeSourceProvider;
+    private string _lastCommittedSourcePath = string.Empty;
 
     public ObservableCollection<SourceBookmarkItem> SourceBookmarks { get; } = [];
+    public bool HasSourcePathValidationMessage => !string.IsNullOrWhiteSpace(SourcePathValidationMessage);
 
     public DirectoryTreeViewModel DirectoryTree { get; }
     public FileListViewModel FileList { get; }
@@ -96,15 +105,27 @@ public partial class MainViewModel : ViewModelBase
     {
         var presetStore = new FilterPresetStore();
 
-        _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: true);
-        _memoryProvider.SeedDirectory(MockMemoryFileSystemFactory.TargetPath);
+        // Create an in-memory virtual file system for testing. 
+        // TODO: this should be a debug option, not exposed in release builds
+        _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: _settings.AddArtificialDelay);
+        _providerRegistry.Register(_memoryProvider);
+        _activeSourceProvider = _memoryProvider;
+
+        // TEMP: set a safe default path
         SourcePath = MockMemoryFileSystemFactory.SourcePath;
+        _lastCommittedSourcePath = SourcePath;
 
+        // Create the context and ViewModel for the filter chain
+        _filterContext = new FilterContext(_providerRegistry);
         FilterChain = new FilterChainViewModel(presetStore, _settings);
+        
+        // Create the pipeline view model
         Pipeline = new PipelineViewModel(
-            presetStore: new PipelinePresetStore());
+            presetStore: new PipelinePresetStore(),
+            appSettings: _settings);
 
-        DirectoryTree = new DirectoryTreeViewModel(_memoryProvider, MockMemoryFileSystemFactory.RootPath)
+        // TODO: we will need to be able to init the viewmodel without a source path or provider
+        DirectoryTree = new DirectoryTreeViewModel(_activeSourceProvider, _activeSourceProvider.RootPath)
         {
             ShowFilteredNodesInTree = _settings.ShowFilteredNodesInTree
         };
@@ -116,11 +137,11 @@ public partial class MainViewModel : ViewModelBase
 
         DirectoryTree.SetAsSourcePathRequested += async (_, path) =>
         {
-            SourcePath = path;
             await ApplySourcePathCoreAsync(path);
         };
 
         FileList = new FileListViewModel();
+        FileList.UpdateFilterContext(_filterContext);
 
         WorkflowMenu = new WorkflowMenuViewModel(_workflowStore);
         WorkflowMenu.SaveRequested += async (_, _) => await SaveWorkflowAsync();
@@ -172,7 +193,17 @@ public partial class MainViewModel : ViewModelBase
         // Only populate the text field — don't apply until the user commits
         // (Enter key or dropdown close after mouse selection).
         if (value is not null)
+        {
             SourcePath = value.Path;
+        }
+    }
+
+    partial void OnSourcePathChanged(string value)
+    {
+        if (!PathHelper.AreEquivalentUserPaths(value, _lastCommittedSourcePath))
+        {
+            SourcePathValidationMessage = string.Empty;
+        }
     }
 
     partial void OnUseAbsolutePathsForSelectionChanged(bool value)
@@ -385,7 +416,8 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private void RevertSourcePath()
     {
-        SourcePath = DirectoryTree.RootNodes.FirstOrDefault()?.FullPath ?? SourcePath;
+        SourcePathValidationMessage = string.Empty;
+        SourcePath = _lastCommittedSourcePath;
     }
 
     [RelayCommand]
@@ -396,30 +428,112 @@ public partial class MainViewModel : ViewModelBase
         await ApplySourcePathCoreAsync(path);
     }
 
+    [RelayCommand]
+    private async Task BrowseSourcePath()
+    {
+        var mainWindow = GetMainWindow();
+        if (mainWindow is null)
+            return;
+
+        var folder = await mainWindow.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "Select source folder",
+            AllowMultiple = false,
+        });
+
+        if (folder is not { Count: > 0 })
+            return;
+
+        var selectedUri = folder[0].Path;
+        if (!selectedUri.IsAbsoluteUri || !selectedUri.IsFile)
+        {
+            SourcePathValidationMessage = "Selected location is not a local filesystem folder.";
+            LogPanel.AddEntry(SourcePathValidationMessage, LogLevel.Error);
+            return;
+        }
+
+        var pickedPath = selectedUri.LocalPath;
+        SourcePath = pickedPath;
+        await ApplySourcePathCoreAsync(pickedPath);
+    }
+
     private async Task ApplySourcePathCoreAsync(string path)
     {
-        var previousPath = DirectoryTree.RootNodes.FirstOrDefault()?.FullPath ?? path;
+        var normalizedPath = PathHelper.NormalizeUserPath(path);
+        if (string.IsNullOrWhiteSpace(normalizedPath))
+            return;
+
+        var previousPath = _lastCommittedSourcePath;
+        var previousProvider = _activeSourceProvider;
+        var nextProvider = ResolveSourceProvider(normalizedPath);
+
         try
         {
-            await DirectoryTree.ChangeRootAsync(path);
-            RecordRecentSource(path);
+            if (!ReferenceEquals(previousProvider, nextProvider))
+            {
+                DirectoryTree.SetProvider(nextProvider);
+                _activeSourceProvider = nextProvider;
+            }
+
+            // See if we can set this path as a root (it will throw if not)
+            await DirectoryTree.ChangeRootAsync(normalizedPath);
+
+            _lastCommittedSourcePath = normalizedPath;
+            SourcePath = normalizedPath;
+            SourcePathValidationMessage = string.Empty;
+
+            RecordRecentSource(normalizedPath);
             await ApplyFiltersAsync();
-            _settings.LastSourcePath = path;
+            _settings.LastSourcePath = normalizedPath;
             await _settingsStore.SaveAsync(_settings);
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"Failed to change source path to '{path}': {ex}");
-            SourcePath = previousPath;
+            Debug.WriteLine($"Failed to change source path to '{normalizedPath}': {ex}");
+
+            SourcePathValidationMessage = BuildSourcePathValidationMessage(normalizedPath, ex);
+            LogPanel.AddEntry(SourcePathValidationMessage, LogLevel.Error);
+
+            if (!ReferenceEquals(previousProvider, nextProvider))
+            {
+                DirectoryTree.SetProvider(previousProvider);
+                _activeSourceProvider = previousProvider;
+            }
+
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(previousPath))
+                {
+                    await DirectoryTree.ChangeRootAsync(previousPath);
+                    await ApplyFiltersAsync();
+                }
+            }
+            catch (Exception rollbackEx)
+            {
+                Debug.WriteLine($"Failed to restore previous source path '{previousPath}': {rollbackEx}");
+                LogPanel.AddEntry($"Failed to restore previous source path '{previousPath}'.", LogLevel.Error);
+            }
+
+            if (SourcePath != previousPath)
+            {
+                SourcePath = previousPath;                
+            }
         }
     }
 
     [RelayCommand]
     private async Task BookmarkCurrentPath()
     {
-        var path = PathHelper.RemoveTrailingSeparator(SourcePath.Trim());
-        if (string.IsNullOrWhiteSpace(path) || _settings.FavouritePaths.Contains(path))
+        var path = PathHelper.NormalizeUserPath(SourcePath);
+        if (string.IsNullOrWhiteSpace(path))
+        {
             return;
+        }
+
+        if (_settings.FavouritePaths.Any(existing => PathHelper.AreEquivalentUserPaths(existing, path)))
+        {
+            return;
+        }
 
         _settings.FavouritePaths.Insert(0, path);
         RefreshSourceBookmarks();
@@ -431,14 +545,15 @@ public partial class MainViewModel : ViewModelBase
     {
         if (item is null) return;
 
+        var normalizedPath = PathHelper.NormalizeUserPath(item.Path);
         bool removed;
         if (item.IsBookmark)
         {
-            removed = _settings.FavouritePaths.Remove(item.Path);
+            removed = RemoveEquivalentPath(_settings.FavouritePaths, normalizedPath);
         }
         else
         {
-            removed = _settings.RecentSources.Remove(item.Path);
+            removed = RemoveEquivalentPath(_settings.RecentSources, normalizedPath);
         }
 
         if (removed)
@@ -450,10 +565,14 @@ public partial class MainViewModel : ViewModelBase
 
     private void RecordRecentSource(string path)
     {
-        path = PathHelper.RemoveTrailingSeparator(path);
-        
-        _settings.RecentSources.Remove(path);
-        _settings.RecentSources.Insert(0, path);
+        var normalizedPath = PathHelper.NormalizeUserPath(path);
+        if (string.IsNullOrWhiteSpace(normalizedPath))
+        {
+            return;
+        }
+
+        RemoveEquivalentPath(_settings.RecentSources, normalizedPath);
+        _settings.RecentSources.Insert(0, normalizedPath);
         if (_settings.RecentSources.Count > MaxRecentSources)
         {
             _settings.RecentSources.RemoveAt(MaxRecentSources);
@@ -466,21 +585,13 @@ public partial class MainViewModel : ViewModelBase
     {
         // Preserve the current text — Clear() nulls SelectedItem which
         // causes the editable ComboBox to wipe its Text binding.
-        var currentPath = PathHelper.RemoveTrailingSeparator(SourcePath);
+        var currentPath = PathHelper.NormalizeUserPath(SourcePath);
 
         SourceBookmarks.Clear();
-        var addedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var addedPaths = new HashSet<string>(PathHelper.PathComparer);
 
-        // Clean trailing slashes out of existing entries first
-        var normalizedFavourites = _settings.FavouritePaths
-            .Select(PathHelper.RemoveTrailingSeparator)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        
-        var normalizedRecent = _settings.RecentSources
-            .Select(PathHelper.RemoveTrailingSeparator)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        var normalizedFavourites = PathHelper.NormalizeDistinctUserPaths(_settings.FavouritePaths);
+        var normalizedRecent = PathHelper.NormalizeDistinctUserPaths(_settings.RecentSources);
 
         // Save normalized lists back
         _settings.FavouritePaths = normalizedFavourites;
@@ -499,6 +610,34 @@ public partial class MainViewModel : ViewModelBase
         }
 
         SourcePath = currentPath;
+    }
+
+    private static bool RemoveEquivalentPath(List<string> list, string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        var normalizedPath = PathHelper.NormalizeUserPath(path);
+        return list.RemoveAll(existing => PathHelper.AreEquivalentUserPaths(existing, normalizedPath)) > 0;
+    }
+
+    private IFileSystemProvider ResolveSourceProvider(string normalizedPath) =>
+        _providerRegistry.Resolve(normalizedPath)
+        ?? throw new NotSupportedException($"No provider for path: {normalizedPath}");
+
+    private static string BuildSourcePathValidationMessage(string path, Exception ex)
+    {
+        return ex switch
+        {
+            DirectoryNotFoundException => $"Path not found: {path}",
+            FileNotFoundException => $"Path not found: {path}",
+            UnauthorizedAccessException => $"Access denied: {path}",
+            ArgumentException => $"Invalid path: {path}",
+            NotSupportedException => $"Unsupported path format: {path}",
+            _ => $"Could not open source path: {path}",
+        };
     }
 
     private async void OnChainChanged(object? sender, EventArgs e)
@@ -520,9 +659,9 @@ public partial class MainViewModel : ViewModelBase
     private async Task ApplyFiltersAsync(CancellationToken ct = default)
     {
         var chain = FilterChain.BuildLiveChain();
-        FileList.UpdateChain(chain, _memoryProvider);
+        FileList.UpdateChain(chain);
 
-        await DirectoryTree.ApplyFiltersAsync(chain, _memoryProvider, ct);
+        await DirectoryTree.ApplyFiltersAsync(chain, _filterContext, ct);
         await FileList.ReapplyFiltersAsync(ct);
         RefreshIdleStats();
     }
@@ -608,13 +747,6 @@ public partial class MainViewModel : ViewModelBase
         LazyExpandScan = _settings.LazyExpandScan;
         DefaultOverwriteMode = _settings.DefaultOverwriteMode;
 
-        if (saved.RestoreLastSourcePath && !saved.RestoreLastWorkflow
-            && saved.LastSourcePath is { Length: > 0 })
-        {
-            SourcePath = saved.LastSourcePath;
-        }
-        RefreshSourceBookmarks();
-
         // Phase 1: hardcode /mem/Mirror as the mirror-filter comparison path.
         FilterChain.PipelineDestinationPath = MockMemoryFileSystemFactory.TargetPath;
         await _operationJournal.RotateAsync(_settings.LogRetentionDays);
@@ -627,20 +759,28 @@ public partial class MainViewModel : ViewModelBase
             {
                 var session = await _sessionStore.LoadAsync(GetSessionPath());
                 if (session is not null)
+                {
                     await ApplyWorkflowConfigAsync(session);
+                }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
             {
                 Debug.WriteLine($"Failed to restore session snapshot: {ex}");
             }
         }
+        else if (saved.RestoreLastSourcePath && saved.LastSourcePath is { Length: > 0 })
+        {
+            SourcePath = saved.LastSourcePath;
+        }
+
+        RefreshSourceBookmarks();
 
         // Pre-wire the chain before the initial tree load so the first file list load
         // already has a chain to evaluate.
         var chain = FilterChain.BuildLiveChain();
-        FileList.UpdateChain(chain, _memoryProvider);
-
-        await DirectoryTree.InitializeAsync(ct: CancellationToken.None);
+        _activeSourceProvider = ResolveSourceProvider(PathHelper.NormalizeUserPath(SourcePath));
+        DirectoryTree.SetProvider(_activeSourceProvider);
+        FileList.UpdateChain(chain);
 
         // TODO: automatically reading the last used directory on startup could be expensive,
         // especially if it was a network drive or MTP. It should definitely be a setting that can be turned off.
@@ -649,13 +789,18 @@ public partial class MainViewModel : ViewModelBase
         {
             try
             {
-                await DirectoryTree.ChangeRootAsync(SourcePath);
+                await ApplySourcePathCoreAsync(SourcePath);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Failed to set initial source path to '{SourcePath}': {ex}");
-                SourcePath = DirectoryTree.RootNodes.FirstOrDefault()?.FullPath ?? SourcePath;
+                SourcePath = _lastCommittedSourcePath;
             }
+        }
+        else
+        {
+            await DirectoryTree.InitializeAsync(ct: CancellationToken.None);
+            _lastCommittedSourcePath = DirectoryTree.RootNodes.FirstOrDefault()?.FullPath ?? _lastCommittedSourcePath;
         }
 
         if (DirectoryTree.SelectedNode != null)
@@ -684,11 +829,11 @@ public partial class MainViewModel : ViewModelBase
         var runner = new PipelineRunner(pipeline);
         var job = new PipelineJob
         {
-            RootNode       = rootNode,
-            SourceProvider = _memoryProvider,
-            TargetProvider = _memoryProvider,
-            OverwriteMode  = ParseOverwriteMode(_settings.DefaultOverwriteMode),
-            DeleteMode     = ParseDeleteMode(_settings.DefaultDeleteMode),
+            RootNode         = rootNode,
+            SourceProvider   = _activeSourceProvider,
+            ProviderRegistry = _providerRegistry,
+            OverwriteMode    = ParseOverwriteMode(_settings.DefaultOverwriteMode),
+            DeleteMode       = ParseDeleteMode(_settings.DefaultDeleteMode),
         };
 
         var plan = await runner.PreviewAsync(job, CancellationToken.None);
@@ -730,11 +875,11 @@ public partial class MainViewModel : ViewModelBase
         var runner = new PipelineRunner(pipeline);
         var job = new PipelineJob
         {
-            RootNode       = rootNode,
-            SourceProvider = _memoryProvider,
-            TargetProvider = _memoryProvider,
-            OverwriteMode  = ParseOverwriteMode(_settings.DefaultOverwriteMode),
-            DeleteMode     = ParseDeleteMode(_settings.DefaultDeleteMode),
+            RootNode         = rootNode,
+            SourceProvider   = _activeSourceProvider,
+            ProviderRegistry = _providerRegistry,
+            OverwriteMode    = ParseOverwriteMode(_settings.DefaultOverwriteMode),
+            DeleteMode       = ParseDeleteMode(_settings.DefaultDeleteMode),
         };
         await ExecutePipelineAsync(runner, job);
     }
@@ -866,7 +1011,6 @@ public partial class MainViewModel : ViewModelBase
     private async Task ApplyWorkflowConfigAsync(WorkflowConfig config)
     {
         // Restore source path
-        SourcePath = config.SourcePath;
         await ApplySourcePathCoreAsync(config.SourcePath);
 
         // Restore filter chain

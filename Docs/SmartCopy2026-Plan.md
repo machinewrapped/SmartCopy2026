@@ -411,18 +411,18 @@ Real filesystem test strategy (three tiers):
 #### 5.2.2 — Source Acquisition UX (native browse + path commit)
 
 Deliverables:
-- [ ] Replace disabled Browse buttons with native folder picker wiring (source + destination contexts)
-- [ ] Keep editable `SourcePath` commit semantics (Enter/dropdown close) while allowing picker-driven path updates
-- [ ] Ensure bookmarks/MRU normalization works across multiple drives, UNC paths, and trailing-separator variations
-- [ ] Add validation/error messaging for inaccessible or missing paths without freezing UI
+- [X] Replace disabled Browse buttons with native folder picker wiring (source + destination contexts)
+- [X] Keep editable `SourcePath` commit semantics (Enter/dropdown close) while allowing picker-driven path updates
+- [X] Ensure bookmarks/MRU normalization works across multiple drives, UNC paths, and trailing-separator variations
+- [X] Add validation/error messaging for inaccessible or missing paths without freezing UI
 
 Acceptance criteria:
-- [ ] User can pick a local folder and immediately scan it
-- [ ] MRU/bookmarks de-duplicate equivalent paths reliably
-- [ ] Invalid/unreachable path entry fails safely and preserves last good state
+- [X] User can pick a local folder and immediately scan it
+- [X] MRU/bookmarks de-duplicate equivalent paths reliably
+- [X] Invalid/unreachable path entry fails safely and preserves last good state
 
 Verification:
-- [ ] Automated tests for bookmark/MRU normalization edge cases
+- [X] Automated tests for bookmark/MRU normalization edge cases
 - [ ] Manual smoke: local drive path, UNC/network path, disconnected path recovery
 
 #### 5.2.3 — Real Provider Runtime Integration (scanner + pipeline path)
@@ -442,7 +442,20 @@ Verification:
 - [ ] Automated tests around provider switching and pipeline execution provider routing
 - [ ] Manual smoke: scan/filter/preview/run on a real directory tree with at least 10k files
 
-#### 5.2.4 — Capability-Gated Delete/Trash and Move Semantics
+### 5.2.4 - Directory browser integration for filter and pipeline editors
+
+- [ ] Browse/Bookmark functionality for MirrorFilterEditorView
+- [ ] Generalise the browse/bookmark functionality to use in CopyMoveStepEditor (custom view component?)
+
+Acceptance criteria:
+- [ ] Target directory pickers have full parity with source picker in MainWindow
+- [ ] Code duplication minimised, should be easy to re-use in other views in future
+
+Verification
+- [ ] Manual testing of UI and functionality
+- [ ] Add automated tests if applicable
+
+#### 5.2.5 — Capability-Gated Delete/Trash and Move Semantics
 
 Deliverables:
 - [ ] Introduce `TrashService` abstraction/adapters with timeout and fallback behavior
@@ -459,7 +472,7 @@ Verification:
 - [ ] Unit tests for trash fallback, timeout, and move fallback paths
 - [ ] Manual smoke: delete-to-trash and permanent delete on local files
 
-#### 5.2.5 — Watcher and Incremental Rescan (selection-preserving)
+#### 5.2.6 — Watcher and Incremental Rescan (selection-preserving)
 
 Deliverables:
 - [ ] Gate watcher startup by provider capability and path suitability
@@ -476,7 +489,7 @@ Verification:
 - [ ] Automated tests for debounce/coalescing and subtree-only updates
 - [ ] Manual smoke with scripted file churn in nested directories
 
-#### 5.2.6 — Drag-and-Drop Integration and Hardening
+#### 5.2.7 — Drag-and-Drop Integration and Hardening
 
 Deliverables:
 - [ ] Add drag-and-drop for source and destination path inputs
@@ -523,8 +536,10 @@ Exit criteria:
 
 Scope:
 - [ ] Theming, localization infrastructure, update checks
-- [ ] Confirm quit whilst operation is in progress
+- [ ] Confirm quit whilst pipeline execution is in progress
+- [ ] Disable changing source path whilst pipeline execution is in progress (or confirm + cancel)
 - [ ] Disable Pipeline Run & Preview whilst scan is in progress
+- [ ] Lock Pipeline view whilst execution is in progress (no run, preview, remove or edit steps)
 - [ ] Open PreviewView and show a progress bar whilst OperationPlan is being prepared
 
 Exit criteria:

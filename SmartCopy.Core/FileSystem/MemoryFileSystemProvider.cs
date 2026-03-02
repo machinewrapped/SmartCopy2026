@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -10,7 +11,7 @@ namespace SmartCopy.Core.FileSystem;
 
 public sealed class MemoryFileSystemProvider : IFileSystemProvider
 {
-    private const string Root = "/";
+    private const string DefaultRoot = "/mem";
     private readonly ConcurrentDictionary<string, MemoryEntry> _entries = new(StringComparer.OrdinalIgnoreCase);
     // SemaphoreSlim(1,1) provides async-compatible exclusive locking for all mutation operations.
     private readonly SemaphoreSlim _mutationSemaphore = new(1, 1);
@@ -18,13 +19,15 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
     // Add artificial delay to simulate real I/O for testing progress reporting.
     public bool AddArtificialDelay { get; set; }
 
-    public MemoryFileSystemProvider(bool addArtificialDelay = false)
+    public MemoryFileSystemProvider(bool addArtificialDelay = false, string? customRootPath = null)
     {
         AddArtificialDelay = addArtificialDelay;
-        _entries[Root] = MemoryEntry.CreateDirectory();
+        RootPath = customRootPath ?? DefaultRoot;
+        Debug.Assert(RootPath.StartsWith("/"));
+        _entries[RootPath] = MemoryEntry.CreateDirectory();
     }
 
-    public string RootPath => Root;
+    public string RootPath { get; }
     public bool SupportsProgress => true;
     public ProviderCapabilities Capabilities => new(
         CanSeek: true,
@@ -38,7 +41,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         EnsureDirectoryExists(normalizedPath);
 
         // GetParentPath(kv.Key) == normalizedPath selects direct children.
-        // The extra inequality guard is only needed for root ("/"), where GetParentPath("/") == "/".
+        // The extra inequality guard is only needed for root, where GetParentPath(RootPath) == RootPath.
         var children = _entries
             .Where(kv => GetParentPath(kv.Key).Equals(normalizedPath, StringComparison.OrdinalIgnoreCase)
                          && !kv.Key.Equals(normalizedPath, StringComparison.OrdinalIgnoreCase))
@@ -107,7 +110,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
 
             if (AddArtificialDelay)
             {
-                await Task.Delay(100, ct); // Simulate delay for testing progress reporting
+                await Task.Delay(2, ct); // Simulate delay for testing progress reporting
             }
 
             progress?.Report(read);
@@ -256,14 +259,16 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         var prefix = root.EndsWith('/') ? root : root + '/';
         return full.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
             ? full[prefix.Length..]
-            : full.TrimStart('/');
+            : GetRelativeToRoot(full);
     }
 
     public string[] SplitPath(string path)
     {
-        if (string.IsNullOrWhiteSpace(path))
+        var normalized = Normalize(path);
+        var relative = GetRelativeToRoot(normalized);
+        if (string.IsNullOrWhiteSpace(relative))
             return [];
-        return path.Replace('\\', '/').Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        return relative.Split('/', StringSplitOptions.RemoveEmptyEntries);
     }
 
     public string JoinPath(string basePath, IReadOnlyList<string> segments)
@@ -325,7 +330,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
             throw new DirectoryNotFoundException(path);
         }
 
-        if (!path.Equals(Root, StringComparison.OrdinalIgnoreCase))
+        if (!path.Equals(RootPath, StringComparison.OrdinalIgnoreCase))
         {
             EnsureDirectoryExists(GetParentPath(path), createIfMissing: true);
         }
@@ -363,11 +368,11 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         return path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string Normalize(string path)
+    private string Normalize(string path)
     {
         if (string.IsNullOrWhiteSpace(path))
         {
-            return Root;
+            return RootPath;
         }
 
         var normalized = path.Replace('\\', '/').Trim();
@@ -376,9 +381,11 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
             normalized = "/" + normalized;
         }
 
+        int iterations = 0;
         while (normalized.Contains("//", StringComparison.Ordinal))
         {
             normalized = normalized.Replace("//", "/", StringComparison.Ordinal);
+            Debug.Assert(iterations < 3);
         }
 
         if (normalized.Length > 1)
@@ -386,35 +393,46 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
             normalized = normalized.TrimEnd('/');
         }
 
-        return normalized;
+        if (normalized.Equals("/", StringComparison.Ordinal))
+        {
+            return RootPath;
+        }
+
+        if (normalized.Equals(RootPath, StringComparison.OrdinalIgnoreCase) ||
+            normalized.StartsWith(RootPath + "/", StringComparison.OrdinalIgnoreCase))
+        {
+            return normalized;
+        }
+
+        return RootPath + normalized;
     }
 
-    private static string GetParentPath(string path)
+    private string GetParentPath(string path)
     {
         path = Normalize(path);
-        if (path.Equals(Root, StringComparison.OrdinalIgnoreCase))
+        if (path.Equals(RootPath, StringComparison.OrdinalIgnoreCase))
         {
-            return Root;
+            return RootPath;
         }
 
         var lastSeparator = path.LastIndexOf('/');
         if (lastSeparator <= 0)
         {
-            return Root;
+            return RootPath;
         }
 
         return path[..lastSeparator];
     }
 
-    private static string Combine(string basePath, string relativePath)
+    private string Combine(string basePath, string relativePath)
     {
         return Normalize(basePath.TrimEnd('/') + "/" + relativePath.TrimStart('/'));
     }
 
     private FileSystemNode ToNode(string path, MemoryEntry entry)
     {
-        var name = path.Equals(Root, StringComparison.OrdinalIgnoreCase)
-            ? Root
+        var name = path.Equals(RootPath, StringComparison.OrdinalIgnoreCase)
+            ? RootPath
             : path[(path.LastIndexOf('/') + 1)..];
 
         return new FileSystemNode
@@ -429,12 +447,12 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         };
     }
 
-    private static string GetRelativeToRoot(string path)
+    private string GetRelativeToRoot(string path)
     {
-        if (path.Equals(Root, StringComparison.OrdinalIgnoreCase))
+        if (path.Equals(RootPath, StringComparison.OrdinalIgnoreCase))
             return string.Empty;
 
-        var root = Root.EndsWith('/') ? Root : Root + '/';
+        var root = RootPath.EndsWith('/') ? RootPath : RootPath + '/';
         return path.StartsWith(root, StringComparison.OrdinalIgnoreCase)
             ? path[root.Length..]
             : path.TrimStart('/');

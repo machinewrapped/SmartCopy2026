@@ -16,8 +16,8 @@ public sealed class PipelineJob
     /// <summary>Provider used to read source files.</summary>
     public required IFileSystemProvider SourceProvider { get; init; }
 
-    /// <summary>Provider used to write/check destination files. May be <see langword="null"/> for delete-only pipelines.</summary>
-    public IFileSystemProvider? TargetProvider { get; init; }
+    /// <summary>Provider registry for resolving paths during pipeline execution.</summary>
+    public required FileSystemProviderRegistry ProviderRegistry { get; init; }
 
     /// <summary>Controls how pre-existing destination files are handled.</summary>
     public OverwriteMode OverwriteMode { get; init; } = OverwriteMode.IfNewer;

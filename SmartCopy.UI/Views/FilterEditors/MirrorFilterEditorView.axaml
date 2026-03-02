@@ -12,10 +12,10 @@
                 <TextBox Grid.Column="0"
                          Text="{Binding ComparisonPath}"
                          Watermark="/path/to/target" />
-                <!-- Browse stub: will be wired in Phase 2 with real folder picker -->
                 <Button Grid.Column="1" Content="…"
-                        Width="32" IsEnabled="False"
-                        ToolTip.Tip="Browse (available in Phase 2)" />
+                        Width="32"
+                        Click="OnBrowseComparisonPathClick"
+                        ToolTip.Tip="Browse for comparison folder" />
             </Grid>
         </StackPanel>
 

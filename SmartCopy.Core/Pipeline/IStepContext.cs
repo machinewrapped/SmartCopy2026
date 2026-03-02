@@ -12,7 +12,7 @@ public interface IStepContext
 {
     DirectoryTreeNode RootNode { get; }
     IFileSystemProvider SourceProvider { get; }
-    IFileSystemProvider? TargetProvider { get; }
+    FileSystemProviderRegistry ProviderRegistry { get; }
     OverwriteMode OverwriteMode { get; }
     DeleteMode DeleteMode { get; }
 

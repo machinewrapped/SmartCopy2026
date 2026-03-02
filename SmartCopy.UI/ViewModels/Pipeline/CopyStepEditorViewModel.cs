@@ -5,7 +5,7 @@ using SmartCopy.Core.Settings;
 
 namespace SmartCopy.UI.ViewModels.Pipeline;
 
-public partial class CopyStepEditorViewModel : StepEditorViewModelBase
+public partial class CopyStepEditorViewModel : StepEditorViewModelBase, IHasDestinationPath
 {
     public IReadOnlyList<string> DestinationBookmarks { get; }
 

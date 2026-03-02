@@ -11,7 +11,7 @@ namespace SmartCopy.UI.ViewModels;
 
 public class DirectoryTreeViewModel : ViewModelBase
 {
-    private readonly DirectoryScanner _scanner;
+    private DirectoryScanner _scanner;
     private string _rootPath;
     private DirectoryTreeNode? _selectedNode;
     private bool _isLoading;
@@ -39,6 +39,11 @@ public class DirectoryTreeViewModel : ViewModelBase
         _scanner = new DirectoryScanner(provider);
     }
 
+    public void SetProvider(IFileSystemProvider provider)
+    {
+        _scanner = new DirectoryScanner(provider);
+    }
+
     public DirectoryTreeNode? SelectedNode
     {
         get => _selectedNode;
@@ -58,10 +63,10 @@ public class DirectoryTreeViewModel : ViewModelBase
     /// </summary>
     public async Task ApplyFiltersAsync(
         FilterChain chain,
-        IFileSystemProvider? comparisonProvider,
+        IFilterContext? context = null,
         CancellationToken ct = default)
     {
-        await chain.ApplyToTreeAsync(RootNodes, comparisonProvider, ct);
+        await chain.ApplyToTreeAsync(RootNodes, context, ct);
     }
 
     public async Task InitializeAsync(CancellationToken ct = default)

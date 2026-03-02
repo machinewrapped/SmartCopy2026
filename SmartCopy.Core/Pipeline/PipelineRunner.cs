@@ -153,17 +153,17 @@ public sealed class PipelineRunner
 
         public DirectoryTreeNode RootNode { get; }
         public IFileSystemProvider SourceProvider { get; }
-        public IFileSystemProvider? TargetProvider { get; }
         public OverwriteMode OverwriteMode { get; }
         public DeleteMode DeleteMode { get; }
+        public FileSystemProviderRegistry ProviderRegistry { get; }
 
         public StepContext(PipelineJob job)
         {
             RootNode = job.RootNode;
             SourceProvider = job.SourceProvider;
-            TargetProvider = job.TargetProvider;
             OverwriteMode = job.OverwriteMode;
             DeleteMode = job.DeleteMode;
+            ProviderRegistry = job.ProviderRegistry;
         }
 
         public PipelineContext GetNodeContext(DirectoryTreeNode node)
@@ -180,7 +180,7 @@ public sealed class PipelineRunner
             {
                 SourceNode = node,
                 SourceProvider = SourceProvider,
-                TargetProvider = TargetProvider,
+                ProviderRegistry = ProviderRegistry,
                 PathSegments = segments,
                 CurrentExtension = extension,
                 OverwriteMode = OverwriteMode,
@@ -190,6 +190,8 @@ public sealed class PipelineRunner
             _contexts[node] = context;
             return context;
         }
+
+        public IFileSystemProvider? ResolveProvider(string path) => ProviderRegistry.Resolve(path);
 
         public bool IsNodeFailed(DirectoryTreeNode node) => _failedNodes.Contains(node);
         public void MarkFailed(DirectoryTreeNode node) => _failedNodes.Add(node);

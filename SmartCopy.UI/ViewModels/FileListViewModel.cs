@@ -1,5 +1,4 @@
 using SmartCopy.Core.DirectoryTree;
-using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
 
 namespace SmartCopy.UI.ViewModels;
@@ -9,7 +8,7 @@ public class FileListViewModel : ViewModelBase
     private CancellationTokenSource? _loadCts;
 
     private FilterChain? _chain;
-    private IFileSystemProvider? _comparisonProvider;
+    private IFilterContext? _filterContext;
     private DirectoryTreeNode? _currentDirectoryNode;
 
     // The full unfiltered set of file nodes for the current directory.
@@ -39,11 +38,10 @@ public class FileListViewModel : ViewModelBase
     }
 
     /// <summary>Stores the active filter chain for use in subsequent load and reapply calls.</summary>
-    public void UpdateChain(FilterChain? chain, IFileSystemProvider? comparisonProvider)
-    {
-        _chain = chain;
-        _comparisonProvider = comparisonProvider;
-    }
+    public void UpdateChain(FilterChain? chain) => _chain = chain;
+
+    /// <summary>Stores the filter context so MirrorFilter can resolve memory/non-local paths.</summary>
+    public void UpdateFilterContext(IFilterContext? context) => _filterContext = context;
 
     /// <summary>
     /// Re-applies the current filter chain to the already-loaded file nodes
@@ -124,7 +122,7 @@ public class FileListViewModel : ViewModelBase
     private async Task ApplyChainToFilesAsync(CancellationToken ct = default)
     {
         if (_chain is not null && _files.Count > 0)
-            await _chain.ApplyToTreeAsync(_files, _comparisonProvider, ct);
+            await _chain.ApplyToTreeAsync(_files, _filterContext, ct);
     }
 
     private void RefreshVisibleFiles()

@@ -69,7 +69,7 @@ public sealed class PipelineRunnerSelectionTests
     [Fact]
     public async Task InvertSelection_then_Copy_CopiesOnlyNewlySelectedFiles()
     {
-        var (provider, root, a, b, c, d, e) = await CreateFiveFileFixtureAsync();
+        var (provider, root, a, b, c, _, _) = await CreateFiveFileFixtureAsync();
 
         // A, B, C initially selected; D, E not selected
         a.CheckState = CheckState.Checked;
@@ -79,7 +79,7 @@ public sealed class PipelineRunnerSelectionTests
         var runner = new PipelineRunner(new TransformPipeline(
         [
             new InvertSelectionStep(),
-            new CopyStep("/dest"),
+            new CopyStep("/mem/dest"),
         ]));
 
         await runner.ExecuteAsync(
@@ -87,7 +87,7 @@ public sealed class PipelineRunnerSelectionTests
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                TargetProvider = provider,
+                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -109,7 +109,7 @@ public sealed class PipelineRunnerSelectionTests
     {
         // Regression: PreviewAsync must not mutate real CheckState so that
         // ExecuteAsync sees the correct (un-inverted) state and inverts it once.
-        var (provider, root, a, b, c, d, e) = await CreateFiveFileFixtureAsync();
+        var (provider, root, a, b, c, _, _) = await CreateFiveFileFixtureAsync();
 
         // A, B, C initially selected; D, E not selected
         a.CheckState = CheckState.Checked;
@@ -120,7 +120,7 @@ public sealed class PipelineRunnerSelectionTests
         {
             RootNode       = root,
             SourceProvider = provider,
-            TargetProvider = provider,
+            ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
             OverwriteMode  = OverwriteMode.Always,
             DeleteMode     = DeleteMode.Trash,
         };
@@ -128,7 +128,7 @@ public sealed class PipelineRunnerSelectionTests
         var runner = new PipelineRunner(new TransformPipeline(
         [
             new InvertSelectionStep(),
-            new CopyStep("/dest"),
+            new CopyStep("/mem/dest"),
         ]));
 
         // Preview first — this must NOT flip real CheckState
@@ -154,7 +154,7 @@ public sealed class PipelineRunnerSelectionTests
     [Fact]
     public async Task SelectAll_then_Copy_CopiesAllFilterIncludedFiles()
     {
-        var (provider, root, x, y, z) = await CreateThreeFileFixtureAsync("x", "y", "z");
+        var (provider, root, x, _, _) = await CreateThreeFileFixtureAsync("x", "y", "z");
 
         // Only X is initially selected
         x.CheckState = CheckState.Checked;
@@ -162,20 +162,20 @@ public sealed class PipelineRunnerSelectionTests
         var runner = new PipelineRunner(new TransformPipeline(
         [
             new SelectAllStep(),
-            new CopyStep("/dest"),
+            new CopyStep("/mem/dest"),
         ]));
 
-        await runner.ExecuteAsync(
-            new PipelineJob
-            {
-                RootNode       = root,
-                SourceProvider = provider,
-                TargetProvider = provider,
-                OverwriteMode  = OverwriteMode.Always,
-                DeleteMode     = DeleteMode.Trash,
-            },
-            progress: null,
-            ct: CancellationToken.None);
+            await runner.ExecuteAsync(
+                new PipelineJob
+                {
+                    RootNode       = root,
+                    SourceProvider = provider,
+                    ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+                    OverwriteMode  = OverwriteMode.Always,
+                    DeleteMode     = DeleteMode.Trash,
+                },
+                progress: null,
+                ct: CancellationToken.None);
 
         // All three files should be copied after SelectAll
         Assert.True(await provider.ExistsAsync("/dest/src/x.txt", CancellationToken.None));
@@ -200,7 +200,7 @@ public sealed class PipelineRunnerSelectionTests
         var runner = new PipelineRunner(new TransformPipeline(
         [
             new ClearSelectionStep(),
-            new CopyStep("/dest"),
+            new CopyStep("/mem/dest"),
         ]));
 
         await runner.ExecuteAsync(
@@ -208,7 +208,7 @@ public sealed class PipelineRunnerSelectionTests
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                TargetProvider = provider,
+                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -228,15 +228,14 @@ public sealed class PipelineRunnerSelectionTests
     [Fact]
     public async Task SelectAll_Preview_ShowsOnlyCopyActionsNotSelectionActions()
     {
-        var (sourceProvider, targetProvider) = MemoryFileSystemFixtures.CreatePair(
-            src => src
+        var provider = MemoryFileSystemFixtures.Create(src => src
                 .WithDirectory("/src")
                 .WithFile("/src/p.txt", "p"u8)
                 .WithFile("/src/q.txt", "q"u8)
-                .WithFile("/src/r.txt", "r"u8),
-            tgt => tgt.WithDirectory("/dest"));
+                .WithFile("/src/r.txt", "r"u8)
+                .WithDirectory("/dest"));
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(sourceProvider);
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
         var p = root.FindNodeByPathSegments(["src", "p.txt"]);
         var q = root.FindNodeByPathSegments(["src", "q.txt"]);
         var r = root.FindNodeByPathSegments(["src", "r.txt"]);
@@ -248,15 +247,15 @@ public sealed class PipelineRunnerSelectionTests
         var runner = new PipelineRunner(new TransformPipeline(
         [
             new SelectAllStep(),
-            new CopyStep("/dest"),
+            new CopyStep("/mem/dest"),
         ]));
 
         var plan = await runner.PreviewAsync(
             new PipelineJob
             {
                 RootNode       = root,
-                SourceProvider = sourceProvider,
-                TargetProvider = targetProvider,
+                SourceProvider = provider,
+                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },

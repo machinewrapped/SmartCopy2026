@@ -78,13 +78,13 @@ public sealed class PipelineDirectoryTests
         dirNode.CheckState = CheckState.Checked;
 
         var ct = CancellationToken.None;
-        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("/dest")]));
+        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("/mem/dest")]));
         var results = await runner.ExecuteAsync(
             new PipelineJob
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                TargetProvider = provider,
+                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -121,7 +121,7 @@ public sealed class PipelineDirectoryTests
         {
             RootNode       = musicRoot,
             SourceProvider = provider,
-            TargetProvider = null,
+            ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
             OverwriteMode  = OverwriteMode.Always,
             DeleteMode     = DeleteMode.Permanent,
         };
@@ -156,13 +156,13 @@ public sealed class PipelineDirectoryTests
         mp3Node.FilterResult = FilterResult.Included;
         mp3Node.CheckState = CheckState.Checked;
 
-        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("/dest")]));
+        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("/mem/dest")]));
         var results = await runner.ExecuteAsync(
             new PipelineJob
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                TargetProvider = provider,
+                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -177,44 +177,6 @@ public sealed class PipelineDirectoryTests
         // excluded readme.txt keeps parent dir non-empty
         Assert.True(await provider.ExistsAsync("/src/music/readme.txt", ct));
         Assert.True(await provider.ExistsAsync("/src/music", ct));
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Move: cross-provider dir fails gracefully
-    // ─────────────────────────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task Move_NoAtomicDir_WhenDifferentProviders()
-    {
-        var (sourceProvider, targetProvider) = MemoryFileSystemFixtures.CreatePair(
-            src => src.WithSimulatedFile("/src/music/a.flac", 1000),
-            tgt => tgt.WithDirectory("/dest"));
-
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(sourceProvider);
-
-        var dirNode = root.FindNodeByPathSegments(["src", "music"]);
-        Assert.NotNull(dirNode);
-
-        dirNode.FilterResult = FilterResult.Included;
-        dirNode.CheckState = CheckState.Checked;
-
-        var ct = CancellationToken.None;
-        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("/dest")]));
-        var results = await runner.ExecuteAsync(
-            new PipelineJob
-            {
-                RootNode       = root,
-                SourceProvider = sourceProvider,
-                TargetProvider = targetProvider,
-                OverwriteMode  = OverwriteMode.Always,
-                DeleteMode     = DeleteMode.Trash,
-            },
-            progress: null,
-            ct: ct);
-
-        Assert.Single(results);
-        Assert.False(results[0].IsSuccess);
-        Assert.True(await sourceProvider.ExistsAsync("/src/music", ct)); // source untouched
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -239,7 +201,7 @@ public sealed class PipelineDirectoryTests
         var runner = new PipelineRunner(new TransformPipeline(
         [
             new FlattenStep(),
-            new MoveStep("/dest"),
+            new MoveStep("/mem/dest"),
         ]));
 
         var results = await runner.ExecuteAsync(
@@ -247,7 +209,7 @@ public sealed class PipelineDirectoryTests
             {
                 RootNode       = musicRoot,
                 SourceProvider = provider,
-                TargetProvider = provider,
+                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -280,14 +242,14 @@ public sealed class PipelineDirectoryTests
         var runner = new PipelineRunner(new TransformPipeline(
         [
             new RebaseStep(stripPrefix: "src", addPrefix: "archive"),
-            new MoveStep("/dest"),
+            new MoveStep("/mem/dest"),
         ]));
         var results = await runner.ExecuteAsync(
             new PipelineJob
             {
                 RootNode       = srcRoot,
                 SourceProvider = provider,
-                TargetProvider = provider,
+                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -321,13 +283,13 @@ public sealed class PipelineDirectoryTests
         parentDir.CheckState = CheckState.Checked;
 
         var ct = CancellationToken.None;
-        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("/dest")]));
+        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("/mem/dest")]));
         var results = await runner.ExecuteAsync(
             new PipelineJob
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                TargetProvider = provider,
+                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -365,7 +327,7 @@ public sealed class PipelineDirectoryTests
         {
             RootNode       = musicRoot,
             SourceProvider = provider,
-            TargetProvider = null,
+            ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
             OverwriteMode  = OverwriteMode.Always,
             DeleteMode     = DeleteMode.Permanent,
         };
@@ -386,28 +348,26 @@ public sealed class PipelineDirectoryTests
     [Fact]
     public async Task Copy_Preview_ExpandsDirectoryToPerFileActions()
     {
-        var (sourceProvider, targetProvider) = MemoryFileSystemFixtures.CreatePair(
-            src => src
+        var provider = MemoryFileSystemFixtures.Create(f => f
                 .WithSimulatedFile("/src/music/a.flac", 1000)
-                .WithSimulatedFile("/src/music/b.flac", 2000),
-            tgt => tgt
+                .WithSimulatedFile("/src/music/b.flac", 2000)
                 .WithDirectory("/dest")
                 .WithSimulatedFile("/dest/src/music/a.flac", 1000)); // a.flac already exists at dest
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(sourceProvider);
+        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
         var dirNode = root.FindNodeByPathSegments(["src", "music"]);
         Assert.NotNull(dirNode);
         dirNode.FilterResult = FilterResult.Included;
         dirNode.CheckState = CheckState.Checked;
 
         var ct = CancellationToken.None;
-        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/dest")]));
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/mem/dest")]));
         var plan = await runner.PreviewAsync(
             new PipelineJob
             {
                 RootNode       = root,
-                SourceProvider = sourceProvider,
-                TargetProvider = targetProvider,
+                SourceProvider = provider,
+                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             }, ct);
@@ -444,13 +404,13 @@ public sealed class PipelineDirectoryTests
         // With dirNode (src/music) selected, the pipeline should see 1 atomic move result,
         // not 2 individual file results.
         var ct = CancellationToken.None;
-        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("/dest")]));
+        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("/mem/dest")]));
         var results = await runner.ExecuteAsync(
             new PipelineJob
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                TargetProvider = provider,
+                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },

@@ -2,6 +2,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using SmartCopy.Core.DirectoryTree;
+using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Tests.TestInfrastructure;
@@ -14,25 +15,24 @@ public sealed class PipelineRunnerTests
     [Fact]
     public async Task CopyPipeline_PreviewsAndExecutes()
     {
-        var (sourceProvider, targetProvider) = MemoryFileSystemFixtures.CreatePair(
-            source => source
+        var provider = MemoryFileSystemFixtures.Create(source => source
                 .WithDirectory("/source")
-                .WithFile("/source/song.flac", Encoding.UTF8.GetBytes("audio")),
-            target => target.WithDirectory("/Mirror"));
+                .WithFile("/source/song.flac", Encoding.UTF8.GetBytes("audio"))
+                .WithDirectory("/Mirror"));
 
-        var sourceRoot = await MemoryFileSystemFixtures.BuildDirectoryTree(sourceProvider);
+        var sourceRoot = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
         var sourceNode = sourceRoot.FindNodeByPathSegments(["source", "song.flac"]);
         Assert.NotNull(sourceNode);
 
         sourceNode.CheckState = CheckState.Checked;
-        var pipeline = new TransformPipeline([new CopyStep("/Mirror")]);
+        var pipeline = new TransformPipeline([new CopyStep("/mem/Mirror")]);
         var runner = new PipelineRunner(pipeline);
 
         var job = new PipelineJob
         {
             RootNode       = sourceRoot,
-            SourceProvider = sourceProvider,
-            TargetProvider = targetProvider,
+            SourceProvider = provider,
+            ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
             OverwriteMode  = OverwriteMode.IfNewer,
             DeleteMode     = DeleteMode.Trash,
         };
@@ -45,7 +45,7 @@ public sealed class PipelineRunnerTests
         var results = await runner.ExecuteAsync(job, progress: null, ct: CancellationToken.None);
 
         Assert.Contains(results, r => r.SourceNodeResult == SourceResult.Copied && r.IsSuccess);
-        Assert.True(await targetProvider.ExistsAsync("/Mirror/source/song.flac", CancellationToken.None));
+        Assert.True(await provider.ExistsAsync("/Mirror/source/song.flac", CancellationToken.None));
     }
 
     [Fact]
@@ -61,12 +61,13 @@ public sealed class PipelineRunnerTests
         node.CheckState = CheckState.Checked;
 
         var runner = new PipelineRunner(new TransformPipeline([new DeleteStep()]));
+        var registry = MemoryFileSystemFixtures.CreateRegistry(provider);
 
         var job = new PipelineJob
         {
             RootNode       = root,
             SourceProvider = provider,
-            TargetProvider = null,
+            ProviderRegistry = registry,
             OverwriteMode  = OverwriteMode.Always,
             DeleteMode     = DeleteMode.Permanent,
         };
@@ -87,12 +88,13 @@ public sealed class PipelineRunnerTests
         Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
         var runner = new PipelineRunner(new TransformPipeline([new DeleteStep()]));
+        var registry = MemoryFileSystemFixtures.CreateRegistry(provider);
 
         var job = new PipelineJob
         {
             RootNode       = root,
             SourceProvider = provider,
-            TargetProvider = null,
+            ProviderRegistry = registry,
             OverwriteMode  = OverwriteMode.Always,
             DeleteMode     = DeleteMode.Permanent,
         };
@@ -120,12 +122,13 @@ public sealed class PipelineRunnerTests
         sourceNode.CheckState = CheckState.Checked;
 
         var runner = new PipelineRunner(new TransformPipeline([new DeleteStep()]));
+        var registry = MemoryFileSystemFixtures.CreateRegistry(provider);
 
         var job = new PipelineJob
         {
             RootNode       = sourceNode,
             SourceProvider = provider,
-            TargetProvider = null,
+            ProviderRegistry = registry,
             OverwriteMode  = OverwriteMode.Always,
             DeleteMode     = DeleteMode.Permanent,
         };
@@ -143,71 +146,69 @@ public sealed class PipelineRunnerTests
     [Fact]
     public async Task FlattenThenCopy_FlattensPathAtDestination()
     {
-        var (sourceProvider, targetProvider) = MemoryFileSystemFixtures.CreatePair(
-            source => source
+        var provider = MemoryFileSystemFixtures.Create(source => source
                 .WithDirectory("/source")
                 .WithDirectory("/source/deep")
                 .WithDirectory("/source/deep/folder")
-                .WithFile("/source/deep/folder/track.mp3", "x"u8),
-            target => target.WithDirectory("/out"));
+                .WithFile("/source/deep/folder/track.mp3", "x"u8)
+                .WithDirectory("/out"));
 
-        var sourceRoot = await MemoryFileSystemFixtures.BuildDirectoryTree(sourceProvider);
+        var sourceRoot = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
         var node = sourceRoot.FindNodeByPathSegments(["source", "deep", "folder", "track.mp3"]);
         Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
         var runner = new PipelineRunner(new TransformPipeline(
         [
             new FlattenStep(),
-            new CopyStep("/out"),
+            new CopyStep("/mem/out"),
         ]));
 
         await runner.ExecuteAsync(
             new PipelineJob
             {
                 RootNode       = sourceRoot,
-                SourceProvider = sourceProvider,
-                TargetProvider = targetProvider,
+                SourceProvider = provider,
+                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
             progress: null,
             ct: CancellationToken.None);
 
-        Assert.True(await targetProvider.ExistsAsync("/out/track.mp3", CancellationToken.None));
+        Assert.True(await provider.ExistsAsync("/out/track.mp3", CancellationToken.None));
     }
 
     [Fact]
     public async Task FlattenThenCopy_PreviewReportsFlattened_DestinationPath()
     {
-        var (sourceProvider, targetProvider) = MemoryFileSystemFixtures.CreatePair(
-            source => source
+        var provider = MemoryFileSystemFixtures.Create(f => f
                 .WithDirectory("/source/deep/folder")
-                .WithFile("/source/deep/folder/track.mp3", "x"u8),
-            target => target.WithDirectory("/out"));
+                .WithFile("/source/deep/folder/track.mp3", "x"u8)
+                .WithDirectory("/out"));
 
-        var sourceRoot = await MemoryFileSystemFixtures.BuildDirectoryTree(sourceProvider);
+        var sourceRoot = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
         var node = sourceRoot.FindNodeByPathSegments(["source", "deep", "folder", "track.mp3"]);
         Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
         var runner = new PipelineRunner(new TransformPipeline(
         [
             new FlattenStep(),
-            new CopyStep("/out"),
+            new CopyStep("/mem/out"),
         ]));
 
         var plan = await runner.PreviewAsync(
             new PipelineJob
             {
                 RootNode       = sourceRoot,
-                SourceProvider = sourceProvider,
-                TargetProvider = targetProvider,
+                SourceProvider = provider,
+                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
             CancellationToken.None);
 
         var copyAction = plan.Actions.Single(a => a.SourceResult == SourceResult.Copied);
-        Assert.Equal("/out/track.mp3", copyAction.DestinationPath);
+        Assert.Equal("/mem/out/track.mp3", copyAction.DestinationPath);
     }
 
     [Fact]
@@ -223,14 +224,14 @@ public sealed class PipelineRunnerTests
         var node = sourceRoot.FindNodeByPathSegments(["source", "song.mp3"]);
         Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
-        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("/dest")]));
+        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("/mem/dest")]));
 
         var results = await runner.ExecuteAsync(
             new PipelineJob
             {
                 RootNode       = sourceRoot,
                 SourceProvider = provider,
-                TargetProvider = provider,
+                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
                 OverwriteMode  = OverwriteMode.Skip,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -254,13 +255,13 @@ public sealed class PipelineRunnerTests
             .WithDirectory("/source")
             .WithDirectory("/dest"));
         var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
-        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/dest")]));
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/mem/dest")]));
 
         var emptyJob = new PipelineJob
         {
             RootNode       = root,
             SourceProvider = provider,
-            TargetProvider = provider,
+            ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
             OverwriteMode  = OverwriteMode.Always,
             DeleteMode     = DeleteMode.Trash,
         };
