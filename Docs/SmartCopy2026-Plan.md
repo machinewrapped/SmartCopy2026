@@ -442,7 +442,20 @@ Verification:
 - [ ] Automated tests around provider switching and pipeline execution provider routing
 - [ ] Manual smoke: scan/filter/preview/run on a real directory tree with at least 10k files
 
-#### 5.2.4 — Capability-Gated Delete/Trash and Move Semantics
+### 5.2.4 - Directory browser integration for filter and pipeline editors
+
+- [ ] Browse/Bookmark functionality for MirrorFilterEditorView
+- [ ] Generalise the browse/bookmark functionality to use in CopyMoveStepEditor (custom view component?)
+
+Acceptance criteria:
+- [ ] Target directory pickers have full parity with source picker in MainWindow
+- [ ] Code duplication minimised, should be easy to re-use in other views in future
+
+Verification
+- [ ] Manual testing of UI and functionality
+- [ ] Add automated tests if applicable
+
+#### 5.2.5 — Capability-Gated Delete/Trash and Move Semantics
 
 Deliverables:
 - [ ] Introduce `TrashService` abstraction/adapters with timeout and fallback behavior
@@ -459,7 +472,7 @@ Verification:
 - [ ] Unit tests for trash fallback, timeout, and move fallback paths
 - [ ] Manual smoke: delete-to-trash and permanent delete on local files
 
-#### 5.2.5 — Watcher and Incremental Rescan (selection-preserving)
+#### 5.2.6 — Watcher and Incremental Rescan (selection-preserving)
 
 Deliverables:
 - [ ] Gate watcher startup by provider capability and path suitability
@@ -476,7 +489,7 @@ Verification:
 - [ ] Automated tests for debounce/coalescing and subtree-only updates
 - [ ] Manual smoke with scripted file churn in nested directories
 
-#### 5.2.6 — Drag-and-Drop Integration and Hardening
+#### 5.2.7 — Drag-and-Drop Integration and Hardening
 
 Deliverables:
 - [ ] Add drag-and-drop for source and destination path inputs
