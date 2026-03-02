@@ -1011,6 +1011,7 @@ public partial class MainViewModel : ViewModelBase
     private async Task ApplyWorkflowConfigAsync(WorkflowConfig config)
     {
         // Restore source path
+        SourcePath = config.SourcePath;
         await ApplySourcePathCoreAsync(config.SourcePath);
 
         // Restore filter chain
