@@ -44,12 +44,7 @@ public static class PathHelper
             }
         }
 
-        if (path.EndsWith(Path.DirectorySeparatorChar) || path.EndsWith(Path.AltDirectorySeparatorChar))
-        {
-            return path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        }
-
-        return path;
+        return path.TrimEnd(separators);
     }
 
     /// <summary>
