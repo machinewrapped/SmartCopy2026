@@ -105,10 +105,13 @@ public partial class MainViewModel : ViewModelBase
     {
         var presetStore = new FilterPresetStore();
 
-        // Create an in-memory virtual file system for testing. TODO: make this a debug option.
+        // Create an in-memory virtual file system for testing. 
+        // TODO: this should be a debug option, not exposed in release builds
         _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: _settings.AddArtificialDelay);
         _providerRegistry.Register(_memoryProvider);
         _activeSourceProvider = _memoryProvider;
+
+        // TEMP: set a safe default path
         SourcePath = MockMemoryFileSystemFactory.SourcePath;
         _lastCommittedSourcePath = SourcePath;
 
@@ -134,7 +137,6 @@ public partial class MainViewModel : ViewModelBase
 
         DirectoryTree.SetAsSourcePathRequested += async (_, path) =>
         {
-            SourcePath = path;
             await ApplySourcePathCoreAsync(path);
         };
 
@@ -192,7 +194,6 @@ public partial class MainViewModel : ViewModelBase
         // (Enter key or dropdown close after mouse selection).
         if (value is not null)
         {
-            SourcePathValidationMessage = string.Empty;
             SourcePath = value.Path;
         }
     }
@@ -474,7 +475,9 @@ public partial class MainViewModel : ViewModelBase
                 _activeSourceProvider = nextProvider;
             }
 
+            // See if we can set this path as a root (it will throw if not)
             await DirectoryTree.ChangeRootAsync(normalizedPath);
+
             _lastCommittedSourcePath = normalizedPath;
             SourcePath = normalizedPath;
             SourcePathValidationMessage = string.Empty;
@@ -511,7 +514,10 @@ public partial class MainViewModel : ViewModelBase
                 LogPanel.AddEntry($"Failed to restore previous source path '{previousPath}'.", LogLevel.Error);
             }
 
-            SourcePath = previousPath;
+            if (SourcePath != previousPath)
+            {
+                SourcePath = previousPath;                
+            }
         }
     }
 
@@ -741,13 +747,6 @@ public partial class MainViewModel : ViewModelBase
         LazyExpandScan = _settings.LazyExpandScan;
         DefaultOverwriteMode = _settings.DefaultOverwriteMode;
 
-        if (saved.RestoreLastSourcePath && !saved.RestoreLastWorkflow
-            && saved.LastSourcePath is { Length: > 0 })
-        {
-            SourcePath = saved.LastSourcePath;
-        }
-        RefreshSourceBookmarks();
-
         // Phase 1: hardcode /mem/Mirror as the mirror-filter comparison path.
         FilterChain.PipelineDestinationPath = MockMemoryFileSystemFactory.TargetPath;
         await _operationJournal.RotateAsync(_settings.LogRetentionDays);
@@ -760,13 +759,21 @@ public partial class MainViewModel : ViewModelBase
             {
                 var session = await _sessionStore.LoadAsync(GetSessionPath());
                 if (session is not null)
+                {
                     await ApplyWorkflowConfigAsync(session);
+                }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
             {
                 Debug.WriteLine($"Failed to restore session snapshot: {ex}");
             }
         }
+        else if (saved.RestoreLastSourcePath && saved.LastSourcePath is { Length: > 0 })
+        {
+            SourcePath = saved.LastSourcePath;
+        }
+
+        RefreshSourceBookmarks();
 
         // Pre-wire the chain before the initial tree load so the first file list load
         // already has a chain to evaluate.
@@ -1004,7 +1011,6 @@ public partial class MainViewModel : ViewModelBase
     private async Task ApplyWorkflowConfigAsync(WorkflowConfig config)
     {
         // Restore source path
-        SourcePath = config.SourcePath;
         await ApplySourcePathCoreAsync(config.SourcePath);
 
         // Restore filter chain
