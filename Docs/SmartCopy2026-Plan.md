@@ -428,22 +428,24 @@ Verification:
 #### 5.2.3 — Real Provider Runtime Integration (scanner + pipeline path)
 
 Deliverables:
-- [ ] Introduce runtime provider selection (memory for debug flows, local for real filesystem flows)
-- [ ] Wire `DirectoryTreeViewModel` and `FileListViewModel` to the active provider at root-change time
-- [ ] Ensure pipeline preview/run uses active source provider and correct destination provider
-- [ ] Preserve existing progress, cancellation, and log semantics when using local files
+- [X] Introduce runtime provider selection (memory for debug flows, local for real filesystem flows) - DONE: path based resolution
+- [X] Wire `DirectoryTreeViewModel` and `FileListViewModel` to the active provider at root-change time
+- [X] Ensure pipeline preview/run uses active source provider and correct target providers
+- [X] Preserve existing progress, cancellation, and log semantics when using local files
 
 Acceptance criteria:
-- [ ] Phase 1 workflows behave the same from a user perspective when pointed at real folders
-- [ ] No hard dependency on memory-only paths (`/mem`) remains in execution paths
-- [ ] Cancel/rescan remains responsive during large local scans
+- [X] No hard dependency on memory-only paths (`/mem`) remains in execution paths
+- [X] Phase 1 workflows behave the same from a user perspective when pointed at real folders
+- [X] UI remains responsive during large local scans
+- [ ] Functional pause button
 
 Verification:
+- [X] Manual smoke: scan/filter/preview/run on a real directory tree with at least 10k files
 - [ ] Automated tests around provider switching and pipeline execution provider routing
-- [ ] Manual smoke: scan/filter/preview/run on a real directory tree with at least 10k files
 
 ### 5.2.4 - Directory browser integration for filter and pipeline editors
 
+Deliverables:
 - [ ] Browse/Bookmark functionality for MirrorFilterEditorView
 - [ ] Generalise the browse/bookmark functionality to use in CopyMoveStepEditor (custom view component?)
 
