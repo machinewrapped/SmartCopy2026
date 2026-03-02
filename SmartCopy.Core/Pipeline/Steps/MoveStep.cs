@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using System.Threading;
 using SmartCopy.Core.DirectoryTree;
+using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
@@ -68,70 +69,72 @@ public sealed class MoveStep : IPipelineStep
     public async IAsyncEnumerable<TransformResult> ApplyAsync(
         IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
-        // Nodes covered by an earlier atomic directory move are skipped.
-        var handledNodes = new HashSet<DirectoryTreeNode>();
+        var nodeCtx = context.GetNodeContext(context.RootNode);
+        var targetProvider = nodeCtx.ResolveProvider(DestinationPath)
+            ?? throw new InvalidOperationException("TargetProvider must be set for MoveStep.");
+        var sameProvider = ReferenceEquals(targetProvider, context.SourceProvider);
+        var canAtomicMove = targetProvider.Capabilities.CanAtomicMove;
 
-        foreach (var node in context.RootNode.GetSelectedDescendants())
+        await foreach (var result in WalkAndMoveAsync(context.RootNode, context, targetProvider, sameProvider, canAtomicMove, ct))
+            yield return result;
+    }
+
+    // Depth-first recursive move: child directories first, then files in the current node.
+    // Atomically moves entire subtrees where possible; falls back to piecewise otherwise.
+    private async IAsyncEnumerable<TransformResult> WalkAndMoveAsync(
+        DirectoryTreeNode node, IStepContext context,
+        IFileSystemProvider targetProvider, bool sameProvider, bool canAtomicMove,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        foreach (var child in node.Children)
         {
             ct.ThrowIfCancellationRequested();
-            if (context.IsNodeFailed(node)) continue;
-            if (handledNodes.Contains(node)) continue;
+            if (context.IsNodeFailed(child)) continue;
+            if (child.CheckState == CheckState.Unchecked) continue;
 
-            var nodeCtx = context.GetNodeContext(node);
-            var targetProvider = nodeCtx.ResolveProvider(DestinationPath)
-                ?? throw new InvalidOperationException("TargetProvider must be set for MoveStep.");
-
-            var sameProvider = ReferenceEquals(targetProvider, context.SourceProvider);
-            var canAtomicMove = targetProvider.Capabilities.CanAtomicMove;
-
-            if (node.IsDirectory)
+            if (sameProvider && canAtomicMove && CanMoveEntireSubtree(child))
             {
-                if (sameProvider && canAtomicMove && CanMoveEntireSubtree(node))
+                var childCtx = context.GetNodeContext(child);
+                var dest = targetProvider.JoinPath(DestinationPath, childCtx.PathSegments);
+                var destExists = await targetProvider.ExistsAsync(dest, ct);
+
+                if (destExists && context.OverwriteMode == OverwriteMode.Skip)
                 {
-                    var destination = targetProvider.JoinPath(DestinationPath, nodeCtx.PathSegments);
-                    var destExists = await targetProvider.ExistsAsync(destination, ct);
-
-                    if (destExists && context.OverwriteMode == OverwriteMode.Skip)
-                    {
-                        MarkDescendantsHandled(node, handledNodes);
-                        yield return new TransformResult(
-                            IsSuccess: true,
-                            SourceNode: node,
-                            SourceNodeResult: SourceResult.None,
-                            DestinationPath: destination,
-                            InputBytes: node.Size);
-                        continue;
-                    }
-
-                    await context.SourceProvider.MoveAsync(node.FullPath, destination, ct);
-                    MarkDescendantsHandled(node, handledNodes);
                     yield return new TransformResult(
                         IsSuccess: true,
-                        SourceNode: node,
-                        SourceNodeResult: SourceResult.Moved,
-                        DestinationPath: destination,
-                        DestinationResult: destExists ? DestinationResult.Overwritten : DestinationResult.Created,
-                        NumberOfFilesAffected: node.CountAllFiles(),
-                        NumberOfFoldersAffected: node.CountAllFolders(),
-                        InputBytes: node.Size,
-                        OutputBytes: node.Size);
+                        SourceNode: child,
+                        SourceNodeResult: SourceResult.None,
+                        DestinationPath: dest,
+                        InputBytes: child.Size);
+                    continue;
                 }
-                else
-                {
-                    // Directory cannot be moved atomically (cross-provider or partial subtree).
-                    // TODO: This is not a failure, we just have to move it piecewise
-                    context.MarkFailed(node);
-                    MarkDescendantsHandled(node, handledNodes);
-                    yield return new TransformResult(
-                        IsSuccess: false,
-                        SourceNode: node,
-                        SourceNodeResult: SourceResult.None);
-                }
-                continue;
-            }
 
-            // File node
-            var fileCtx = context.GetNodeContext(node);
+                await context.SourceProvider.MoveAsync(child.FullPath, dest, ct);
+                yield return new TransformResult(
+                    IsSuccess: true,
+                    SourceNode: child,
+                    SourceNodeResult: SourceResult.Moved,
+                    DestinationPath: dest,
+                    DestinationResult: destExists ? DestinationResult.Overwritten : DestinationResult.Created,
+                    NumberOfFilesAffected: child.CountAllFiles(),
+                    NumberOfFoldersAffected: child.CountAllFolders(),
+                    InputBytes: child.Size,
+                    OutputBytes: child.Size);
+            }
+            else
+            {
+                // Atomic move not possible (cross-provider or partial selection): recurse piecewise.
+                await foreach (var result in WalkAndMoveAsync(child, context, targetProvider, sameProvider, canAtomicMove, ct))
+                    yield return result;
+            }
+        }
+
+        foreach (var file in node.Files)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!file.IsSelected || context.IsNodeFailed(file)) continue;
+
+            var fileCtx = context.GetNodeContext(file);
             var fileDest = targetProvider.JoinPath(DestinationPath, fileCtx.PathSegments);
             var fileDestExists = await targetProvider.ExistsAsync(fileDest, ct);
 
@@ -139,33 +142,33 @@ public sealed class MoveStep : IPipelineStep
             {
                 yield return new TransformResult(
                     IsSuccess: true,
-                    SourceNode: node,
+                    SourceNode: file,
                     SourceNodeResult: SourceResult.None,
                     DestinationPath: fileDest,
-                    InputBytes: node.Size);
+                    InputBytes: file.Size);
                 continue;
             }
 
             if (sameProvider && canAtomicMove)
             {
-                await context.SourceProvider.MoveAsync(node.FullPath, fileDest, ct);
+                await context.SourceProvider.MoveAsync(file.FullPath, fileDest, ct);
             }
             else
             {
-                await using var stream = await context.SourceProvider.OpenReadAsync(node.FullPath, ct);
+                await using var stream = await context.SourceProvider.OpenReadAsync(file.FullPath, ct);
                 await targetProvider.WriteAsync(fileDest, stream, progress: null, ct);
-                await context.SourceProvider.DeleteAsync(node.FullPath, ct);
+                await context.SourceProvider.DeleteAsync(file.FullPath, ct);
             }
 
             yield return new TransformResult(
                 IsSuccess: true,
-                SourceNode: node,
+                SourceNode: file,
                 SourceNodeResult: SourceResult.Moved,
                 DestinationPath: fileDest,
                 DestinationResult: fileDestExists ? DestinationResult.Overwritten : DestinationResult.Created,
                 NumberOfFilesAffected: 1,
-                InputBytes: node.Size,
-                OutputBytes: node.Size);
+                InputBytes: file.Size,
+                OutputBytes: file.Size);
         }
     }
 
@@ -180,16 +183,5 @@ public sealed class MoveStep : IPipelineStep
         foreach (var child in node.Children)
             if (!CanMoveEntireSubtree(child)) return false;
         return true;
-    }
-
-    private static void MarkDescendantsHandled(DirectoryTreeNode node, HashSet<DirectoryTreeNode> handled)
-    {
-        foreach (var file in node.Files)
-            handled.Add(file);
-        foreach (var child in node.Children)
-        {
-            handled.Add(child);
-            MarkDescendantsHandled(child, handled);
-        }
     }
 }
