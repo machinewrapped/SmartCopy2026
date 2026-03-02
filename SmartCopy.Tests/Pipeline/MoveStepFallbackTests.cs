@@ -26,6 +26,7 @@ public sealed class MoveStepFallbackTests
         public IFileSystemProvider? TargetProvider { get; }
         public OverwriteMode OverwriteMode => OverwriteMode.Always;
         public DeleteMode DeleteMode => DeleteMode.Permanent;
+        public FileSystemProviderRegistry? ProviderRegistry => null;
 
         public MoveTestContext(DirectoryTreeNode root, IFileSystemProvider source, IFileSystemProvider? target = null)
         {

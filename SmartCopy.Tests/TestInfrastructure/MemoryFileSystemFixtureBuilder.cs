@@ -1,5 +1,3 @@
-using System;
-using System.Text;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 
@@ -26,7 +24,7 @@ public sealed class MemoryFileSystemFixtureBuilder
     public MemoryFileSystemFixtureBuilder WithTextFile(string path, string content,
         FileAttributes attributes = FileAttributes.Normal)
     {
-        _provider.SeedFile(path, Encoding.UTF8.GetBytes(content), attributes);
+        _provider.SeedFile(path, System.Text.Encoding.UTF8.GetBytes(content), attributes);
         return this;
     }
 
@@ -88,7 +86,7 @@ public static class MemoryFileSystemFixtures
 
     private static async Task<DirectoryTreeNode> BuildDirectoryTreeNode(MemoryFileSystemProvider provider, FileSystemNode entry, DirectoryTreeNode? parent)
     {
-        var node = new DirectoryTreeNode(entry, parent, _provider: parent is null ? provider : null);
+        var node = new DirectoryTreeNode(entry, parent);
 
         if (!entry.IsDirectory)
             return node;

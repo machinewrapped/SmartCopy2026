@@ -29,7 +29,7 @@ public sealed class MirrorFilterTests
 
         var filter = new MirrorFilter(MirrorProviderPath, MirrorCompareMode.NameOnly, FilterMode.Exclude);
 
-        Assert.True(await filter.MatchesAsync(node));
+        Assert.True(await filter.MatchesAsync(node, FilterContext.FromProvider(provider)));
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public sealed class MirrorFilterTests
 
         var filter = new MirrorFilter(MirrorProviderPath, MirrorCompareMode.NameOnly, FilterMode.Exclude);
 
-        Assert.False(await filter.MatchesAsync(node));
+        Assert.False(await filter.MatchesAsync(node, FilterContext.FromProvider(provider)));
     }
 
     [Fact]
@@ -60,7 +60,7 @@ public sealed class MirrorFilterTests
 
         var filter = new MirrorFilter(MirrorProviderPath, MirrorCompareMode.NameOnly, FilterMode.Exclude);
 
-        Assert.True(await filter.MatchesAsync(node));
+        Assert.True(await filter.MatchesAsync(node, FilterContext.FromProvider(provider)));
     }
 
     [Fact]
@@ -77,7 +77,7 @@ public sealed class MirrorFilterTests
 
         var filter = new MirrorFilter(MirrorProviderPath, MirrorCompareMode.NameOnly, FilterMode.Exclude);
 
-        Assert.False(await filter.MatchesAsync(node));
+        Assert.False(await filter.MatchesAsync(node, FilterContext.FromProvider(provider)));
     }
 
     // -------------------------------------------------------------------------
@@ -97,7 +97,7 @@ public sealed class MirrorFilterTests
 
         var filter = new MirrorFilter(MirrorProviderPath, MirrorCompareMode.NameAndSize, FilterMode.Exclude);
 
-        Assert.True(await filter.MatchesAsync(node));
+        Assert.True(await filter.MatchesAsync(node, FilterContext.FromProvider(provider)));
     }
 
     [Fact]
@@ -113,7 +113,7 @@ public sealed class MirrorFilterTests
 
         var filter = new MirrorFilter(MirrorProviderPath, MirrorCompareMode.NameAndSize, FilterMode.Exclude);
 
-        Assert.False(await filter.MatchesAsync(node));
+        Assert.False(await filter.MatchesAsync(node, FilterContext.FromProvider(provider)));
     }
 
     [Fact]
@@ -129,7 +129,7 @@ public sealed class MirrorFilterTests
 
         var filter = new MirrorFilter(MirrorProviderPath, MirrorCompareMode.NameAndSize, FilterMode.Exclude);
 
-        Assert.False(await filter.MatchesAsync(node));
+        Assert.False(await filter.MatchesAsync(node, FilterContext.FromProvider(provider)));
     }
 
     // -------------------------------------------------------------------------
@@ -151,7 +151,7 @@ public sealed class MirrorFilterTests
         Assert.NotNull(dir);
 
         // No files inside → vacuously all files are mirrored
-        Assert.True(await filter.MatchesAsync(dir));
+        Assert.True(await filter.MatchesAsync(dir, FilterContext.FromProvider(provider)));
     }
 
     [Fact]
@@ -167,7 +167,7 @@ public sealed class MirrorFilterTests
 
         var filter = new MirrorFilter(MirrorProviderPath, MirrorCompareMode.NameOnly, FilterMode.Exclude);
 
-        Assert.False(await filter.MatchesAsync(dir));
+        Assert.False(await filter.MatchesAsync(dir, FilterContext.FromProvider(provider)));
     }
 
     [Fact]
@@ -185,7 +185,7 @@ public sealed class MirrorFilterTests
 
         var filter = new MirrorFilter(MirrorProviderPath, MirrorCompareMode.NameOnly, FilterMode.Exclude);
 
-        Assert.True(await filter.MatchesAsync(dir));
+        Assert.True(await filter.MatchesAsync(dir, FilterContext.FromProvider(provider)));
     }
 
     [Fact]
@@ -204,7 +204,7 @@ public sealed class MirrorFilterTests
         var dir = root.FindNodeByPathSegments(["Alternative"]);
         Assert.NotNull(dir);
 
-        Assert.False(await filter.MatchesAsync(dir));
+        Assert.False(await filter.MatchesAsync(dir, FilterContext.FromProvider(provider)));
     }
 
     [Fact]
@@ -222,7 +222,7 @@ public sealed class MirrorFilterTests
 
         var filter = new MirrorFilter(MirrorProviderPath, MirrorCompareMode.NameAndSize, FilterMode.Exclude);
 
-        Assert.False(await filter.MatchesAsync(dir));
+        Assert.False(await filter.MatchesAsync(dir, FilterContext.FromProvider(provider)));
     }
 
     // -------------------------------------------------------------------------
@@ -246,7 +246,7 @@ public sealed class MirrorFilterTests
         Assert.NotNull(newFile);
 
         var chain = new FilterChain([new MirrorFilter(MirrorProviderPath, MirrorCompareMode.NameOnly, FilterMode.Exclude)]);
-        var result = (await chain.ApplyAsync([oldFile, newFile])).ToList();
+        var result = (await chain.ApplyAsync([oldFile, newFile], FilterContext.FromProvider(fs))).ToList();
 
         Assert.Single(result);
         Assert.Equal("new.mp3", result[0].Name);
@@ -272,7 +272,7 @@ public sealed class MirrorFilterTests
         Assert.NotNull(algiersSong);
 
         var chain = new FilterChain([new MirrorFilter(MirrorProviderPath, MirrorCompareMode.NameOnly, FilterMode.Exclude)]);
-        var result = (await chain.ApplyAsync([curveSong, algiersSong])).ToList();
+        var result = (await chain.ApplyAsync([curveSong, algiersSong], FilterContext.FromProvider(provider))).ToList();
 
         Assert.Single(result);
         Assert.Equal("pain.mp3", result[0].Name);
@@ -295,6 +295,6 @@ public sealed class MirrorFilterTests
         Assert.NotNull(song);
 
         var filter = new MirrorFilter(mirrorRoot, MirrorCompareMode.NameOnly, FilterMode.Exclude);
-        Assert.True(await filter.MatchesAsync(song));
+        Assert.True(await filter.MatchesAsync(song, FilterContext.LocalOnly));
     }
 }

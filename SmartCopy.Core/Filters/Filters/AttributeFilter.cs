@@ -21,6 +21,7 @@ public sealed class AttributeFilter : FilterBase
 
     public override ValueTask<bool> MatchesAsync(
         DirectoryTreeNode node,
+        IFilterContext context,
         CancellationToken ct = default)
     {
         return ValueTask.FromResult((node.Attributes & RequiredAttributes) == RequiredAttributes);

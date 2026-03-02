@@ -36,9 +36,10 @@ public sealed class MirrorFilter : FilterBase
 
     public override async ValueTask<bool> MatchesAsync(
         DirectoryTreeNode node,
+        IFilterContext context,
         CancellationToken ct = default)
     {
-        var comparisonProvider = ResolveComparisonProvider(node);
+        var comparisonProvider = ResolveComparisonProvider(context);
         if (comparisonProvider is null)
         {
             return false;
@@ -82,12 +83,12 @@ public sealed class MirrorFilter : FilterBase
                && targetNode.Size == node.Size;
     }
 
-    private IFileSystemProvider? ResolveComparisonProvider(DirectoryTreeNode node)
+    private IFileSystemProvider? ResolveComparisonProvider(IFilterContext context)
     {
         if (string.IsNullOrWhiteSpace(ComparisonPath))
             return null;
 
-        return FileSystemProviderRegistry.Resolve(ComparisonPath) ?? node.Provider;
+        return context.ResolveProvider(ComparisonPath);
     }
 
     protected override JsonObject BuildParameters() =>

@@ -63,9 +63,10 @@ public class DirectoryTreeViewModel : ViewModelBase
     /// </summary>
     public async Task ApplyFiltersAsync(
         FilterChain chain,
+        IFilterContext? context = null,
         CancellationToken ct = default)
     {
-        await chain.ApplyToTreeAsync(RootNodes, ct);
+        await chain.ApplyToTreeAsync(RootNodes, context, ct);
     }
 
     public async Task InitializeAsync(CancellationToken ct = default)

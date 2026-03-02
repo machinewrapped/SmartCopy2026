@@ -24,4 +24,7 @@ public sealed class PipelineJob
 
     /// <summary>Controls whether deleted files go to the recycle bin or are permanently removed.</summary>
     public DeleteMode DeleteMode { get; init; } = DeleteMode.Trash;
+
+    /// <summary>Provider registry for resolving paths during pipeline execution.</summary>
+    public FileSystemProviderRegistry? ProviderRegistry { get; init; }
 }

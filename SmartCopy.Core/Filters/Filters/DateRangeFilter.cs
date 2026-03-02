@@ -37,6 +37,7 @@ public sealed class DateRangeFilter : FilterBase
 
     public override ValueTask<bool> MatchesAsync(
         DirectoryTreeNode node,
+        IFilterContext context,
         CancellationToken ct = default)
     {
         var value = Field == DateField.Created ? node.CreatedAt : node.ModifiedAt;

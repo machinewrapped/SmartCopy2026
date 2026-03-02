@@ -4,103 +4,102 @@ using System.IO;
 
 namespace SmartCopy.Core.FileSystem;
 
-public static class FileSystemProviderRegistry
+public sealed class FileSystemProviderRegistry
 {
-    private static readonly object Sync = new();
-    private static readonly Dictionary<string, IFileSystemProvider> RegisteredProviders = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly Dictionary<string, LocalFileSystemProvider> LocalProviders = new(StringComparer.OrdinalIgnoreCase);
+    // Instance state — per-registry registered providers
+    private readonly object _lock = new();
+    private readonly Dictionary<string, IFileSystemProvider> _registered
+        = new(StringComparer.OrdinalIgnoreCase);
 
-    public static void Register(string pathPrefix, IFileSystemProvider provider)
+    // Static state — safe: LocalFileSystemProvider is stateless, shared across all registries
+    private static readonly object LocalSync = new();
+    private static readonly Dictionary<string, LocalFileSystemProvider> LocalProviders
+        = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>A shared empty registry for local-path-only resolution.</summary>
+    public static FileSystemProviderRegistry Empty { get; } = new();
+
+    public void Register(string pathPrefix, IFileSystemProvider provider)
     {
-        if (string.IsNullOrWhiteSpace(pathPrefix))
-            throw new ArgumentException("Path prefix must be provided.", nameof(pathPrefix));
-        ArgumentNullException.ThrowIfNull(provider);
-
-        var canonicalPrefix = CanonicalizePath(pathPrefix);
-        lock (Sync)
-        {
-            RegisteredProviders[canonicalPrefix] = provider;
-        }
+        var key = CanonicalizePath(pathPrefix);
+        lock (_lock)
+            _registered[key] = provider;
     }
 
-    public static void Unregister(string pathPrefix)
+    public void Unregister(string pathPrefix)
     {
-        if (string.IsNullOrWhiteSpace(pathPrefix))
-            return;
-
-        var canonicalPrefix = CanonicalizePath(pathPrefix);
-        lock (Sync)
-        {
-            RegisteredProviders.Remove(canonicalPrefix);
-        }
+        var key = CanonicalizePath(pathPrefix);
+        lock (_lock)
+            _registered.Remove(key);
     }
 
     /// <summary>
-    /// Returns the best-matching registered provider, or a lazily-created
-    /// <see cref="LocalFileSystemProvider"/> for any fully-qualified local path.
-    /// Returns <see langword="null"/> for relative or unrecognised paths.
+    /// Resolves a provider for <paramref name="path"/> using longest-prefix matching
+    /// among registered providers, falling back to a cached <see cref="LocalFileSystemProvider"/>
+    /// for fully-qualified local paths.
     /// </summary>
-    public static IFileSystemProvider? Resolve(string path)
+    public IFileSystemProvider? Resolve(string path)
     {
-        if (string.IsNullOrWhiteSpace(path))
-            return null;
+        if (string.IsNullOrWhiteSpace(path)) return null;
 
-        if (TryResolveRegistered(path, out var registered))
-            return registered;
+        var canonical = CanonicalizePath(path);
 
-        if (Path.IsPathFullyQualified(path))
-            return GetOrCreateLocalProvider(path);
+        // Snapshot under lock, then search outside lock
+        KeyValuePair<string, IFileSystemProvider>[] snapshot;
+        lock (_lock)
+            snapshot = [.. _registered];
 
-        return null;
-    }
-
-    public static bool TryResolveRegistered(string path, out IFileSystemProvider provider)
-    {
-        provider = null!;
-        if (string.IsNullOrWhiteSpace(path))
-            return false;
-
-        var canonicalPath = CanonicalizePath(path);
-        KeyValuePair<string, IFileSystemProvider>? bestMatch = null;
-
-        lock (Sync)
+        (string Prefix, IFileSystemProvider Provider)? best = null;
+        foreach (var entry in snapshot)
         {
-            foreach (var entry in RegisteredProviders)
-            {
-                if (!IsPrefixMatch(canonicalPath, entry.Key))
-                    continue;
-
-                if (bestMatch is null || entry.Key.Length > bestMatch.Value.Key.Length)
-                    bestMatch = entry;
-            }
+            if (!IsPrefixMatch(canonical, entry.Key)) continue;
+            if (best is null || entry.Key.Length > best.Value.Prefix.Length)
+                best = (entry.Key, entry.Value);
         }
+        if (best is not null) return best.Value.Provider;
 
-        if (bestMatch is null)
-            return false;
-
-        provider = bestMatch.Value.Value;
-        return true;
+        return GetOrCreateLocalProvider(path);
     }
 
-    public static IFileSystemProvider GetOrCreateLocalProvider(string path)
+    /// <summary>
+    /// Returns (or lazily creates) a <see cref="LocalFileSystemProvider"/> for the drive
+    /// root of <paramref name="path"/>. Returns <see langword="null"/> for non-local paths.
+    /// </summary>
+    public static IFileSystemProvider? GetOrCreateLocalProvider(string path)
     {
+        if (!Path.IsPathFullyQualified(path)) return null;
+
         var fullPath = Path.GetFullPath(path);
         var root = Path.GetPathRoot(fullPath);
         var providerRoot = string.IsNullOrWhiteSpace(root) ? fullPath : root;
 
-        lock (Sync)
+        lock (LocalSync)
         {
             if (!LocalProviders.TryGetValue(providerRoot, out var provider))
-            {
-                provider = new LocalFileSystemProvider(providerRoot);
-                LocalProviders[providerRoot] = provider;
-            }
-
+                LocalProviders[providerRoot] = provider = new LocalFileSystemProvider(providerRoot);
             return provider;
         }
     }
 
-    private static bool IsPrefixMatch(string canonicalPath, string canonicalPrefix)
+    internal static string CanonicalizePath(string path)
+    {
+        var canonical = path.Trim().Replace('\\', '/');
+        while (canonical.Contains("//", StringComparison.Ordinal))
+            canonical = canonical.Replace("//", "/", StringComparison.Ordinal);
+
+        if (canonical.Length == 0)
+            return "/";
+
+        if (canonical.Length == 1 && canonical[0] == '/')
+            return canonical;
+
+        if (canonical.Length == 3 && char.IsLetter(canonical[0]) && canonical[1] == ':' && canonical[2] == '/')
+            return canonical;
+
+        return canonical.TrimEnd('/');
+    }
+
+    internal static bool IsPrefixMatch(string canonicalPath, string canonicalPrefix)
     {
         if (canonicalPath.Equals(canonicalPrefix, StringComparison.OrdinalIgnoreCase))
             return true;
@@ -113,26 +112,5 @@ public static class FileSystemProviderRegistry
 
         return canonicalPath.Length > canonicalPrefix.Length
                && canonicalPath[canonicalPrefix.Length] == '/';
-    }
-
-    private static string CanonicalizePath(string path)
-    {
-        var canonical = path.Trim().Replace('\\', '/');
-        while (canonical.Contains("//", StringComparison.Ordinal))
-        {
-            canonical = canonical.Replace("//", "/", StringComparison.Ordinal);
-        }
-
-        if (canonical.Length == 0)
-            return "/";
-
-        // Keep root-like paths intact ("/", "C:/"), trim trailing separators otherwise.
-        if (canonical.Length == 1 && canonical[0] == '/')
-            return canonical;
-
-        if (canonical.Length == 3 && char.IsLetter(canonical[0]) && canonical[1] == ':' && canonical[2] == '/')
-            return canonical;
-
-        return canonical.TrimEnd('/');
     }
 }

@@ -156,6 +156,7 @@ public sealed class PipelineRunner
         public IFileSystemProvider? TargetProvider { get; }
         public OverwriteMode OverwriteMode { get; }
         public DeleteMode DeleteMode { get; }
+        public FileSystemProviderRegistry? ProviderRegistry { get; }
 
         public StepContext(PipelineJob job)
         {
@@ -164,6 +165,7 @@ public sealed class PipelineRunner
             TargetProvider = job.TargetProvider;
             OverwriteMode = job.OverwriteMode;
             DeleteMode = job.DeleteMode;
+            ProviderRegistry = job.ProviderRegistry;
         }
 
         public PipelineContext GetNodeContext(DirectoryTreeNode node)

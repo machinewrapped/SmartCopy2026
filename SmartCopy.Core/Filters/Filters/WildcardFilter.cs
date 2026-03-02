@@ -29,6 +29,7 @@ public sealed class WildcardFilter : FilterBase
 
     public override ValueTask<bool> MatchesAsync(
         DirectoryTreeNode node,
+        IFilterContext context,
         CancellationToken ct = default)
     {
         if (_patterns.Length == 0)

@@ -33,6 +33,7 @@ public sealed class ExtensionFilter : FilterBase
 
     public override ValueTask<bool> MatchesAsync(
         DirectoryTreeNode node,
+        IFilterContext context,
         CancellationToken ct = default)
     {
         if (node.IsDirectory)

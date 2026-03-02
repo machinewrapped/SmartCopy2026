@@ -18,5 +18,6 @@ public interface IFilter
 
     ValueTask<bool> MatchesAsync(
         DirectoryTreeNode node,
+        IFilterContext context,
         CancellationToken ct = default);
 }
