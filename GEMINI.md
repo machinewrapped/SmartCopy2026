@@ -10,7 +10,7 @@ When building the project using `dotnet build` in a console session, the MSBuild
 To cleanly read build errors directly in the console output, force the environment into non-interactive mode or explicitly turn off the terminal logger. Try the following command:
 
    ```powershell
-   dotnet build SmartCopy.UI/SmartCopy.UI.csproj /tl:off /clp:ErrorsOnly | Out-String
+   dotnet build /tl:off /clp:ErrorsOnly | Out-String
    ```
      
 **Rule:** Always attempt to gather dotnet build output natively using the command above. Do not write temporary files to the workspace. If you are still unable to read the console output, ask the user for help by providing the command you ran and requesting they provide the output.
