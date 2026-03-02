@@ -536,8 +536,10 @@ Exit criteria:
 
 Scope:
 - [ ] Theming, localization infrastructure, update checks
-- [ ] Confirm quit whilst operation is in progress
+- [ ] Confirm quit whilst pipeline execution is in progress
+- [ ] Disable changing source path whilst pipeline execution is in progress (or confirm + cancel)
 - [ ] Disable Pipeline Run & Preview whilst scan is in progress
+- [ ] Lock Pipeline view whilst execution is in progress (no run, preview, remove or edit steps)
 - [ ] Open PreviewView and show a progress bar whilst OperationPlan is being prepared
 
 Exit criteria:
