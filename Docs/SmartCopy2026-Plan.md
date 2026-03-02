@@ -5,7 +5,7 @@
 
 This document is the execution plan for the SmartCopyTool rewrite.
 
-Architecture, contracts, UI behavior and data schemas are documented in `Docs/SmartCopy2026-Architecture.md`.
+Architecture, contracts, UI behavior and data schemas are documented in `Docs/Architecture.md`.
 
 ## Table of Contents
 
@@ -196,7 +196,7 @@ Verification:
 
 #### 5.1.4 — Filter Chain
 
-Full filter chain implementation delivered across six sub-steps. Implementation details and UI flows are in Architecture and UIUX documentation.
+Full filter chain implementation delivered across six sub-steps. Implementation details and UI flows are in Architecture and UI+UX documentation.
 
 Delivered:
 - [x] Core filter engine: `IFilter`, `FilterChain`, `FilterConfig`, `FilterChainConfig`

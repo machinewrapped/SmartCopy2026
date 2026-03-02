@@ -10,47 +10,41 @@ SmartCopy2026 is a cross-platform file manager (Windows/Linux/macOS) rewritten f
 
 ```bash
 # Build
-dotnet build SmartCopy.App/SmartCopy.App.csproj
+dotnet build | Out-String
 
 # Run (watch mode for development)
-dotnet watch run --project SmartCopy.App/SmartCopy.App.csproj
+dotnet watch run
 
 # Run tests
 # IMPORTANT: Codex (only) is unable to run the tests and must ask the user to run them manually.
-dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj
+dotnet test | Out-String
 
 # Run a single test
-dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj --filter "FullyQualifiedName~TestClassName"
+dotnet test --filter "FullyQualifiedName~TestClassName" | Out-String
 
 # Publish self-contained single file
-dotnet publish SmartCopy.App/SmartCopy.App.csproj -c Release --self-contained true -p:PublishSingleFile=true
+dotnet publish -c Release --self-contained true -p:PublishSingleFile=true | Out-String
 ```
 
-## Documentation
+## Project Status
+Current progress and outstanding tasks are recorded in `Docs/SmartCopy2026-Plan.md`. 
 
-### Implementation Status
-Current progress and tasks to be completed are recorded in `Docs/SmartCopy2026-Plan.md`. 
+It is focussed on planning and tracking deliverables. Refer to it when you need to get up to speed, update it when a deliverable is completed and validated.
 
-It is focussed on planning and tracking deliverables. Refer to it when you need to get up to speed, update it when progress is made.
+## System Architecture Documentation
+Canonical architecture reference document: `Docs/Architecture.md`
 
-### System Architecture
-Canonical architecture reference lives in: `Docs/SmartCopy2026-Architecture.md#1-architecture-design`
+This document should be updated when changes affect architecture, design, or implementation details.
 
-When architecture or contract details change, update the architecture reference, then update the plan.
+Technical contracts (providers, filters, pipeline):
+- `Docs/Architecture.md#2-key-technical-designs`
 
-Detailed technical contracts (providers, filters, pipeline, preview/progress, scanner/watcher, plugin interface) live in:
-- `Docs/SmartCopy2026-Architecture.md#2-key-technical-designs`
+Canonical reference for implementation details:
+- `Docs/Architecture.md#3-algorithms-and-implementation-notes`
 
-Canonical algorithm/invariant reference (selection state, tri-state propagation, mirror matching, wildcard matching, safety defaults) lives in:
-- `Docs/SmartCopy2026-Architecture.md#3-algorithms-and-implementation-notes`
+## UI/UX Design Documentation
 
-This document should be updated when changes are made that affect design and implementation.
-
-### UI Design
-
-Canonical UI and interaction designs can be found in `Docs/SmartCopy2026-UIUX.md`. 
-
-Refer to this document for UI consistency and keep it updated when manual testing leads to requests for UI/UX changes.
+Canonical UI and interaction designs can be found in `Docs/UI+UX.md`.  Refer to this document for UI consistency, update it after UI/UX decisions are made.
 
 ## Solution Structure
 
@@ -63,18 +57,19 @@ Four projects in `SmartCopy2026.slnx`:
 
 ### UI Layout
 
-`MainWindow.axaml` is a 5-row grid:
+`MainWindow.axaml` is a 6 row grid:
 1. Menu bar
 2. Source path field
-3. Three-column area (FilterChain | splitter | DirectoryTree | splitter | FileList)
-4. PipelineView (step cards with → connectors)
-5. StatusBarViewModel (live updates)
+3. Three-column area (FilterChain | DirectoryTree | FileList)
+4. Pipeline edit/view/execution
+5. Collapsible log panel
+6. Status bar
 
-### Key abstractions (see Docs/SmartCopy2026-Architecture.md)
+### Key abstractions
 
 - **IFileSystemProvider** — unified interface for local disk, MTP devices, and in-memory (tests). Capabilities are declared via `ProviderCapabilities` flags.
-- **IFilter / FilterChain** — composable filters (Wildcard, Mirror, DateRange, etc.). Each filter returns `Included` or `Excluded` per node.
-- **TransformPipeline** — ordered steps: *path steps* (Flatten, Rebase, Rename), *content steps* (Convert), *executable steps* (Copy, Move, Delete). Generates an `OperationPlan` for preview before execution.
+- **FilterChain** — composable `IFilter` chain for filesystem view (Wildcard, Mirror, DateRange, etc.)
+- **TransformPipeline** — ordered sequence of `IPipelineStep` to apply to the selected filesystem nodes.
 
 ## UI Guidelines & Anti-Patterns
 

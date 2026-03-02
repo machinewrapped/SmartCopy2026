@@ -1,7 +1,6 @@
 # SmartCopy2026 - UI/UX Design Reference
 
 **Prepared:** 2026-02-24
-**Source:** Extracted from `Docs/SmartCopy2026-Architecture.md` to keep UI/UX separated from technical architecture.
 
 ## Table of Contents
 
@@ -17,23 +16,26 @@
 ## 1. UI Improvements Over Predecessor
 
 1. **Source and destination fields accept drag-and-drop** from Explorer/Finder
-2. **Proper tri-state tree checkboxes** — `▣` for indeterminate
+2. **Tri-state tree checkboxes** — `▣` for mixed selection
 3. **Filter chain is visual** — each filter is a card; drag to reorder; toggle without removing
-4. **Pipeline is visual** — steps shown as an arrow chain; presets as buttons
-   and cards use human-readable summary + technical subtitle formatting
-5. **Three-column layout** — Filters | Folders | Files in a single resizable row; all three columns
-   have draggable splitters; column widths are persisted across sessions
-6. **Filter cards are human-friendly** — each card shows a readable summary ("Only .mp3 and .flac
-   files") above a dimmed technical subtitle; enable/disable via checkbox; edit via pencil icon
-7. **Preview** — shows exactly what will happen before running
-8. **Device picker** — MTP devices appear in the destination path picker on Copy/Move pipeline
-   steps alongside local paths (the 📁 Browse button becomes a "Local folder... / Phone (MTP)..."
-   split flyout when MTP devices are available)
+4. **Filter cards are human-friendly** — each card shows a readable summary above a technical subtitle; enable/disable via checkbox; edit via pencil icon
+5. **Pipeline is visual** — steps shown as an arrow chain; cards contain human-readable summary + technical subtitle
+6. **Three-column layout** — Filters | Folders | Files in a single resizable row; draggable splitters; layout is persisted across sessions
+7. **Preview** — see what will happen before running
+8. **Device picker** — MTP devices appear in folder browser dialog, when supported
 9. **Keyboard-first** — every action reachable via keyboard; focus indicators on all controls
 
 ## 2. Main Window Layout
 
-The main content area uses a **3-column layout** — Filters | Folders | Files — all at the same height and separated by draggable `GridSplitter`s. This places the filter controls in direct visual proximity to the tree and file list they affect, making the data-flow left-to-right and immediately legible to new users. The design now features a top menu and specific interactive elements reflecting the latest implementation.
+`MainWindow.axaml` is a 6 row grid:
+1. Menu bar
+2. Source path field
+3. Three-column area (FilterChain | DirectoryTree | FileList)
+4. Pipeline edit/view/execution
+5. Collapsible log panel
+6. Status bar
+
+The main content area uses a **3-column layout** — Filters | Folders | Files — all at the same height and separated by draggable `GridSplitter`s. This places the filter controls in visual proximity to the tree and file list they affect, making the data-flow readable left-to-right.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -54,12 +56,12 @@ The main content area uses a **3-column layout** — Filters | Folders | Files �
 │                                                            [👁 Preview]       │
 │ → Copy to Test ✎ ✕  → + Add step                                             │
 │   Destination: /m…                                                           │
+├─────────────────┴─┴──────────────────┴─┴─────────────────────────────────────┤
+│ LOG PANEL                                                   [Clear] [Save]   │
 ├──────────────────────────────────────────────────────────────────────────────┤
 │ 142 files selected · 2.3 GB · 17 filtered out          12/142 ████░ 34% 0:34 │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
-
-`║` = draggable GridSplitter between columns
 
 **Status bar anatomy** (`StatusBarView`):
 
@@ -70,9 +72,8 @@ The main content area uses a **3-column layout** — Filters | Folders | Files �
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **`SelectionView`** — always visible; updates live as the user checks nodes or changes filters. Shows `N files selected · size · M filtered out`. When nothing is selected: `No files selected`.
-- **`OperationProgressView`** — docked to the right; only visible while an operation is running (`IsActive = true`). Shows `files completed / total`, a progress bar, ETA, Pause, and Cancel.
-- Both are hosted by `StatusBarView`, which is bound to `MainViewModel.StatusBar` (`StatusBarViewModel`).
+- **`SelectionView`** — always visible; updates live as the user checks nodes or changes filters.
+- **`OperationProgressView`** — docked to the right; only visible while an operation is running.
 
 **Filter card anatomy** (each filter in the Filters column):
 ```text
