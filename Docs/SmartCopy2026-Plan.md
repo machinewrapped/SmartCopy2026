@@ -5,8 +5,6 @@
 
 This document is the execution plan for the SmartCopyTool rewrite.
 
-Architecture, contracts, UI behavior and data schemas are documented in `Docs/Architecture.md`.
-
 ## Table of Contents
 
 Reference:

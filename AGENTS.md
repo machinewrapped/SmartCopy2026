@@ -31,20 +31,12 @@ Current progress and outstanding tasks are recorded in `Docs/SmartCopy2026-Plan.
 
 It is focussed on planning and tracking deliverables. Refer to it when you need to get up to speed, update it when a deliverable is completed and validated.
 
-## System Architecture Documentation
-Canonical architecture reference document: `Docs/Architecture.md`
-
-This document should be updated when changes affect architecture, design, or implementation details.
-
-Technical contracts (providers, filters, pipeline):
-- `Docs/Architecture.md#2-key-technical-designs`
-
-Canonical reference for implementation details:
-- `Docs/Architecture.md#3-algorithms-and-implementation-notes`
+## System Architecture
+Architectural overview and design principles: `Docs/Architecture.md` This document should be reviewed when designing a solution and updated when changes affect the architecture, design, or implementation.
 
 ## UI/UX Design Documentation
 
-Canonical UI and interaction designs can be found in `Docs/UI+UX.md`.  Refer to this document for UI consistency, update it after UI/UX decisions are made.
+Canonical UI and interaction designs can be found in `Docs/UI+UX.md`. Refer to this document for UI consistency, update it after UI/UX decisions are made.
 
 ## Solution Structure
 
@@ -55,17 +47,7 @@ Four projects in `SmartCopy2026.slnx`:
 - **SmartCopy.UI** — MVVM layer.
 - **SmartCopy.Tests** — xUnit + NSubstitute. Uses `MemoryFileSystemProvider` for fast, hermetic tests.
 
-### UI Layout
-
-`MainWindow.axaml` is a 6 row grid:
-1. Menu bar
-2. Source path field
-3. Three-column area (FilterChain | DirectoryTree | FileList)
-4. Pipeline edit/view/execution
-5. Collapsible log panel
-6. Status bar
-
-### Key abstractions
+## Key abstractions
 
 - **IFileSystemProvider** — unified interface for local disk, MTP devices, and in-memory (tests). Capabilities are declared via `ProviderCapabilities` flags.
 - **FilterChain** — composable `IFilter` chain for filesystem view (Wildcard, Mirror, DateRange, etc.)
