@@ -32,6 +32,10 @@ public partial class MainViewModel : ViewModelBase
     private string _sourcePath = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSourcePathValidationMessage))]
+    private string _sourcePathValidationMessage = string.Empty;
+
+    [ObservableProperty]
     private SourceBookmarkItem? _selectedSourceBookmark;
 
     [ObservableProperty]
@@ -71,6 +75,7 @@ public partial class MainViewModel : ViewModelBase
     private bool _addArtificialDelay = false;
 
     private readonly MemoryFileSystemProvider _memoryProvider;
+    private readonly LocalFileSystemProvider _localProvider;
     private readonly AppSettings _settings = new();
     private readonly AppSettingsStore _settingsStore = new();
     private readonly SessionStore _sessionStore = new();
@@ -80,8 +85,11 @@ public partial class MainViewModel : ViewModelBase
     private readonly SelectionSerializer _selectionSerializer = new();
     private CancellationTokenSource? _filterCts;
     private CancellationTokenSource? _runCts;
+    private IFileSystemProvider _activeSourceProvider;
+    private string _lastCommittedSourcePath = string.Empty;
 
     public ObservableCollection<SourceBookmarkItem> SourceBookmarks { get; } = [];
+    public bool HasSourcePathValidationMessage => !string.IsNullOrWhiteSpace(SourcePathValidationMessage);
 
     public DirectoryTreeViewModel DirectoryTree { get; }
     public FileListViewModel FileList { get; }
@@ -97,14 +105,17 @@ public partial class MainViewModel : ViewModelBase
         var presetStore = new FilterPresetStore();
 
         _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: true);
+        _localProvider = new LocalFileSystemProvider(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
         _memoryProvider.SeedDirectory(MockMemoryFileSystemFactory.TargetPath);
         SourcePath = MockMemoryFileSystemFactory.SourcePath;
+        _lastCommittedSourcePath = SourcePath;
+        _activeSourceProvider = _memoryProvider;
 
         FilterChain = new FilterChainViewModel(presetStore, _settings);
         Pipeline = new PipelineViewModel(
             presetStore: new PipelinePresetStore());
 
-        DirectoryTree = new DirectoryTreeViewModel(_memoryProvider, MockMemoryFileSystemFactory.RootPath)
+        DirectoryTree = new DirectoryTreeViewModel(_activeSourceProvider, MockMemoryFileSystemFactory.RootPath)
         {
             ShowFilteredNodesInTree = _settings.ShowFilteredNodesInTree
         };
@@ -172,7 +183,18 @@ public partial class MainViewModel : ViewModelBase
         // Only populate the text field — don't apply until the user commits
         // (Enter key or dropdown close after mouse selection).
         if (value is not null)
+        {
+            SourcePathValidationMessage = string.Empty;
             SourcePath = value.Path;
+        }
+    }
+
+    partial void OnSourcePathChanged(string value)
+    {
+        if (!PathHelper.AreEquivalentUserPaths(value, _lastCommittedSourcePath))
+        {
+            SourcePathValidationMessage = string.Empty;
+        }
     }
 
     partial void OnUseAbsolutePathsForSelectionChanged(bool value)
@@ -385,7 +407,8 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private void RevertSourcePath()
     {
-        SourcePath = DirectoryTree.RootNodes.FirstOrDefault()?.FullPath ?? SourcePath;
+        SourcePathValidationMessage = string.Empty;
+        SourcePath = _lastCommittedSourcePath;
     }
 
     [RelayCommand]
@@ -396,20 +419,90 @@ public partial class MainViewModel : ViewModelBase
         await ApplySourcePathCoreAsync(path);
     }
 
+    [RelayCommand]
+    private async Task BrowseSourcePath()
+    {
+        var mainWindow = GetMainWindow();
+        if (mainWindow is null)
+            return;
+
+        var folder = await mainWindow.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "Select source folder",
+            AllowMultiple = false,
+        });
+
+        if (folder is not { Count: > 0 })
+            return;
+
+        var selectedUri = folder[0].Path;
+        if (!selectedUri.IsAbsoluteUri || !selectedUri.IsFile)
+        {
+            SourcePathValidationMessage = "Selected location is not a local filesystem folder.";
+            LogPanel.AddEntry(SourcePathValidationMessage, LogLevel.Error);
+            return;
+        }
+
+        var pickedPath = selectedUri.LocalPath;
+        SourcePath = pickedPath;
+        await ApplySourcePathCoreAsync(pickedPath);
+    }
+
     private async Task ApplySourcePathCoreAsync(string path)
     {
-        var previousPath = DirectoryTree.RootNodes.FirstOrDefault()?.FullPath ?? path;
+        var normalizedPath = PathHelper.NormalizeUserPath(path);
+        if (string.IsNullOrWhiteSpace(normalizedPath))
+            return;
+
+        var previousPath = _lastCommittedSourcePath;
+        var previousProvider = _activeSourceProvider;
+        var nextProvider = ResolveSourceProvider(normalizedPath);
+
         try
         {
-            await DirectoryTree.ChangeRootAsync(path);
-            RecordRecentSource(path);
+            if (!ReferenceEquals(previousProvider, nextProvider))
+            {
+                DirectoryTree.SetProvider(nextProvider);
+                _activeSourceProvider = nextProvider;
+            }
+
+            await DirectoryTree.ChangeRootAsync(normalizedPath);
+            _lastCommittedSourcePath = normalizedPath;
+            SourcePath = normalizedPath;
+            SourcePathValidationMessage = string.Empty;
+
+            RecordRecentSource(normalizedPath);
             await ApplyFiltersAsync();
-            _settings.LastSourcePath = path;
+            _settings.LastSourcePath = normalizedPath;
             await _settingsStore.SaveAsync(_settings);
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"Failed to change source path to '{path}': {ex}");
+            Debug.WriteLine($"Failed to change source path to '{normalizedPath}': {ex}");
+
+            SourcePathValidationMessage = BuildSourcePathValidationMessage(normalizedPath, ex);
+            LogPanel.AddEntry(SourcePathValidationMessage, LogLevel.Error);
+
+            if (!ReferenceEquals(previousProvider, nextProvider))
+            {
+                DirectoryTree.SetProvider(previousProvider);
+                _activeSourceProvider = previousProvider;
+            }
+
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(previousPath))
+                {
+                    await DirectoryTree.ChangeRootAsync(previousPath);
+                    await ApplyFiltersAsync();
+                }
+            }
+            catch (Exception rollbackEx)
+            {
+                Debug.WriteLine($"Failed to restore previous source path '{previousPath}': {rollbackEx}");
+                LogPanel.AddEntry($"Failed to restore previous source path '{previousPath}'.", LogLevel.Error);
+            }
+
             SourcePath = previousPath;
         }
     }
@@ -417,9 +510,16 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private async Task BookmarkCurrentPath()
     {
-        var path = PathHelper.RemoveTrailingSeparator(SourcePath.Trim());
-        if (string.IsNullOrWhiteSpace(path) || _settings.FavouritePaths.Contains(path))
+        var path = PathHelper.NormalizeUserPath(SourcePath);
+        if (string.IsNullOrWhiteSpace(path))
+        {
             return;
+        }
+
+        if (_settings.FavouritePaths.Any(existing => PathHelper.AreEquivalentUserPaths(existing, path)))
+        {
+            return;
+        }
 
         _settings.FavouritePaths.Insert(0, path);
         RefreshSourceBookmarks();
@@ -431,14 +531,15 @@ public partial class MainViewModel : ViewModelBase
     {
         if (item is null) return;
 
+        var normalizedPath = PathHelper.NormalizeUserPath(item.Path);
         bool removed;
         if (item.IsBookmark)
         {
-            removed = _settings.FavouritePaths.Remove(item.Path);
+            removed = RemoveEquivalentPath(_settings.FavouritePaths, normalizedPath);
         }
         else
         {
-            removed = _settings.RecentSources.Remove(item.Path);
+            removed = RemoveEquivalentPath(_settings.RecentSources, normalizedPath);
         }
 
         if (removed)
@@ -450,10 +551,14 @@ public partial class MainViewModel : ViewModelBase
 
     private void RecordRecentSource(string path)
     {
-        path = PathHelper.RemoveTrailingSeparator(path);
-        
-        _settings.RecentSources.Remove(path);
-        _settings.RecentSources.Insert(0, path);
+        var normalizedPath = PathHelper.NormalizeUserPath(path);
+        if (string.IsNullOrWhiteSpace(normalizedPath))
+        {
+            return;
+        }
+
+        RemoveEquivalentPath(_settings.RecentSources, normalizedPath);
+        _settings.RecentSources.Insert(0, normalizedPath);
         if (_settings.RecentSources.Count > MaxRecentSources)
         {
             _settings.RecentSources.RemoveAt(MaxRecentSources);
@@ -466,21 +571,13 @@ public partial class MainViewModel : ViewModelBase
     {
         // Preserve the current text — Clear() nulls SelectedItem which
         // causes the editable ComboBox to wipe its Text binding.
-        var currentPath = PathHelper.RemoveTrailingSeparator(SourcePath);
+        var currentPath = PathHelper.NormalizeUserPath(SourcePath);
 
         SourceBookmarks.Clear();
-        var addedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var addedPaths = new HashSet<string>(PathHelper.PathComparer);
 
-        // Clean trailing slashes out of existing entries first
-        var normalizedFavourites = _settings.FavouritePaths
-            .Select(PathHelper.RemoveTrailingSeparator)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        
-        var normalizedRecent = _settings.RecentSources
-            .Select(PathHelper.RemoveTrailingSeparator)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        var normalizedFavourites = PathHelper.NormalizeDistinctUserPaths(_settings.FavouritePaths);
+        var normalizedRecent = PathHelper.NormalizeDistinctUserPaths(_settings.RecentSources);
 
         // Save normalized lists back
         _settings.FavouritePaths = normalizedFavourites;
@@ -499,6 +596,53 @@ public partial class MainViewModel : ViewModelBase
         }
 
         SourcePath = currentPath;
+    }
+
+    private static bool RemoveEquivalentPath(ICollection<string> list, string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        var normalizedPath = PathHelper.NormalizeUserPath(path);
+        var matches = list
+            .Where(existing => PathHelper.AreEquivalentUserPaths(existing, normalizedPath))
+            .ToList();
+
+        var removed = false;
+        foreach (var match in matches)
+        {
+            removed |= list.Remove(match);
+        }
+
+        return removed;
+    }
+
+    private IFileSystemProvider ResolveSourceProvider(string normalizedPath)
+    {
+        return IsMemoryProviderPath(normalizedPath)
+            ? _memoryProvider
+            : _localProvider;
+    }
+
+    private static bool IsMemoryProviderPath(string path)
+    {
+        return path.Equals("/mem", StringComparison.OrdinalIgnoreCase) ||
+               path.StartsWith("/mem/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string BuildSourcePathValidationMessage(string path, Exception ex)
+    {
+        return ex switch
+        {
+            DirectoryNotFoundException => $"Path not found: {path}",
+            FileNotFoundException => $"Path not found: {path}",
+            UnauthorizedAccessException => $"Access denied: {path}",
+            ArgumentException => $"Invalid path: {path}",
+            NotSupportedException => $"Unsupported path format: {path}",
+            _ => $"Could not open source path: {path}",
+        };
     }
 
     private async void OnChainChanged(object? sender, EventArgs e)
@@ -520,9 +664,9 @@ public partial class MainViewModel : ViewModelBase
     private async Task ApplyFiltersAsync(CancellationToken ct = default)
     {
         var chain = FilterChain.BuildLiveChain();
-        FileList.UpdateChain(chain, _memoryProvider);
+        FileList.UpdateChain(chain, _activeSourceProvider);
 
-        await DirectoryTree.ApplyFiltersAsync(chain, _memoryProvider, ct);
+        await DirectoryTree.ApplyFiltersAsync(chain, _activeSourceProvider, ct);
         await FileList.ReapplyFiltersAsync(ct);
         RefreshIdleStats();
     }
@@ -638,9 +782,9 @@ public partial class MainViewModel : ViewModelBase
         // Pre-wire the chain before the initial tree load so the first file list load
         // already has a chain to evaluate.
         var chain = FilterChain.BuildLiveChain();
-        FileList.UpdateChain(chain, _memoryProvider);
-
-        await DirectoryTree.InitializeAsync(ct: CancellationToken.None);
+        _activeSourceProvider = ResolveSourceProvider(PathHelper.NormalizeUserPath(SourcePath));
+        DirectoryTree.SetProvider(_activeSourceProvider);
+        FileList.UpdateChain(chain, _activeSourceProvider);
 
         // TODO: automatically reading the last used directory on startup could be expensive,
         // especially if it was a network drive or MTP. It should definitely be a setting that can be turned off.
@@ -649,13 +793,18 @@ public partial class MainViewModel : ViewModelBase
         {
             try
             {
-                await DirectoryTree.ChangeRootAsync(SourcePath);
+                await ApplySourcePathCoreAsync(SourcePath);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Failed to set initial source path to '{SourcePath}': {ex}");
-                SourcePath = DirectoryTree.RootNodes.FirstOrDefault()?.FullPath ?? SourcePath;
+                SourcePath = _lastCommittedSourcePath;
             }
+        }
+        else
+        {
+            await DirectoryTree.InitializeAsync(ct: CancellationToken.None);
+            _lastCommittedSourcePath = DirectoryTree.RootNodes.FirstOrDefault()?.FullPath ?? _lastCommittedSourcePath;
         }
 
         if (DirectoryTree.SelectedNode != null)
@@ -682,11 +831,12 @@ public partial class MainViewModel : ViewModelBase
             return;
 
         var runner = new PipelineRunner(pipeline);
+        var targetProvider = ResolveTargetProvider(pipeline);
         var job = new PipelineJob
         {
             RootNode       = rootNode,
-            SourceProvider = _memoryProvider,
-            TargetProvider = _memoryProvider,
+            SourceProvider = _activeSourceProvider,
+            TargetProvider = targetProvider,
             OverwriteMode  = ParseOverwriteMode(_settings.DefaultOverwriteMode),
             DeleteMode     = ParseDeleteMode(_settings.DefaultDeleteMode),
         };
@@ -728,11 +878,12 @@ public partial class MainViewModel : ViewModelBase
             return;
 
         var runner = new PipelineRunner(pipeline);
+        var targetProvider = ResolveTargetProvider(pipeline);
         var job = new PipelineJob
         {
             RootNode       = rootNode,
-            SourceProvider = _memoryProvider,
-            TargetProvider = _memoryProvider,
+            SourceProvider = _activeSourceProvider,
+            TargetProvider = targetProvider,
             OverwriteMode  = ParseOverwriteMode(_settings.DefaultOverwriteMode),
             DeleteMode     = ParseDeleteMode(_settings.DefaultDeleteMode),
         };
@@ -965,5 +1116,22 @@ public partial class MainViewModel : ViewModelBase
     {
         var deleteStep = pipeline.Steps.OfType<DeleteStep>().FirstOrDefault();
         return deleteStep?.Mode ?? fallback;
+    }
+
+    private IFileSystemProvider ResolveTargetProvider(TransformPipeline pipeline)
+    {
+        var destinationPath = pipeline.Steps
+            .OfType<CopyStep>()
+            .Select(step => step.DestinationPath)
+            .Concat(pipeline.Steps.OfType<MoveStep>().Select(step => step.DestinationPath))
+            .FirstOrDefault(path => !string.IsNullOrWhiteSpace(path));
+
+        if (string.IsNullOrWhiteSpace(destinationPath))
+        {
+            return _activeSourceProvider;
+        }
+
+        var normalizedPath = PathHelper.NormalizeUserPath(destinationPath);
+        return ResolveSourceProvider(normalizedPath);
     }
 }

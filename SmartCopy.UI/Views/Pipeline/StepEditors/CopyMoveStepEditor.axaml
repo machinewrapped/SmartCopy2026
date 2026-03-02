@@ -12,8 +12,8 @@
                      HorizontalAlignment="Stretch" />
            <Button Grid.Column="1"
                    Content="📁"
-                   IsEnabled="False"
-                   ToolTip.Tip="Browse (Phase 2)"
+                   Click="OnBrowseDestinationClick"
+                   ToolTip.Tip="Browse for destination folder"
                    Width="36" />
        </Grid>
    </StackPanel>

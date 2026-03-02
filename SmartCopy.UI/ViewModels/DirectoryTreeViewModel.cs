@@ -11,7 +11,7 @@ namespace SmartCopy.UI.ViewModels;
 
 public class DirectoryTreeViewModel : ViewModelBase
 {
-    private readonly DirectoryScanner _scanner;
+    private DirectoryScanner _scanner;
     private string _rootPath;
     private DirectoryTreeNode? _selectedNode;
     private bool _isLoading;
@@ -36,6 +36,11 @@ public class DirectoryTreeViewModel : ViewModelBase
     public DirectoryTreeViewModel(IFileSystemProvider provider, string rootPath)
     {
         _rootPath = rootPath;
+        _scanner = new DirectoryScanner(provider);
+    }
+
+    public void SetProvider(IFileSystemProvider provider)
+    {
         _scanner = new DirectoryScanner(provider);
     }
 
