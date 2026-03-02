@@ -381,20 +381,32 @@ Approach: front-load validation and risk burn-down. After each user-facing integ
 #### 5.2.1 — Validation Harness and Capability Contract (first)
 
 Deliverables:
-- [ ] Expand provider contract tests so they run against both `MemoryFileSystemProvider` and `LocalFileSystemProvider`
-- [ ] Add targeted tests for path normalization/splitting/joining on Windows + POSIX-style inputs
-- [ ] Add coverage for cross-volume move fallback behavior (copy+delete when atomic move is unavailable)
-- [ ] Add explicit capability assertions (`CanSeek`, `CanAtomicMove`, path limits) per provider
-- [ ] Define a Phase 2 smoke dataset for repeatable manual verification (small tree + large files + mixed attributes)
+- [x] Expand provider contract tests so they run against both `MemoryFileSystemProvider` and `LocalFileSystemProvider`
+- [x] Add targeted tests for path normalization/splitting/joining on Windows + POSIX-style inputs
+- [x] Add coverage for cross-volume move fallback behavior (copy+delete when atomic move is unavailable)
+- [x] Add explicit capability assertions (`CanSeek`, `CanAtomicMove`, path limits) per provider
+- [x] Define a Phase 2 smoke dataset for repeatable manual verification (small tree + large files + mixed attributes)
 
 Acceptance criteria:
-- [ ] Provider contract suite passes for memory and local providers
-- [ ] Capability-dependent code paths are covered by tests and do not depend on implicit platform assumptions
-- [ ] Failures in local-provider behavior are caught by tests before UI wiring
+- [x] Provider contract suite passes for memory and local providers
+- [x] Capability-dependent code paths are covered by tests and do not depend on implicit platform assumptions
+- [x] Failures in local-provider behavior are caught by tests before UI wiring
 
 Verification:
-- [ ] `dotnet build SmartCopy2026.slnx`
-- [ ] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj`
+- [x] `dotnet build SmartCopy2026.slnx`
+- [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj`
+
+New files:
+- `SmartCopy.Tests/TestInfrastructure/CapabilityOverrideProvider.cs` — capability decorator for testing fallback paths
+- `SmartCopy.Tests/TestInfrastructure/SmokeDataset.cs` — canonical Phase 2 smoke dataset (`Seed` + `SeedTo`)
+- `SmartCopy.Tests/FileSystem/ProviderContractTests.cs` — 11-test abstract contract + Memory/Local subclasses
+- `SmartCopy.Tests/FileSystem/PathHandlingTests.cs` — 14 path normalization/splitting/joining tests
+- `SmartCopy.Tests/Pipeline/MoveStepFallbackTests.cs` — 4 tests for cross-provider and CanAtomicMove=false fallback paths
+
+Real filesystem test strategy (three tiers):
+1. **Hermetic** — `TempDirectory` + `MemoryFileSystemProvider`; always-on, no external deps; runs in CI
+2. **Smoke** — programmatic `SmokeDataset.Seed*()` into temp dirs; same dataset for both providers
+3. **Slow** (Phase 2.X) — opt-in via `SMARTCOPY_SLOW_TEST_PATH` env var; tagged `[Trait("Category", "Slow")]`; use for validation matrix items (100k nodes, large files, locked files, network paths)
 
 #### 5.2.2 — Source Acquisition UX (native browse + path commit)
 
