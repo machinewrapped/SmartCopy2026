@@ -30,6 +30,8 @@ public partial class OperationProgressViewModel : ViewModelBase
 
     public PipelineJob Begin(PipelineJob job)
     {
+        if (IsActive) throw new InvalidOperationException("Operation already in progress");
+
         _cancellationTokenSource = new CancellationTokenSource();
         _pauseTokenSource = new PauseTokenSource();
         IsActive = true;
