@@ -13,7 +13,8 @@ namespace SmartCopy.Core.DirectoryTree;
 public sealed class DirectoryTreeNode(
     FileSystemNode _filesystemNode,
     DirectoryTreeNode? _parent,
-    CheckState _checkState = CheckState.Unchecked) : INotifyPropertyChanged
+    CheckState _checkState = CheckState.Unchecked) 
+    : INotifyPropertyChanged
 {
     public string Name => _filesystemNode.Name;
     public string FullPath => _filesystemNode.FullPath;
@@ -156,10 +157,14 @@ public sealed class DirectoryTreeNode(
         IsMarkedForRemoval = true;
 
         foreach (var child in Children)
+        {
             child.MarkForRemoval();
+        }
 
         foreach (var file in Files)
+        {
             file.MarkForRemoval();
+        }
     }
 
     public IEnumerable<DirectoryTreeNode> GetSelectedDescendants()
@@ -253,11 +258,12 @@ public sealed class DirectoryTreeNode(
 
         if (removedAnyChildren)
         {
+            MarkDirty();
+
             // If we removed any children, we may need to recalculate our filter state
             FilterChain.RecalculateParentExclusion(this);
         }
     }
-
 
     internal int CountSelectedFiles() =>
         (IsSelected && !IsDirectory ? 1 : 0) + (IsDirectory ? Children.Sum(c => c.CountSelectedFiles()) + Files.Count(f => f.IsSelected) : 0);
@@ -278,6 +284,9 @@ public sealed class DirectoryTreeNode(
 
     private void SetCheckStateWithPropagation(CheckState newState)
     {
+        if (_checkState == newState)
+            return;
+
         // Change self
         _checkState = newState;
 
