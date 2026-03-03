@@ -155,8 +155,7 @@ public class DirectoryTreeViewModel : ViewModelBase
         try
         {
             await Task.Delay(100, ct);
-            foreach (var root in RootNodes)
-                root.ClearDirty();
+
             SelectionChanged?.Invoke(this, EventArgs.Empty);
         }
         catch (OperationCanceledException) { }
