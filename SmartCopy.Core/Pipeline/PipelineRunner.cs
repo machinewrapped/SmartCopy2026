@@ -68,7 +68,8 @@ public sealed class PipelineRunner
         PipelineJob job,
         IProgress<OperationProgress>? progress = null,
         IProgress<TransformResult>? nodeProgress = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        PauseTokenSource? pauseToken = null)
     {
         _pipeline.Validate(new PipelineValidationContext(
             job.RootNode.GetSelectedDescendants().Any()));
@@ -94,6 +95,9 @@ public sealed class PipelineRunner
 
             await foreach (var result in step.ApplyAsync(context, ct))
             {
+                if (pauseToken is not null)
+                    await pauseToken.WaitIfPausedAsync(ct);
+
                 results.Add(result);
                 nodeProgress?.Report(result);
 

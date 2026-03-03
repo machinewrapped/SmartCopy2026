@@ -83,6 +83,7 @@ public partial class MainViewModel : ViewModelBase
     private readonly SelectionSerializer _selectionSerializer = new();
     private CancellationTokenSource? _filterCts;
     private CancellationTokenSource? _runCts;
+    private PauseTokenSource? _runPause;
     private string _lastCommittedSourcePath = string.Empty;
 
     public ObservableCollection<SourceBookmarkItem> SourceBookmarks { get; } = [];
@@ -868,7 +869,10 @@ public partial class MainViewModel : ViewModelBase
         _runCts?.Dispose();
         _runCts = new CancellationTokenSource();
 
-        StatusBar.Progress.Begin(_runCts);
+        _runPause?.Dispose();
+        _runPause = new PauseTokenSource();
+
+        StatusBar.Progress.Begin(_runCts, _runPause);
         var progress = new Progress<OperationProgress>(StatusBar.Progress.Update);
         var nodeProgress = new Progress<TransformResult>(OnNodeCompleted);
 
@@ -877,7 +881,7 @@ public partial class MainViewModel : ViewModelBase
 
         try
         {
-            var results = await runner.ExecuteAsync(job, progress, nodeProgress, _runCts.Token);
+            var results = await runner.ExecuteAsync(job, progress, nodeProgress, _runCts.Token, _runPause);
 
             await _operationJournal.WriteAsync(results.Where(r => r.SourceNodeResult != SourceResult.None));
 
@@ -917,6 +921,8 @@ public partial class MainViewModel : ViewModelBase
         }
         finally
         {
+            _runPause?.Dispose();
+            _runPause = null;
             FileList.RemoveAllMarkedForRemoval();
             DirectoryTree.RemoveNodesMarkedForRemoval();
         }
