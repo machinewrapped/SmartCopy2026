@@ -95,7 +95,9 @@ public class DirectoryTreeViewModel : ViewModelBase
             }
 
             if (root is not null)
+            {
                 SelectedNode = root;
+            }
         }
         finally
         {
@@ -132,33 +134,5 @@ public class DirectoryTreeViewModel : ViewModelBase
         {
             SelectionChanged?.Invoke(this, EventArgs.Empty);
         }
-    }
-
-    private DirectoryTreeNode? FindNode(string fullPath)
-    {
-        var stack = new Stack<DirectoryTreeNode>(RootNodes);
-        while (stack.Count > 0)
-        {
-            var node = stack.Pop();
-            if (string.Equals(node.FullPath, fullPath, StringComparison.OrdinalIgnoreCase))
-            {
-                return node;
-            }
-
-            for (var i = node.Children.Count - 1; i >= 0; i--)
-            {
-                stack.Push(node.Children[i]);
-            }
-
-            foreach (var file in node.Files)
-            {
-                if (string.Equals(file.FullPath, fullPath, StringComparison.OrdinalIgnoreCase))
-                {
-                    return file;
-                }
-            }
-        }
-
-        return null;
     }
 }

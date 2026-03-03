@@ -697,7 +697,9 @@ public partial class MainViewModel : ViewModelBase
         }
 
         foreach (var child in node.Children)
+        {
             CollectStatsRecursive(child, ref selected, ref totalBytes, ref filteredOut);
+        }
     }
 
     private async void InitializeInBackground()
