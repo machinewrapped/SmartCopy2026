@@ -1,0 +1,5 @@
+{
+"dotnet.backgroundAnalysis.compilerDiagnosticsScope": "fullSolution",
+"csharp.inlayHints.enableInlayHintsForImplicitObjectCreation": true,
+"csharp.preview.improvedLaunchExperience": true,
+}
