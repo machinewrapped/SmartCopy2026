@@ -29,6 +29,10 @@ public sealed class DirectoryTreeNode(
     public override string ToString() => CanonicalRelativePath + (IsDirectory ? "/" : "");
 
     private int _batchUpdateDepth = 0;
+    private bool _isDirty;
+    public bool IsDirty => _isDirty;
+    public int NumSelectedFiles { get; private set; }
+    public long TotalSelectedBytes { get; private set; }
 
     public CheckState CheckState
     {
@@ -60,6 +64,7 @@ public sealed class DirectoryTreeNode(
             if (_filterResult != value)
             {
                 _filterResult = value;
+                MarkDirty();
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IsSelected));
                 OnPropertyChanged(nameof(IsFilterIncluded));
@@ -105,6 +110,33 @@ public sealed class DirectoryTreeNode(
     public ObservableCollection<DirectoryTreeNode> Files { get; } = [];
 
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    public void MarkDirty()
+    {
+        if (_isDirty) return;
+        
+        _isDirty = true;
+        OnPropertyChanged(nameof(IsDirty));
+        Parent?.MarkDirty();
+    }
+
+    public void ClearDirty() => _isDirty = false;
+
+    public void BuildStats()
+    {
+        int files = 0;
+        long bytes = 0;
+        foreach (var file in Files)
+            if (file.IsSelected) { files++; bytes += file.Size; }
+        foreach (var child in Children)
+        {
+            child.BuildStats();
+            files += child.NumSelectedFiles;
+            bytes += child.TotalSelectedBytes;
+        }
+        NumSelectedFiles = files;
+        TotalSelectedBytes = bytes;
+    }
 
     public IDisposable BeginBatchUpdate()
     {
@@ -255,17 +287,13 @@ public sealed class DirectoryTreeNode(
     {
         // Change self
         _checkState = newState;
+        MarkDirty();
         OnPropertyChanged(nameof(CheckState));
         OnPropertyChanged(nameof(IsSelected));
 
         // Downward propagation
         if (newState != CheckState.Indeterminate && (Children.Count > 0 || Files.Count > 0))
         {
-            // TODO: this batch update doesn't prevent downward events firing,
-            // and we don't propagate state changes up if the parent was mixed and stayed mixed
-            // so we only get an event at the root node on first CheckState or Selection changed.
-            // Ideally we want to bubble any state change up to the root node to recalculate stats,
-            // but consolidate the changes into one event.
             using (BeginBatchUpdate())
             {
                 PropagateDownward(newState);
@@ -302,6 +330,7 @@ public sealed class DirectoryTreeNode(
     private void SetCheckState(CheckState newState)
     {
         _checkState = newState;
+        MarkDirty();
         OnPropertyChanged(nameof(CheckState));
         OnPropertyChanged(nameof(IsSelected));
     }

@@ -674,32 +674,23 @@ public partial class MainViewModel : ViewModelBase
 
         foreach (var root in DirectoryTree.RootNodes)
         {
-            CollectStatsRecursive(root, ref selected, ref totalBytes, ref filteredOut);
+            root.BuildStats();
+            selected += root.NumSelectedFiles;
+            totalBytes += root.TotalSelectedBytes;
+            filteredOut += CountFilteredOut(root);
         }
 
         Pipeline.SetSelectedIncludedFileCount(selected);
         StatusBar.Selection.UpdateStats(selected, totalBytes, filteredOut);
     }
 
-    private static void CollectStatsRecursive(DirectoryTreeNode node, ref int selected, ref long totalBytes, ref int filteredOut)
+    private static int CountFilteredOut(DirectoryTreeNode node)
     {
-        foreach (var file in node.Files)
-        {
-            if (file.IsSelected)
-            {
-                selected++;
-                totalBytes += file.Size;
-            }
-            else if (file.CheckState == CheckState.Checked && file.FilterResult == FilterResult.Excluded)
-            {
-                filteredOut++;
-            }
-        }
-
+        var count = node.Files.Count(f =>
+            f.CheckState == CheckState.Checked && f.FilterResult == FilterResult.Excluded);
         foreach (var child in node.Children)
-        {
-            CollectStatsRecursive(child, ref selected, ref totalBytes, ref filteredOut);
-        }
+            count += CountFilteredOut(child);
+        return count;
     }
 
     private async void InitializeInBackground()

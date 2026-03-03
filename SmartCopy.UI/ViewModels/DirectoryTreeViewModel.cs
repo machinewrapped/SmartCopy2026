@@ -128,12 +128,30 @@ public class DirectoryTreeViewModel : ViewModelBase
         }
     }
 
+    private CancellationTokenSource? _selectionCts;
+
     private void OnRootNodePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        // null property name = batch reset; CheckState or IsSelected = individual change
-        if (e.PropertyName is null or nameof(DirectoryTreeNode.CheckState) or nameof(DirectoryTreeNode.IsSelected))
+        if (e.PropertyName == nameof(DirectoryTreeNode.IsDirty)
+            && sender is DirectoryTreeNode { IsDirty: true })
         {
+            ScheduleSelectionChangedAsync();
+        }
+    }
+
+    private async void ScheduleSelectionChangedAsync()
+    {
+        _selectionCts?.Cancel();
+        _selectionCts?.Dispose();
+        _selectionCts = new CancellationTokenSource();
+        var ct = _selectionCts.Token;
+        try
+        {
+            await Task.Delay(100, ct);
+            foreach (var root in RootNodes)
+                root.ClearDirty();
             SelectionChanged?.Invoke(this, EventArgs.Empty);
         }
+        catch (OperationCanceledException) { }
     }
 }
