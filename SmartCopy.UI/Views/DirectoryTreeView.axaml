@@ -9,6 +9,7 @@
         <conv:CheckStateConverter x:Key="CheckStateConverter" />
         <conv:FilterResultOpacityConverter x:Key="FilterResultOpacityConverter" />
         <conv:NodeVisibilityConverter x:Key="NodeVisibilityConverter" />
+        <conv:NullIfEmptyStringConverter x:Key="NullIfEmptyStringConverter" />
     </UserControl.Resources>
 
     <TreeView x:Name="DirectoryTree"
@@ -38,7 +39,8 @@
         <TreeView.ItemTemplate>
             <TreeDataTemplate ItemsSource="{Binding Children}">
                 <StackPanel Orientation="Horizontal" Spacing="4"
-                            Opacity="{Binding FilterResult, Converter={StaticResource FilterResultOpacityConverter}}">
+                            Opacity="{Binding FilterResult, Converter={StaticResource FilterResultOpacityConverter}}"
+                            ToolTip.Tip="{Binding Notes, Converter={StaticResource NullIfEmptyStringConverter}}">
                     <StackPanel.ContextMenu>
                         <ContextMenu>
                             <MenuItem Header="Set as Source Path" Click="OnSetAsSourcePathClick" />

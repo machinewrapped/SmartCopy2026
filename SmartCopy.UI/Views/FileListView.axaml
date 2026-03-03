@@ -9,6 +9,7 @@
        <conv:CheckStateConverter x:Key="CheckStateConverter" />
        <conv:FileSizeConverter x:Key="FileSizeConverter" />
        <conv:FilterResultExcludedConverter x:Key="FilterResultExcludedConverter" />
+       <conv:NullIfEmptyStringConverter x:Key="NullIfEmptyStringConverter" />
    </UserControl.Resources>
 
    <UserControl.Styles>
@@ -45,6 +46,7 @@
                        <TextBlock Text="{Binding Name}"
                                   Classes.excluded-file="{Binding FilterResult, Converter={StaticResource FilterResultExcludedConverter}}"
                                   Classes.removed="{Binding IsMarkedForRemoval}"
+                                  ToolTip.Tip="{Binding Notes, Converter={StaticResource NullIfEmptyStringConverter}}"
                                   VerticalAlignment="Center" Padding="4,0" />
                    </DataTemplate>
                </DataGridTemplateColumn.CellTemplate>

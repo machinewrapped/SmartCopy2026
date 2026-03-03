@@ -102,6 +102,7 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
                 OnPropertyChanged(nameof(IsSelected));
                 OnPropertyChanged(nameof(IsFilterIncluded));
                 OnPropertyChanged(nameof(IsAtomicIncluded));
+                OnPropertyChanged(nameof(FilterResult));
             }
         }
     }
@@ -137,6 +138,20 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
     public bool IsSelected => CheckState == CheckState.Checked && FilterResult == FilterResult.Included;
     public bool IsFilterIncluded => FilterResult != FilterResult.Excluded;
     public bool IsAtomicIncluded => FilterResult == FilterResult.Included;
+
+    private string _notes = string.Empty;
+    public string Notes
+    {
+        get => _notes;
+        set
+        {
+            if (_notes != value)
+            {
+                _notes = value;
+                OnPropertyChanged();
+            }
+        }
+    }
 
     public DirectoryTreeNode? Parent { get; }
     public ObservableCollection<DirectoryTreeNode> Children { get; } = [];
