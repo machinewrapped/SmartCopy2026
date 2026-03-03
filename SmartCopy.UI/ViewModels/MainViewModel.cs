@@ -677,20 +677,11 @@ public partial class MainViewModel : ViewModelBase
             root.BuildStats();
             selected += root.NumSelectedFiles;
             totalBytes += root.TotalSelectedBytes;
-            filteredOut += CountFilteredOut(root);
+            filteredOut += root.NumFilterExcludedFiles;
         }
 
         Pipeline.SetSelectedIncludedFileCount(selected);
         StatusBar.Selection.UpdateStats(selected, totalBytes, filteredOut);
-    }
-
-    private static int CountFilteredOut(DirectoryTreeNode node)
-    {
-        var count = node.Files.Count(f =>
-            f.CheckState == CheckState.Checked && f.FilterResult == FilterResult.Excluded);
-        foreach (var child in node.Children)
-            count += CountFilteredOut(child);
-        return count;
     }
 
     private async void InitializeInBackground()
@@ -741,7 +732,6 @@ public partial class MainViewModel : ViewModelBase
         DefaultOverwriteMode = _settings.DefaultOverwriteMode;
 
         // Phase 1: hardcode /mem/Mirror as the mirror-filter comparison path.
-        FilterChain.PipelineDestinationPath = MockMemoryFileSystemFactory.TargetPath;
         await _operationJournal.RotateAsync(_settings.LogRetentionDays);
         await WorkflowMenu.RefreshAsync();
 

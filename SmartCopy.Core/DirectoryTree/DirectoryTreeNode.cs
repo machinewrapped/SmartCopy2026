@@ -47,6 +47,7 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
 
     public bool IsDirty { get; private set; } = false;
     public int NumSelectedFiles { get; private set; }
+    public int NumFilterExcludedFiles { get; private set;}
     public long TotalSelectedBytes { get; private set; }
 
     public CheckState CheckState
@@ -141,12 +142,21 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
     {
         int files = 0;
         long bytes = 0;
+        int excluded = 0;
+
         foreach (var file in Files)
         {
-            if (file.IsSelected)
+            if (file.CheckState == CheckState.Checked)
             { 
-                files++; 
-                bytes += file.Size; 
+                if (IsFilterIncluded)
+                {
+                    files++;
+                    bytes += file.Size;                     
+                }
+                else
+                {
+                    excluded++;
+                }
             }
         }
 
@@ -159,10 +169,12 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
 
             files += child.NumSelectedFiles;
             bytes += child.TotalSelectedBytes;
+            excluded += child.NumFilterExcludedFiles;
         }
 
         NumSelectedFiles = files;
         TotalSelectedBytes = bytes;
+        NumFilterExcludedFiles = excluded;
         ClearDirty();
     }
 

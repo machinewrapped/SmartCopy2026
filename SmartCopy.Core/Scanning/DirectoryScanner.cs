@@ -54,7 +54,10 @@ public sealed class DirectoryScanner
                     continue;
                 }
 
-                var node = new DirectoryTreeNode(child, currentDirectory);
+                // User may select parent whilst scan is in progress... propagate the check state to new additions
+                CheckState initialCheckstate = currentDirectory.CheckState == CheckState.Checked ? CheckState.Checked : CheckState.Unchecked;
+
+                var node = new DirectoryTreeNode(child, currentDirectory, initialCheckstate);
                 if (node.IsDirectory)
                 {
                     currentDirectory.Children.Add(node);
