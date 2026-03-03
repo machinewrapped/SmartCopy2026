@@ -64,11 +64,7 @@ public sealed class PipelineRunner
         };
     }
 
-    public async Task<IReadOnlyList<TransformResult>> ExecuteAsync(
-        PipelineJob job,
-        IProgress<OperationProgress>? progress = null,
-        IProgress<TransformResult>? nodeProgress = null,
-        CancellationToken ct = default)
+    public async Task<IReadOnlyList<TransformResult>> ExecuteAsync(PipelineJob job)
     {
         _pipeline.Validate(new PipelineValidationContext(
             job.RootNode.GetSelectedDescendants().Any()));
@@ -90,12 +86,15 @@ public sealed class PipelineRunner
 
         foreach (var step in _pipeline.Steps)
         {
-            ct.ThrowIfCancellationRequested();
+            job.CancellationToken.ThrowIfCancellationRequested();
 
-            await foreach (var result in step.ApplyAsync(context, ct))
+            await foreach (var result in step.ApplyAsync(context, job.CancellationToken))
             {
+                if (job.PauseToken is not null)
+                    await job.PauseToken.WaitIfPausedAsync(job.CancellationToken);
+
                 results.Add(result);
-                nodeProgress?.Report(result);
+                job.NodeProgress?.Report(result);
 
                 if (!result.IsSuccess || result.SourceNodeResult == SourceResult.None)
                     continue;
@@ -107,7 +106,7 @@ public sealed class PipelineRunner
                     var elapsed = stopwatch.Elapsed;
                     var remaining = EstimateRemaining(elapsed, completedBytes, totalBytes);
 
-                    progress?.Report(new OperationProgress(
+                    job.Progress?.Report(new OperationProgress(
                         CurrentFile: result.SourceNode.CanonicalRelativePath,
                         CurrentFileBytes: result.InputBytes,
                         CurrentFileTotalBytes: result.InputBytes,

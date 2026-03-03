@@ -82,7 +82,6 @@ public partial class MainViewModel : ViewModelBase
     private readonly SelectionManager _selectionManager = new();
     private readonly SelectionSerializer _selectionSerializer = new();
     private CancellationTokenSource? _filterCts;
-    private CancellationTokenSource? _runCts;
     private string _lastCommittedSourcePath = string.Empty;
 
     public ObservableCollection<SourceBookmarkItem> SourceBookmarks { get; } = [];
@@ -864,20 +863,17 @@ public partial class MainViewModel : ViewModelBase
 
     private async Task ExecutePipelineAsync(PipelineRunner runner, PipelineJob job)
     {
-        _runCts?.Cancel();
-        _runCts?.Dispose();
-        _runCts = new CancellationTokenSource();
-
-        StatusBar.Progress.Begin(_runCts);
-        var progress = new Progress<OperationProgress>(StatusBar.Progress.Update);
         var nodeProgress = new Progress<TransformResult>(OnNodeCompleted);
+        var executionJob = StatusBar.Progress.Begin(job with { NodeProgress = nodeProgress });
+
+        Pipeline.IsRunning = true;
 
         if (AutoOpenLogOnRun)
             LogPanel.IsExpanded = true;
 
         try
         {
-            var results = await runner.ExecuteAsync(job, progress, nodeProgress, _runCts.Token);
+            var results = await runner.ExecuteAsync(executionJob);
 
             await _operationJournal.WriteAsync(results.Where(r => r.SourceNodeResult != SourceResult.None));
 
@@ -917,6 +913,7 @@ public partial class MainViewModel : ViewModelBase
         }
         finally
         {
+            Pipeline.IsRunning = false;
             FileList.RemoveAllMarkedForRemoval();
             DirectoryTree.RemoveNodesMarkedForRemoval();
         }

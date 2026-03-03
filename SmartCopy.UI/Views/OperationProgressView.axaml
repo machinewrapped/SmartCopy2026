@@ -13,7 +13,14 @@
             <TextBlock Text="{Binding TimeRemaining}" VerticalAlignment="Center" HorizontalAlignment="Right" MinWidth="50" />
             <Button Content="Pause"
                     Command="{Binding PauseCommand}"
+                    IsVisible="{Binding !IsPaused}"
                     AutomationProperties.Name="Pause operation"
+                    CornerRadius="4"
+                    Padding="8,2" />
+            <Button Content="Resume"
+                    Command="{Binding ResumeCommand}"
+                    IsVisible="{Binding IsPaused}"
+                    AutomationProperties.Name="Resume operation"
                     CornerRadius="4"
                     Padding="8,2" />
             <Button Content="Cancel"

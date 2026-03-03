@@ -437,7 +437,7 @@ Acceptance criteria:
 - [X] No hard dependency on memory-only paths (`/mem`) remains in execution paths
 - [X] Phase 1 workflows behave the same from a user perspective when pointed at real folders
 - [X] UI remains responsive during large local scans
-- [ ] Functional pause button
+- [X] Functional pause button
 
 Verification:
 - [X] Manual smoke: scan/filter/preview/run on a real directory tree with at least 10k files

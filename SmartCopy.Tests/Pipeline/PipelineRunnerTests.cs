@@ -42,7 +42,7 @@ public sealed class PipelineRunnerTests
         Assert.Single(plan.Actions);
         Assert.Contains("/Mirror", plan.Actions[0].DestinationPath);
 
-        var results = await runner.ExecuteAsync(job, progress: null, ct: CancellationToken.None);
+        var results = await runner.ExecuteAsync(job);
 
         Assert.Contains(results, r => r.SourceNodeResult == SourceResult.Copied && r.IsSuccess);
         Assert.True(await provider.ExistsAsync("/Mirror/source/song.flac", CancellationToken.None));
@@ -73,7 +73,7 @@ public sealed class PipelineRunnerTests
         };
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            runner.ExecuteAsync(job, progress: null, ct: CancellationToken.None));
+            runner.ExecuteAsync(job));
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public sealed class PipelineRunnerTests
         };
 
         await runner.PreviewAsync(job, ct: CancellationToken.None);
-        await runner.ExecuteAsync(job, progress: null, ct: CancellationToken.None);
+        await runner.ExecuteAsync(job);
 
         Assert.False(await provider.ExistsAsync("/source/delete-me.txt", CancellationToken.None));
     }
@@ -171,9 +171,7 @@ public sealed class PipelineRunnerTests
                 ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
-            },
-            progress: null,
-            ct: CancellationToken.None);
+            });
 
         Assert.True(await provider.ExistsAsync("/out/track.mp3", CancellationToken.None));
     }
@@ -234,9 +232,7 @@ public sealed class PipelineRunnerTests
                 ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Skip,
                 DeleteMode     = DeleteMode.Trash,
-            },
-            progress: null,
-            ct: CancellationToken.None);
+            });
 
         Assert.Contains(results, r => r.SourceNodeResult == SourceResult.None);
         // Source must not have been deleted.
@@ -272,7 +268,7 @@ public sealed class PipelineRunnerTests
         Assert.Contains("At least one file must be selected", previewError.Message);
 
         var executeError = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            runner.ExecuteAsync(emptyJob, progress: null, ct: CancellationToken.None));
+            runner.ExecuteAsync(emptyJob));
 
         Assert.Contains("At least one file must be selected", executeError.Message);
     }
