@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Progress;
 
 namespace SmartCopy.UI.ViewModels;
@@ -27,16 +28,23 @@ public partial class OperationProgressViewModel : ViewModelBase
     [ObservableProperty]
     private string _timeRemaining = string.Empty;
 
-    public void Begin(CancellationTokenSource cancellationTokenSource, PauseTokenSource pauseTokenSource)
+    public PipelineJob Begin(PipelineJob job)
     {
-        _cancellationTokenSource = cancellationTokenSource;
-        _pauseTokenSource = pauseTokenSource;
+        _cancellationTokenSource = new CancellationTokenSource();
+        _pauseTokenSource = new PauseTokenSource();
         IsActive = true;
         IsPaused = false;
         PercentComplete = 0;
         StatusText = "Starting operation...";
         CurrentFile = string.Empty;
         TimeRemaining = string.Empty;
+
+        return job with
+        {
+            CancellationToken = _cancellationTokenSource.Token,
+            PauseToken = _pauseTokenSource,
+            Progress = new Progress<OperationProgress>(Update)
+        };
     }
 
     public void Complete()
@@ -46,6 +54,9 @@ public partial class OperationProgressViewModel : ViewModelBase
         IsPaused = false;
         StatusText = "Completed";
         TimeRemaining = "0:00 left";
+
+        _cancellationTokenSource?.Dispose();
+        _pauseTokenSource?.Dispose();
         _cancellationTokenSource = null;
         _pauseTokenSource = null;
     }
@@ -57,6 +68,9 @@ public partial class OperationProgressViewModel : ViewModelBase
         IsPaused = false;
         StatusText = "Cancelled";
         TimeRemaining = string.Empty;
+
+        _cancellationTokenSource?.Dispose();
+        _pauseTokenSource?.Dispose();
         _cancellationTokenSource = null;
         _pauseTokenSource = null;
     }

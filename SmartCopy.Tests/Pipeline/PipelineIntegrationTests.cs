@@ -31,9 +31,7 @@ public sealed class PipelineIntegrationTests
                 ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
-            },
-            progress: null,
-            ct: CancellationToken.None);
+            });
 
         Assert.True(await provider.ExistsAsync("/dest/src/song.mp3", CancellationToken.None));
     }
@@ -64,9 +62,7 @@ public sealed class PipelineIntegrationTests
                 ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
-            },
-            progress: null,
-            ct: CancellationToken.None);
+            });
 
         Assert.True(await provider.ExistsAsync("/dest/song.mp3", CancellationToken.None));
     }
@@ -93,9 +89,7 @@ public sealed class PipelineIntegrationTests
                     ProviderRegistry = provider.CreateRegistry(),
                     OverwriteMode  = OverwriteMode.Always,
                     DeleteMode     = DeleteMode.Permanent,
-                },
-                progress: null,
-                ct: CancellationToken.None));
+                }));
     }
 
     [Fact]
@@ -121,9 +115,7 @@ public sealed class PipelineIntegrationTests
                 ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Skip,
                 DeleteMode     = DeleteMode.Trash,
-            },
-            progress: null,
-            ct: CancellationToken.None);
+            });
 
         Assert.Contains(skipResults, result => result.SourceNodeResult == SourceResult.None);
 
@@ -135,9 +127,7 @@ public sealed class PipelineIntegrationTests
                 ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
-            },
-            progress: null,
-            ct: CancellationToken.None);
+            });
 
         Assert.Contains(alwaysResults, result => result.SourceNodeResult == SourceResult.Copied);
     }
@@ -169,9 +159,7 @@ public sealed class PipelineIntegrationTests
                 ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
-            },
-            progress: null,
-            ct: CancellationToken.None);
+            });
 
         Assert.True(await provider.ExistsAsync("/backup/src/song.mp3", CancellationToken.None));
         Assert.True(await provider.ExistsAsync("/archive/src/song.mp3", CancellationToken.None));
@@ -201,9 +189,7 @@ public sealed class PipelineIntegrationTests
                 ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
-            },
-            progress: null,
-            ct: CancellationToken.None);
+            });
 
         var logDir = Path.Combine(Path.GetTempPath(), "SmartCopy2026.Tests", Guid.NewGuid().ToString("N"), "logs");
         var journal = new OperationJournal(logDir);

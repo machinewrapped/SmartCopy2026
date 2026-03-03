@@ -78,7 +78,6 @@ public sealed class PipelineDirectoryTests
         dirNode.FilterResult = FilterResult.Included;
         dirNode.CheckState = CheckState.Checked;
 
-        var ct = CancellationToken.None;
         var runner = new PipelineRunner(new TransformPipeline([new MoveStep("/mem/dest")]));
         var results = await runner.ExecuteAsync(
             new PipelineJob
@@ -88,17 +87,15 @@ public sealed class PipelineDirectoryTests
                 ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
-            },
-            progress: null,
-            ct: ct);
+            });
 
         Assert.Single(results);
         Assert.True(results[0].IsSuccess);
         Assert.Equal(SourceResult.Moved, results[0].SourceNodeResult);
-        Assert.False(await provider.ExistsAsync("/src/music", ct));
-        Assert.True(await provider.ExistsAsync("/dest/src/music", ct));
-        Assert.True(await provider.ExistsAsync("/dest/src/music/a.flac", ct));
-        Assert.True(await provider.ExistsAsync("/dest/src/music/b.flac", ct));
+        Assert.False(await provider.ExistsAsync("/src/music", CancellationToken.None));
+        Assert.True(await provider.ExistsAsync("/dest/src/music", CancellationToken.None));
+        Assert.True(await provider.ExistsAsync("/dest/src/music/a.flac", CancellationToken.None));
+        Assert.True(await provider.ExistsAsync("/dest/src/music/b.flac", CancellationToken.None));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -128,7 +125,7 @@ public sealed class PipelineDirectoryTests
         };
 
         await runner.PreviewAsync(job);
-        var results = await runner.ExecuteAsync(job, progress: null);
+        var results = await runner.ExecuteAsync(job);
 
         Assert.Single(results);
         Assert.True(results[0].IsSuccess);
@@ -166,9 +163,7 @@ public sealed class PipelineDirectoryTests
                 ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
-            },
-            progress: null,
-            ct: ct);
+            });
 
         Assert.Single(results);
         Assert.True(results[0].IsSuccess);
@@ -213,9 +208,7 @@ public sealed class PipelineDirectoryTests
                 ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
-            },
-            progress: null,
-            ct: ct);
+            });
 
         // FlattenStep + MoveStep each produce results for the nodes traversed
         var moveResult = results.Single(r => r.SourceNodeResult == SourceResult.Moved);
@@ -253,9 +246,7 @@ public sealed class PipelineDirectoryTests
                 ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
-            },
-            progress: null,
-            ct: ct);
+            });
 
         var moveResult = results.Single(r => r.SourceNodeResult == SourceResult.Moved);
         Assert.True(moveResult.IsSuccess);
@@ -293,9 +284,7 @@ public sealed class PipelineDirectoryTests
                 ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
-            },
-            progress: null,
-            ct: ct);
+            });
 
         // One atomic result covering the entire subtree including nested dirs
         Assert.Single(results);
@@ -322,7 +311,6 @@ public sealed class PipelineDirectoryTests
         rockDir.FilterResult = FilterResult.Included;
         rockDir.CheckState = CheckState.Checked;
 
-        var ct = CancellationToken.None;
         var runner = new PipelineRunner(new TransformPipeline([new DeleteStep()]));
         var job = new PipelineJob
         {
@@ -332,14 +320,14 @@ public sealed class PipelineDirectoryTests
             OverwriteMode  = OverwriteMode.Always,
             DeleteMode     = DeleteMode.Permanent,
         };
-        await runner.PreviewAsync(job, ct);
-        var results = await runner.ExecuteAsync(job, progress: null, ct: ct);
+        await runner.PreviewAsync(job);
+        var results = await runner.ExecuteAsync(job);
 
         Assert.Single(results);
         Assert.True(results[0].IsSuccess);
-        Assert.False(await provider.ExistsAsync("/src/music/rock", ct));       // rock subdir gone
-        Assert.True(await provider.ExistsAsync("/src/music/excluded.txt", ct)); // excluded file stays
-        Assert.True(await provider.ExistsAsync("/src/music", ct));              // parent still exists
+        Assert.False(await provider.ExistsAsync("/src/music/rock", CancellationToken.None));       // rock subdir gone
+        Assert.True(await provider.ExistsAsync("/src/music/excluded.txt", CancellationToken.None)); // excluded file stays
+        Assert.True(await provider.ExistsAsync("/src/music", CancellationToken.None));              // parent still exists
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -414,9 +402,7 @@ public sealed class PipelineDirectoryTests
                 ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
-            },
-            progress: null,
-            ct: ct);
+            });
 
         Assert.Single(results);
         Assert.Equal(SourceResult.Moved, results[0].SourceNodeResult);

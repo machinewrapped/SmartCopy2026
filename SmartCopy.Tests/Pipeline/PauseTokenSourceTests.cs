@@ -126,8 +126,7 @@ public sealed class PauseTokenSourceTests
         pts.Pause(); // pause before starting — runner will block on first result
 
         var runTask = Task.Run(() => runner.ExecuteAsync(
-            job, progress: null, nodeProgress: null,
-            ct: CancellationToken.None, pauseToken: pts));
+            job with { PauseToken = pts, CancellationToken = CancellationToken.None }));
 
         // Verify the runner is blocked (hasn't completed after brief wait)
         var winner = await Task.WhenAny(runTask, Task.Delay(50));
@@ -168,8 +167,7 @@ public sealed class PauseTokenSourceTests
         pts.Pause();
 
         var runTask = Task.Run(() => runner.ExecuteAsync(
-            job, progress: null, nodeProgress: null,
-            ct: cts.Token, pauseToken: pts));
+            job with { PauseToken = pts, CancellationToken = cts.Token }));
 
         // Verify blocked
         var winner = await Task.WhenAny(runTask, Task.Delay(50));

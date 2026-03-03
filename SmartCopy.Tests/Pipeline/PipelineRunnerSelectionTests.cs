@@ -90,9 +90,7 @@ public sealed class PipelineRunnerSelectionTests
                 ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
-            },
-            progress: null,
-            ct: CancellationToken.None);
+            });
 
         // D and E should have been copied (they were unchecked → inverted to checked)
         Assert.True(await provider.ExistsAsync("/dest/src/d.txt", CancellationToken.None));
@@ -135,7 +133,7 @@ public sealed class PipelineRunnerSelectionTests
         await runner.PreviewAsync(job, ct: CancellationToken.None);
 
         // Execute — inversion happens exactly once on the real tree
-        await runner.ExecuteAsync(job, progress: null, ct: CancellationToken.None);
+        await runner.ExecuteAsync(job);
 
         // D and E should have been copied (they were unchecked → inverted to checked)
         Assert.True(await provider.ExistsAsync("/dest/src/d.txt", CancellationToken.None));
@@ -173,9 +171,7 @@ public sealed class PipelineRunnerSelectionTests
                     ProviderRegistry = provider.CreateRegistry(),
                     OverwriteMode  = OverwriteMode.Always,
                     DeleteMode     = DeleteMode.Trash,
-                },
-                progress: null,
-                ct: CancellationToken.None);
+                });
 
         // All three files should be copied after SelectAll
         Assert.True(await provider.ExistsAsync("/dest/src/x.txt", CancellationToken.None));
@@ -211,9 +207,7 @@ public sealed class PipelineRunnerSelectionTests
                 ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
-            },
-            progress: null,
-            ct: CancellationToken.None);
+            });
 
         // Nothing should be copied — ClearSelection empties the working set
         Assert.False(await provider.ExistsAsync("/dest/src/p.txt", CancellationToken.None));
