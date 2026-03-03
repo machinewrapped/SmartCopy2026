@@ -16,6 +16,7 @@ public class DirectoryTreeViewModel : ViewModelBase
     private DirectoryTreeNode? _selectedNode;
     private bool _isLoading;
 
+    /// <summary>Indicates whether the directory tree is currently loading.</summary>
     public bool IsLoading
     {
         get => _isLoading;
@@ -28,9 +29,11 @@ public class DirectoryTreeViewModel : ViewModelBase
     /// <summary>Raised when the user requests a node's path be set as the source root.</summary>
     public event EventHandler<string>? SetAsSourcePathRequested;
 
+    /// <summary>Requests that the node at the given path be set as the working source root.</summary>
     public void RequestSetAsSourcePath(string path) =>
         SetAsSourcePathRequested?.Invoke(this, path);
 
+    /// <summary>The root nodes of the directory tree.</summary>
     public ObservableCollection<DirectoryTreeNode> RootNodes { get; } = [];
 
     public DirectoryTreeViewModel(IFileSystemProvider provider, string rootPath)
@@ -65,7 +68,10 @@ public class DirectoryTreeViewModel : ViewModelBase
         IFilterContext? context = null,
         CancellationToken ct = default)
     {
-        await chain.ApplyToTreeAsync(RootNodes, context, ct);
+        foreach (var root in RootNodes)
+        {
+            await chain.ApplyToTreeAsync(root, context, ct);
+        }
     }
 
     public async Task InitializeAsync(CancellationToken ct = default)

@@ -5,10 +5,14 @@ namespace SmartCopy.UI.ViewModels;
 
 public class FileListViewModel : ViewModelBase
 {
+    public FileListViewModel(IFilterContext filterContext)
+    {
+        _filterContext = filterContext;
+    }
+
     private CancellationTokenSource? _loadCts;
 
-    private FilterChain? _chain;
-    private IFilterContext? _filterContext;
+    private readonly IFilterContext _filterContext;
     private DirectoryTreeNode? _currentDirectoryNode;
 
     // The full unfiltered set of file nodes for the current directory.
@@ -37,19 +41,16 @@ public class FileListViewModel : ViewModelBase
         }
     }
 
-    /// <summary>Stores the active filter chain for use in subsequent load and reapply calls.</summary>
-    public void UpdateChain(FilterChain? chain) => _chain = chain;
-
-    /// <summary>Stores the filter context so MirrorFilter can resolve memory/non-local paths.</summary>
-    public void UpdateFilterContext(IFilterContext? context) => _filterContext = context;
-
     /// <summary>
-    /// Re-applies the current filter chain to the already-loaded file nodes
-    /// and refreshes <see cref="VisibleFiles"/>.
+    /// Applies the filter chain to the current file list.
     /// </summary>
-    public async Task ReapplyFiltersAsync(CancellationToken ct = default)
+    public async Task ApplyChainToFilesAsync(FilterChain filterChain, CancellationToken ct = default)
     {
-        await ApplyChainToFilesAsync(ct);
+        if (_currentDirectoryNode != null)
+        {
+            await filterChain.ApplyToTreeAsync(_currentDirectoryNode, _filterContext, ct);
+        }
+
         RefreshVisibleFiles();
     }
 
@@ -57,7 +58,7 @@ public class FileListViewModel : ViewModelBase
     /// Displays the files already scanned into <paramref name="directoryNode"/>,
     /// then applies the current filter chain.
     /// </summary>
-    public async Task LoadFilesForNodeAsync(DirectoryTreeNode directoryNode)
+    public async Task LoadFilesForNodeAsync(DirectoryTreeNode directoryNode, FilterChain filterChain)
     {
         _loadCts?.Cancel();
         _loadCts?.Dispose();
@@ -67,8 +68,7 @@ public class FileListViewModel : ViewModelBase
         _currentDirectoryNode = directoryNode;
         _files = [.. directoryNode.Files];
 
-        await ApplyChainToFilesAsync(ct);
-        RefreshVisibleFiles();
+        await ApplyChainToFilesAsync(filterChain, ct);
     }
 
     public DirectoryTreeNode? FindFile(string fullPath)
@@ -117,12 +117,6 @@ public class FileListViewModel : ViewModelBase
             }
             node = node.Parent;
         }
-    }
-
-    private async Task ApplyChainToFilesAsync(CancellationToken ct = default)
-    {
-        if (_chain is not null && _files.Count > 0)
-            await _chain.ApplyToTreeAsync(_files, _filterContext, ct);
     }
 
     private void RefreshVisibleFiles()

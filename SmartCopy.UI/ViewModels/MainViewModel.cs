@@ -140,8 +140,7 @@ public partial class MainViewModel : ViewModelBase
             await ApplySourcePathCoreAsync(path);
         };
 
-        FileList = new FileListViewModel();
-        FileList.UpdateFilterContext(_filterContext);
+        FileList = new FileListViewModel(_filterContext);
 
         WorkflowMenu = new WorkflowMenuViewModel(_workflowStore);
         WorkflowMenu.SaveRequested += async (_, _) => await SaveWorkflowAsync();
@@ -175,7 +174,7 @@ public partial class MainViewModel : ViewModelBase
                 {
                     try
                     {
-                        await FileList.LoadFilesForNodeAsync(selectedNode);
+                        await FileList.LoadFilesForNodeAsync(selectedNode, FilterChain.BuildLiveChain());
                     }
                     catch (Exception ex)
                     {
@@ -478,12 +477,16 @@ public partial class MainViewModel : ViewModelBase
             // See if we can set this path as a root (it will throw if not)
             await DirectoryTree.ChangeRootAsync(normalizedPath);
 
-            _lastCommittedSourcePath = normalizedPath;
-            SourcePath = normalizedPath;
-            SourcePathValidationMessage = string.Empty;
+            if (_lastCommittedSourcePath != normalizedPath)
+            {
+                _lastCommittedSourcePath = normalizedPath;
+                SourcePath = normalizedPath;
+                SourcePathValidationMessage = string.Empty;                
+            }
 
             RecordRecentSource(normalizedPath);
             await ApplyFiltersAsync();
+
             _settings.LastSourcePath = normalizedPath;
             await _settingsStore.SaveAsync(_settings);
         }
@@ -659,10 +662,10 @@ public partial class MainViewModel : ViewModelBase
     private async Task ApplyFiltersAsync(CancellationToken ct = default)
     {
         var chain = FilterChain.BuildLiveChain();
-        FileList.UpdateChain(chain);
 
+        await FileList.ApplyChainToFilesAsync(chain, ct);
         await DirectoryTree.ApplyFiltersAsync(chain, _filterContext, ct);
-        await FileList.ReapplyFiltersAsync(ct);
+
         RefreshIdleStats();
     }
 
@@ -758,12 +761,8 @@ public partial class MainViewModel : ViewModelBase
 
         RefreshSourceBookmarks();
 
-        // Pre-wire the chain before the initial tree load so the first file list load
-        // already has a chain to evaluate.
-        var chain = FilterChain.BuildLiveChain();
         _activeSourceProvider = ResolveSourceProvider(PathHelper.NormalizeUserPath(SourcePath));
         DirectoryTree.SetProvider(_activeSourceProvider);
-        FileList.UpdateChain(chain);
 
         // TODO: automatically reading the last used directory on startup could be expensive,
         // especially if it was a network drive or MTP. It should definitely be a setting that can be turned off.
@@ -788,7 +787,8 @@ public partial class MainViewModel : ViewModelBase
 
         if (DirectoryTree.SelectedNode != null)
         {
-            await FileList.LoadFilesForNodeAsync(DirectoryTree.SelectedNode);
+            FilterChain filterChain = FilterChain.BuildLiveChain();
+            await FileList.LoadFilesForNodeAsync(DirectoryTree.SelectedNode, filterChain);
         }
 
         // Apply filters to the freshly loaded tree.
