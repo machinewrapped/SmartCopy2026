@@ -1,14 +1,11 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Pipeline;
@@ -86,7 +83,6 @@ public partial class MainViewModel : ViewModelBase
     private readonly SelectionSerializer _selectionSerializer = new();
     private CancellationTokenSource? _filterCts;
     private CancellationTokenSource? _runCts;
-    private IFileSystemProvider _activeSourceProvider;
     private string _lastCommittedSourcePath = string.Empty;
 
     public ObservableCollection<SourceBookmarkItem> SourceBookmarks { get; } = [];
@@ -109,11 +105,6 @@ public partial class MainViewModel : ViewModelBase
         // TODO: this should be a debug option, not exposed in release builds
         _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: _settings.AddArtificialDelay);
         _providerRegistry.Register(_memoryProvider);
-        _activeSourceProvider = _memoryProvider;
-
-        // TEMP: set a safe default path
-        SourcePath = MockMemoryFileSystemFactory.SourcePath;
-        _lastCommittedSourcePath = SourcePath;
 
         // Create the context and ViewModel for the filter chain
         _filterContext = new FilterContext(_providerRegistry);
@@ -124,8 +115,8 @@ public partial class MainViewModel : ViewModelBase
             presetStore: new PipelinePresetStore(),
             appSettings: _settings);
 
-        // TODO: we will need to be able to init the viewmodel without a source path or provider
-        DirectoryTree = new DirectoryTreeViewModel(_activeSourceProvider, _activeSourceProvider.RootPath)
+        // TODO: we will need to be able to init the viewmodel without a provider
+        DirectoryTree = new DirectoryTreeViewModel(_providerRegistry)
         {
             ShowFilteredNodesInTree = _settings.ShowFilteredNodesInTree
         };
@@ -140,8 +131,7 @@ public partial class MainViewModel : ViewModelBase
             await ApplySourcePathCoreAsync(path);
         };
 
-        FileList = new FileListViewModel();
-        FileList.UpdateFilterContext(_filterContext);
+        FileList = new FileListViewModel(_filterContext);
 
         WorkflowMenu = new WorkflowMenuViewModel(_workflowStore);
         WorkflowMenu.SaveRequested += async (_, _) => await SaveWorkflowAsync();
@@ -175,7 +165,7 @@ public partial class MainViewModel : ViewModelBase
                 {
                     try
                     {
-                        await FileList.LoadFilesForNodeAsync(selectedNode);
+                        await FileList.LoadFilesForNodeAsync(selectedNode, FilterChain.BuildLiveChain());
                     }
                     catch (Exception ex)
                     {
@@ -315,27 +305,38 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private void SelectAll()
     {
-        _selectionManager.SelectAll(DirectoryTree.RootNodes);
+        if (DirectoryTree.RootNode == null)
+            return;
+
+        _selectionManager.SelectAll([DirectoryTree.RootNode]);
         RefreshIdleStats();
     }
 
     [RelayCommand]
     private void ClearSelection()
     {
-        _selectionManager.ClearAll(DirectoryTree.RootNodes);
+        if (DirectoryTree.RootNode == null)
+            return;
+
+        _selectionManager.ClearAll([DirectoryTree.RootNode]);
         RefreshIdleStats();
     }
 
     [RelayCommand]
     private void InvertSelection()
     {
-        _selectionManager.InvertAll(DirectoryTree.RootNodes);
+        if (DirectoryTree.RootNode == null)
+            return;
+
+        _selectionManager.InvertAll([DirectoryTree.RootNode]);
         RefreshIdleStats();
     }
 
     [RelayCommand]
     private async Task SaveSelectionAsText()
     {
+        if (DirectoryTree.RootNode == null) return;
+
         var mainWindow = GetMainWindow();
         if (mainWindow is null) return;
 
@@ -353,13 +354,15 @@ public partial class MainViewModel : ViewModelBase
 
         if (file is null) return;
         var path = file.Path.LocalPath;
-        var snapshot = _selectionManager.Capture(DirectoryTree.RootNodes, UseAbsolutePathsForSelection);
+        var snapshot = _selectionManager.Capture([DirectoryTree.RootNode], UseAbsolutePathsForSelection);
         await _selectionSerializer.SaveAsync(path, snapshot);
     }
 
     [RelayCommand]
     private async Task SaveSelectionAsPlaylist()
     {
+        if (DirectoryTree.RootNode == null) return;
+
         var mainWindow = GetMainWindow();
         if (mainWindow is null) return;
 
@@ -377,15 +380,17 @@ public partial class MainViewModel : ViewModelBase
 
         if (file is null) return;
         var path = file.Path.LocalPath;
-        var snapshot = _selectionManager.Capture(DirectoryTree.RootNodes, UseAbsolutePathsForSelection);
+        var snapshot = _selectionManager.Capture([DirectoryTree.RootNode], UseAbsolutePathsForSelection);
         await _selectionSerializer.SaveAsync(path, snapshot);
     }
 
     [RelayCommand]
     private async Task RestoreSelection()
     {
+        if (DirectoryTree.RootNode == null) return;
+
         var mainWindow = GetMainWindow();
-        if (mainWindow is null) return;
+        if (mainWindow is null) return; 
 
         var files = await mainWindow.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
@@ -401,7 +406,7 @@ public partial class MainViewModel : ViewModelBase
         if (files is not { Count: > 0 }) return;
         var path = files[0].Path.LocalPath;
         var snapshot = await _selectionSerializer.LoadAsync(path);
-        var result = _selectionManager.Restore(DirectoryTree.RootNodes, snapshot);
+        var result = _selectionManager.Restore([DirectoryTree.RootNode], snapshot);
         RefreshIdleStats();
 
         if (result.HasUnmatched)
@@ -453,37 +458,37 @@ public partial class MainViewModel : ViewModelBase
         }
 
         var pickedPath = selectedUri.LocalPath;
-        SourcePath = pickedPath;
         await ApplySourcePathCoreAsync(pickedPath);
     }
 
     private async Task ApplySourcePathCoreAsync(string path)
     {
         var normalizedPath = PathHelper.NormalizeUserPath(path);
+
         if (string.IsNullOrWhiteSpace(normalizedPath))
             return;
 
         var previousPath = _lastCommittedSourcePath;
-        var previousProvider = _activeSourceProvider;
-        var nextProvider = ResolveSourceProvider(normalizedPath);
+        if (normalizedPath == previousPath)
+        {
+            return;
+        }
 
         try
         {
-            if (!ReferenceEquals(previousProvider, nextProvider))
-            {
-                DirectoryTree.SetProvider(nextProvider);
-                _activeSourceProvider = nextProvider;
-            }
+            SourcePath = normalizedPath;
 
             // See if we can set this path as a root (it will throw if not)
             await DirectoryTree.ChangeRootAsync(normalizedPath);
 
             _lastCommittedSourcePath = normalizedPath;
-            SourcePath = normalizedPath;
-            SourcePathValidationMessage = string.Empty;
+            SourcePathValidationMessage = string.Empty;                
 
             RecordRecentSource(normalizedPath);
+
+            // Apply filter chain
             await ApplyFiltersAsync();
+
             _settings.LastSourcePath = normalizedPath;
             await _settingsStore.SaveAsync(_settings);
         }
@@ -493,12 +498,6 @@ public partial class MainViewModel : ViewModelBase
 
             SourcePathValidationMessage = BuildSourcePathValidationMessage(normalizedPath, ex);
             LogPanel.AddEntry(SourcePathValidationMessage, LogLevel.Error);
-
-            if (!ReferenceEquals(previousProvider, nextProvider))
-            {
-                DirectoryTree.SetProvider(previousProvider);
-                _activeSourceProvider = previousProvider;
-            }
 
             try
             {
@@ -642,6 +641,11 @@ public partial class MainViewModel : ViewModelBase
 
     private async void OnChainChanged(object? sender, EventArgs e)
     {
+        if (DirectoryTree == null || DirectoryTree.IsLoaded == false || DirectoryTree.IsLoading)
+        {
+            return;
+        }
+
         // Debounce: cancel any in-flight apply and wait ~100 ms before re-evaluating.
         _filterCts?.Cancel();
         _filterCts?.Dispose();
@@ -659,26 +663,28 @@ public partial class MainViewModel : ViewModelBase
     private async Task ApplyFiltersAsync(CancellationToken ct = default)
     {
         var chain = FilterChain.BuildLiveChain();
-        FileList.UpdateChain(chain);
 
+        await FileList.ApplyChainToFilesAsync(chain, ct);
         await DirectoryTree.ApplyFiltersAsync(chain, _filterContext, ct);
-        await FileList.ReapplyFiltersAsync(ct);
+
         RefreshIdleStats();
     }
 
     private void RefreshIdleStats()
     {
-        int selected = 0;
-        long totalBytes = 0;
-        int filteredOut = 0;
-
-        foreach (var root in DirectoryTree.RootNodes)
+        if (DirectoryTree.RootNode == null)
         {
-            root.BuildStats();
-            selected += root.NumSelectedFiles;
-            totalBytes += root.TotalSelectedBytes;
-            filteredOut += root.NumFilterExcludedFiles;
+            Pipeline.SetSelectedIncludedFileCount(0);
+            StatusBar.Selection.UpdateStats(0,0,0);
+            return;
         }
+
+        var root = DirectoryTree.RootNode;
+        root.BuildStats();
+
+        int selected = root.NumSelectedFiles;
+        int filteredOut = root.NumFilterExcludedFiles;
+        long totalBytes = root.TotalSelectedBytes;
 
         Pipeline.SetSelectedIncludedFileCount(selected);
         StatusBar.Selection.UpdateStats(selected, totalBytes, filteredOut);
@@ -731,7 +737,6 @@ public partial class MainViewModel : ViewModelBase
         LazyExpandScan = _settings.LazyExpandScan;
         DefaultOverwriteMode = _settings.DefaultOverwriteMode;
 
-        // Phase 1: hardcode /mem/Mirror as the mirror-filter comparison path.
         await _operationJournal.RotateAsync(_settings.LogRetentionDays);
         await WorkflowMenu.RefreshAsync();
 
@@ -755,19 +760,14 @@ public partial class MainViewModel : ViewModelBase
         {
             SourcePath = saved.LastSourcePath;
         }
+        else
+        {
+            // TEMP: set a safe default path
+            SourcePath = MockMemoryFileSystemFactory.SourcePath;
+        }
 
         RefreshSourceBookmarks();
 
-        // Pre-wire the chain before the initial tree load so the first file list load
-        // already has a chain to evaluate.
-        var chain = FilterChain.BuildLiveChain();
-        _activeSourceProvider = ResolveSourceProvider(PathHelper.NormalizeUserPath(SourcePath));
-        DirectoryTree.SetProvider(_activeSourceProvider);
-        FileList.UpdateChain(chain);
-
-        // TODO: automatically reading the last used directory on startup could be expensive,
-        // especially if it was a network drive or MTP. It should definitely be a setting that can be turned off.
-        // However, for Phase 1 when the filesystem is in-memory it is convenient for validating the UI/UX.
         if (SourcePath is { Length: > 0 })
         {
             try
@@ -780,40 +780,30 @@ public partial class MainViewModel : ViewModelBase
                 SourcePath = _lastCommittedSourcePath;
             }
         }
-        else
-        {
-            await DirectoryTree.InitializeAsync(ct: CancellationToken.None);
-            _lastCommittedSourcePath = DirectoryTree.RootNodes.FirstOrDefault()?.FullPath ?? _lastCommittedSourcePath;
-        }
 
-        if (DirectoryTree.SelectedNode != null)
-        {
-            await FileList.LoadFilesForNodeAsync(DirectoryTree.SelectedNode);
-        }
-
-        // Apply filters to the freshly loaded tree.
-        await ApplyFiltersAsync();
-
-        LogPanel.AddEntry("SmartCopy 2026 ready — memory source loaded");
+        LogPanel.AddEntry("SmartCopy 2026 ready");
     }
 
     private async Task PreviewPipelineAsync()
     {
         var pipeline = Pipeline.BuildLivePipeline();
-        if (DirectoryTree.RootNodes.Count == 0)
+        if (DirectoryTree.IsLoaded == false)
             return;
-
-        var rootNode = DirectoryTree.RootNodes.First();
-        Pipeline.SetSelectedIncludedFileCount(rootNode.GetSelectedDescendants().Count(n => !n.IsDirectory));
 
         if (!Pipeline.CanRun)
             return;
+
+        var rootNode = DirectoryTree.RootNode
+            ?? throw new ApplicationException("Directory tree is loaded but root node is not set");
+
+        var sourceProvider = DirectoryTree.SourceProvider
+            ?? throw new ApplicationException("Directory tree is loaded but source provider is unknown");
 
         var runner = new PipelineRunner(pipeline);
         var job = new PipelineJob
         {
             RootNode         = rootNode,
-            SourceProvider   = _activeSourceProvider,
+            SourceProvider   = sourceProvider,
             ProviderRegistry = _providerRegistry,
             OverwriteMode    = ParseOverwriteMode(_settings.DefaultOverwriteMode),
             DeleteMode       = ParseDeleteMode(_settings.DefaultDeleteMode),
@@ -846,20 +836,25 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
-        if (DirectoryTree.RootNodes.Count == 0)
+        if (DirectoryTree.IsLoaded == false)
             return;
 
-        var rootNode = DirectoryTree.RootNodes.First();
-        Pipeline.SetSelectedIncludedFileCount(rootNode.GetSelectedDescendants().Count(n => !n.IsDirectory));
+        var rootNode = DirectoryTree.RootNode
+            ?? throw new ApplicationException("Directory tree is loaded but root node is not set");
+
+        Pipeline.SetSelectedIncludedFileCount(rootNode.NumSelectedFiles);
 
         if (!Pipeline.CanRun)
             return;
+
+        var sourceProvider = DirectoryTree.SourceProvider
+            ?? throw new ApplicationException("Directory tree is loaded but source provider is unknown");
 
         var runner = new PipelineRunner(pipeline);
         var job = new PipelineJob
         {
             RootNode         = rootNode,
-            SourceProvider   = _activeSourceProvider,
+            SourceProvider   = sourceProvider,
             ProviderRegistry = _providerRegistry,
             OverwriteMode    = ParseOverwriteMode(_settings.DefaultOverwriteMode),
             DeleteMode       = ParseDeleteMode(_settings.DefaultDeleteMode),
@@ -993,9 +988,7 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     private async Task ApplyWorkflowConfigAsync(WorkflowConfig config)
     {
-        // Restore source path
-        SourcePath = config.SourcePath;
-        await ApplySourcePathCoreAsync(config.SourcePath);
+        DirectoryTree.Reset();
 
         // Restore filter chain
         FilterChain.Filters.Clear();
@@ -1014,6 +1007,9 @@ public partial class MainViewModel : ViewModelBase
             Config = config.Pipeline,
         };
         Pipeline.LoadPreset(pipelinePreset);
+
+        // Restore source path
+        await ApplySourcePathCoreAsync(config.SourcePath);
     }
 
     /// <summary>

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,6 +19,8 @@ public sealed class FilterChain
     }
 
     public IReadOnlyList<IFilter> Filters => _filters;
+
+    public static FilterChain Empty => new([]);
 
     public async Task<IReadOnlyList<DirectoryTreeNode>> ApplyAsync(
         IEnumerable<DirectoryTreeNode> nodes,
@@ -40,12 +43,12 @@ public sealed class FilterChain
     }
 
     public async Task ApplyToTreeAsync(
-        IEnumerable<DirectoryTreeNode> roots,
+        DirectoryTreeNode root,
         IFilterContext? context = null,
         CancellationToken ct = default)
     {
         var resolvedContext = context ?? FilterContext.LocalOnly;
-        var stack = new Stack<DirectoryTreeNode>(roots);
+        var stack = new Stack<DirectoryTreeNode>([root]);
         var postOrderList = new List<DirectoryTreeNode>();
 
         while (stack.Count > 0)
@@ -74,9 +77,10 @@ public sealed class FilterChain
             UpdateDirectoryExclusion(postOrderList[i]);
         }
 
-        foreach (var parent in roots.Where(r => r.Parent != null).Select(r => r.Parent).Distinct())
+        // Roots really shouldn't have a parent, but just in case...
+        if (root.Parent != null)
         {
-            RecalculateParentExclusion(parent);
+            RecalculateParentExclusion(root.Parent);
         }
     }
 

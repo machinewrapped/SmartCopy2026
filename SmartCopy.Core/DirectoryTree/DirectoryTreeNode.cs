@@ -2,14 +2,23 @@ using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
 
 namespace SmartCopy.Core.DirectoryTree;
 
+/// <summary>
+/// Represents a node in the directory tree.
+/// 
+/// The node is stateful and indicates whether it is user-selected, included or excluded by filters, 
+/// whether it is marked for removal, and whether it is expanded.
+/// 
+/// It also caches statistics about the node and its descendants, including the number of selected files, 
+/// the number of filter-excluded files, and the total size of selected files.
+/// 
+/// The node is dirty if any of its descendants are dirty.
+/// </summary>
 public sealed class DirectoryTreeNode : INotifyPropertyChanged
 {
     private readonly FileSystemNode _filesystemNode;
@@ -22,6 +31,7 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
     {
         _filesystemNode = filesystemNode;
         _checkState = checkState;
+
         Parent = parent;
         RelativePathSegments = parent is null ? Array.Empty<string>() : [.. parent.RelativePathSegments.Append(filesystemNode.Name)];
 
@@ -40,15 +50,22 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
     public DateTime ModifiedAt => _filesystemNode.ModifiedAt;
     public FileAttributes Attributes => _filesystemNode.Attributes;
 
+    /// <summary>
+    /// The relative path segments from the root node to this node.
+    /// </summary>
     public string[] RelativePathSegments { get; }
-    public string CanonicalRelativePath => string.Join("/", RelativePathSegments);
 
-    public override string ToString() => CanonicalRelativePath + (IsDirectory ? "/" : "");
+    /// <summary>
+    /// The canonical relative path from the root node to this node.
+    /// </summary>
+    public string CanonicalRelativePath => string.Join("/", RelativePathSegments);
 
     public bool IsDirty { get; private set; } = false;
     public int NumSelectedFiles { get; private set; }
     public int NumFilterExcludedFiles { get; private set;}
     public long TotalSelectedBytes { get; private set; }
+
+    public override string ToString() => CanonicalRelativePath + (IsDirectory ? "/" : "");
 
     public CheckState CheckState
     {
@@ -85,6 +102,7 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
                 OnPropertyChanged(nameof(IsSelected));
                 OnPropertyChanged(nameof(IsFilterIncluded));
                 OnPropertyChanged(nameof(IsAtomicIncluded));
+                OnPropertyChanged(nameof(FilterResult));
             }
         }
     }
@@ -120,6 +138,20 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
     public bool IsSelected => CheckState == CheckState.Checked && FilterResult == FilterResult.Included;
     public bool IsFilterIncluded => FilterResult != FilterResult.Excluded;
     public bool IsAtomicIncluded => FilterResult == FilterResult.Included;
+
+    private string _notes = string.Empty;
+    public string Notes
+    {
+        get => _notes;
+        set
+        {
+            if (_notes != value)
+            {
+                _notes = value;
+                OnPropertyChanged();
+            }
+        }
+    }
 
     public DirectoryTreeNode? Parent { get; }
     public ObservableCollection<DirectoryTreeNode> Children { get; } = [];
@@ -232,7 +264,7 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
         }
     }
 
-    public DirectoryTreeNode? FindNodeByPathSegments(string[] pathSegments)
+    public DirectoryTreeNode? FindNodeByPathSegments(params string[] pathSegments)
     {
         var currentNode = this;
         for (int i = 0; i < pathSegments.Length; i++)

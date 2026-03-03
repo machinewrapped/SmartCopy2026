@@ -23,7 +23,7 @@ public sealed class PipelineDirectoryTests
             .WithSimulatedFile("/music/b.txt", 50));
 
         var dir = root.Children.Single(n => n.Name == "music");
-        await new FilterChain([new ExtensionFilter(["mp3"], FilterMode.Only)]).ApplyToTreeAsync([root]);
+        await new FilterChain([new ExtensionFilter(["mp3"], FilterMode.Only)]).ApplyToTreeAsync(root);
 
         Assert.Equal(FilterResult.Mixed, dir.FilterResult);
         Assert.True(dir.IsFilterIncluded);   // Mixed → visible in tree (not Excluded)
@@ -37,7 +37,8 @@ public sealed class PipelineDirectoryTests
             .WithDirectory("/music")
             .WithSimulatedFile("/music/a.mp3", 100)
             .WithSimulatedFile("/music/b.mp3", 200));
-        await new FilterChain([]).ApplyToTreeAsync([root]); // empty chain → all Included
+
+        await new FilterChain([]).ApplyToTreeAsync(root); // empty chain → all Included
 
         var dir = root.Children.Single(n => n.Name == "music");
         Assert.Equal(FilterResult.Included, dir.FilterResult);

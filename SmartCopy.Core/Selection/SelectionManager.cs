@@ -72,8 +72,10 @@ public sealed class SelectionManager
         {
             var node = stack.Pop();
             yield return node;
+
             foreach (var file in node.Files)
                 yield return file;
+
             for (var i = node.Children.Count - 1; i >= 0; i--)
                 stack.Push(node.Children[i]);
         }
