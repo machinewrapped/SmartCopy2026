@@ -1,12 +1,8 @@
-using System;
 using System.Collections.Specialized;
 using System.ComponentModel;
-using System.IO;
 using System.Text.Json;
 using Avalonia.Controls;
 using Avalonia.Input;
-using Avalonia.Layout;
-using Avalonia.Platform;
 using SmartCopy.UI.ViewModels;
 using SmartCopy.UI.ViewModels.Workflows;
 
@@ -558,7 +554,9 @@ public partial class MainWindow : Window
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
             if (DataContext is MainViewModel vm && !string.IsNullOrWhiteSpace(vm.SourcePath))
+            {
                 vm.ApplySourcePathCommand.Execute(null);
+            }
         });
     }
 
