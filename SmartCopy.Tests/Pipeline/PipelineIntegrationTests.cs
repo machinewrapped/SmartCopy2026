@@ -16,7 +16,7 @@ public sealed class PipelineIntegrationTests
             .WithDirectory("/dest")
             .WithFile("/src/song.mp3", "audio"u8));
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var root = await provider.BuildDirectoryTree();
         var node = root.FindNodeByPathSegments(["src", "song.mp3"]);
         Assert.NotNull(node);
 
@@ -28,7 +28,7 @@ public sealed class PipelineIntegrationTests
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+                ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -46,7 +46,7 @@ public sealed class PipelineIntegrationTests
             .WithDirectory("/dest")
             .WithFile("/src/deep/song.mp3", "audio"u8));
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var root = await provider.BuildDirectoryTree();
         var node = root.FindNodeByPathSegments(["src", "deep", "song.mp3"]);
         Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
@@ -61,7 +61,7 @@ public sealed class PipelineIntegrationTests
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+                ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -78,7 +78,7 @@ public sealed class PipelineIntegrationTests
             .WithDirectory("/src")
             .WithFile("/src/delete.txt", "x"u8));
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var root = await provider.BuildDirectoryTree();
         var node = root.FindNodeByPathSegments(["src", "delete.txt"]);
         Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
@@ -90,7 +90,7 @@ public sealed class PipelineIntegrationTests
                 {
                     RootNode       = root,
                     SourceProvider = provider,
-                    ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+                    ProviderRegistry = provider.CreateRegistry(),
                     OverwriteMode  = OverwriteMode.Always,
                     DeleteMode     = DeleteMode.Permanent,
                 },
@@ -107,7 +107,7 @@ public sealed class PipelineIntegrationTests
             .WithFile("/src/song.mp3", "new"u8)
             .WithFile("/dest/src/song.mp3", "old"u8));
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var root = await provider.BuildDirectoryTree();
         var node = root.FindNodeByPathSegments(["src", "song.mp3"]);
         Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
@@ -118,7 +118,7 @@ public sealed class PipelineIntegrationTests
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+                ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Skip,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -132,7 +132,7 @@ public sealed class PipelineIntegrationTests
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+                ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -151,7 +151,7 @@ public sealed class PipelineIntegrationTests
             .WithDirectory("/archive")
             .WithFile("/src/song.mp3", "audio"u8));
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var root = await provider.BuildDirectoryTree();
         var node = root.FindNodeByPathSegments(["src", "song.mp3"]);
         Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
@@ -166,7 +166,7 @@ public sealed class PipelineIntegrationTests
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+                ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -186,7 +186,7 @@ public sealed class PipelineIntegrationTests
             .WithDirectory("/dest")
             .WithSimulatedFile("/src/song.mp3", 256*1024));
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var root = await provider.BuildDirectoryTree();
         var node = root.FindNodeByPathSegments(["src", "song.mp3"]);
         Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
@@ -198,7 +198,7 @@ public sealed class PipelineIntegrationTests
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+                ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },

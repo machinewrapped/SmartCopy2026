@@ -72,7 +72,7 @@ public sealed class PipelineDirectoryTests
             .WithSimulatedFile("/src/music/b.flac", 2000)
             .WithDirectory("/dest"));
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var root = await provider.BuildDirectoryTree();
 
         var dirNode = root.Children.Single(n => n.Name == "src").Children.Single(n => n.Name == "music");
         dirNode.FilterResult = FilterResult.Included;
@@ -85,7 +85,7 @@ public sealed class PipelineDirectoryTests
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+                ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -113,7 +113,7 @@ public sealed class PipelineDirectoryTests
             .WithSimulatedFile("/src/music/b.flac", 800));
 
         // Build the tree from /src/music so music IS the root — avoids accidental root-level deletion.
-        var musicRoot = await MemoryFileSystemFixtures.BuildDirectoryTree(provider, "/src/music");
+        var musicRoot = await provider.BuildDirectoryTree("/src/music");
         musicRoot.FilterResult = FilterResult.Included;
         musicRoot.CheckState = CheckState.Checked;
 
@@ -122,7 +122,7 @@ public sealed class PipelineDirectoryTests
         {
             RootNode       = musicRoot,
             SourceProvider = provider,
-            ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+            ProviderRegistry = provider.CreateRegistry(),
             OverwriteMode  = OverwriteMode.Always,
             DeleteMode     = DeleteMode.Permanent,
         };
@@ -148,7 +148,7 @@ public sealed class PipelineDirectoryTests
             .WithFile("/src/music/readme.txt", "notes"u8)
             .WithDirectory("/dest"));
 
-        DirectoryTreeNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        DirectoryTreeNode root = await provider.BuildDirectoryTree();
 
         var ct = CancellationToken.None;
         // Only the mp3 is selected — readme.txt is left unchecked (partial coverage).
@@ -163,7 +163,7 @@ public sealed class PipelineDirectoryTests
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+                ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -192,7 +192,7 @@ public sealed class PipelineDirectoryTests
             .WithDirectory("/dest"));
 
         // Build from /src/music so "rock" is a direct child of the scan root.
-        var musicRoot = await MemoryFileSystemFixtures.BuildDirectoryTree(provider, "/src/music");
+        var musicRoot = await provider.BuildDirectoryTree("/src/music");
         var dirNode = musicRoot.Children.Single(n => n.Name == "rock");
         dirNode.FilterResult = FilterResult.Included;
         dirNode.CheckState = CheckState.Checked;
@@ -210,7 +210,7 @@ public sealed class PipelineDirectoryTests
             {
                 RootNode       = musicRoot,
                 SourceProvider = provider,
-                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+                ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -234,7 +234,7 @@ public sealed class PipelineDirectoryTests
             .WithDirectory("/dest"));
 
         // Build from /src so "music" is a direct child of the scan root.
-        var srcRoot = await MemoryFileSystemFixtures.BuildDirectoryTree(provider, "/src");
+        var srcRoot = await provider.BuildDirectoryTree("/src");
         var dirNode = srcRoot.Children.Single(n => n.Name == "music");
         dirNode.FilterResult = FilterResult.Included;
         dirNode.CheckState = CheckState.Checked;
@@ -250,7 +250,7 @@ public sealed class PipelineDirectoryTests
             {
                 RootNode       = srcRoot,
                 SourceProvider = provider,
-                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+                ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -277,7 +277,7 @@ public sealed class PipelineDirectoryTests
             .WithSimulatedFile("/src/music/rock/b.flac", 2000)
             .WithDirectory("/dest"));
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var root = await provider.BuildDirectoryTree();
         var parentDir = root.FindNodeByPathSegments(["src", "music"]);
         Assert.NotNull(parentDir);
         parentDir.FilterResult = FilterResult.Included;
@@ -290,7 +290,7 @@ public sealed class PipelineDirectoryTests
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+                ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -317,7 +317,7 @@ public sealed class PipelineDirectoryTests
             .WithFile("/src/music/excluded.txt", "x"u8));
 
         // Build from /src/music — music has rock (selected) and excluded.txt (not selected).
-        var musicRoot = await MemoryFileSystemFixtures.BuildDirectoryTree(provider, "/src/music");
+        var musicRoot = await provider.BuildDirectoryTree("/src/music");
         var rockDir = musicRoot.Children.Single(n => n.Name == "rock");
         rockDir.FilterResult = FilterResult.Included;
         rockDir.CheckState = CheckState.Checked;
@@ -328,7 +328,7 @@ public sealed class PipelineDirectoryTests
         {
             RootNode       = musicRoot,
             SourceProvider = provider,
-            ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+            ProviderRegistry = provider.CreateRegistry(),
             OverwriteMode  = OverwriteMode.Always,
             DeleteMode     = DeleteMode.Permanent,
         };
@@ -355,7 +355,7 @@ public sealed class PipelineDirectoryTests
                 .WithDirectory("/dest")
                 .WithSimulatedFile("/dest/src/music/a.flac", 1000)); // a.flac already exists at dest
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var root = await provider.BuildDirectoryTree();
         var dirNode = root.FindNodeByPathSegments(["src", "music"]);
         Assert.NotNull(dirNode);
         dirNode.FilterResult = FilterResult.Included;
@@ -368,7 +368,7 @@ public sealed class PipelineDirectoryTests
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+                ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             }, ct);
@@ -396,7 +396,7 @@ public sealed class PipelineDirectoryTests
             .WithSimulatedFile("/src/music/b.flac", 2000)
             .WithDirectory("/dest"));
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var root = await provider.BuildDirectoryTree();
         var dirNode = root.FindNodeByPathSegments(["src", "music"]);
         Assert.NotNull(dirNode);
         dirNode.FilterResult = FilterResult.Included;
@@ -411,7 +411,7 @@ public sealed class PipelineDirectoryTests
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+                ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
