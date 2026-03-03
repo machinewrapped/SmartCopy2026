@@ -58,8 +58,7 @@ public class DirectoryTreeViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Applies <paramref name="chain"/> to every node in the tree, setting
-    /// <see cref="DirectoryTreeNode.FilterResult"/> and <see cref="DirectoryTreeNode.ExcludedByFilter"/>.
+    /// Applies <paramref name="chain"/> to every node in the tree, setting <see cref="DirectoryTreeNode.FilterResult"/>/>.
     /// </summary>
     public async Task ApplyFiltersAsync(
         FilterChain chain,
@@ -73,7 +72,9 @@ public class DirectoryTreeViewModel : ViewModelBase
     {
         // Unsubscribe from old roots before clearing
         foreach (var oldRoot in RootNodes)
+        {
             oldRoot.PropertyChanged -= OnRootNodePropertyChanged;
+        }
 
         RootNodes.Clear();
         IsLoading = true;

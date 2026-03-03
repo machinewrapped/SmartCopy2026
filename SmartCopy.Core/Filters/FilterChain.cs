@@ -30,7 +30,7 @@ public sealed class FilterChain
         {
             ct.ThrowIfCancellationRequested();
             var evaluation = await EvaluateNodeAsync(node, resolvedContext, ct);
-            if (evaluation.IsIncluded)
+            if (evaluation == FilterResult.Included)
             {
                 result.Add(node);
             }
@@ -57,8 +57,7 @@ public sealed class FilterChain
             var evaluation = await EvaluateNodeAsync(node, resolvedContext, ct);
             using (node.BeginBatchUpdate())
             {
-                node.FilterResult = evaluation.IsIncluded ? FilterResult.Included : FilterResult.Excluded;
-                node.ExcludedByFilter = evaluation.IsIncluded ? null : evaluation.ExcludedByFilter;
+                node.FilterResult = evaluation;
             }
 
             for (var i = node.Children.Count - 1; i >= 0; i--)
@@ -73,8 +72,7 @@ public sealed class FilterChain
                 var fileEval = await EvaluateNodeAsync(file, resolvedContext, ct);
                 using (file.BeginBatchUpdate())
                 {
-                    file.FilterResult = fileEval.IsIncluded ? FilterResult.Included : FilterResult.Excluded;
-                    file.ExcludedByFilter = fileEval.IsIncluded ? null : fileEval.ExcludedByFilter;
+                    file.FilterResult = fileEval;
                 }
             }
         }
@@ -122,7 +120,6 @@ public sealed class FilterChain
             node.FilterResult = allIncluded ? FilterResult.Included
                               : anyIncluded ? FilterResult.Mixed
                               : FilterResult.Excluded;
-            node.ExcludedByFilter = anyIncluded ? null : AllChildrenExcluded;
         }
     }
 
@@ -144,14 +141,9 @@ public sealed class FilterChain
     public static FilterChain FromConfig(FilterChainConfig config)
         => FromConfig(config, FilterFactory.FromConfig);
 
-    private async Task<NodeEvaluation> EvaluateNodeAsync(
-        DirectoryTreeNode node,
-        IFilterContext context,
-        CancellationToken ct)
+    private async Task<FilterResult> EvaluateNodeAsync(DirectoryTreeNode node, IFilterContext context, CancellationToken ct)
     {
-        bool inSet = true;
-        string? excludedBy = null;
-        IFilter? excludingFilter = null;
+        FilterResult result = FilterResult.Included;
 
         foreach (var filter in _filters.Where(f => f.IsEnabled))
         {
@@ -164,39 +156,28 @@ public sealed class FilterChain
             switch (filter.Mode)
             {
                 case FilterMode.Only:
-                    if (inSet && !matches)
+                    if (!matches)
                     {
-                        inSet = false;
-                        excludedBy = filter.Name;
-                        excludingFilter = filter;
+                        result = FilterResult.Excluded;
                     }
                     break;
 
                 case FilterMode.Add:
                     if (matches)
                     {
-                        inSet = true;
-                        excludedBy = null;
-                        excludingFilter = null;
+                        result = FilterResult.Included;
                     }
                     break;
 
                 case FilterMode.Exclude:
-                    if (inSet && matches)
+                    if (matches)
                     {
-                        inSet = false;
-                        excludedBy = filter.Name;
-                        excludingFilter = filter;
+                        result = FilterResult.Excluded;
                     }
                     break;
             }
         }
 
-        return new NodeEvaluation(inSet, excludedBy, excludingFilter);
+        return result;
     }
-
-    private readonly record struct NodeEvaluation(
-        bool IsIncluded,
-        string? ExcludedByFilter,
-        IFilter? MatchingFilter);
 }

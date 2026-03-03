@@ -29,7 +29,7 @@ public sealed class FilterChainTests
     }
 
     [Fact]
-    public async Task ApplyToTree_SetsFilterResultAndExcludedByFilter()
+    public async Task ApplyToTree_SetsFilterResult()
     {
         DirectoryTreeNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
             .WithDirectory("/src/")
@@ -42,7 +42,6 @@ public sealed class FilterChainTests
         await chain.ApplyToTreeAsync([root]);
 
         Assert.Equal(FilterResult.Excluded, child.FilterResult);
-        Assert.Equal("Extension", child.ExcludedByFilter);
     }
 
     [Fact]
@@ -160,7 +159,6 @@ public sealed class FilterChainTests
             .ApplyToTreeAsync([dir]);
 
         Assert.Equal(FilterResult.Mixed, dir.FilterResult);
-        Assert.Null(dir.ExcludedByFilter);
 
         var mp3 = dir.Files.Single(f => f.Name == "track.mp3");
         Assert.Equal(FilterResult.Included, mp3.FilterResult);
@@ -225,7 +223,6 @@ public sealed class FilterChainTests
         // Directory has a non-mirrored file → must stay visible (Mixed: some included, some excluded)
         DirectoryTreeNode alt = source.Children.Single(c => c.Name == "Alternative");
         Assert.Equal(FilterResult.Mixed, alt.FilterResult);
-        Assert.Null(alt.ExcludedByFilter);
 
         var mirrored = alt.Files.Single(f => f.Name == "mirrored.flac");
         Assert.Equal(FilterResult.Excluded, mirrored.FilterResult);

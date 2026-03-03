@@ -68,20 +68,6 @@ public sealed class DirectoryTreeNode(
         }
     }
 
-    private string? _excludedByFilter;
-    public string? ExcludedByFilter
-    {
-        get => _excludedByFilter;
-        set
-        {
-            if (_excludedByFilter != value)
-            {
-                _excludedByFilter = value;
-                OnPropertyChanged();
-            }
-        }
-    }
-
     private string? _notes;
     public string? Notes
     {
@@ -289,6 +275,11 @@ public sealed class DirectoryTreeNode(
         // Downward propagation
         if (newState != CheckState.Indeterminate && (Children.Count > 0 || Files.Count > 0))
         {
+            // TODO: this batch update doesn't prevent downward events firing,
+            // and we don't propagate state changes up if the parent was mixed and stayed mixed
+            // so we only get an event at the root node on first CheckState or Selection changed.
+            // Ideally we want to bubble any state change up to the root node to recalculate stats,
+            // but consolidate the changes into one event.
             using (BeginBatchUpdate())
             {
                 PropagateDownward(newState);
