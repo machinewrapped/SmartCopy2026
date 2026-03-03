@@ -31,7 +31,7 @@ public sealed class MirrorFilter : FilterBase
     public MirrorCompareMode CompareMode { get; }
     public override bool AppliesToDirectories => true;
 
-    public override string Summary => "Skip files already mirrored";
+    public override string Summary => "Skip files already in target";
     public override string Description => $"Mirror: {ComparisonPath} ({CompareMode})";
 
     public override async ValueTask<bool> MatchesAsync(
@@ -47,6 +47,7 @@ public sealed class MirrorFilter : FilterBase
 
         var comparePath = comparisonProvider.JoinPath(ComparisonPath, node.RelativePathSegments);
         var exists = await comparisonProvider.ExistsAsync(comparePath, ct);
+
         if (!exists)
         {
             return false;
@@ -66,21 +67,25 @@ public sealed class MirrorFilter : FilterBase
             {
                 var fileMirrorPath = comparisonProvider.JoinPath(ComparisonPath, file.RelativePathSegments);
                 if (!await comparisonProvider.ExistsAsync(fileMirrorPath, ct))
+                {
                     return false;
+                }
 
                 if (CompareMode == MirrorCompareMode.NameAndSize)
                 {
                     var mirrorFile = await comparisonProvider.GetNodeAsync(fileMirrorPath, ct);
                     if (mirrorFile.Size != file.Size)
+                    {
                         return false;
+                    }
                 }
             }
+
             return true;
         }
 
         var targetNode = await comparisonProvider.GetNodeAsync(comparePath, ct);
-        return string.Equals(targetNode.Name, node.Name, StringComparison.OrdinalIgnoreCase)
-               && targetNode.Size == node.Size;
+        return targetNode.Size == node.Size;
     }
 
     private IFileSystemProvider? ResolveComparisonProvider(IFilterContext context)
