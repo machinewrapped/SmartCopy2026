@@ -866,6 +866,8 @@ public partial class MainViewModel : ViewModelBase
         var nodeProgress = new Progress<TransformResult>(OnNodeCompleted);
         var executionJob = StatusBar.Progress.Begin(job with { NodeProgress = nodeProgress });
 
+        Pipeline.IsRunning = true;
+
         if (AutoOpenLogOnRun)
             LogPanel.IsExpanded = true;
 
@@ -911,6 +913,7 @@ public partial class MainViewModel : ViewModelBase
         }
         finally
         {
+            Pipeline.IsRunning = false;
             FileList.RemoveAllMarkedForRemoval();
             DirectoryTree.RemoveNodesMarkedForRemoval();
         }

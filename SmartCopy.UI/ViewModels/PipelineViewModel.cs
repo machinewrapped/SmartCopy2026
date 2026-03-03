@@ -25,8 +25,6 @@ public partial class PipelineStepViewModel : ViewModelBase
 {
     private IPipelineStep _step;
     private string _customName;
-    private string? _validationMessage;
-    private bool _hasValidationError;
 
     public PipelineStepViewModel(IPipelineStep step, string? customName = null)
     {
@@ -121,17 +119,11 @@ public partial class PipelineStepViewModel : ViewModelBase
             ? deleteStep.Mode == DeleteMode.Permanent ? "⚠ Permanent delete" : null
             : null;
 
-    public string? ValidationMessage
-    {
-        get => _validationMessage;
-        set => SetProperty(ref _validationMessage, value);
-    }
+    [ObservableProperty]
+    public string? _validationMessage;
 
-    public bool HasValidationError
-    {
-        get => _hasValidationError;
-        set => SetProperty(ref _hasValidationError, value);
-    }
+    [ObservableProperty]
+    public bool _hasValidationError;
 
     public event EventHandler? StepChanged;
 
@@ -211,7 +203,18 @@ public partial class PipelineViewModel : ViewModelBase
     [ObservableProperty]
     private string? _blockingValidationMessage;
 
-    public bool CanRun => ValidationResult.CanRun;
+    private bool _isRunning = false;
+    public bool IsRunning 
+    {
+        get => _isRunning;
+        set 
+        {
+            SetProperty(ref _isRunning, value);
+            UpdateButtonStates();
+        }
+    }
+
+    public bool CanRun => ValidationResult.CanRun && !IsRunning;
 
     public bool HasDeleteStep => Steps.Any(step => step.Step is DeleteStep);
 
@@ -502,8 +505,8 @@ public partial class PipelineViewModel : ViewModelBase
         OnPropertyChanged(nameof(FirstDestinationPath));
         OnPropertyChanged(nameof(HasDeleteStep));
         OnPropertyChanged(nameof(RunButtonLabel));
-        RunPipelineCommand.NotifyCanExecuteChanged();
-        PreviewPipelineCommand.NotifyCanExecuteChanged();
+        UpdateButtonStates();
+
         PipelineChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -515,6 +518,12 @@ public partial class PipelineViewModel : ViewModelBase
             Steps: [.. Steps.Select(BuildConfigWithUiMetadata)],
             OverwriteMode: OverwriteMode.IfNewer.ToString(),
             DeleteMode: DeleteMode.Trash.ToString());
+    }
+
+    private void UpdateButtonStates()
+    {
+        RunPipelineCommand.NotifyCanExecuteChanged();
+        PreviewPipelineCommand.NotifyCanExecuteChanged();
     }
 
     private static TransformStepConfig BuildConfigWithUiMetadata(PipelineStepViewModel stepViewModel)
