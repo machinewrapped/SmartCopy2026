@@ -68,20 +68,6 @@ public sealed class DirectoryTreeNode(
         }
     }
 
-    private string? _notes;
-    public string? Notes
-    {
-        get => _notes;
-        set
-        {
-            if (_notes != value)
-            {
-                _notes = value;
-                OnPropertyChanged();
-            }
-        }
-    }
-
     private bool _isMarkedForRemoval;
     public bool IsMarkedForRemoval
     {
