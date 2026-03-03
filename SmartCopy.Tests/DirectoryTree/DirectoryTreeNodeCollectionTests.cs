@@ -1,12 +1,10 @@
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
-using SmartCopy.Tests.TestInfrastructure;
 
 namespace SmartCopy.Tests.DirectoryTree;
 
 public sealed class DirectoryTreeNodeCollectionTests
 {
-    // Only used to construct new nodes being *added* to an existing tree.
     private static DirectoryTreeNode MakeDir(string name, DirectoryTreeNode? parent = null)
         => new(new FileSystemNode { Name = name, FullPath = name, IsDirectory = true }, parent);
 
@@ -14,13 +12,10 @@ public sealed class DirectoryTreeNodeCollectionTests
         => new(new FileSystemNode { Name = name, FullPath = name, IsDirectory = false }, parent);
 
     [Fact]
-    public async Task AddChild_MarksNodeDirty()
+    public void AddChild_MarksNodeDirty()
     {
-        var rootNode = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
-            .WithDirectory("/root"));
-        var root = rootNode.FindNodeByPathSegments(["root"]);
-        Assert.NotNull(root);
-        rootNode.BuildStats();
+        var root = MakeDir("root");
+        root.BuildStats();
         Assert.False(root.IsDirty);
 
         root.Children.Add(MakeDir("sub", root));
@@ -29,31 +24,24 @@ public sealed class DirectoryTreeNodeCollectionTests
     }
 
     [Fact]
-    public async Task RemoveChild_MarksNodeDirty()
+    public void RemoveChild_MarksNodeDirty()
     {
-        var rootNode = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
-            .WithDirectory("/root")
-            .WithDirectory("/root/sub"));
-        var root = rootNode.FindNodeByPathSegments(["root"]);
-        var sub = rootNode.FindNodeByPathSegments(["root", "sub"]);
-        Assert.NotNull(root);
-        Assert.NotNull(sub);
-        rootNode.BuildStats();
+        var root = MakeDir("root");
+        var child = MakeDir("sub", root);
+        root.Children.Add(child);
+        root.BuildStats();
         Assert.False(root.IsDirty);
 
-        root.Children.Remove(sub);
+        root.Children.Remove(child);
 
         Assert.True(root.IsDirty);
     }
 
     [Fact]
-    public async Task AddFile_MarksNodeDirty()
+    public void AddFile_MarksNodeDirty()
     {
-        var rootNode = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
-            .WithDirectory("/root"));
-        var root = rootNode.FindNodeByPathSegments(["root"]);
-        Assert.NotNull(root);
-        rootNode.BuildStats();
+        var root = MakeDir("root");
+        root.BuildStats();
         Assert.False(root.IsDirty);
 
         root.Files.Add(MakeFile("a.txt", root));
@@ -62,16 +50,12 @@ public sealed class DirectoryTreeNodeCollectionTests
     }
 
     [Fact]
-    public async Task RemoveFile_MarksNodeDirty()
+    public void RemoveFile_MarksNodeDirty()
     {
-        var rootNode = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
-            .WithDirectory("/root")
-            .WithSimulatedFile("/root/a.txt", 512));
-        var root = rootNode.FindNodeByPathSegments(["root"]);
-        var file = rootNode.FindNodeByPathSegments(["root", "a.txt"]);
-        Assert.NotNull(root);
-        Assert.NotNull(file);
-        rootNode.BuildStats();
+        var root = MakeDir("root");
+        var file = MakeFile("a.txt", root);
+        root.Files.Add(file);
+        root.BuildStats();
         Assert.False(root.IsDirty);
 
         root.Files.Remove(file);
@@ -80,60 +64,49 @@ public sealed class DirectoryTreeNodeCollectionTests
     }
 
     [Fact]
-    public async Task AddChild_PropagatesDirtyToAncestors()
+    public void AddChild_PropagatesDirtyToAncestors()
     {
-        var rootNode = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
-            .WithDirectory("/root")
-            .WithDirectory("/root/parent"));
-        var root = rootNode.FindNodeByPathSegments(["root"]);
-        var parent = rootNode.FindNodeByPathSegments(["root", "parent"]);
-        Assert.NotNull(root);
-        Assert.NotNull(parent);
-        rootNode.BuildStats();
-        Assert.False(rootNode.IsDirty);
+        var root = MakeDir("root");
+        var parent = MakeDir("parent", root);
+        root.Children.Add(parent);
+        root.BuildStats();
+        Assert.False(root.IsDirty);
         Assert.False(parent.IsDirty);
 
         parent.Children.Add(MakeDir("leaf", parent));
 
         Assert.True(parent.IsDirty);
         Assert.True(root.IsDirty);
-        Assert.True(rootNode.IsDirty);
     }
 
     [Fact]
-    public async Task RemoveFile_PropagatesDirtyToRoot()
+    public void RemoveFile_PropagatesDirtyToRoot()
     {
-        var rootNode = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
-            .WithDirectory("/root")
-            .WithDirectory("/root/sub")
-            .WithSimulatedFile("/root/sub/a.txt", 512));
-        var sub = rootNode.FindNodeByPathSegments(["root", "sub"]);
-        var file = rootNode.FindNodeByPathSegments(["root", "sub", "a.txt"]);
-        Assert.NotNull(sub);
-        Assert.NotNull(file);
-        rootNode.BuildStats();
-        Assert.False(rootNode.IsDirty);
+        var root = MakeDir("root");
+        var sub = MakeDir("sub", root);
+        var file = MakeFile("a.txt", sub);
+        root.Children.Add(sub);
+        sub.Files.Add(file);
+        root.BuildStats();
+        Assert.False(root.IsDirty);
         Assert.False(sub.IsDirty);
 
         sub.Files.Remove(file);
 
         Assert.True(sub.IsDirty);
-        Assert.True(rootNode.IsDirty);
+        Assert.True(root.IsDirty);
     }
 
     [Fact]
-    public async Task CollectionChange_PropagatesDirtyThroughMultipleLevels()
+    public void CollectionChange_PropagatesDirtyThroughMultipleLevels()
     {
-        var rootNode = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
-            .WithDirectory("/root")
-            .WithDirectory("/root/level1")
-            .WithDirectory("/root/level1/level2"));
-        var level1 = rootNode.FindNodeByPathSegments(["root", "level1"]);
-        var level2 = rootNode.FindNodeByPathSegments(["root", "level1", "level2"]);
-        Assert.NotNull(level1);
-        Assert.NotNull(level2);
-        rootNode.BuildStats();
-        Assert.False(rootNode.IsDirty);
+        var root = MakeDir("root");
+        var level1 = MakeDir("level1", root);
+        var level2 = MakeDir("level2", level1);
+        root.Children.Add(level1);
+        level1.Children.Add(level2);
+        root.BuildStats();
+        Assert.False(root.IsDirty);
         Assert.False(level1.IsDirty);
         Assert.False(level2.IsDirty);
 
@@ -141,6 +114,6 @@ public sealed class DirectoryTreeNodeCollectionTests
 
         Assert.True(level2.IsDirty);
         Assert.True(level1.IsDirty);
-        Assert.True(rootNode.IsDirty);
+        Assert.True(root.IsDirty);
     }
 }
