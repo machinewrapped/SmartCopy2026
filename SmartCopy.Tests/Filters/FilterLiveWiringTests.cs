@@ -30,7 +30,7 @@ public sealed class FilterLiveWiringTests
             provider.SeedFile($"/music/{file}", content: new byte[100]);
         }
 
-        DirectoryTreeNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        DirectoryTreeNode root = await provider.BuildDirectoryTree();
 
         return root.Children.Single(n => n.Name == "music");
     }
@@ -65,7 +65,7 @@ public sealed class FilterLiveWiringTests
         fs.SeedSimulatedFile("/music/large.mp3", 10_000_000);
         fs.SeedSimulatedFile("/music/photo.jpg", 200);
 
-        DirectoryTreeNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(fs);
+        DirectoryTreeNode root = await fs.BuildDirectoryTree();
 
         var dirNode = root.Children.Single(n => n.Name == "music");
 
@@ -173,7 +173,7 @@ public sealed class FilterLiveWiringTests
              .WithDirectory("/root/child2")
              .WithSimulatedFile("/root/child2/track.mp3", 100));
 
-        var vm = new DirectoryTreeViewModel(MemoryFileSystemFixtures.CreateRegistry(fs));
+        var vm = new DirectoryTreeViewModel(fs.CreateRegistry());
         await vm.ChangeRootAsync(fs.RootPath);
         Assert.NotNull(vm.RootNode);
 

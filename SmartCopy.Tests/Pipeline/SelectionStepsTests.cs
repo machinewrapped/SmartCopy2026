@@ -70,7 +70,7 @@ public sealed class SelectionStepsTests
         MakeTree(CheckState initialState = CheckState.Unchecked)
     {
         var provider = MemoryFileSystemFixtures.Create(f => f.WithFile("/src/file.txt", "content"u8));
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider, "/src");
+        var root = await provider.BuildDirectoryTree("/src");
         var file = root.Files.Single(f => f.Name == "file.txt");
         if (initialState != CheckState.Unchecked)
             file.CheckState = initialState;

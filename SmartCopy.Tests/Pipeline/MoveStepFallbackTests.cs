@@ -79,7 +79,7 @@ public sealed class MoveStepFallbackTests
         var sourceProvider = MemoryFileSystemFixtures.Create(s => s.WithFile("/src/file.txt", "content"u8));
         var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target");
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(sourceProvider, "/src");
+        var root = await sourceProvider.BuildDirectoryTree("/src");
         root.Files[0].CheckState = CheckState.Checked;
 
         var ctx = new MoveTestContext(root, sourceProvider, targetProvider);
@@ -105,7 +105,7 @@ public sealed class MoveStepFallbackTests
     {
         var provider = MemoryFileSystemFixtures.Create(s => s.WithFile("/src/file.txt", "atomic"u8));
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider, "/src");
+        var root = await provider.BuildDirectoryTree("/src");
         root.Files[0].CheckState = CheckState.Checked;
 
         // Same provider instance for both source and target → sameProvider = true.
@@ -134,7 +134,7 @@ public sealed class MoveStepFallbackTests
         var noAtomicMove = new CapabilityOverrideProvider(memory,
             new ProviderCapabilities(CanSeek: true, CanAtomicMove: false, MaxPathLength: int.MaxValue));
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(memory, "/src");
+        var root = await memory.BuildDirectoryTree("/src");
         root.Files[0].CheckState = CheckState.Checked;
 
         // Same wrapped instance → sameProvider = true, canAtomicMove = false → fallback.
@@ -165,7 +165,7 @@ public sealed class MoveStepFallbackTests
             .WithFile("/src/dir/b.txt", "bbb"u8));
         var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target");
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(sourceProvider, "/src");
+        var root = await sourceProvider.BuildDirectoryTree("/src");
         var dir = root.Children.Single();
         dir.CheckState = CheckState.Checked;
         foreach (var f in dir.Files) f.CheckState = CheckState.Checked;
@@ -197,7 +197,7 @@ public sealed class MoveStepFallbackTests
             .WithFile("/src/dir/move.txt", "move"u8));
         var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target");
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(sourceProvider, "/src");
+        var root = await sourceProvider.BuildDirectoryTree("/src");
         var dir = root.Children.Single();
         dir.CheckState = CheckState.Indeterminate;
         dir.Files.Single(f => f.Name == "move.txt").CheckState = CheckState.Checked;
@@ -227,7 +227,7 @@ public sealed class MoveStepFallbackTests
             .WithFile("/src/dir/a.txt", "aaa"u8)
             .WithFile("/src/dir/b.txt", "bbb"u8));
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider, "/src");
+        var root = await provider.BuildDirectoryTree("/src");
         var dir = root.Children.Single();
         dir.CheckState = CheckState.Checked;
         foreach (var f in dir.Files) f.CheckState = CheckState.Checked;
@@ -259,7 +259,7 @@ public sealed class MoveStepFallbackTests
             .WithFile("/src/dir/sub/nested.txt", "nested"u8));
         var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target");
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(sourceProvider, "/src");
+        var root = await sourceProvider.BuildDirectoryTree("/src");
         var dir = root.Children.Single();
         var sub = dir.Children.Single();
         dir.CheckState = CheckState.Checked;
@@ -295,7 +295,7 @@ public sealed class MoveStepFallbackTests
         var noAtomicMove = new CapabilityOverrideProvider(memory,
             new ProviderCapabilities(CanSeek: true, CanAtomicMove: false, MaxPathLength: int.MaxValue));
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(memory, "/src");
+        var root = await memory.BuildDirectoryTree("/src");
         var dir = root.Children.Single();
         dir.CheckState = CheckState.Checked;
         foreach (var f in dir.Files) f.CheckState = CheckState.Checked;

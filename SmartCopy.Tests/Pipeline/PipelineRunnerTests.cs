@@ -20,7 +20,7 @@ public sealed class PipelineRunnerTests
                 .WithFile("/source/song.flac", Encoding.UTF8.GetBytes("audio"))
                 .WithDirectory("/Mirror"));
 
-        var sourceRoot = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var sourceRoot = await provider.BuildDirectoryTree();
         var sourceNode = sourceRoot.FindNodeByPathSegments(["source", "song.flac"]);
         Assert.NotNull(sourceNode);
 
@@ -32,7 +32,7 @@ public sealed class PipelineRunnerTests
         {
             RootNode       = sourceRoot,
             SourceProvider = provider,
-            ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+            ProviderRegistry = provider.CreateRegistry(),
             OverwriteMode  = OverwriteMode.IfNewer,
             DeleteMode     = DeleteMode.Trash,
         };
@@ -55,13 +55,13 @@ public sealed class PipelineRunnerTests
             .WithDirectory("/source")
             .WithFile("/source/delete-me.txt", "x"u8));
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var root = await provider.BuildDirectoryTree();
         var node = root.FindNodeByPathSegments(["source", "delete-me.txt"]);
         Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
 
         var runner = new PipelineRunner(new TransformPipeline([new DeleteStep()]));
-        var registry = MemoryFileSystemFixtures.CreateRegistry(provider);
+        var registry = provider.CreateRegistry();
 
         var job = new PipelineJob
         {
@@ -83,12 +83,12 @@ public sealed class PipelineRunnerTests
             .WithDirectory("/source")
             .WithFile("/source/delete-me.txt", "x"u8));
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var root = await provider.BuildDirectoryTree();
         var node = root.FindNodeByPathSegments(["source", "delete-me.txt"]);
         Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
         var runner = new PipelineRunner(new TransformPipeline([new DeleteStep()]));
-        var registry = MemoryFileSystemFixtures.CreateRegistry(provider);
+        var registry = provider.CreateRegistry();
 
         var job = new PipelineJob
         {
@@ -115,14 +115,14 @@ public sealed class PipelineRunnerTests
             .WithDirectory("/source/sub")
             .WithFile("/source/sub/f3.txt", "z"u8));
 
-        DirectoryTreeNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        DirectoryTreeNode root = await provider.BuildDirectoryTree();
 
         var sourceNode = root.FindNodeByPathSegments(["source"]);
         Assert.NotNull(sourceNode);
         sourceNode.CheckState = CheckState.Checked;
 
         var runner = new PipelineRunner(new TransformPipeline([new DeleteStep()]));
-        var registry = MemoryFileSystemFixtures.CreateRegistry(provider);
+        var registry = provider.CreateRegistry();
 
         var job = new PipelineJob
         {
@@ -153,7 +153,7 @@ public sealed class PipelineRunnerTests
                 .WithFile("/source/deep/folder/track.mp3", "x"u8)
                 .WithDirectory("/out"));
 
-        var sourceRoot = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var sourceRoot = await provider.BuildDirectoryTree();
         var node = sourceRoot.FindNodeByPathSegments(["source", "deep", "folder", "track.mp3"]);
         Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
@@ -168,7 +168,7 @@ public sealed class PipelineRunnerTests
             {
                 RootNode       = sourceRoot,
                 SourceProvider = provider,
-                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+                ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -186,7 +186,7 @@ public sealed class PipelineRunnerTests
                 .WithFile("/source/deep/folder/track.mp3", "x"u8)
                 .WithDirectory("/out"));
 
-        var sourceRoot = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var sourceRoot = await provider.BuildDirectoryTree();
         var node = sourceRoot.FindNodeByPathSegments(["source", "deep", "folder", "track.mp3"]);
         Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
@@ -201,7 +201,7 @@ public sealed class PipelineRunnerTests
             {
                 RootNode       = sourceRoot,
                 SourceProvider = provider,
-                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+                ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -220,7 +220,7 @@ public sealed class PipelineRunnerTests
             .WithFile("/source/song.mp3", "original"u8)
             .WithFile("/dest/source/song.mp3", "existing"u8));
 
-        var sourceRoot = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var sourceRoot = await provider.BuildDirectoryTree();
         var node = sourceRoot.FindNodeByPathSegments(["source", "song.mp3"]);
         Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
@@ -231,7 +231,7 @@ public sealed class PipelineRunnerTests
             {
                 RootNode       = sourceRoot,
                 SourceProvider = provider,
-                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+                ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Skip,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -254,14 +254,14 @@ public sealed class PipelineRunnerTests
         var provider = MemoryFileSystemFixtures.Create(fixture => fixture
             .WithDirectory("/source")
             .WithDirectory("/dest"));
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var root = await provider.BuildDirectoryTree();
         var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/mem/dest")]));
 
         var emptyJob = new PipelineJob
         {
             RootNode       = root,
             SourceProvider = provider,
-            ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+            ProviderRegistry = provider.CreateRegistry(),
             OverwriteMode  = OverwriteMode.Always,
             DeleteMode     = DeleteMode.Trash,
         };

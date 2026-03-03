@@ -22,7 +22,7 @@ public sealed class PipelineRunnerSelectionTests
             .WithFile($"/src/{name2}.txt", "b"u8)
             .WithFile($"/src/{name3}.txt", "c"u8));
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var root = await provider.BuildDirectoryTree();
         var a = root.FindNodeByPathSegments(["src", $"{name1}.txt"]);
         var b = root.FindNodeByPathSegments(["src", $"{name2}.txt"]);
         var c = root.FindNodeByPathSegments(["src", $"{name3}.txt"]);
@@ -47,7 +47,7 @@ public sealed class PipelineRunnerSelectionTests
             .WithFile("/src/d.txt", "d"u8)
             .WithFile("/src/e.txt", "e"u8));
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var root = await provider.BuildDirectoryTree();
         var a = root.FindNodeByPathSegments(["src", "a.txt"]);
         var b = root.FindNodeByPathSegments(["src", "b.txt"]);
         var c = root.FindNodeByPathSegments(["src", "c.txt"]);
@@ -87,7 +87,7 @@ public sealed class PipelineRunnerSelectionTests
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+                ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -120,7 +120,7 @@ public sealed class PipelineRunnerSelectionTests
         {
             RootNode       = root,
             SourceProvider = provider,
-            ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+            ProviderRegistry = provider.CreateRegistry(),
             OverwriteMode  = OverwriteMode.Always,
             DeleteMode     = DeleteMode.Trash,
         };
@@ -170,7 +170,7 @@ public sealed class PipelineRunnerSelectionTests
                 {
                     RootNode       = root,
                     SourceProvider = provider,
-                    ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+                    ProviderRegistry = provider.CreateRegistry(),
                     OverwriteMode  = OverwriteMode.Always,
                     DeleteMode     = DeleteMode.Trash,
                 },
@@ -208,7 +208,7 @@ public sealed class PipelineRunnerSelectionTests
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+                ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },
@@ -235,7 +235,7 @@ public sealed class PipelineRunnerSelectionTests
                 .WithFile("/src/r.txt", "r"u8)
                 .WithDirectory("/dest"));
 
-        var root = await MemoryFileSystemFixtures.BuildDirectoryTree(provider);
+        var root = await provider.BuildDirectoryTree();
         var p = root.FindNodeByPathSegments(["src", "p.txt"]);
         var q = root.FindNodeByPathSegments(["src", "q.txt"]);
         var r = root.FindNodeByPathSegments(["src", "r.txt"]);
@@ -255,7 +255,7 @@ public sealed class PipelineRunnerSelectionTests
             {
                 RootNode       = root,
                 SourceProvider = provider,
-                ProviderRegistry = MemoryFileSystemFixtures.CreateRegistry(provider),
+                ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
                 DeleteMode     = DeleteMode.Trash,
             },

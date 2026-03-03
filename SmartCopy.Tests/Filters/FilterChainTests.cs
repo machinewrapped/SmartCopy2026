@@ -215,7 +215,7 @@ public sealed class FilterChainTests
             .WithSimulatedFile("/Mirror/Alternative/mirrored.flac", size: 1000));
 
         // "new.flac" is NOT in the mirror
-        DirectoryTreeNode source = await MemoryFileSystemFixtures.BuildDirectoryTree(provider, "/source");
+        DirectoryTreeNode source = await provider.BuildDirectoryTree("/source");
 
         var chain = new FilterChain([new MirrorFilter("/mem/Mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude)]);
         await chain.ApplyToTreeAsync(source, FilterContext.FromProvider(provider));
@@ -240,7 +240,7 @@ public sealed class FilterChainTests
             .WithDirectory("/Mirror/Alternative")
             .WithSimulatedFile("/Mirror/Alternative/song.flac", size: 1000));
 
-        DirectoryTreeNode source = await MemoryFileSystemFixtures.BuildDirectoryTree(provider, "/source");
+        DirectoryTreeNode source = await provider.BuildDirectoryTree("/source");
 
         var chain = new FilterChain([new MirrorFilter("/mem/Mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude)]);
         await chain.ApplyToTreeAsync(source, FilterContext.FromProvider(provider));
