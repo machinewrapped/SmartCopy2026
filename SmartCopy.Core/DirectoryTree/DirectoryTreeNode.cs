@@ -10,11 +10,28 @@ using SmartCopy.Core.Filters;
 
 namespace SmartCopy.Core.DirectoryTree;
 
-public sealed class DirectoryTreeNode(
-    FileSystemNode _filesystemNode,
-    DirectoryTreeNode? _parent,
-    CheckState _checkState = CheckState.Unchecked) : INotifyPropertyChanged
+public sealed class DirectoryTreeNode : INotifyPropertyChanged
 {
+    private readonly FileSystemNode _filesystemNode;
+    private CheckState _checkState;
+
+    public DirectoryTreeNode(
+        FileSystemNode filesystemNode,
+        DirectoryTreeNode? parent,
+        CheckState checkState = CheckState.Unchecked)
+    {
+        _filesystemNode = filesystemNode;
+        _checkState = checkState;
+        Parent = parent;
+        RelativePathSegments = parent is null ? Array.Empty<string>() : [.. parent.RelativePathSegments.Append(filesystemNode.Name)];
+
+        if (IsDirectory)
+        {
+            Children.CollectionChanged += (_, _) => MarkDirty();
+            Files.CollectionChanged    += (_, _) => MarkDirty();            
+        }
+    }
+
     public string Name => _filesystemNode.Name;
     public string FullPath => _filesystemNode.FullPath;
     public bool IsDirectory => _filesystemNode.IsDirectory;
@@ -23,12 +40,15 @@ public sealed class DirectoryTreeNode(
     public DateTime ModifiedAt => _filesystemNode.ModifiedAt;
     public FileAttributes Attributes => _filesystemNode.Attributes;
 
-    public string[] RelativePathSegments {get; init; } = _parent is null ? Array.Empty<string>() : [.. _parent.RelativePathSegments.Append(_filesystemNode.Name)];
+    public string[] RelativePathSegments { get; }
     public string CanonicalRelativePath => string.Join("/", RelativePathSegments);
 
     public override string ToString() => CanonicalRelativePath + (IsDirectory ? "/" : "");
 
-    private int _batchUpdateDepth = 0;
+    public bool IsDirty { get; private set; } = false;
+    public int NumSelectedFiles { get; private set; }
+    public int NumFilterExcludedFiles { get; private set;}
+    public long TotalSelectedBytes { get; private set; }
 
     public CheckState CheckState
     {
@@ -60,6 +80,7 @@ public sealed class DirectoryTreeNode(
             if (_filterResult != value)
             {
                 _filterResult = value;
+                MarkDirty();
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IsSelected));
                 OnPropertyChanged(nameof(IsFilterIncluded));
@@ -100,16 +121,61 @@ public sealed class DirectoryTreeNode(
     public bool IsFilterIncluded => FilterResult != FilterResult.Excluded;
     public bool IsAtomicIncluded => FilterResult == FilterResult.Included;
 
-    public DirectoryTreeNode? Parent { get; init; } = _parent;
+    public DirectoryTreeNode? Parent { get; }
     public ObservableCollection<DirectoryTreeNode> Children { get; } = [];
     public ObservableCollection<DirectoryTreeNode> Files { get; } = [];
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public IDisposable BeginBatchUpdate()
+    public void MarkDirty()
     {
-        _batchUpdateDepth++;
-        return new BatchUpdateScope(this);
+        if (IsDirty) return;
+
+        IsDirty = true;
+        OnPropertyChanged(nameof(IsDirty));
+        Parent?.MarkDirty();
+    }
+
+    public void ClearDirty() => IsDirty = false;
+
+    public void BuildStats()
+    {
+        int files = 0;
+        long bytes = 0;
+        int excluded = 0;
+
+        foreach (var file in Files)
+        {
+            if (file.CheckState == CheckState.Checked)
+            { 
+                if (IsFilterIncluded)
+                {
+                    files++;
+                    bytes += file.Size;                     
+                }
+                else
+                {
+                    excluded++;
+                }
+            }
+        }
+
+        foreach (var child in Children)
+        {
+            if (child.IsDirty)
+            {
+                child.BuildStats();                
+            }
+
+            files += child.NumSelectedFiles;
+            bytes += child.TotalSelectedBytes;
+            excluded += child.NumFilterExcludedFiles;
+        }
+
+        NumSelectedFiles = files;
+        TotalSelectedBytes = bytes;
+        NumFilterExcludedFiles = excluded;
+        ClearDirty();
     }
 
     public void MarkForRemoval()
@@ -119,10 +185,14 @@ public sealed class DirectoryTreeNode(
         IsMarkedForRemoval = true;
 
         foreach (var child in Children)
+        {
             child.MarkForRemoval();
+        }
 
         foreach (var file in Files)
+        {
             file.MarkForRemoval();
+        }
     }
 
     public IEnumerable<DirectoryTreeNode> GetSelectedDescendants()
@@ -216,11 +286,12 @@ public sealed class DirectoryTreeNode(
 
         if (removedAnyChildren)
         {
+            MarkDirty();
+
             // If we removed any children, we may need to recalculate our filter state
             FilterChain.RecalculateParentExclusion(this);
         }
     }
-
 
     internal int CountSelectedFiles() =>
         (IsSelected && !IsDirectory ? 1 : 0) + (IsDirectory ? Children.Sum(c => c.CountSelectedFiles()) + Files.Count(f => f.IsSelected) : 0);
@@ -236,41 +307,27 @@ public sealed class DirectoryTreeNode(
 
     void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
-        if (_batchUpdateDepth == 0)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-    }
-
-    private void EndBatchUpdate()
-    {
-        _batchUpdateDepth--;
-        if (_batchUpdateDepth == 0)
-        {
-            OnPropertyChanged(); // Reset bindings
-        }
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
     private void SetCheckStateWithPropagation(CheckState newState)
     {
+        if (_checkState == newState)
+            return;
+
         // Change self
         _checkState = newState;
-        OnPropertyChanged(nameof(CheckState));
-        OnPropertyChanged(nameof(IsSelected));
+
+        MarkDirty();
 
         // Downward propagation
         if (newState != CheckState.Indeterminate && (Children.Count > 0 || Files.Count > 0))
         {
-            // TODO: this batch update doesn't prevent downward events firing,
-            // and we don't propagate state changes up if the parent was mixed and stayed mixed
-            // so we only get an event at the root node on first CheckState or Selection changed.
-            // Ideally we want to bubble any state change up to the root node to recalculate stats,
-            // but consolidate the changes into one event.
-            using (BeginBatchUpdate())
-            {
-                PropagateDownward(newState);
-            }
+            PropagateDownward(newState);
         }
+
+        OnPropertyChanged(nameof(CheckState));
+        OnPropertyChanged(nameof(IsSelected));
 
         // Upward recalculation
         Parent?.RecalculateCheckState();
@@ -302,6 +359,7 @@ public sealed class DirectoryTreeNode(
     private void SetCheckState(CheckState newState)
     {
         _checkState = newState;
+        MarkDirty();
         OnPropertyChanged(nameof(CheckState));
         OnPropertyChanged(nameof(IsSelected));
     }
@@ -347,10 +405,5 @@ public sealed class DirectoryTreeNode(
             SetCheckState(computedState);
             Parent?.RecalculateCheckState();
         }
-    }
-
-    private class BatchUpdateScope(DirectoryTreeNode node) : IDisposable
-    {
-        public void Dispose() => node.EndBatchUpdate();
     }
 }

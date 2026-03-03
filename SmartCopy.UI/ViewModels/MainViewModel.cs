@@ -674,32 +674,14 @@ public partial class MainViewModel : ViewModelBase
 
         foreach (var root in DirectoryTree.RootNodes)
         {
-            CollectStatsRecursive(root, ref selected, ref totalBytes, ref filteredOut);
+            root.BuildStats();
+            selected += root.NumSelectedFiles;
+            totalBytes += root.TotalSelectedBytes;
+            filteredOut += root.NumFilterExcludedFiles;
         }
 
         Pipeline.SetSelectedIncludedFileCount(selected);
         StatusBar.Selection.UpdateStats(selected, totalBytes, filteredOut);
-    }
-
-    private static void CollectStatsRecursive(DirectoryTreeNode node, ref int selected, ref long totalBytes, ref int filteredOut)
-    {
-        foreach (var file in node.Files)
-        {
-            if (file.IsSelected)
-            {
-                selected++;
-                totalBytes += file.Size;
-            }
-            else if (file.CheckState == CheckState.Checked && file.FilterResult == FilterResult.Excluded)
-            {
-                filteredOut++;
-            }
-        }
-
-        foreach (var child in node.Children)
-        {
-            CollectStatsRecursive(child, ref selected, ref totalBytes, ref filteredOut);
-        }
     }
 
     private async void InitializeInBackground()
@@ -750,7 +732,6 @@ public partial class MainViewModel : ViewModelBase
         DefaultOverwriteMode = _settings.DefaultOverwriteMode;
 
         // Phase 1: hardcode /mem/Mirror as the mirror-filter comparison path.
-        FilterChain.PipelineDestinationPath = MockMemoryFileSystemFactory.TargetPath;
         await _operationJournal.RotateAsync(_settings.LogRetentionDays);
         await WorkflowMenu.RefreshAsync();
 

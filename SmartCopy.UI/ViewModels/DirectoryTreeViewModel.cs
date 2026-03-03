@@ -97,7 +97,14 @@ public class DirectoryTreeViewModel : ViewModelBase
 
             if (root is not null)
             {
-                SelectedNode = root;
+                // Calculate stats and clear dirty flags
+                root.BuildStats();
+
+                // Default to root node, if user hasn't selected one during the scan
+                if (SelectedNode is null)
+                {
+                    SelectedNode = root;                    
+                }
             }
         }
         finally
@@ -128,12 +135,29 @@ public class DirectoryTreeViewModel : ViewModelBase
         }
     }
 
+    private CancellationTokenSource? _selectionCts;
+
     private void OnRootNodePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        // null property name = batch reset; CheckState or IsSelected = individual change
-        if (e.PropertyName is null or nameof(DirectoryTreeNode.CheckState) or nameof(DirectoryTreeNode.IsSelected))
+        if (e.PropertyName == nameof(DirectoryTreeNode.IsDirty)
+            && sender is DirectoryTreeNode { IsDirty: true })
         {
+            ScheduleSelectionChangedAsync();
+        }
+    }
+
+    private async void ScheduleSelectionChangedAsync()
+    {
+        _selectionCts?.Cancel();
+        _selectionCts?.Dispose();
+        _selectionCts = new CancellationTokenSource();
+        var ct = _selectionCts.Token;
+        try
+        {
+            await Task.Delay(100, ct);
+
             SelectionChanged?.Invoke(this, EventArgs.Empty);
         }
+        catch (OperationCanceledException) { }
     }
 }

@@ -73,4 +73,41 @@ public sealed class DirectoryTreeNodeSelectionTests
         node.FilterResult = FilterResult.Excluded;
         Assert.False(node.IsSelected);
     }
+
+    [Fact]
+    public async Task MarkDirty_PropagatesFromLeafToRoot()
+    {
+        var rootNode = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
+            .WithDirectory("/root")
+            .WithDirectory("/root/sub")
+            .WithSimulatedFile("/root/sub/track.mp3", 512));
+
+        rootNode.BuildStats();
+        Assert.False(rootNode.IsDirty);
+
+        var file = rootNode.FindNodeByPathSegments(["root", "sub", "track.mp3"]);
+        Assert.NotNull(file);
+
+        file.CheckState = CheckState.Checked;
+
+        Assert.True(rootNode.IsDirty);
+    }
+
+    [Fact]
+    public async Task BuildStats_ComputesNumSelectedFilesAndBytes()
+    {
+        var rootNode = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
+            .WithDirectory("/root")
+            .WithSimulatedFile("/root/a.mp3", 1000)
+            .WithSimulatedFile("/root/b.mp3", 2000));
+
+        var fileA = rootNode.FindNodeByPathSegments(["root", "a.mp3"]);
+        Assert.NotNull(fileA);
+        fileA.CheckState = CheckState.Checked;
+
+        rootNode.BuildStats();
+
+        Assert.Equal(1, rootNode.NumSelectedFiles);
+        Assert.Equal(1000, rootNode.TotalSelectedBytes);
+    }
 }
