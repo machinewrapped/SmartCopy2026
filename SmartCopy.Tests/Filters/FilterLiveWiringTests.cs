@@ -173,7 +173,7 @@ public sealed class FilterLiveWiringTests
              .WithDirectory("/root/child2")
              .WithSimulatedFile("/root/child2/track.mp3", 100));
 
-        var vm = new DirectoryTreeViewModel(fs);
+        var vm = new DirectoryTreeViewModel(MemoryFileSystemFixtures.CreateRegistry(fs));
         await vm.ChangeRootAsync(fs.RootPath);
         Assert.NotNull(vm.RootNode);
 

@@ -9,9 +9,12 @@ namespace SmartCopy.UI.ViewModels;
 
 public class DirectoryTreeViewModel : ViewModelBase
 {
-    private DirectoryScanner _scanner;
+    private FileSystemProviderRegistry _providerRegistry;
     private DirectoryTreeNode? _selectedNode;
     private bool _isLoading;
+
+    /// <summary>The root nodes of the directory tree.</summary>
+    public DirectoryTreeNode? RootNode => ItemsSource.Any() ? ItemsSource.First() : null;
 
     /// <summary>Indicates whether the directory tree is currently loading.</summary>
     public bool IsLoading
@@ -20,8 +23,11 @@ public class DirectoryTreeViewModel : ViewModelBase
         private set => SetProperty(ref _isLoading, value);
     }
 
-    // <summary>Indicates whether the directory tree is fully loaded</summary>
+    /// <summary>Indicates whether the directory tree is fully loaded</summary>
     public bool IsLoaded { get; private set; }
+
+    /// <summary>The filesystem that contains the root node</summary>
+    public IFileSystemProvider? SourceProvider { get; private set; }
 
     /// <summary>Raised when any node's <see cref="DirectoryTreeNode.CheckState"/> changes.</summary>
     public event EventHandler? SelectionChanged;
@@ -33,17 +39,9 @@ public class DirectoryTreeViewModel : ViewModelBase
     public void RequestSetAsSourcePath(string path) =>
         SetAsSourcePathRequested?.Invoke(this, path);
 
-    /// <summary>The root nodes of the directory tree.</summary>
-    public DirectoryTreeNode? RootNode => ItemsSource.Any() ? ItemsSource.First() : null;
-
-    public DirectoryTreeViewModel(IFileSystemProvider provider)
+    public DirectoryTreeViewModel(FileSystemProviderRegistry providerRegistry)
     {
-        _scanner = new DirectoryScanner(provider);
-    }
-
-    public void SetProvider(IFileSystemProvider provider)
-    {
-        _scanner = new DirectoryScanner(provider);
+        _providerRegistry = providerRegistry;
     }
 
     public DirectoryTreeNode? SelectedNode
@@ -101,6 +99,7 @@ public class DirectoryTreeViewModel : ViewModelBase
     internal void Reset()
     {
         ItemsSource.Clear();
+        SourceProvider = null;
         IsLoaded = false;
         IsLoading = false;
     }
@@ -111,19 +110,26 @@ public class DirectoryTreeViewModel : ViewModelBase
         if (RootNode != null)
         {
             RootNode.PropertyChanged -= OnRootNodePropertyChanged;
-            ItemsSource.Clear();
+            Reset();
         }
 
         try
         {
             var scanOptions = new ScanOptions { LazyExpand = false, IncludeHidden = true };
+
+            var sourceProvider = _providerRegistry.Resolve(rootPath)
+                ?? throw new ArgumentException("Source path cannot be mapped to a FileSystemProvider");
+
+            var scanner = new DirectoryScanner(sourceProvider);
             
-            await foreach (var node in _scanner.ScanAsync(rootPath, scanOptions, ct: ct))
+            await foreach (var node in scanner.ScanAsync(rootPath, scanOptions, ct: ct))
             {
                 // First node yielded is our root node
                 if (!ItemsSource.Any())
                 {
                     ItemsSource.Add(node);
+
+                    SourceProvider = sourceProvider;
 
                     node.IsExpanded = true;
                     node.PropertyChanged += OnRootNodePropertyChanged;

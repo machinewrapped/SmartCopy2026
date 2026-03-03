@@ -1,14 +1,11 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Pipeline;
@@ -86,7 +83,6 @@ public partial class MainViewModel : ViewModelBase
     private readonly SelectionSerializer _selectionSerializer = new();
     private CancellationTokenSource? _filterCts;
     private CancellationTokenSource? _runCts;
-    private IFileSystemProvider _activeSourceProvider;
     private string _lastCommittedSourcePath = string.Empty;
 
     public ObservableCollection<SourceBookmarkItem> SourceBookmarks { get; } = [];
@@ -109,7 +105,6 @@ public partial class MainViewModel : ViewModelBase
         // TODO: this should be a debug option, not exposed in release builds
         _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: _settings.AddArtificialDelay);
         _providerRegistry.Register(_memoryProvider);
-        _activeSourceProvider = _memoryProvider;
 
         // Create the context and ViewModel for the filter chain
         _filterContext = new FilterContext(_providerRegistry);
@@ -121,7 +116,7 @@ public partial class MainViewModel : ViewModelBase
             appSettings: _settings);
 
         // TODO: we will need to be able to init the viewmodel without a provider
-        DirectoryTree = new DirectoryTreeViewModel(_activeSourceProvider)
+        DirectoryTree = new DirectoryTreeViewModel(_providerRegistry)
         {
             ShowFilteredNodesInTree = _settings.ShowFilteredNodesInTree
         };
@@ -479,18 +474,8 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
-        var previousProvider = _activeSourceProvider;
-        var nextProvider = ResolveSourceProvider(normalizedPath);
-
         try
         {
-            if (!ReferenceEquals(previousProvider, nextProvider))
-            {
-                // TODO: Initialise DirectoryTree with the FileSystemProviderRegistry and let it resolve the provider from the path
-                DirectoryTree.SetProvider(nextProvider);
-                _activeSourceProvider = nextProvider;
-            }
-
             SourcePath = normalizedPath;
 
             // See if we can set this path as a root (it will throw if not)
@@ -513,12 +498,6 @@ public partial class MainViewModel : ViewModelBase
 
             SourcePathValidationMessage = BuildSourcePathValidationMessage(normalizedPath, ex);
             LogPanel.AddEntry(SourcePathValidationMessage, LogLevel.Error);
-
-            if (!ReferenceEquals(previousProvider, nextProvider))
-            {
-                DirectoryTree.SetProvider(previousProvider);
-                _activeSourceProvider = previousProvider;
-            }
 
             try
             {
@@ -789,9 +768,6 @@ public partial class MainViewModel : ViewModelBase
 
         RefreshSourceBookmarks();
 
-        _activeSourceProvider = ResolveSourceProvider(PathHelper.NormalizeUserPath(SourcePath));
-        DirectoryTree.SetProvider(_activeSourceProvider);
-
         if (SourcePath is { Length: > 0 })
         {
             try
@@ -811,20 +787,23 @@ public partial class MainViewModel : ViewModelBase
     private async Task PreviewPipelineAsync()
     {
         var pipeline = Pipeline.BuildLivePipeline();
-        if (DirectoryTree.RootNode == null)
+        if (DirectoryTree.IsLoaded == false)
             return;
-
-        var rootNode = DirectoryTree.RootNode;
-        Pipeline.SetSelectedIncludedFileCount(rootNode.GetSelectedDescendants().Count(n => !n.IsDirectory));
 
         if (!Pipeline.CanRun)
             return;
+
+        var rootNode = DirectoryTree.RootNode
+            ?? throw new ApplicationException("Directory tree is loaded but root node is not set");
+
+        var sourceProvider = DirectoryTree.SourceProvider
+            ?? throw new ApplicationException("Directory tree is loaded but source provider is unknown");
 
         var runner = new PipelineRunner(pipeline);
         var job = new PipelineJob
         {
             RootNode         = rootNode,
-            SourceProvider   = _activeSourceProvider,
+            SourceProvider   = sourceProvider,
             ProviderRegistry = _providerRegistry,
             OverwriteMode    = ParseOverwriteMode(_settings.DefaultOverwriteMode),
             DeleteMode       = ParseDeleteMode(_settings.DefaultDeleteMode),
@@ -857,20 +836,25 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
-        if (DirectoryTree.RootNode == null)
+        if (DirectoryTree.IsLoaded == false)
             return;
 
-        var rootNode = DirectoryTree.RootNode;
-        Pipeline.SetSelectedIncludedFileCount(rootNode.GetSelectedDescendants().Count(n => !n.IsDirectory));
+        var rootNode = DirectoryTree.RootNode
+            ?? throw new ApplicationException("Directory tree is loaded but root node is not set");
+
+        Pipeline.SetSelectedIncludedFileCount(rootNode.NumSelectedFiles);
 
         if (!Pipeline.CanRun)
             return;
+
+        var sourceProvider = DirectoryTree.SourceProvider
+            ?? throw new ApplicationException("Directory tree is loaded but source provider is unknown");
 
         var runner = new PipelineRunner(pipeline);
         var job = new PipelineJob
         {
             RootNode         = rootNode,
-            SourceProvider   = _activeSourceProvider,
+            SourceProvider   = sourceProvider,
             ProviderRegistry = _providerRegistry,
             OverwriteMode    = ParseOverwriteMode(_settings.DefaultOverwriteMode),
             DeleteMode       = ParseDeleteMode(_settings.DefaultDeleteMode),
