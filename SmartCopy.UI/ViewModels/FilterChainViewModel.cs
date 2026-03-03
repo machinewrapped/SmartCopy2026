@@ -150,6 +150,7 @@ public partial class FilterChainViewModel : ViewModelBase
         var vm = new FilterViewModel(filter);
         vm.IsEnabledChanged += (_, _) => ChainChanged?.Invoke(this, EventArgs.Empty);
         Filters.Add(vm);
+
         ChainChanged?.Invoke(this, EventArgs.Empty);
     }
 

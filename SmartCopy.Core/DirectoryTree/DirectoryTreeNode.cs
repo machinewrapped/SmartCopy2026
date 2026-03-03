@@ -249,7 +249,7 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
         }
     }
 
-    public DirectoryTreeNode? FindNodeByPathSegments(string[] pathSegments)
+    public DirectoryTreeNode? FindNodeByPathSegments(params string[] pathSegments)
     {
         var currentNode = this;
         for (int i = 0; i < pathSegments.Length; i++)

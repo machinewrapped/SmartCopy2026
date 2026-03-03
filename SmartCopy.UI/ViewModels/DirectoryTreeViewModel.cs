@@ -1,7 +1,5 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Threading;
-using System.Threading.Tasks;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
@@ -12,7 +10,6 @@ namespace SmartCopy.UI.ViewModels;
 public class DirectoryTreeViewModel : ViewModelBase
 {
     private DirectoryScanner _scanner;
-    private string _rootPath;
     private DirectoryTreeNode? _selectedNode;
     private bool _isLoading;
 
@@ -22,6 +19,9 @@ public class DirectoryTreeViewModel : ViewModelBase
         get => _isLoading;
         private set => SetProperty(ref _isLoading, value);
     }
+
+    // <summary>Indicates whether the directory tree is fully loaded</summary>
+    public bool IsLoaded { get; private set; }
 
     /// <summary>Raised when any node's <see cref="DirectoryTreeNode.CheckState"/> changes.</summary>
     public event EventHandler? SelectionChanged;
@@ -34,11 +34,10 @@ public class DirectoryTreeViewModel : ViewModelBase
         SetAsSourcePathRequested?.Invoke(this, path);
 
     /// <summary>The root nodes of the directory tree.</summary>
-    public ObservableCollection<DirectoryTreeNode> RootNodes { get; } = [];
+    public DirectoryTreeNode? RootNode => ItemsSource.Any() ? ItemsSource.First() : null;
 
-    public DirectoryTreeViewModel(IFileSystemProvider provider, string rootPath)
+    public DirectoryTreeViewModel(IFileSystemProvider provider)
     {
-        _rootPath = rootPath;
         _scanner = new DirectoryScanner(provider);
     }
 
@@ -60,6 +59,19 @@ public class DirectoryTreeViewModel : ViewModelBase
         set => SetProperty(ref _showFilteredNodesInTree, value);
     }
 
+    /// <summary> Avalonia TreeView requires an enumerable root</summary>
+    private ObservableCollection<DirectoryTreeNode> ItemsSource { get; } = [];
+
+    /// <summary>
+    /// Set the root path for the directory tree (may be underneath the filesystem root)
+    /// </summary>
+    public async Task ChangeRootAsync(string newRootPath, CancellationToken ct = default)
+    {
+        IsLoaded = false;
+        IsLoading = true;
+        await InitializeAsync(newRootPath, ct: ct);
+    }
+
     /// <summary>
     /// Applies <paramref name="chain"/> to every node in the tree, setting <see cref="DirectoryTreeNode.FilterResult"/>/>.
     /// </summary>
@@ -68,75 +80,73 @@ public class DirectoryTreeViewModel : ViewModelBase
         IFilterContext? context = null,
         CancellationToken ct = default)
     {
-        foreach (var root in RootNodes)
+        if (RootNode == null) 
+            return;
+
+        await chain.ApplyToTreeAsync(RootNode, context, ct);
+    }
+
+    public void RemoveNodesMarkedForRemoval()
+    {
+        if (RootNode == null || RootNode.IsMarkedForRemoval)
         {
-            await chain.ApplyToTreeAsync(root, context, ct);
+            Reset();
+        }
+        else
+        {
+            RootNode.RemoveNodesMarkedForRemoval();
         }
     }
 
-    public async Task InitializeAsync(CancellationToken ct = default)
+    internal void Reset()
+    {
+        ItemsSource.Clear();
+        IsLoaded = false;
+        IsLoading = false;
+    }
+
+    private async Task InitializeAsync(string rootPath, CancellationToken ct = default)
     {
         // Unsubscribe from old roots before clearing
-        foreach (var oldRoot in RootNodes)
+        if (RootNode != null)
         {
-            oldRoot.PropertyChanged -= OnRootNodePropertyChanged;
+            RootNode.PropertyChanged -= OnRootNodePropertyChanged;
+            ItemsSource.Clear();
         }
 
-        RootNodes.Clear();
-        IsLoading = true;
-
-        DirectoryTreeNode? root = null;
         try
         {
             var scanOptions = new ScanOptions { LazyExpand = false, IncludeHidden = true };
-            await foreach (var node in _scanner.ScanAsync(_rootPath, scanOptions, ct: ct))
+            
+            await foreach (var node in _scanner.ScanAsync(rootPath, scanOptions, ct: ct))
             {
-                if (root is null)
+                // First node yielded is our root node
+                if (!ItemsSource.Any())
                 {
-                    root = node;
-                    root.IsExpanded = true;
-                    root.PropertyChanged += OnRootNodePropertyChanged;
-                    RootNodes.Add(root);
-                }
-                // subsequent nodes are already wired into the tree by the scanner
-            }
+                    ItemsSource.Add(node);
 
-            if (root is not null)
-            {
-                // Calculate stats and clear dirty flags
-                root.BuildStats();
-
-                // Default to root node, if user hasn't selected one during the scan
-                if (SelectedNode is null)
-                {
-                    SelectedNode = root;                    
+                    node.IsExpanded = true;
+                    node.PropertyChanged += OnRootNodePropertyChanged;
                 }
+
+                // subsequent nodes are wired into the tree by the scanner
             }
         }
         finally
         {
             IsLoading = false;
+            IsLoaded = RootNode != null;
         }
-    }
 
-    public async Task ChangeRootAsync(string newRootPath, CancellationToken ct = default)
-    {
-        _rootPath = newRootPath;
-        await InitializeAsync(ct: ct);
-    }
-
-    public void RemoveNodesMarkedForRemoval()
-    {
-        for (var i = RootNodes.Count - 1; i >= 0; i--)
+        if (RootNode is not null)
         {
-            var root = RootNodes[i];
-            if (root.IsMarkedForRemoval)
+            // Calculate stats and clear dirty flags
+            RootNode.BuildStats();
+
+            // Default to root node, if user hasn't selected one during the scan
+            if (SelectedNode is null)
             {
-                RootNodes.RemoveAt(i);
-            }
-            else
-            {
-                root.RemoveNodesMarkedForRemoval();
+                SelectedNode = RootNode;
             }
         }
     }

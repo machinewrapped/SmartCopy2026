@@ -12,7 +12,7 @@
     </UserControl.Resources>
 
     <TreeView x:Name="DirectoryTree"
-              ItemsSource="{Binding RootNodes}"
+              ItemsSource="{Binding ItemsSource}"
               SelectedItem="{Binding SelectedNode, Mode=TwoWay}"
               AutomationProperties.Name="Directory tree"
               Background="Transparent"
