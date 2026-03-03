@@ -10,12 +10,28 @@ using SmartCopy.Core.Filters;
 
 namespace SmartCopy.Core.DirectoryTree;
 
-public sealed class DirectoryTreeNode(
-    FileSystemNode _filesystemNode,
-    DirectoryTreeNode? _parent,
-    CheckState _checkState = CheckState.Unchecked) 
-    : INotifyPropertyChanged
+public sealed class DirectoryTreeNode : INotifyPropertyChanged
 {
+    private readonly FileSystemNode _filesystemNode;
+    private CheckState _checkState;
+
+    public DirectoryTreeNode(
+        FileSystemNode filesystemNode,
+        DirectoryTreeNode? parent,
+        CheckState checkState = CheckState.Unchecked)
+    {
+        _filesystemNode = filesystemNode;
+        _checkState = checkState;
+        Parent = parent;
+        RelativePathSegments = parent is null ? Array.Empty<string>() : [.. parent.RelativePathSegments.Append(filesystemNode.Name)];
+
+        if (IsDirectory)
+        {
+            Children.CollectionChanged += (_, _) => MarkDirty();
+            Files.CollectionChanged    += (_, _) => MarkDirty();            
+        }
+    }
+
     public string Name => _filesystemNode.Name;
     public string FullPath => _filesystemNode.FullPath;
     public bool IsDirectory => _filesystemNode.IsDirectory;
@@ -24,12 +40,12 @@ public sealed class DirectoryTreeNode(
     public DateTime ModifiedAt => _filesystemNode.ModifiedAt;
     public FileAttributes Attributes => _filesystemNode.Attributes;
 
-    public string[] RelativePathSegments {get; init; } = _parent is null ? Array.Empty<string>() : [.. _parent.RelativePathSegments.Append(_filesystemNode.Name)];
+    public string[] RelativePathSegments { get; }
     public string CanonicalRelativePath => string.Join("/", RelativePathSegments);
 
     public override string ToString() => CanonicalRelativePath + (IsDirectory ? "/" : "");
 
-    public bool IsDirty { get; private set; } = true;
+    public bool IsDirty { get; private set; } = false;
     public int NumSelectedFiles { get; private set; }
     public long TotalSelectedBytes { get; private set; }
 
@@ -104,7 +120,7 @@ public sealed class DirectoryTreeNode(
     public bool IsFilterIncluded => FilterResult != FilterResult.Excluded;
     public bool IsAtomicIncluded => FilterResult == FilterResult.Included;
 
-    public DirectoryTreeNode? Parent { get; init; } = _parent;
+    public DirectoryTreeNode? Parent { get; }
     public ObservableCollection<DirectoryTreeNode> Children { get; } = [];
     public ObservableCollection<DirectoryTreeNode> Files { get; } = [];
 

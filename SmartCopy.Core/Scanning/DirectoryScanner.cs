@@ -20,7 +20,8 @@ public sealed class DirectoryScanner
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var rootNode = new DirectoryTreeNode(
-            await _provider.GetNodeAsync(rootPath, ct), _parent: null);
+            await _provider.GetNodeAsync(rootPath, ct), parent: null);
+
         yield return rootNode;
 
         // visited guards against circular symbolic links re-enqueueing an already-processed path.
