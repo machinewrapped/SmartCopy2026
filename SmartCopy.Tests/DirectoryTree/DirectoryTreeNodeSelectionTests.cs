@@ -82,9 +82,11 @@ public sealed class DirectoryTreeNodeSelectionTests
             .WithDirectory("/root/sub")
             .WithSimulatedFile("/root/sub/track.mp3", 512));
 
+        rootNode.BuildStats();
+        Assert.False(rootNode.IsDirty);
+
         var file = rootNode.FindNodeByPathSegments(["root", "sub", "track.mp3"]);
         Assert.NotNull(file);
-        Assert.False(rootNode.IsDirty);
 
         file.CheckState = CheckState.Checked;
 

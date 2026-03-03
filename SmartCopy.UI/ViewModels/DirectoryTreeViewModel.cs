@@ -97,7 +97,14 @@ public class DirectoryTreeViewModel : ViewModelBase
 
             if (root is not null)
             {
-                SelectedNode = root;
+                // Calculate stats and clear dirty flags
+                root.BuildStats();
+
+                // Default to root node, if user hasn't selected one during the scan
+                if (SelectedNode is null)
+                {
+                    SelectedNode = root;                    
+                }
             }
         }
         finally

@@ -28,9 +28,7 @@ public sealed class DirectoryTreeNode(
 
     public override string ToString() => CanonicalRelativePath + (IsDirectory ? "/" : "");
 
-    private int _batchUpdateDepth = 0;
-    private bool _isDirty;
-    public bool IsDirty => _isDirty;
+    public bool IsDirty { get; private set; } = true;
     public int NumSelectedFiles { get; private set; }
     public long TotalSelectedBytes { get; private set; }
 
@@ -113,35 +111,42 @@ public sealed class DirectoryTreeNode(
 
     public void MarkDirty()
     {
-        if (_isDirty) return;
-        
-        _isDirty = true;
+        if (IsDirty) return;
+
+        IsDirty = true;
         OnPropertyChanged(nameof(IsDirty));
         Parent?.MarkDirty();
     }
 
-    public void ClearDirty() => _isDirty = false;
+    public void ClearDirty() => IsDirty = false;
 
     public void BuildStats()
     {
         int files = 0;
         long bytes = 0;
         foreach (var file in Files)
-            if (file.IsSelected) { files++; bytes += file.Size; }
+        {
+            if (file.IsSelected)
+            { 
+                files++; 
+                bytes += file.Size; 
+            }
+        }
+
         foreach (var child in Children)
         {
-            child.BuildStats();
+            if (child.IsDirty)
+            {
+                child.BuildStats();                
+            }
+
             files += child.NumSelectedFiles;
             bytes += child.TotalSelectedBytes;
         }
+
         NumSelectedFiles = files;
         TotalSelectedBytes = bytes;
-    }
-
-    public IDisposable BeginBatchUpdate()
-    {
-        _batchUpdateDepth++;
-        return new BatchUpdateScope(this);
+        ClearDirty();
     }
 
     public void MarkForRemoval()
@@ -268,37 +273,24 @@ public sealed class DirectoryTreeNode(
 
     void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
-        if (_batchUpdateDepth == 0)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-    }
-
-    private void EndBatchUpdate()
-    {
-        _batchUpdateDepth--;
-        if (_batchUpdateDepth == 0)
-        {
-            OnPropertyChanged(); // Reset bindings
-        }
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
     private void SetCheckStateWithPropagation(CheckState newState)
     {
         // Change self
         _checkState = newState;
+
         MarkDirty();
-        OnPropertyChanged(nameof(CheckState));
-        OnPropertyChanged(nameof(IsSelected));
 
         // Downward propagation
         if (newState != CheckState.Indeterminate && (Children.Count > 0 || Files.Count > 0))
         {
-            using (BeginBatchUpdate())
-            {
-                PropagateDownward(newState);
-            }
+            PropagateDownward(newState);
         }
+
+        OnPropertyChanged(nameof(CheckState));
+        OnPropertyChanged(nameof(IsSelected));
 
         // Upward recalculation
         Parent?.RecalculateCheckState();
@@ -376,10 +368,5 @@ public sealed class DirectoryTreeNode(
             SetCheckState(computedState);
             Parent?.RecalculateCheckState();
         }
-    }
-
-    private class BatchUpdateScope(DirectoryTreeNode node) : IDisposable
-    {
-        public void Dispose() => node.EndBatchUpdate();
     }
 }

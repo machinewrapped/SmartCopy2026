@@ -54,11 +54,7 @@ public sealed class FilterChain
             var node = stack.Pop();
             postOrderList.Add(node);
 
-            var evaluation = await EvaluateNodeAsync(node, resolvedContext, ct);
-            using (node.BeginBatchUpdate())
-            {
-                node.FilterResult = evaluation;
-            }
+            node.FilterResult = await EvaluateNodeAsync(node, resolvedContext, ct);
 
             for (var i = node.Children.Count - 1; i >= 0; i--)
             {
@@ -69,11 +65,7 @@ public sealed class FilterChain
             // parent exclusion recalculation can see their correct state.
             foreach (var file in node.Files)
             {
-                var fileEval = await EvaluateNodeAsync(file, resolvedContext, ct);
-                using (file.BeginBatchUpdate())
-                {
-                    file.FilterResult = fileEval;
-                }
+                file.FilterResult = await EvaluateNodeAsync(file, resolvedContext, ct);
             }
         }
 
@@ -115,12 +107,9 @@ public sealed class FilterChain
             node.Files.Any(f => f.FilterResult != FilterResult.Excluded) ||
             node.Children.Any(c => c.FilterResult != FilterResult.Excluded);
 
-        using (node.BeginBatchUpdate())
-        {
-            node.FilterResult = allIncluded ? FilterResult.Included
-                              : anyIncluded ? FilterResult.Mixed
-                              : FilterResult.Excluded;
-        }
+        node.FilterResult = allIncluded ? FilterResult.Included
+                            : anyIncluded ? FilterResult.Mixed
+                            : FilterResult.Excluded;
     }
 
     public FilterChainConfig ToConfig(string name = "Default", string? description = null)
