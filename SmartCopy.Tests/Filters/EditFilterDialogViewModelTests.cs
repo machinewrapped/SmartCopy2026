@@ -85,7 +85,7 @@ public sealed class EditFilterDialogViewModelTests
     [Fact]
     public void ForNew_MirrorType_SetsComparisonPathSuggestion()
     {
-        var vm = EditFilterDialogViewModel.ForNew("Mirror", "/mem/Mirror");
+        var vm = EditFilterDialogViewModel.ForNew("Mirror", pipelineDestinationPath: "/mem/Mirror");
         var editor = (MirrorFilterEditorViewModel)vm.Editor;
 
         Assert.IsType<MirrorFilterEditorViewModel>(editor);

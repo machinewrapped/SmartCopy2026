@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SmartCopy.Core.Filters;
+using SmartCopy.Core.Settings;
 using SmartCopy.UI.ViewModels.Filters;
 
 namespace SmartCopy.UI.ViewModels;
@@ -140,18 +141,20 @@ public partial class EditFilterDialogViewModel : ObservableObject
     /// <summary>Creates an empty editor for a new filter of the given type.</summary>
     public static EditFilterDialogViewModel ForNew(
         string filterType,
+        AppSettings? settings = null,
         string pipelineDestinationPath = "")
     {
-        var editor = FilterEditorViewModelFactory.Create(filterType);
+        var editor = FilterEditorViewModelFactory.Create(filterType, settings);
         return CreateFromEditor(editor, pipelineDestinationPath);
     }
 
     /// <summary>Creates a pre-populated editor for editing an existing filter.</summary>
     public static EditFilterDialogViewModel ForEdit(
         IFilter existingFilter,
+        AppSettings? settings = null,
         string pipelineDestinationPath = "")
     {
-        var editor = FilterEditorViewModelFactory.CreateFrom(existingFilter);
+        var editor = FilterEditorViewModelFactory.CreateFrom(existingFilter, settings);
         return CreateFromEditor(editor, pipelineDestinationPath);
     }
 

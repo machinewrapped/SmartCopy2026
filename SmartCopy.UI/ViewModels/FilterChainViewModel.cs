@@ -97,6 +97,9 @@ public partial class FilterChainViewModel : ViewModelBase
     /// <summary>Preset store — exposed so code-behind can call SaveUserPresetAsync.</summary>
     public FilterPresetStore PresetStore { get; }
 
+    /// <summary>Exposed so code-behind can pass it to the filter editor dialogs.</summary>
+    public AppSettings AppSettings { get; }
+
     /// <summary>Fired whenever the chain changes: add, remove, reorder, toggle, or edit.</summary>
     public event EventHandler? ChainChanged;
 
@@ -138,6 +141,7 @@ public partial class FilterChainViewModel : ViewModelBase
         FilterChainPresetStore? chainPresetStore = null)
     {
         PresetStore = presetStore;
+        AppSettings = settings;
         _chainPresetStore = chainPresetStore ?? new FilterChainPresetStore();
         _showExcludedNodesInTree = settings.ShowFilteredNodesInTree;
         AddFilter = new AddFilterViewModel(presetStore, settings);

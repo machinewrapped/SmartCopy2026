@@ -92,6 +92,7 @@ public partial class FilterChainView : UserControl
 
         var vm = EditFilterDialogViewModel.ForNew(
             filterType,
+            _currentViewModel.AppSettings,
             _currentViewModel.PipelineDestinationPath);
 
         var dialog = new EditFilterDialog { DataContext = vm };
@@ -113,6 +114,7 @@ public partial class FilterChainView : UserControl
 
         var vm = EditFilterDialogViewModel.ForEdit(
             filterVm.BackingFilter,
+            _currentViewModel.AppSettings,
             _currentViewModel.PipelineDestinationPath);
 
         var dialog = new EditFilterDialog { DataContext = vm };

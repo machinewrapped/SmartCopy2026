@@ -7,25 +7,25 @@ namespace SmartCopy.UI.ViewModels.Pipeline;
 
 public partial class MoveStepEditorViewModel : StepEditorViewModelBase, IHasDestinationPath
 {
-    public IReadOnlyList<string> DestinationBookmarks { get; }
+    public PathPickerViewModel DestinationPathPicker { get; }
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsValid))]
-    private string _destinationPath = string.Empty;
-
-    [ObservableProperty]
-    private string? _selectedDestinationBookmark;
+    public string DestinationPath 
+    {
+        get => DestinationPathPicker.Path;
+        set => DestinationPathPicker.Path = value;
+    }
 
     public MoveStepEditorViewModel(AppSettings? settings = null)
     {
-        DestinationBookmarks = settings is null
-            ? []
-            : settings.FavouritePaths.Concat(settings.RecentTargets).Distinct().ToList();
-    }
-
-    partial void OnSelectedDestinationBookmarkChanged(string? value)
-    {
-        if (value is not null) DestinationPath = value;
+        DestinationPathPicker = new PathPickerViewModel(settings ?? new AppSettings(), new AppSettingsStore(), PathPickerMode.Target);
+        DestinationPathPicker.PropertyChanged += (s, e) => 
+        {
+            if (e.PropertyName == nameof(PathPickerViewModel.Path))
+            {
+                OnPropertyChanged(nameof(DestinationPath));
+                OnPropertyChanged(nameof(IsValid));
+            }
+        };
     }
 
     public override bool IsValid => !string.IsNullOrWhiteSpace(DestinationPath);

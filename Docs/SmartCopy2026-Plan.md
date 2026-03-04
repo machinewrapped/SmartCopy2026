@@ -446,16 +446,16 @@ Verification:
 ### 5.2.4 - Directory browser integration for filter and pipeline editors
 
 Deliverables:
-- [ ] Browse/Bookmark functionality for MirrorFilterEditorView
-- [ ] Generalise the browse/bookmark functionality to use in CopyMoveStepEditor (custom view component?)
+- [x] Browse/Bookmark functionality for MirrorFilterEditorView
+- [x] Generalise the browse/bookmark functionality to use in CopyMoveStepEditor (UserControl)
 
 Acceptance criteria:
-- [ ] Target directory pickers have full parity with source picker in MainWindow
-- [ ] Code duplication minimised, should be easy to re-use in other views in future
+- [x] Target directory pickers have full parity with source picker in MainWindow
+- [x] Code duplication minimised, should be easy to re-use in other views in future
 
 Verification
-- [ ] Manual testing of UI and functionality
-- [ ] Add automated tests if applicable
+- [x] Manual testing of UI and functionality
+- [x] Add automated tests if applicable
 
 #### 5.2.5 — Capability-Gated Delete/Trash and Move Semantics
 

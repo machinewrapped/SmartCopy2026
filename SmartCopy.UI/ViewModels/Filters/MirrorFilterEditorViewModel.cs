@@ -1,14 +1,19 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Filters.Filters;
+using SmartCopy.Core.Settings;
 
 namespace SmartCopy.UI.ViewModels.Filters;
 
 public partial class MirrorFilterEditorViewModel : FilterEditorViewModelBase
 {
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsValid))]
-    private string _comparisonPath = string.Empty;
+    public PathPickerViewModel ComparisonPathPicker { get; }
+
+    public string ComparisonPath
+    {
+        get => ComparisonPathPicker.Path;
+        set => ComparisonPathPicker.Path = value;
+    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsValid))]
@@ -28,7 +33,20 @@ public partial class MirrorFilterEditorViewModel : FilterEditorViewModelBase
         set { if (value) CompareMode = MirrorCompareMode.NameAndSize; }
     }
 
-    partial void OnComparisonPathChanged(string value) => AutoUpdateName();
+    public MirrorFilterEditorViewModel(AppSettings? settings = null)
+    {
+        ComparisonPathPicker = new PathPickerViewModel(settings ?? new AppSettings(), new AppSettingsStore(), PathPickerMode.Target);
+        ComparisonPathPicker.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName == nameof(PathPickerViewModel.Path))
+            {
+                OnPropertyChanged(nameof(ComparisonPath));
+                OnPropertyChanged(nameof(IsValid));
+                AutoUpdateName();
+            }
+        };
+    }
+
     partial void OnCompareModeChanged(MirrorCompareMode value) => AutoUpdateName();
 
     public override bool IsValid => !string.IsNullOrWhiteSpace(ComparisonPath);

@@ -1,5 +1,6 @@
 using System;
 using SmartCopy.Core.Filters;
+using SmartCopy.Core.Settings;
 
 namespace SmartCopy.UI.ViewModels.Filters;
 
@@ -8,20 +9,20 @@ namespace SmartCopy.UI.ViewModels.Filters;
 /// </summary>
 public static class FilterEditorViewModelFactory
 {
-    public static FilterEditorViewModelBase Create(string filterType) => filterType switch
+    public static FilterEditorViewModelBase Create(string filterType, AppSettings? settings = null) => filterType switch
     {
         "Extension" => new ExtensionFilterEditorViewModel(),
         "Wildcard"  => new WildcardFilterEditorViewModel(),
         "DateRange" => new DateRangeFilterEditorViewModel(),
         "SizeRange" => new SizeRangeFilterEditorViewModel(),
-        "Mirror"    => new MirrorFilterEditorViewModel(),
+        "Mirror"    => new MirrorFilterEditorViewModel(settings),
         "Attribute" => new AttributeFilterEditorViewModel(),
         _ => throw new InvalidOperationException($"Unknown filter type: {filterType}")
     };
 
-    public static FilterEditorViewModelBase CreateFrom(IFilter filter)
+    public static FilterEditorViewModelBase CreateFrom(IFilter filter, AppSettings? settings = null)
     {
-        var editor = Create(filter.Config.FilterType);
+        var editor = Create(filter.Config.FilterType, settings);
         editor.LoadFrom(filter);
         return editor;
     }
