@@ -457,22 +457,20 @@ Verification
 - [x] Manual testing of UI and functionality
 - [x] Add automated tests if applicable
 
-#### 5.2.5 — Capability-Gated Delete/Trash and Move Semantics
+#### 5.2.5— Drag-and-Drop Integration and Hardening
 
 Deliverables:
-- [ ] Introduce `TrashService` abstraction/adapters with timeout and fallback behavior
-- [ ] Route delete behavior through capability/availability checks (trash when available, permanent when explicitly chosen or fallback required)
-- [ ] Handle non-atomic move scenarios explicitly and record outcome in operation journal
-- [ ] Surface capability-derived safety messaging in preview/run UX
+- [ ] Add drag-and-drop for source and destination path inputs
+- [ ] Validate dropped paths and reject unsupported payloads safely
+- [ ] Confirm keyboard-first behavior remains intact after DnD additions
 
 Acceptance criteria:
-- [ ] Delete operations are deterministic and journaled as `Trashed` vs `Deleted`
-- [ ] Cross-volume moves do not fail silently; fallback path is visible and tested
-- [ ] Destructive-operation guardrails from Phase 1 are preserved
+- [ ] Dragging folders from OS shell updates source/destination fields reliably
+- [ ] DnD does not bypass validation/confirmation safeguards
+- [ ] Accessibility and keyboard workflows remain unchanged
 
 Verification:
-- [ ] Unit tests for trash fallback, timeout, and move fallback paths
-- [ ] Manual smoke: delete-to-trash and permanent delete on local files
+- [ ] UI-level smoke checks for DnD + keyboard navigation regression
 
 #### 5.2.6 — Watcher and Incremental Rescan (selection-preserving)
 
@@ -491,20 +489,22 @@ Verification:
 - [ ] Automated tests for debounce/coalescing and subtree-only updates
 - [ ] Manual smoke with scripted file churn in nested directories
 
-#### 5.2.7 — Drag-and-Drop Integration and Hardening
+#### 5.2.7 — Capability-Gated Delete/Trash and Move Semantics
 
 Deliverables:
-- [ ] Add drag-and-drop for source and destination path inputs
-- [ ] Validate dropped paths and reject unsupported payloads safely
-- [ ] Confirm keyboard-first behavior remains intact after DnD additions
+- [ ] Introduce `TrashService` abstraction/adapters with timeout and fallback behavior
+- [ ] Route delete behavior through capability/availability checks (trash when available, permanent when explicitly chosen or fallback required)
+- [ ] Handle non-atomic move scenarios explicitly and record outcome in operation journal
+- [ ] Surface capability-derived safety messaging in preview/run UX
 
 Acceptance criteria:
-- [ ] Dragging folders from OS shell updates source/destination fields reliably
-- [ ] DnD does not bypass validation/confirmation safeguards
-- [ ] Accessibility and keyboard workflows remain unchanged
+- [ ] Delete operations are deterministic and journaled as `Trashed` vs `Deleted`
+- [ ] Cross-volume moves do not fail silently; fallback path is visible and tested
+- [ ] Destructive-operation guardrails from Phase 1 are preserved
 
 Verification:
-- [ ] UI-level smoke checks for DnD + keyboard navigation regression
+- [ ] Unit tests for trash fallback, timeout, and move fallback paths
+- [ ] Manual smoke: delete-to-trash and permanent delete on local files
 
 #### 5.2.X Phase 2 Validation Matrix (must pass before closing phase)
 
