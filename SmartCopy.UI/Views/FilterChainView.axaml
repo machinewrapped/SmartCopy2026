@@ -34,7 +34,7 @@
                              Background="Transparent" BorderThickness="0"
                              KeyDown="OnFilterListKeyDown">
                         <ListBox.Styles>
-                            <!-- Suppress default selection highlight -->
+                            <!-- Subtle selection highlight -->
                             <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
                                 <Setter Property="Background" Value="Transparent" />
                                 <Setter Property="BorderBrush" Value="#4facfe" />
