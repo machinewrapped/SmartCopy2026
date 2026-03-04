@@ -1,6 +1,7 @@
 using System.Collections.Specialized;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
@@ -46,7 +47,7 @@ public partial class PipelineView : UserControl
         };
     }
 
-    private void OnAddStepButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void OnAddStepButtonClick(object? sender, RoutedEventArgs e)
     {
         _currentViewModel?.AddStep.GoBackCommand.Execute(null);
         AddStepPopup.IsOpen = true;
@@ -142,7 +143,7 @@ public partial class PipelineView : UserControl
         }
     }
 
-    private void OnLoadPresetButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void OnLoadPresetButtonClick(object? sender, RoutedEventArgs e)
     {
         if (sender is Button { CommandParameter: string name })
         {
@@ -151,7 +152,7 @@ public partial class PipelineView : UserControl
         }
     }
 
-    private async void OnDeletePipelinePresetButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void OnDeletePipelinePresetButtonClick(object? sender, RoutedEventArgs e)
     {
         if (sender is Button { CommandParameter: string name } && _currentViewModel != null)
         {

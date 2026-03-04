@@ -3,7 +3,6 @@ using System.ComponentModel;
 using System.Text.Json;
 using Avalonia.Controls;
 using Avalonia.Input;
-using Avalonia.Platform.Storage;
 using SmartCopy.UI.ViewModels;
 using SmartCopy.UI.ViewModels.Workflows;
 
@@ -18,13 +17,11 @@ public partial class MainWindow : Window
     // Per-column minimum widths (pixels) for the three content columns.
     private const double MinColFilters = 150;
     private const double MinColFolders = 150;
-    private const double MinColFiles   = 300;
 
     // Indices into ContentGrid.ColumnDefinitions for the three resizable columns
     // (0 = Filters, 2 = Folders, 4 = Files; 1 and 3 are the splitter slots).
     private const int ColIdxFilters = 0;
     private const int ColIdxFolders = 2;
-    private const int ColIdxFiles   = 4;
 
     private static readonly string SettingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -65,7 +62,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        WireSourceComboBoxKeyboard();
+
         DataContextChanged += OnMainDataContextChanged;
     }
 
@@ -519,125 +516,6 @@ public partial class MainWindow : Window
         {
             // Best-effort — never crash on close just because we couldn't save prefs.
         }
-    }
-
-    // ── Source ComboBox UX ──────────────────────────────────────────────────────
-    // Keyboard: Tunnel handler fires BEFORE the ComboBox's built-in key handler.
-    // Mouse: SelectionChanged while dropdown is open sets _applyOnDropDownClose;
-    //        DropDownClosed checks it and applies if set.
-
-    private bool _applyOnDropDownClose;
-
-    private void WireSourceComboBoxKeyboard()
-    {
-        SourceDropTarget.AddHandler(DragDrop.DragOverEvent, OnSourceDragOver);
-        SourceDropTarget.AddHandler(DragDrop.DropEvent, OnSourceDrop);
-
-        SourceComboBox.AddHandler(
-            KeyDownEvent,
-            OnSourceComboBoxKeyDown,
-            Avalonia.Interactivity.RoutingStrategies.Tunnel);
-
-        // If the selection changes while the dropdown is open, the user picked an item.
-        SourceComboBox.SelectionChanged += (_, _) =>
-        {
-            if (SourceComboBox.IsDropDownOpen)
-                _applyOnDropDownClose = true;
-        };
-
-        SourceComboBox.DropDownClosed += OnSourceComboBoxDropDownClosed;
-    }
-
-    private void OnSourceComboBoxDropDownClosed(object? sender, EventArgs e)
-    {
-        if (!_applyOnDropDownClose) return;
-        _applyOnDropDownClose = false;
-
-        // Defer so the SelectedItem → SourcePath binding settles
-        // after the popup disposes.
-        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-        {
-            if (DataContext is MainViewModel vm && !string.IsNullOrWhiteSpace(vm.SourcePath))
-            {
-                vm.ApplySourcePathCommand.Execute(null);
-            }
-        });
-    }
-
-    private void OnSourceComboBoxKeyDown(object? sender, KeyEventArgs e)
-    {
-        var combo = SourceComboBox;
-
-        switch (e.Key)
-        {
-            // Enter → commit the current text/selection and apply.
-            case Key.Enter:
-                combo.IsDropDownOpen = false;
-                if (DataContext is MainViewModel vm)
-                {
-                    vm.ApplySourcePathCommand.Execute(null);
-                }
-                e.Handled = true;
-                break;
-
-            // Escape → close dropdown if open, otherwise revert path.
-            case Key.Escape:
-                if (combo.IsDropDownOpen)
-                {
-                    combo.IsDropDownOpen = false;
-                }
-
-                if (DataContext is MainViewModel rv)
-                {
-                    rv.RevertSourcePathCommand.Execute(null);
-                }
-                e.Handled = true;
-                break;
-        }
-    }
-
-    private void OnSourceDragOver(object? sender, DragEventArgs e)
-    {
-        // Defer detailed validation to the drop handler. Only check for presence of files or folders.
-        if (e.DataTransfer.Items.Any(x => x.Formats.Contains(DataFormat.File)))
-        {
-            e.DragEffects = e.DragEffects & (DragDropEffects.Copy | DragDropEffects.Move);
-        }
-        else
-        {
-            e.DragEffects = DragDropEffects.None;
-        }
-        e.Handled = true;
-    }
-
-    private void OnSourceDrop(object? sender, DragEventArgs e)
-    {
-        var items = e.DataTransfer.Items;
-        if (items is null)
-        {
-            e.Handled = true;
-            return;
-        }
-
-        foreach (IDataTransferItem item in items)
-        {
-            if (item.Formats.Contains(DataFormat.File))
-            {
-                if (item.TryGetFile() is IStorageFolder folder)
-                {
-                    var path = folder.TryGetLocalPath() ?? folder.Path.LocalPath;
-
-                    if (!string.IsNullOrWhiteSpace(path) && DataContext is MainViewModel vm)
-                    {
-                        vm.SourcePath = path;
-                        vm.ApplySourcePathCommand.Execute(null);
-                        break;
-                    }                    
-                }                
-            }
-        }
-        
-        e.Handled = true;
     }
 
     // ── Settings record ────────────────────────────────────────────────────────

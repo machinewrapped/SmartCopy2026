@@ -11,6 +11,7 @@ using SmartCopy.Core.Filters;
 using SmartCopy.UI.ViewModels;
 using SmartCopy.UI.ViewModels.Dialogs;
 using SmartCopy.UI.Views.Dialogs;
+using Avalonia.Interactivity;
 
 namespace SmartCopy.UI.Views;
 
@@ -64,7 +65,7 @@ public partial class FilterChainView : UserControl
     private void OnPresetPickedClosePopup(FilterPreset _) => Dispatcher.UIThread.Post(() => AddFilterPopup.IsOpen = false);
     private void OnCloseRequestedClosePopup() => Dispatcher.UIThread.Post(() => AddFilterPopup.IsOpen = false);
 
-    private void OnAddFilterButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void OnAddFilterButtonClick(object? sender, RoutedEventArgs e)
     {
         // Reset to Level 1 each time the popup opens.
         _currentViewModel?.AddFilter.GoBackCommand.Execute(null);
@@ -185,7 +186,7 @@ public partial class FilterChainView : UserControl
 
     // ---- Load / Delete Flyout Handlers ----
 
-    private void OnLoadPresetButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void OnLoadPresetButtonClick(object? sender, RoutedEventArgs e)
     {
         if (sender is Button { CommandParameter: string name })
         {
@@ -194,7 +195,7 @@ public partial class FilterChainView : UserControl
         }
     }
 
-    private async void OnDeletePresetButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void OnDeletePresetButtonClick(object? sender, RoutedEventArgs e)
     {
         if (sender is Button { CommandParameter: string name } && _currentViewModel != null)
         {
@@ -224,7 +225,7 @@ public partial class FilterChainView : UserControl
     {
         // Attach a pointer-pressed handler to each filter card container so we can
         // detect a press on the ≡ drag handle and start a drag.
-        e.Container.AddHandler(PointerPressedEvent, OnFilterCardPointerPressed, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+        e.Container.AddHandler(PointerPressedEvent, OnFilterCardPointerPressed, RoutingStrategies.Tunnel);
     }
 
     private async void OnFilterCardPointerPressed(object? sender, PointerPressedEventArgs e)

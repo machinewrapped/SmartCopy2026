@@ -26,13 +26,6 @@ public partial class MainViewModel : ViewModelBase
     private const int MaxRecentSources = 10;    // TODO: make this configurable
 
     [ObservableProperty]
-    private string _sourcePath = string.Empty;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasSourcePathValidationMessage))]
-    private string _sourcePathValidationMessage = string.Empty;
-
-    [ObservableProperty]
     private SourceBookmarkItem? _selectedSourceBookmark;
 
     [ObservableProperty]
@@ -71,6 +64,18 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private bool _addArtificialDelay = false;
 
+    public string SourcePath
+    {
+        get => SourcePathPicker.Path;
+        set => SourcePathPicker.Path = value;
+    }
+
+    public string SourcePathValidationMessage
+    {
+        get => SourcePathPicker.ValidationMessage;
+        set => SourcePathPicker.ValidationMessage = value;
+    }
+
     private readonly MemoryFileSystemProvider _memoryProvider;
     private readonly FileSystemProviderRegistry _providerRegistry = new();
     private readonly FilterContext _filterContext;
@@ -84,8 +89,9 @@ public partial class MainViewModel : ViewModelBase
     private CancellationTokenSource? _filterCts;
     private string _lastCommittedSourcePath = string.Empty;
 
+    public PathPickerViewModel SourcePathPicker { get; }
+
     public ObservableCollection<SourceBookmarkItem> SourceBookmarks { get; } = [];
-    public bool HasSourcePathValidationMessage => !string.IsNullOrWhiteSpace(SourcePathValidationMessage);
 
     public DirectoryTreeViewModel DirectoryTree { get; }
     public FileListViewModel FileList { get; }
@@ -113,6 +119,9 @@ public partial class MainViewModel : ViewModelBase
         Pipeline = new PipelineViewModel(
             presetStore: new PipelinePresetStore(),
             appSettings: _settings);
+
+        // Create the source path picker
+        SourcePathPicker = new PathPickerViewModel(_settings, _settingsStore, PathPickerMode.Source);
 
         // TODO: we will need to be able to init the viewmodel without a provider
         DirectoryTree = new DirectoryTreeViewModel(_providerRegistry)
@@ -174,6 +183,17 @@ public partial class MainViewModel : ViewModelBase
             }
         };
 
+        SourcePathPicker.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName == nameof(PathPickerViewModel.Path))
+            {
+                OnPropertyChanged(nameof(SourcePath));
+                OnPropertyChanged(nameof(SourcePathValidationMessage));
+            }
+        };
+
+        SourcePathPicker.PathCommitted += async (s,p) => await ApplySourcePathCoreAsync(p);
+
         InitializeInBackground();
     }
 
@@ -184,14 +204,6 @@ public partial class MainViewModel : ViewModelBase
         if (value is not null)
         {
             SourcePath = value.Path;
-        }
-    }
-
-    partial void OnSourcePathChanged(string value)
-    {
-        if (!PathHelper.AreEquivalentUserPaths(value, _lastCommittedSourcePath))
-        {
-            SourcePathValidationMessage = string.Empty;
         }
     }
 
@@ -420,7 +432,6 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private void RevertSourcePath()
     {
-        SourcePathValidationMessage = string.Empty;
         SourcePath = _lastCommittedSourcePath;
     }
 
@@ -736,6 +747,8 @@ public partial class MainViewModel : ViewModelBase
         LazyExpandScan = _settings.LazyExpandScan;
         DefaultOverwriteMode = _settings.DefaultOverwriteMode;
 
+        SourcePathPicker.RefreshSettings();
+
         await _operationJournal.RotateAsync(_settings.LogRetentionDays);
         await WorkflowMenu.RefreshAsync();
 
@@ -776,7 +789,7 @@ public partial class MainViewModel : ViewModelBase
             catch (Exception ex)
             {
                 Debug.WriteLine($"Failed to set initial source path to '{SourcePath}': {ex}");
-                SourcePath = _lastCommittedSourcePath;
+                RevertSourcePath();
             }
         }
 
