@@ -429,46 +429,9 @@ public partial class MainViewModel : ViewModelBase
         => Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime d
             ? d.MainWindow : null;
 
-    [RelayCommand]
     private void RevertSourcePath()
     {
         SourcePath = _lastCommittedSourcePath;
-    }
-
-    [RelayCommand]
-    private async Task ApplySourcePath()
-    {
-        var path = SourcePath.Trim();
-        if (string.IsNullOrWhiteSpace(path)) return;
-        await ApplySourcePathCoreAsync(path);
-    }
-
-    [RelayCommand]
-    private async Task BrowseSourcePath()
-    {
-        var mainWindow = GetMainWindow();
-        if (mainWindow is null)
-            return;
-
-        var folder = await mainWindow.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
-        {
-            Title = "Select source folder",
-            AllowMultiple = false,
-        });
-
-        if (folder is not { Count: > 0 })
-            return;
-
-        var selectedUri = folder[0].Path;
-        if (!selectedUri.IsAbsoluteUri || !selectedUri.IsFile)
-        {
-            SourcePathValidationMessage = "Selected location is not a local filesystem folder.";
-            LogPanel.AddEntry(SourcePathValidationMessage, LogLevel.Error);
-            return;
-        }
-
-        var pickedPath = selectedUri.LocalPath;
-        await ApplySourcePathCoreAsync(pickedPath);
     }
 
     private async Task ApplySourcePathCoreAsync(string path)
