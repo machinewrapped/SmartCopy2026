@@ -18,10 +18,10 @@ public partial class PathPickerViewModel : ViewModelBase
     private string _path = string.Empty;
 
     [ObservableProperty]
-    private SourceBookmarkItem? _selectedBookmark;
+    private string _validationMessage = string.Empty;
 
     [ObservableProperty]
-    public string _validationMessage = string.Empty;
+    private SourceBookmarkItem? _selectedBookmark;
 
     public ObservableCollection<SourceBookmarkItem> Bookmarks { get; } = [];
 

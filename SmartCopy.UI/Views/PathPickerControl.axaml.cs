@@ -133,19 +133,21 @@ public partial class PathPickerControl : UserControl
 
         foreach (IDataTransferItem item in items)
         {
-            if (item.Formats.Contains(DataFormat.File))
-            {
-                if (item.TryGetFile() is IStorageFolder folder)
-                {
-                    var path = folder.TryGetLocalPath() ?? folder.Path.LocalPath;
+            if (!item.Formats.Contains(DataFormat.File)) 
+                continue;
 
-                    if (!string.IsNullOrWhiteSpace(path) && DataContext is PathPickerViewModel vm)
-                    {
-                        vm.Path = path;
-                        vm.ApplyPathCommand.Execute(null);
-                    }
-                }                
+            if (item.TryGetFile() is IStorageFolder folder)
+            {
+                var path = folder.TryGetLocalPath();
+
+                if (!string.IsNullOrWhiteSpace(path) && DataContext is PathPickerViewModel vm)
+                {
+                    vm.Path = path;
+                    vm.ApplyPathCommand.Execute(null);
+                }
             }
+
+            break;
         }
         
         e.Handled = true;
