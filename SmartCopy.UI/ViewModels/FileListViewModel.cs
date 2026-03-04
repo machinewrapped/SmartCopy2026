@@ -103,6 +103,13 @@ public class FileListViewModel : ViewModelBase
         RefreshVisibleFiles();
     }
 
+    public void Clear()
+    {
+        _files.Clear();
+        _currentDirectoryNode = null;
+        RefreshVisibleFiles();        
+    }
+
     public void ClearIfUnder(DirectoryTreeNode removedDirectory)
     {
         var node = _currentDirectoryNode;

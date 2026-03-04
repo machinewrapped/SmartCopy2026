@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 
 namespace SmartCopy.UI.ViewModels;
 
@@ -6,6 +7,7 @@ public partial class StatusBarViewModel : ViewModelBase
 {
     public SelectionViewModel Selection { get; } = new();
     public OperationProgressViewModel Progress { get; }
+    public IRelayCommand? CancelScanCommand { get; set; }
 
     [ObservableProperty]
     private bool _isScanning;
