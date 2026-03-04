@@ -195,7 +195,7 @@ public partial class MainViewModel : ViewModelBase
 
         SourcePathPicker.PathCommitted += async (s,p) => await ApplySourcePathCoreAsync(p);
 
-        StatusBar.CancelScanCommand = CancelScanCommand;
+        StatusBar.CancelScanRequested += (_, _) => _scanCts?.Cancel();
 
         InitializeInBackground();
     }
@@ -314,8 +314,6 @@ public partial class MainViewModel : ViewModelBase
             StatusBar.Progress.CancelCommand.Execute(null);
     }
 
-    [RelayCommand]
-    private void CancelScan() => _scanCts?.Cancel();
 
     // ── Selection commands ──────────────────────────────────────────────────────
 
@@ -460,13 +458,13 @@ public partial class MainViewModel : ViewModelBase
         try
         {
             SourcePath = normalizedPath;
+            SourcePathValidationMessage = string.Empty;
 
             FileList.Clear();
 
             await DirectoryTree.ChangeRootAsync(normalizedPath, ct);
 
             _lastCommittedSourcePath = normalizedPath;
-            SourcePathValidationMessage = string.Empty;
 
             RecordRecentSource(normalizedPath);
 

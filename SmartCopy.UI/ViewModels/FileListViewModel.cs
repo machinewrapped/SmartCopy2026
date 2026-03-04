@@ -107,7 +107,7 @@ public class FileListViewModel : ViewModelBase
     {
         _files.Clear();
         _currentDirectoryNode = null;
-        RefreshVisibleFiles();        
+        RefreshVisibleFiles();
     }
 
     public void ClearIfUnder(DirectoryTreeNode removedDirectory)
