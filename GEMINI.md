@@ -3,6 +3,8 @@
 
 # Gemini-specific rules
 
+**Antigravity does not provide good support for reading the output of console commands on Windows. You can often get around this by appending `| Out-String` to the command to force the output to be a string.**
+
 ## Handling `dotnet build` compilation output
 When building the project using `dotnet build` in a console session, the MSBuild Terminal Logger uses ANSI escape sequences and carriage return `\r` characters to overdraw its progress bar. This mangles the captured output for the agent pipeline, hiding compilation errors and producing gibberish text.
 
