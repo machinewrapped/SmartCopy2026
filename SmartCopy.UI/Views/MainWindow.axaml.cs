@@ -598,46 +598,42 @@ public partial class MainWindow : Window
 
     private void OnSourceDragOver(object? sender, DragEventArgs e)
     {
-#pragma warning disable CS0618
-        var files = e.Data.GetFiles();
-#pragma warning restore CS0618
-        
-        // Only accept exactly one item that is a directory
-        if (files != null)
+        // Defer detailed validation to the drop handler. Only check for presence of files or folders.
+        if (e.DataTransfer.Items.Any(x => x.Formats.Contains(DataFormat.File)))
         {
-            var filesList = files as IReadOnlyList<IStorageItem> ?? Enumerable.ToList(files);
-            if (filesList.Count == 1 && filesList[0] is IStorageFolder folder)
-            {
-                if (folder.TryGetLocalPath() != null || folder.Path.IsAbsoluteUri)
-                {
-                    e.DragEffects = e.DragEffects & (DragDropEffects.Copy | DragDropEffects.Move);
-                    e.Handled = true;
-                    return;
-                }
-            }
+            e.DragEffects = e.DragEffects & (DragDropEffects.Copy | DragDropEffects.Move);
         }
-        
-        e.DragEffects = DragDropEffects.None;
+        else
+        {
+            e.DragEffects = DragDropEffects.None;
+        }
         e.Handled = true;
     }
 
     private void OnSourceDrop(object? sender, DragEventArgs e)
     {
-#pragma warning disable CS0618
-        var files = e.Data.GetFiles();
-#pragma warning restore CS0618
-        
-        if (files != null)
+        var items = e.DataTransfer.Items;
+        if (items is null)
         {
-            var filesList = files as IReadOnlyList<IStorageItem> ?? Enumerable.ToList(files);
-            if (filesList.Count == 1 && filesList[0] is IStorageFolder folder)
+            e.Handled = true;
+            return;
+        }
+
+        foreach (IDataTransferItem item in items)
+        {
+            if (item.Formats.Contains(DataFormat.File))
             {
-                var path = folder.TryGetLocalPath() ?? folder.Path.LocalPath;
-                if (!string.IsNullOrWhiteSpace(path) && DataContext is MainViewModel vm)
+                if (item.TryGetFile() is IStorageFolder folder)
                 {
-                    vm.SourcePath = path;
-                    vm.ApplySourcePathCommand.Execute(null);
-                }
+                    var path = folder.TryGetLocalPath() ?? folder.Path.LocalPath;
+
+                    if (!string.IsNullOrWhiteSpace(path) && DataContext is MainViewModel vm)
+                    {
+                        vm.SourcePath = path;
+                        vm.ApplySourcePathCommand.Execute(null);
+                        break;
+                    }                    
+                }                
             }
         }
         
