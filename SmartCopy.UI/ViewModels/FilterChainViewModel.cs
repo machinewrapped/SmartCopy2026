@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Settings;
+using System.Text.Json;
 
 namespace SmartCopy.UI.ViewModels;
 
@@ -79,6 +80,10 @@ public partial class FilterChainViewModel : ViewModelBase
     [ObservableProperty]
     private FilterViewModel? _selectedFilter;
 
+    public ObservableCollection<FilterChainPreset> UserPresets { get; } = [];
+
+    private readonly FilterChainPresetStore _chainPresetStore;
+
     /// <summary>
     /// Pushed by MainViewModel whenever the pipeline's first destination path changes.
     /// Used to pre-populate the mirror filter editor suggestion and the filter card description.
@@ -110,9 +115,6 @@ public partial class FilterChainViewModel : ViewModelBase
     /// <summary>Raised when the user clicks Save ▾; code-behind handles the file picker.</summary>
     public event EventHandler? SaveChainRequested;
 
-    /// <summary>Raised when the user clicks Load ▾; code-behind handles the file picker.</summary>
-    public event EventHandler? LoadChainRequested;
-
     public event EventHandler<bool>? VisibilityToggled;
 
     private bool _showExcludedNodesInTree = true;
@@ -126,15 +128,43 @@ public partial class FilterChainViewModel : ViewModelBase
         }
     }
 
+    public event EventHandler<string>? DeleteChainRequested;
+
     public FilterChainViewModel() : this(new FilterPresetStore(), new AppSettings()) { }
 
-    public FilterChainViewModel(FilterPresetStore presetStore, AppSettings settings)
+    public FilterChainViewModel(
+        FilterPresetStore presetStore,
+        AppSettings settings,
+        FilterChainPresetStore? chainPresetStore = null)
     {
         PresetStore = presetStore;
+        _chainPresetStore = chainPresetStore ?? new FilterChainPresetStore();
         _showExcludedNodesInTree = settings.ShowFilteredNodesInTree;
         AddFilter = new AddFilterViewModel(presetStore, settings);
         AddFilter.PresetPicked += OnPresetPicked;
         AddFilter.NewFilterRequested += typeKey => NewFilterDialogRequested?.Invoke(this, typeKey);
+
+        InitializePresetsInBackground();
+    }
+
+    private async void InitializePresetsInBackground()
+    {
+        try
+        {
+            await RefreshPresetsAsync();
+        }
+        catch { }
+    }
+
+    public async Task RefreshPresetsAsync()
+    {
+        var users = await _chainPresetStore.GetUserPresetsAsync();
+
+        UserPresets.Clear();
+        foreach (var preset in users)
+        {
+            UserPresets.Add(preset);
+        }
     }
 
     /// <summary>
@@ -198,9 +228,43 @@ public partial class FilterChainViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void LoadChain()
+    public void DeleteChain(string name)
     {
-        LoadChainRequested?.Invoke(this, EventArgs.Empty);
+        DeleteChainRequested?.Invoke(this, name);
+    }
+
+    public async Task SaveChainAsync(string name)
+    {
+        var config = new FilterChainConfig(
+            Name: name,
+            Description: null,
+            Filters: Filters.Select(f => f.BackingFilter.Config).ToList());
+
+        await _chainPresetStore.SaveUserPresetAsync(name, config);
+        await RefreshPresetsAsync();
+    }
+
+    [RelayCommand]
+    private void LoadChainPreset(string name)
+    {
+        var preset = UserPresets.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (preset is null) return;
+
+        Filters.Clear();
+        foreach (var filterConfig in preset.Config.Filters)
+        {
+            var filter = FilterFactory.FromConfig(filterConfig);
+            var vm = new FilterViewModel(filter);
+            vm.IsEnabledChanged += (_, _) => ChainChanged?.Invoke(this, EventArgs.Empty);
+            Filters.Add(vm);
+        }
+        ChainChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public async Task DeleteChainAsync(string name)
+    {
+        await _chainPresetStore.DeleteUserPresetAsync(name);
+        await RefreshPresetsAsync();
     }
 
     partial void OnPipelineDestinationPathChanged(string value)
