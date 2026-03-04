@@ -460,17 +460,17 @@ Verification
 #### 5.2.5— Drag-and-Drop Integration and Hardening
 
 Deliverables:
-- [ ] Add drag-and-drop for source and destination path inputs
-- [ ] Validate dropped paths and reject unsupported payloads safely
-- [ ] Confirm keyboard-first behavior remains intact after DnD additions
+- [x] Add drag-and-drop for source and destination path inputs
+- [x] Validate dropped paths and reject unsupported payloads safely
+- [x] Confirm keyboard-first behavior remains intact after DnD additions
 
 Acceptance criteria:
-- [ ] Dragging folders from OS shell updates source/destination fields reliably
-- [ ] DnD does not bypass validation/confirmation safeguards
-- [ ] Accessibility and keyboard workflows remain unchanged
+- [x] Dragging folders from OS shell updates source/destination fields reliably
+- [x] DnD does not bypass validation/confirmation safeguards
+- [x] Accessibility and keyboard workflows remain unchanged
 
 Verification:
-- [ ] UI-level smoke checks for DnD + keyboard navigation regression
+- [X] UI-level smoke checks for DnD + keyboard navigation regression
 
 #### 5.2.6 — Watcher and Incremental Rescan (selection-preserving)
 

@@ -36,7 +36,7 @@
         </Border>
 
         <!-- Source Field -->
-        <Border Grid.Row="1" Background="#252526" BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="6" Margin="10,10,10,5" Padding="10">
+        <Border x:Name="SourceDropTarget" DragDrop.AllowDrop="True" Grid.Row="1" Background="#252526" BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="6" Margin="10,10,10,5" Padding="10">
             <Grid RowDefinitions="Auto, Auto" ColumnDefinitions="Auto, *, Auto, Auto">
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Source" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold"/>
                 <ComboBox x:Name="SourceComboBox"

@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Platform.Storage;
 using SmartCopy.UI.ViewModels;
 using SmartCopy.UI.ViewModels.Workflows;
 
@@ -529,6 +530,9 @@ public partial class MainWindow : Window
 
     private void WireSourceComboBoxKeyboard()
     {
+        SourceDropTarget.AddHandler(DragDrop.DragOverEvent, OnSourceDragOver);
+        SourceDropTarget.AddHandler(DragDrop.DropEvent, OnSourceDrop);
+
         SourceComboBox.AddHandler(
             KeyDownEvent,
             OnSourceComboBoxKeyDown,
@@ -590,6 +594,54 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 break;
         }
+    }
+
+    private void OnSourceDragOver(object? sender, DragEventArgs e)
+    {
+#pragma warning disable CS0618
+        var files = e.Data.GetFiles();
+#pragma warning restore CS0618
+        
+        // Only accept exactly one item that is a directory
+        if (files != null)
+        {
+            var filesList = files as IReadOnlyList<IStorageItem> ?? Enumerable.ToList(files);
+            if (filesList.Count == 1 && filesList[0] is IStorageFolder folder)
+            {
+                if (folder.TryGetLocalPath() != null || folder.Path.IsAbsoluteUri)
+                {
+                    e.DragEffects = e.DragEffects & (DragDropEffects.Copy | DragDropEffects.Move);
+                    e.Handled = true;
+                    return;
+                }
+            }
+        }
+        
+        e.DragEffects = DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void OnSourceDrop(object? sender, DragEventArgs e)
+    {
+#pragma warning disable CS0618
+        var files = e.Data.GetFiles();
+#pragma warning restore CS0618
+        
+        if (files != null)
+        {
+            var filesList = files as IReadOnlyList<IStorageItem> ?? Enumerable.ToList(files);
+            if (filesList.Count == 1 && filesList[0] is IStorageFolder folder)
+            {
+                var path = folder.TryGetLocalPath() ?? folder.Path.LocalPath;
+                if (!string.IsNullOrWhiteSpace(path) && DataContext is MainViewModel vm)
+                {
+                    vm.SourcePath = path;
+                    vm.ApplySourcePathCommand.Execute(null);
+                }
+            }
+        }
+        
+        e.Handled = true;
     }
 
     // ── Settings record ────────────────────────────────────────────────────────

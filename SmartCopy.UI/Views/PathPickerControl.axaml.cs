@@ -38,6 +38,10 @@ public partial class PathPickerControl : UserControl
 
     private void WireComboBoxKeyboard()
     {
+        DragDrop.SetAllowDrop(this, true);
+        AddHandler(DragDrop.DragOverEvent, OnDragOver);
+        AddHandler(DragDrop.DropEvent, OnDrop);
+
         PathComboBox.AddHandler(
             KeyDownEvent,
             OnComboBoxKeyDown,
@@ -123,5 +127,53 @@ public partial class PathPickerControl : UserControl
                 e.Handled = true;
                 break;
         }
+    }
+
+    private void OnDragOver(object? sender, DragEventArgs e)
+    {
+#pragma warning disable CS0618
+        var files = e.Data.GetFiles();
+#pragma warning restore CS0618
+        
+        // Only accept exactly one item that is a directory
+        if (files != null)
+        {
+            var filesList = files as IReadOnlyList<IStorageItem> ?? Enumerable.ToList(files);
+            if (filesList.Count == 1 && filesList[0] is IStorageFolder folder)
+            {
+                if (folder.TryGetLocalPath() != null || folder.Path.IsAbsoluteUri)
+                {
+                    e.DragEffects = e.DragEffects & (DragDropEffects.Copy | DragDropEffects.Move);
+                    e.Handled = true;
+                    return;
+                }
+            }
+        }
+        
+        e.DragEffects = DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void OnDrop(object? sender, DragEventArgs e)
+    {
+#pragma warning disable CS0618
+        var files = e.Data.GetFiles();
+#pragma warning restore CS0618
+        
+        if (files != null)
+        {
+            var filesList = files as IReadOnlyList<IStorageItem> ?? Enumerable.ToList(files);
+            if (filesList.Count == 1 && filesList[0] is IStorageFolder folder)
+            {
+                var path = folder.TryGetLocalPath() ?? folder.Path.LocalPath;
+                if (!string.IsNullOrWhiteSpace(path) && DataContext is PathPickerViewModel vm)
+                {
+                    vm.Path = path;
+                    vm.ApplyPathCommand.Execute(null);
+                }
+            }
+        }
+        
+        e.Handled = true;
     }
 }
