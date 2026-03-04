@@ -79,7 +79,7 @@ public sealed class FilterChainPresetStore
         await File.WriteAllTextAsync(filePath, json, ct);
     }
 
-    public async Task DeleteUserPresetAsync(
+    public Task DeleteUserPresetAsync(
         string name,
         string? explicitDirectory = null,
         CancellationToken ct = default)
@@ -87,33 +87,27 @@ public sealed class FilterChainPresetStore
         ct.ThrowIfCancellationRequested();
         if (string.IsNullOrWhiteSpace(name))
         {
-            return;
+            throw new ArgumentException("Preset name must not be empty.", nameof(name));
         }
 
         var directory = explicitDirectory ?? GetDefaultPresetDirectory();
         if (!Directory.Exists(directory))
         {
-            return;
+            Debug.WriteLine($"[FilterChainPresetStore] Cannot delete preset '{name}': directory not found at '{directory}'");
+            return Task.CompletedTask;
         }
 
         var directPath = Path.Combine(directory, $"{ToSafeId(name)}.sc2filterchain");
         if (File.Exists(directPath))
         {
             File.Delete(directPath);
-            return;
+        }
+        else
+        {
+            Debug.WriteLine($"[FilterChainPresetStore] Cannot delete preset '{name}': file not found at '{directPath}'");
         }
 
-        var presets = await GetUserPresetsAsync(directory, ct);
-        var matching = presets.FirstOrDefault(preset =>
-            string.Equals(preset.Name, name, StringComparison.OrdinalIgnoreCase));
-        if (matching is not null)
-        {
-            var path = Path.Combine(directory, $"{matching.Id}.sc2filterchain");
-            if (File.Exists(path))
-            {
-                File.Delete(path);
-            }
-        }
+        return Task.CompletedTask;
     }
 
     public static string GetDefaultPresetDirectory()

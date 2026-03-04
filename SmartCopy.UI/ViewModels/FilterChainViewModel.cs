@@ -147,8 +147,6 @@ public partial class FilterChainViewModel : ViewModelBase
         InitializePresetsInBackground();
     }
 
-    private static readonly JsonSerializerOptions s_jsonOptions = new() { WriteIndented = true };
-
     private async void InitializePresetsInBackground()
     {
         try
