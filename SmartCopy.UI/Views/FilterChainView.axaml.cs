@@ -138,7 +138,7 @@ public partial class FilterChainView : UserControl
     {
         // Attach a pointer-pressed handler to each filter card container so we can
         // detect a press on the ≡ drag handle and start a drag.
-        e.Container.AddHandler(PointerPressedEvent, OnFilterCardPointerPressed);
+        e.Container.AddHandler(PointerPressedEvent, OnFilterCardPointerPressed, Avalonia.Interactivity.RoutingStrategies.Tunnel);
     }
 
     private async void OnFilterCardPointerPressed(object? sender, PointerPressedEventArgs e)
