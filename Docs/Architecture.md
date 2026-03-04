@@ -31,11 +31,11 @@ SmartCopy2026 follows a strict separation of concerns, heavily utilizing Depende
 *   **Signpost**: Look at `IFilter.cs`, `FilterChain.cs`, and the specific filter implementations.
 
 ### 2.4 Transform Pipeline
-*   **Principle**: File operations are orchestrated as a declarative pipeline of sequential steps applied to the selected root working set.
+*   **Principle**: File operations are orchestrated as a declarative pipeline of sequential steps applied to the selected directory tree.
 *   **Details**:
     *   **Steps** execute filesystem operations (`CopyStep`, `MoveStep`, `DeleteStep`) or metadata mutations (`FlattenStep`).
     *   **Validation** is strict. Preconditions and postconditions prevent execution of invalid pipeline paths (e.g., executing a Move followed by an Overwrite of the unavailable source).
-    *   **Previews** safely preview complex actions and are strictly mandated prior to executing destructive effects (Delete, Overwrite).
+    *   **Previews** safely preview complex actions, automatic prior to executing destructive effects (Delete, Overwrite).
 
     * **Example pipelines:**
     | Use case | Steps |
@@ -46,7 +46,6 @@ SmartCopy2026 follows a strict separation of concerns, heavily utilizing Depende
     | Archive move | `[FlattenStep → MoveStep]` |
     | Copy then move | `[CopyStep("/mem/Backup") → MoveStep("/mem/Archive")]` |
     | Split Backup | `[CopyStep("destination1") → InvertSelectionStep → CopyStep("destination2")]` |
-    | Transcode | `[ConvertStep(mp3, 320k) → CopyStep]` |    
 
 *   **Signpost**: Search `IPipelineStep.cs`, `PipelineRunner.cs`, and `PipelineValidator.cs`.
 
@@ -60,30 +59,24 @@ SmartCopy2026 follows a strict separation of concerns, heavily utilizing Depende
 *   **Details**: `WorkflowConfig` instances encapsulate source paths, target destinations, active filter chains, and pipeline pipelines into unified, single-click presets.
 *   **Signpost**: Find `WorkflowConfig.cs` and `WorkflowPresetStore.cs`.
 
-## 3. Mandatory Rules & Constraints
+## 3. Rules & Constraints
 
 1.  **Cross-provider moves** (e.g., Local to MTP) cannot be atomic. Strategies must gracefully degrade to Copy-then-Delete.
-2.  **UI Performance**: Suppress `INotifyPropertyChanged` notifications when bulk-updating directory check states (e.g. checking a folder with 10k items) to prevent immediate Avalonia dispatcher freeze. 
-3.  **UI Data Binding**: Never bind expensive domain operations or remote path validations to an editable ComboBox's `SelectedItem` property (e.g. 'Source Path'). This triggers unwanted immediate invocations on keystrokes. Defer action execution using distinct confirm transitions ('Enter' or closed dropdown).
-4.  **Path Handling**: Internal pipeline steps strictly utilize canonical separator-free `string[]` path segments relative to the selected root direction. Rely on the relevant `IFileSystemProvider.JoinPath()` to convert back to host-specific filesystem strings when executing operations.
+2.  **UI Data Binding**: Never bind expensive domain operations or remote path validations to an editable ComboBox's `SelectedItem` property (e.g. 'Source Path'). This triggers unwanted immediate invocations on keystrokes. Defer action execution using distinct confirm transitions ('Enter' or closed dropdown).
+3.  **Path Handling**: Paths are internally represented as `string[]` path segments relative to the provider root. Use provider-specific `IFileSystemProvider.JoinPath()` to convert to canonical paths when the filesystem is known.
 
 ## 4.Pitfalls
 
 ### Editable ComboBox + ObservableCollection Pitfall (Source Path Selector)
 
-The Source path field is an **editable `ComboBox`** bound to `SourceBookmarks` (items) and
-`SourcePath` (text). Two binding pitfalls must be avoided whenever this pattern is used:
+The Source path field is an **editable `ComboBox`** bound to `SourceBookmarks` (items) and `SourcePath` (text). Two pitfalls must be avoided whenever this pattern is used:
 
 **Pitfall 1 — Do not apply side effects from `SelectedItem` changes.**
-An editable ComboBox fires `SelectedItem` changes on every arrow-key press (including when the
-dropdown is closed). If the ViewModel reacts to `SelectedItem` by triggering an expensive
-operation (directory rescan, API call, etc.), the UI becomes sluggish and unintended states are committed.
+An editable ComboBox fires `SelectedItem` changes on every arrow-key press (including when the dropdown is closed). If the ViewModel reacts to `SelectedItem` by triggering an expensive operation (e.g. directory scan), unintended states are committed and the UI becomes sluggish.
 
-**Correct pattern:** `OnSelectedSourceBookmarkChanged` should only populate the text field. 
-The actual application must be deferred to an explicit commit action:
+**Correct pattern:** `OnSelectedSourceBookmarkChanged` should only populate the text field. The actual application must be deferred to an explicit commit action:
 - **Keyboard:** Enter key fires `ApplySourcePathCommand` (wired via tunnel handler in code-behind)
-- **Mouse:** A `SelectionChanged` handler sets `_applyOnDropDownClose = true` when the dropdown
-  is open. `DropDownClosed` checks this flag and applies via `Dispatcher.UIThread.Post`.
+- **Mouse:** A `SelectionChanged` handler sets `_applyOnDropDownClose = true` when the dropdown is open. `DropDownClosed` checks this flag and applies via `Dispatcher.UIThread.Post`.
 
 **Pitfall 2 — `ObservableCollection.Clear()` wipes the ComboBox `Text` binding.**
 The ComboBox nulls its `SelectedItem` (e.g. during `RefreshSourceBookmarks`), which causes Avalonia to wipe the `Text` property. The two-way binding propagates that blank back to the ViewModel, erasing the user's input.
