@@ -1,13 +1,9 @@
-using System.IO;
-using System.Linq;
 using System.Text;
 using SmartCopy.Core.DirectoryTree;
-using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
+using SmartCopy.Core.FileSystem;
 using SmartCopy.Tests.TestInfrastructure;
-using SmartCopy.UI.ViewModels;
-
 namespace SmartCopy.Tests.Pipeline;
 
 public sealed class PipelineRunnerTests
@@ -271,5 +267,109 @@ public sealed class PipelineRunnerTests
             runner.ExecuteAsync(emptyJob));
 
         Assert.Contains("At least one file must be selected", executeError.Message);
+    }
+
+    [Fact]
+    public async Task CrossProviderPipeline_RoutesToCorrectProviders_Execute()
+    {
+        var sourceProvider = MemoryFileSystemFixtures.Create(f => f
+            .WithDirectory("/source")
+            .WithFile("/source/a.txt", "a"u8)
+            .WithFile("/source/b.txt", "b"u8));
+
+        var targetProviderA = MemoryFileSystemFixtures.Create(f => f
+            .WithDirectory("/destA"), customRootPath: "/targetA");
+
+        var targetProviderB = MemoryFileSystemFixtures.Create(f => f
+            .WithDirectory("/destB"), customRootPath: "/targetB");
+
+        var root = await sourceProvider.BuildDirectoryTree();
+        var nodeA = root.FindNodeByPathSegments(["source", "a.txt"]);
+        var nodeB = root.FindNodeByPathSegments(["source", "b.txt"]);
+        Assert.NotNull(nodeA);
+        Assert.NotNull(nodeB);
+        
+        nodeA.CheckState = CheckState.Checked;
+        nodeB.CheckState = CheckState.Checked;
+
+        var registry = new FileSystemProviderRegistry();
+        registry.Register(sourceProvider);
+        registry.Register(targetProviderA);
+        registry.Register(targetProviderB);
+
+        var pipeline = new TransformPipeline([
+            new CopyStep("/targetA/destA"),
+            new CopyStep("/targetB/destB")
+        ]);
+
+        var runner = new PipelineRunner(pipeline);
+        var job = new PipelineJob
+        {
+            RootNode       = root,
+            SourceProvider = sourceProvider,
+            ProviderRegistry = registry,
+            OverwriteMode  = OverwriteMode.Always,
+            DeleteMode     = DeleteMode.Trash,
+        };
+
+        var results = await runner.ExecuteAsync(job);
+
+        Assert.All(results, r => Assert.True(r.IsSuccess));
+
+        Assert.True(await targetProviderA.ExistsAsync("/destA/source/a.txt", CancellationToken.None));
+        Assert.True(await targetProviderA.ExistsAsync("/destA/source/b.txt", CancellationToken.None));
+        Assert.True(await targetProviderB.ExistsAsync("/destB/source/a.txt", CancellationToken.None));
+        Assert.True(await targetProviderB.ExistsAsync("/destB/source/b.txt", CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task CrossProviderPipeline_RoutesToCorrectProviders_Preview()
+    {
+        var sourceProvider = MemoryFileSystemFixtures.Create(f => f
+            .WithDirectory("/source")
+            .WithFile("/source/a.txt", "x"u8));
+
+        var targetProviderA = MemoryFileSystemFixtures.Create(f => f
+            .WithDirectory("/destA"), customRootPath: "/targetA");
+
+        var targetProviderB = MemoryFileSystemFixtures.Create(f => f
+            .WithDirectory("/destB"), customRootPath: "/targetB");
+
+        var root = await sourceProvider.BuildDirectoryTree();
+        var node = root.FindNodeByPathSegments(["source", "a.txt"]);
+        Assert.NotNull(node);
+        node.CheckState = CheckState.Checked;
+
+        var registry = new FileSystemProviderRegistry();
+        registry.Register(sourceProvider);
+        registry.Register(targetProviderA);
+        registry.Register(targetProviderB);
+
+        var pipeline = new TransformPipeline([
+            new CopyStep("/targetA/destA"),
+            new CopyStep("/targetB/destB")
+        ]);
+
+        var runner = new PipelineRunner(pipeline);
+        var job = new PipelineJob
+        {
+            RootNode       = root,
+            SourceProvider = sourceProvider,
+            ProviderRegistry = registry,
+            OverwriteMode  = OverwriteMode.Always,
+            DeleteMode     = DeleteMode.Trash,
+        };
+
+        var plan = await runner.PreviewAsync(job, CancellationToken.None);
+
+        Assert.Equal(2, plan.Actions.Count);
+        
+        var actionA = plan.Actions[0];
+        Assert.Equal(SourceResult.Copied, actionA.SourceResult);
+        Assert.Equal("/targetA/destA/source/a.txt", actionA.DestinationPath);
+
+        var actionB = plan.Actions[1];
+        Assert.Equal(SourceResult.Copied, actionB.SourceResult);
+        Assert.Equal("/targetB/destB/source/a.txt", actionB.DestinationPath);
     }
 }

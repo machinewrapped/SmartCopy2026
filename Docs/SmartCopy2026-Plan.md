@@ -441,7 +441,7 @@ Acceptance criteria:
 
 Verification:
 - [X] Manual smoke: scan/filter/preview/run on a real directory tree with at least 10k files
-- [ ] Automated tests around provider switching and pipeline execution provider routing
+- [x] Automated tests around provider switching and pipeline execution provider routing
 
 ### 5.2.4 - Directory browser integration for filter and pipeline editors
 
