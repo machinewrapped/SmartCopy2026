@@ -29,7 +29,7 @@
                         CornerRadius="4"
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Center" />
-                <Button Content="Save pipeline..."
+                <Button Content="Save As Preset"
                         CornerRadius="4"
                         Margin="0,4,0,0"
                         HorizontalAlignment="Stretch"
@@ -37,7 +37,7 @@
                         IsVisible="{Binding HasSteps}"
                         Command="{Binding SavePipelineCommand}" />
                 <Button x:Name="LoadPresetButton"
-                        Content="Load preset ▾"
+                        Content="Load Preset"
                         CornerRadius="4"
                         Margin="0,4,0,0"
                         HorizontalAlignment="Stretch"
