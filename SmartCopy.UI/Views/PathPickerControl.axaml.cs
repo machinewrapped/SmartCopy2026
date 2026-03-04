@@ -42,7 +42,6 @@ public partial class PathPickerControl : UserControl
 
     private void WireComboBoxKeyboard()
     {
-        DragDrop.SetAllowDrop(this, true);
         AddHandler(DragDrop.DragOverEvent, OnDragOver);
         AddHandler(DragDrop.DropEvent, OnDrop);
 
