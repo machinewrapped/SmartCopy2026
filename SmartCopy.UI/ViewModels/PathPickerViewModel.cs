@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Linq;
-using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SmartCopy.Core.FileSystem;
@@ -38,6 +34,12 @@ public partial class PathPickerViewModel : ViewModelBase
         _settingsStore = settingsStore;
         _mode = mode;
 
+        RefreshBookmarks();
+    }
+
+    /// <summary>Update bookmarks from app settings</summary>
+    public void RefreshSettings()
+    {
         RefreshBookmarks();
     }
 
@@ -146,6 +148,7 @@ public partial class PathPickerViewModel : ViewModelBase
         var currentPath = Path;
 
         Bookmarks.Clear();
+
         var addedPaths = new HashSet<string>(PathHelper.PathComparer);
 
         var recentList = _mode == PathPickerMode.Source ? _settings.RecentSources : _settings.RecentTargets;
@@ -155,8 +158,14 @@ public partial class PathPickerViewModel : ViewModelBase
 
         // Save normalized lists back
         _settings.FavouritePaths = normalizedFavourites;
-        if (_mode == PathPickerMode.Source) _settings.RecentSources = normalizedRecent;
-        else _settings.RecentTargets = normalizedRecent;
+        if (_mode == PathPickerMode.Source)
+        {
+             _settings.RecentSources = normalizedRecent;
+        }
+        else
+        {
+            _settings.RecentTargets = normalizedRecent;
+        }
 
         foreach (var p in _settings.FavouritePaths)
         {

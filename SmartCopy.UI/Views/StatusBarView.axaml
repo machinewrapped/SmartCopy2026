@@ -9,10 +9,22 @@
         <Panel DockPanel.Dock="Right" IsVisible="{Binding Progress.IsActive}">
             <views:OperationProgressView DataContext="{Binding Progress}" />
         </Panel>
-        <TextBlock DockPanel.Dock="Right"
-                   Text="{Binding ScanStatusText}"
-                   IsVisible="{Binding IsScanning}"
-                   VerticalAlignment="Center" Margin="0,0,8,0" />
+        <StackPanel DockPanel.Dock="Right"
+                    Orientation="Horizontal"
+                    IsVisible="{Binding IsScanning}"
+                    VerticalAlignment="Center"
+                    Spacing="6"
+                    Margin="0,0,8,0">
+            <TextBlock Text="{Binding ScanStatusText}" VerticalAlignment="Center" />
+            <Button Command="{Binding CancelScanCommand}"
+                    Content="Cancel"
+                    Padding="6,1"
+                    VerticalAlignment="Center"
+                    Background="#c0392b"
+                    Foreground="White"
+                    BorderThickness="0"
+                    CornerRadius="3" />
+        </StackPanel>
         <TextBlock DockPanel.Dock="Right"
                    Text="Ready"
                    IsVisible="{Binding IsIdle}"

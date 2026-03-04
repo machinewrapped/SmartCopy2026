@@ -66,7 +66,6 @@ public class DirectoryTreeViewModel : ViewModelBase
     public async Task ChangeRootAsync(string newRootPath, CancellationToken ct = default)
     {
         IsLoaded = false;
-        IsLoading = true;
         await InitializeAsync(newRootPath, ct: ct);
     }
 
@@ -115,6 +114,8 @@ public class DirectoryTreeViewModel : ViewModelBase
 
         try
         {
+            IsLoading = true;
+
             var scanOptions = new ScanOptions { LazyExpand = false, IncludeHidden = true };
 
             var sourceProvider = _providerRegistry.Resolve(rootPath)

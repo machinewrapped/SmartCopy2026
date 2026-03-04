@@ -28,6 +28,10 @@ public partial class PathPickerControl : UserControl
         set => SetValue(BrowseButtonToolTipProperty, value);
     }
 
+    // ── Source ComboBox UX ──────────────────────────────────────────────────────
+    // Keyboard: Tunnel handler fires BEFORE the ComboBox's built-in key handler.
+    // Mouse: SelectionChanged while dropdown is open sets _applyOnDropDownClose;
+    //        DropDownClosed checks it and applies if set.
     private bool _applyOnDropDownClose;
 
     public PathPickerControl()
@@ -38,10 +42,13 @@ public partial class PathPickerControl : UserControl
 
     private void WireComboBoxKeyboard()
     {
+        AddHandler(DragDrop.DragOverEvent, OnDragOver);
+        AddHandler(DragDrop.DropEvent, OnDrop);
+
         PathComboBox.AddHandler(
             KeyDownEvent,
             OnComboBoxKeyDown,
-            Avalonia.Interactivity.RoutingStrategies.Tunnel);
+            RoutingStrategies.Tunnel);
 
         // If the selection changes while the dropdown is open, the user picked an item.
         PathComboBox.SelectionChanged += (_, _) =>
@@ -51,31 +58,6 @@ public partial class PathPickerControl : UserControl
         };
 
         PathComboBox.DropDownClosed += OnComboBoxDropDownClosed;
-    }
-
-    private async void OnBrowseClick(object? sender, RoutedEventArgs e)
-    {
-        if (TopLevel.GetTopLevel(this) is not TopLevel topLevel)
-            return;
-
-        var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
-        {
-            Title = BrowseDialogTitle,
-            AllowMultiple = false,
-        });
-
-        if (folders is not { Count: > 0 })
-            return;
-
-        var selectedUri = folders[0].Path;
-        if (!selectedUri.IsAbsoluteUri || !selectedUri.IsFile)
-            return;
-
-        if (DataContext is PathPickerViewModel vm)
-        {
-            vm.Path = selectedUri.LocalPath;
-            vm.ApplyPathCommand.Execute(null);
-        }
     }
 
     private void OnComboBoxDropDownClosed(object? sender, EventArgs e)
@@ -122,6 +104,76 @@ public partial class PathPickerControl : UserControl
                 }
                 e.Handled = true;
                 break;
+        }
+    }
+
+    private void OnDragOver(object? sender, DragEventArgs e)
+    {
+        // Defer detailed validation to the drop handler. Only check for presence of files or folders.
+        if (e.DataTransfer.Items.Any(x => x.Formats.Contains(DataFormat.File)))
+        {
+            e.DragEffects = e.DragEffects & (DragDropEffects.Copy | DragDropEffects.Move);
+        }
+        else
+        {
+            e.DragEffects = DragDropEffects.None;
+        }
+        e.Handled = true;
+    }
+
+    private void OnDrop(object? sender, DragEventArgs e)
+    {
+        var items = e.DataTransfer.Items;
+        if (items is null)
+        {
+            e.Handled = true;
+            return;
+        }
+
+        foreach (IDataTransferItem item in items)
+        {
+            if (!item.Formats.Contains(DataFormat.File)) 
+                continue;
+
+            if (item.TryGetFile() is IStorageFolder folder)
+            {
+                var path = folder.TryGetLocalPath();
+
+                if (!string.IsNullOrWhiteSpace(path) && DataContext is PathPickerViewModel vm)
+                {
+                    vm.Path = path;
+                    vm.ApplyPathCommand.Execute(null);
+                }
+            }
+
+            break;
+        }
+        
+        e.Handled = true;
+    }
+
+    private async void OnBrowseClick(object? sender, RoutedEventArgs e)
+    {
+        if (TopLevel.GetTopLevel(this) is not TopLevel topLevel)
+            return;
+
+        var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = BrowseDialogTitle,
+            AllowMultiple = false,
+        });
+
+        if (folders is not { Count: > 0 })
+            return;
+
+        var selectedUri = folders[0].Path;
+        if (!selectedUri.IsAbsoluteUri || !selectedUri.IsFile)
+            return;
+
+        if (DataContext is PathPickerViewModel vm)
+        {
+            vm.Path = selectedUri.LocalPath;
+            vm.ApplyPathCommand.Execute(null);
         }
     }
 }

@@ -4,7 +4,7 @@
              x:Class="SmartCopy.UI.Views.PathPickerControl"
              x:DataType="vm:PathPickerViewModel">
 
-    <Grid RowDefinitions="Auto, Auto" ColumnDefinitions="*, Auto, Auto">
+    <Grid RowDefinitions="Auto, Auto" ColumnDefinitions="*, Auto, Auto" DragDrop.AllowDrop="True">
         <!-- Input Row -->
         <ComboBox x:Name="PathComboBox"
                   Grid.Row="0"
