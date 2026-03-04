@@ -6,8 +6,11 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Avalonia.Platform.Storage;
 using SmartCopy.Core.Filters;
 using SmartCopy.UI.ViewModels;
+using SmartCopy.UI.ViewModels.Dialogs;
+using SmartCopy.UI.Views.Dialogs;
 
 namespace SmartCopy.UI.Views;
 
@@ -31,6 +34,7 @@ public partial class FilterChainView : UserControl
                 _currentViewModel.Filters.CollectionChanged -= Filters_CollectionChanged;
                 _currentViewModel.NewFilterDialogRequested -= OnNewFilterDialogRequested;
                 _currentViewModel.EditFilterRequested -= OnEditFilterRequested;
+                _currentViewModel.SaveChainRequested -= OnSaveChainRequested;
                 _currentViewModel.AddFilter.PresetPicked -= OnPresetPickedClosePopup;
                 _currentViewModel.AddFilter.CloseRequested -= OnCloseRequestedClosePopup;
             }
@@ -42,6 +46,7 @@ public partial class FilterChainView : UserControl
                 _currentViewModel.Filters.CollectionChanged += Filters_CollectionChanged;
                 _currentViewModel.NewFilterDialogRequested += OnNewFilterDialogRequested;
                 _currentViewModel.EditFilterRequested += OnEditFilterRequested;
+                _currentViewModel.SaveChainRequested += OnSaveChainRequested;
                 _currentViewModel.AddFilter.PresetPicked += OnPresetPickedClosePopup;
                 _currentViewModel.AddFilter.CloseRequested += OnCloseRequestedClosePopup;
             }
@@ -130,6 +135,85 @@ public partial class FilterChainView : UserControl
     {
         var preset = new FilterPreset { Name = name, Config = filter.Config };
         await chainVm.PresetStore.SaveUserPresetAsync(filterType, preset);
+    }
+
+    // ---- Save / Load File Picker ----
+
+    private void OnSaveChainRequested(object? sender, EventArgs e)
+    {
+        _ = SaveChainDialogAsync();
+    }
+
+    private async Task SaveChainDialogAsync()
+    {
+        if (_currentViewModel is null) return;
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel is not Window window) return;
+
+        var dialogVm = new SaveFilterChainDialogViewModel();
+        foreach (var preset in _currentViewModel.UserPresets)
+        {
+            dialogVm.ExistingNames.Add(preset.Name);
+        }
+
+        var dialog = new SaveFilterChainDialog
+        {
+            DataContext = dialogVm
+        };
+
+        var result = await dialog.ShowDialog<bool>(window);
+        if (result && !string.IsNullOrWhiteSpace(dialogVm.ChainName))
+        {
+            if (dialogVm.IsOverwrite)
+            {
+                var confirmVm = new SmartCopy.UI.ViewModels.Workflows.ConfirmDialogViewModel
+                {
+                    Title = "Confirm Replace",
+                    Message = $"Replace existing filter chain \"{dialogVm.ChainName.Trim()}\"?",
+                    ConfirmText = "Replace"
+                };
+                var confirm = new SmartCopy.UI.Views.Workflows.ConfirmDialog { DataContext = confirmVm };
+                var confirmResult = await confirm.ShowDialog<bool?>(window);
+                if (confirmResult != true) return;
+            }
+
+            await _currentViewModel.SaveChainAsync(dialogVm.ChainName.Trim());
+        }
+    }
+
+    // ---- Load / Delete Flyout Handlers ----
+
+    private void OnLoadPresetButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is Button { CommandParameter: string name })
+        {
+            _currentViewModel?.LoadChainPresetCommand?.Execute(name);
+            this.Get<Button>("LoadButton")?.Flyout?.Hide();
+        }
+    }
+
+    private async void OnDeletePresetButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is Button { CommandParameter: string name } && _currentViewModel != null)
+        {
+            this.Get<Button>("LoadButton")?.Flyout?.Hide();
+
+            var topLevel = TopLevel.GetTopLevel(this);
+            if (topLevel is not Window window) return;
+
+            var confirmVm = new SmartCopy.UI.ViewModels.Workflows.ConfirmDialogViewModel
+            {
+                Title = "Confirm Delete",
+                Message = $"Delete filter chain \"{name}\" permanently?",
+                ConfirmText = "Delete"
+            };
+            var confirm = new SmartCopy.UI.Views.Workflows.ConfirmDialog { DataContext = confirmVm };
+            var confirmResult = await confirm.ShowDialog<bool?>(window);
+            if (confirmResult == true)
+            {
+                await _currentViewModel.DeleteChainAsync(name);
+            }
+        }
     }
 
     // ---- DragDrop: drag handle wiring ----
