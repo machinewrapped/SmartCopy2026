@@ -29,6 +29,54 @@
                         CornerRadius="4"
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Center" />
+                <Button Content="Save pipeline..."
+                        CornerRadius="4"
+                        Margin="0,4,0,0"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center"
+                        IsVisible="{Binding HasSteps}"
+                        Command="{Binding SavePipelineCommand}" />
+                <Button x:Name="LoadPresetButton"
+                        Content="Load preset ▾"
+                        CornerRadius="4"
+                        Margin="0,4,0,0"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center"
+                        IsVisible="{Binding !HasSteps}">
+                    <Button.Flyout>
+                        <Flyout Placement="LeftEdgeAlignedTop">
+                            <StackPanel MinWidth="200" MaxHeight="300">
+                                <TextBlock Text="Load Pipeline Preset" Opacity="0.5" Margin="4,0,0,8" FontSize="11" />
+                                <TextBlock Text="No saved pipelines found." IsVisible="{Binding !UserPresets.Count}" Margin="4,0,0,0" Opacity="0.5" />
+                                <ItemsControl ItemsSource="{Binding UserPresets}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="corePipeline:PipelinePreset">
+                                            <Grid ColumnDefinitions="*, Auto" Margin="0,2">
+                                                <Button Grid.Column="0" 
+                                                        Content="{Binding Name}" 
+                                                        HorizontalAlignment="Stretch"
+                                                        HorizontalContentAlignment="Left"
+                                                        Background="Transparent"
+                                                        Click="OnLoadPresetButtonClick"
+                                                        CommandParameter="{Binding Name}" />
+                                                <Button Grid.Column="1" Content="✕"
+                                                        Click="OnDeletePipelinePresetButtonClick"
+                                                        CommandParameter="{Binding Name}"
+                                                        Width="26" Height="26" CornerRadius="4"
+                                                        Padding="0"
+                                                        HorizontalContentAlignment="Center"
+                                                        VerticalContentAlignment="Center"
+                                                        Background="Transparent"
+                                                        ToolTip.Tip="Delete pipeline"
+                                                        Foreground="{DynamicResource DangerForegroundBrush}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
             </StackPanel>
 
             <StackPanel DockPanel.Dock="Top"

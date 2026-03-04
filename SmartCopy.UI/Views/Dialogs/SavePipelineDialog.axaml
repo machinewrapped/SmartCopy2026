@@ -1,0 +1,39 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels.Dialogs"
+        x:Class="SmartCopy.UI.Views.Dialogs.SavePipelineDialog"
+        x:DataType="vm:SavePipelineDialogViewModel"
+        Title="Save Pipeline"
+        Width="400"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#1e1e1e">
+    <StackPanel Spacing="12" Margin="20">
+
+        <StackPanel Spacing="4">
+            <TextBlock Text="Pipeline Name" FontSize="12" Opacity="0.7" />
+            <TextBox Text="{Binding PipelineName}" Watermark="Enter pipeline name" />
+        </StackPanel>
+
+        <StackPanel Spacing="4">
+            <TextBlock Text="Or replace existing:" FontSize="12" Opacity="0.7" />
+            <ComboBox ItemsSource="{Binding ExistingNames}"
+                      SelectedItem="{Binding SelectedExistingName}"
+                      PlaceholderText="(select to replace)"
+                      HorizontalAlignment="Stretch" />
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button Content="Cancel"
+                    Command="{Binding CancelCommand}"
+                    Width="80"
+                    IsCancel="True" />
+            <Button Content="OK"
+                    Command="{Binding OkCommand}"
+                    Width="80"
+                    IsDefault="True" />
+        </StackPanel>
+
+    </StackPanel>
+</Window>

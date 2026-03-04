@@ -183,6 +183,8 @@ public partial class PipelineViewModel : ViewModelBase
     public ObservableCollection<PipelinePreset> UserPresets { get; } = [];
     public AddStepViewModel AddStep { get; }
 
+    public bool HasSteps => Steps.Count > 0;
+
     public StepPresetStore StepPresetStore => _stepPresetStore;
 
     internal AppSettings? AppSettings => _appSettings;
@@ -233,6 +235,7 @@ public partial class PipelineViewModel : ViewModelBase
     public event EventHandler? RunRequested;
     public event EventHandler? PreviewRequested;
     public event EventHandler<PipelineStepViewModel>? EditStepRequested;
+    public event EventHandler? SavePipelineRequested;
 
     public PipelineViewModel(
         PipelinePresetStore? presetStore = null,
@@ -250,9 +253,6 @@ public partial class PipelineViewModel : ViewModelBase
 
         AddStep = new AddStepViewModel(_stepPresetStore, appSettings, stepPresetStorePath);
         AddStep.StepPresetPicked += OnStepPresetPicked;
-        AddStep.LoadPipelinePresetRequested += OnAddStepLoadPipelinePresetRequested;
-        AddStep.SavePipelineRequested += OnAddStepSavePipelineRequested;
-        AddStep.DeletePipelineRequested += OnAddStepDeletePipelineRequested;
 
         Steps.CollectionChanged += OnStepsCollectionChanged;
 
@@ -282,17 +282,7 @@ public partial class PipelineViewModel : ViewModelBase
         AddStepFromResult(step.StepType, step, customName);
     }
 
-    private void OnAddStepLoadPipelinePresetRequested(string name)
-    {
-        LoadPresetCommand.Execute(name);
-    }
-
-    private void OnAddStepSavePipelineRequested(string? name)
-    {
-        SavePipelineCommand.Execute(name);
-    }
-
-    private async void OnAddStepDeletePipelineRequested(string name)
+    public async Task DeletePipelinePresetAsync(string name)
     {
         try
         {
@@ -365,11 +355,15 @@ public partial class PipelineViewModel : ViewModelBase
         }
 
         LoadPreset(preset);
-        AddStep.RequestClose();
     }
 
     [RelayCommand]
-    private async Task SavePipelineAsync(string? name = null)
+    private void SavePipeline()
+    {
+        SavePipelineRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    public async Task SavePipelineAsync(string name)
     {
         if (Steps.Count == 0)
         {
@@ -386,7 +380,6 @@ public partial class PipelineViewModel : ViewModelBase
             _presetDirectory);
 
         await RefreshPresetsAsync();
-        AddStep.RequestClose();
     }
 
     [RelayCommand(CanExecute = nameof(CanRun))]
@@ -466,14 +459,10 @@ public partial class PipelineViewModel : ViewModelBase
         {
             UserPresets.Add(preset);
         }
-
-        AddStep.UserPresets = UserPresets;
     }
 
     private void Revalidate()
     {
-        AddStep.HasSteps = Steps.Count > 0;
-
         foreach (var step in Steps)
         {
             step.ValidationMessage = null;
@@ -505,6 +494,7 @@ public partial class PipelineViewModel : ViewModelBase
         OnPropertyChanged(nameof(FirstDestinationPath));
         OnPropertyChanged(nameof(HasDeleteStep));
         OnPropertyChanged(nameof(RunButtonLabel));
+        OnPropertyChanged(nameof(HasSteps));
         UpdateButtonStates();
 
         PipelineChanged?.Invoke(this, EventArgs.Empty);
