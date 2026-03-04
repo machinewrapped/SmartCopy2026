@@ -5,7 +5,9 @@ using Avalonia.Threading;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.UI.ViewModels;
+using SmartCopy.UI.ViewModels.Dialogs;
 using SmartCopy.UI.ViewModels.Pipeline;
+using SmartCopy.UI.Views.Dialogs;
 using SmartCopy.UI.Views.Pipeline;
 
 namespace SmartCopy.UI.Views;
@@ -27,6 +29,7 @@ public partial class PipelineView : UserControl
                 _currentViewModel.AddStep.StepTypeSelected -= OnAddStepTypeSelected;
                 _currentViewModel.AddStep.StepPresetPicked -= OnStepPresetPickedClosePopup;
                 _currentViewModel.AddStep.CloseRequested -= OnCloseRequestedClosePopup;
+                _currentViewModel.SavePipelineRequested -= OnSavePipelineRequested;
             }
 
             _currentViewModel = DataContext as PipelineViewModel;
@@ -38,6 +41,7 @@ public partial class PipelineView : UserControl
                 _currentViewModel.AddStep.StepTypeSelected += OnAddStepTypeSelected;
                 _currentViewModel.AddStep.StepPresetPicked += OnStepPresetPickedClosePopup;
                 _currentViewModel.AddStep.CloseRequested += OnCloseRequestedClosePopup;
+                _currentViewModel.SavePipelineRequested += OnSavePipelineRequested;
             }
         };
     }
@@ -135,6 +139,76 @@ public partial class PipelineView : UserControl
             Dispatcher.UIThread.Post(
                 () => StepsScrollViewer?.ScrollToEnd(),
                 DispatcherPriority.Loaded);
+        }
+    }
+
+    private void OnLoadPresetButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is Button { CommandParameter: string name })
+        {
+            _currentViewModel?.LoadPresetCommand?.Execute(name);
+            this.Get<Button>("LoadPresetButton")?.Flyout?.Hide();
+        }
+    }
+
+    private async void OnDeletePipelinePresetButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is Button { CommandParameter: string name } && _currentViewModel != null)
+        {
+            this.Get<Button>("LoadPresetButton")?.Flyout?.Hide();
+
+            var topLevel = TopLevel.GetTopLevel(this);
+            if (topLevel is not Window window) return;
+
+            var confirmVm = new SmartCopy.UI.ViewModels.Workflows.ConfirmDialogViewModel
+            {
+                Title = "Confirm Delete",
+                Message = $"Delete pipeline \"{name}\" permanently?",
+                ConfirmText = "Delete"
+            };
+            var confirm = new SmartCopy.UI.Views.Workflows.ConfirmDialog { DataContext = confirmVm };
+            var confirmResult = await confirm.ShowDialog<bool?>(window);
+            if (confirmResult == true)
+            {
+                await _currentViewModel.DeletePipelinePresetAsync(name);
+            }
+        }
+    }
+
+    private async void OnSavePipelineRequested(object? sender, EventArgs e)
+    {
+        if (_currentViewModel is null) return;
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel is not Window window) return;
+
+        var dialogVm = new SavePipelineDialogViewModel();
+        foreach (var preset in _currentViewModel.UserPresets)
+        {
+            dialogVm.ExistingNames.Add(preset.Name);
+        }
+
+        var dialog = new SavePipelineDialog
+        {
+            DataContext = dialogVm
+        };
+
+        var result = await dialog.ShowDialog<bool>(window);
+        if (result && !string.IsNullOrWhiteSpace(dialogVm.PipelineName))
+        {
+            if (dialogVm.IsOverwrite)
+            {
+                var confirmVm = new SmartCopy.UI.ViewModels.Workflows.ConfirmDialogViewModel
+                {
+                    Title = "Confirm Replace",
+                    Message = $"Replace existing pipeline \"{dialogVm.PipelineName.Trim()}\"?",
+                    ConfirmText = "Replace"
+                };
+                var confirm = new SmartCopy.UI.Views.Workflows.ConfirmDialog { DataContext = confirmVm };
+                var confirmResult = await confirm.ShowDialog<bool?>(window);
+                if (confirmResult != true) return;
+            }
+
+            await _currentViewModel.SavePipelineAsync(dialogVm.PipelineName.Trim());
         }
     }
 
