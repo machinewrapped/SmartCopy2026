@@ -18,6 +18,9 @@ public sealed class DeleteStep : IPipelineStep
     public StepKind StepType => StepKind.Delete;
     public bool IsExecutable => true;
 
+    public string AutoSummary => Mode == DeleteMode.Permanent ? "Delete" : "Trash";
+    public string Description => Mode == DeleteMode.Permanent ? "Delete permanently" : "Delete to Trash";
+
     public TransformStepConfig Config => new(StepType, new JsonObject { ["deleteMode"] = Mode.ToString() });
 
     public void Validate(StepValidationContext context)

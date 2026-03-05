@@ -86,10 +86,12 @@ public partial class PipelineView : UserControl
                 await SaveStepPresetAsync(kind, vm.ResultStep, vm.StepName);
             }
 
-            var destPath = (vm.ResultStep as CopyStep)?.DestinationPath
-                ?? (vm.ResultStep as MoveStep)?.DestinationPath;
+            var destPath = (vm.ResultStep as IHasDestinationPath)?.DestinationPath;
+
             if (destPath is not null)
+            {
                 _currentViewModel.RecordRecentTarget(destPath);
+            }
 
             _currentViewModel.AddStepFromResult(kind, vm.ResultStep, vm.ResultCustomName);
         }
@@ -113,10 +115,11 @@ public partial class PipelineView : UserControl
                 await SaveStepPresetAsync(step.Kind, vm.ResultStep, vm.StepName);
             }
 
-            var destPath = (vm.ResultStep as CopyStep)?.DestinationPath
-                ?? (vm.ResultStep as MoveStep)?.DestinationPath;
+            var destPath = (vm.ResultStep as IHasDestinationPath)?.DestinationPath;
             if (destPath is not null)
+            {
                 _currentViewModel.RecordRecentTarget(destPath);
+            }
 
             _currentViewModel.ReplaceStep(step, vm.ResultStep, vm.ResultCustomName);
         }

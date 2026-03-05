@@ -12,6 +12,9 @@ public sealed class SelectAllStep : IPipelineStep
     public bool IsExecutable => false;
     public bool IsConfigurable => false;
 
+    public string AutoSummary => StepType.ForDisplay();
+    public string Description => "Mark all files as selected";
+
     public void Validate(StepValidationContext context)
     {
         // No preconditions. Post-condition: reset SourceExists so downstream steps

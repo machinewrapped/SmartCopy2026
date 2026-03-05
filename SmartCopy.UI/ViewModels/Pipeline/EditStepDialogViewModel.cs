@@ -15,17 +15,7 @@ public partial class EditStepDialogViewModel : ObservableObject
 
     public StepKind Kind { get; }
 
-    public string Title => Kind switch
-    {
-        StepKind.Copy => "Copy Step",
-        StepKind.Move => "Move Step",
-        StepKind.Delete => "Delete Step",
-        StepKind.Flatten => "Flatten Step",
-        StepKind.Rename => "Rename Step",
-        StepKind.Rebase => "Rebase Step",
-        StepKind.Convert => "Convert Step",
-        _ => "Step",
-    };
+    public string Title => Kind.ForDisplay() + " step";
 
     [ObservableProperty]
     private IPipelineStep? _resultStep;
@@ -53,7 +43,10 @@ public partial class EditStepDialogViewModel : ObservableObject
         Editor = editor;
         Editor.PropertyChanged += (_, e) =>
         {
-            AutoUpdateStepName();
+            if (!_userHasEditedStepName)
+            {
+                AutoUpdateStepName();                
+            }
 
             if (e.PropertyName == nameof(StepEditorViewModelBase.IsValid))
             {
@@ -62,14 +55,14 @@ public partial class EditStepDialogViewModel : ObservableObject
             }
         };
 
-        if (string.IsNullOrWhiteSpace(initialCustomName))
+        if (!string.IsNullOrWhiteSpace(initialCustomName))
         {
-            AutoUpdateStepName(force: true);
+            StepName = initialCustomName.Trim();
+            _userHasEditedStepName = true;
         }
         else
         {
-            _userHasEditedStepName = true;
-            StepName = initialCustomName.Trim();
+            AutoUpdateStepName();
         }
 
         OnPropertyChanged(nameof(IsValid));
@@ -90,23 +83,22 @@ public partial class EditStepDialogViewModel : ObservableObject
 
     partial void OnStepNameChanged(string value)
     {
-        if (!_isAutoUpdatingStepName && !string.IsNullOrWhiteSpace(value))
-        {
-            _userHasEditedStepName = true;
-        }
+        // Disable auto-naming if user edits the name, re-neable it if they delete it
+        _userHasEditedStepName = !_isAutoUpdatingStepName && !string.IsNullOrWhiteSpace(value);
     }
 
     [RelayCommand(CanExecute = nameof(IsValid))]
     private void Ok()
     {
         ResultStep = Editor.BuildStep();
-        var autoName = PipelineStepDisplay.NormalizeCustomName(GenerateAutoName());
-        var finalName = PipelineStepDisplay.NormalizeCustomName(StepName);
-        ResultCustomName =
-            string.IsNullOrWhiteSpace(finalName) ||
-            string.Equals(finalName, autoName, StringComparison.OrdinalIgnoreCase)
-                ? null
-                : finalName;
+
+        var stepName = StepName?.Trim();
+        var autoName = ResultStep.AutoSummary;
+
+        ResultCustomName = string.IsNullOrEmpty(stepName) || string.Equals(stepName, autoName, StringComparison.OrdinalIgnoreCase)
+            ? null
+            : stepName;
+
         OkRequested?.Invoke();
     }
 
@@ -116,33 +108,16 @@ public partial class EditStepDialogViewModel : ObservableObject
         CancelRequested?.Invoke();
     }
 
-    private void AutoUpdateStepName(bool force = false)
+    private void AutoUpdateStepName()
     {
-        if (!force && _userHasEditedStepName)
-        {
-            return;
-        }
-
         _isAutoUpdatingStepName = true;
         try
         {
-            StepName = GenerateAutoName();
+            StepName = Editor.BuildStep().AutoSummary;
         }
         finally
         {
             _isAutoUpdatingStepName = false;
-        }
-    }
-
-    private string GenerateAutoName()
-    {
-        try
-        {
-            return PipelineStepDisplay.GetSummary(Editor.BuildStep());
-        }
-        catch
-        {
-            return PipelineStepDisplay.GetDefaultTitle(Kind);
         }
     }
 }

@@ -12,6 +12,9 @@ public sealed class InvertSelectionStep : IPipelineStep
     public bool IsExecutable => false;
     public bool IsConfigurable => false;
 
+    public string AutoSummary => StepType.ForDisplay();
+    public string Description => "Toggle selection status of each file";
+
     public TransformStepConfig Config => new(StepType, new JsonObject());
 
     public void Validate(StepValidationContext context)

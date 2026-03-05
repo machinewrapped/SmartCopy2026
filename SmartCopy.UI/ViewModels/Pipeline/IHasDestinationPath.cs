@@ -1,6 +1,6 @@
 namespace SmartCopy.UI.ViewModels.Pipeline;
 
-public interface IHasDestinationPath
+public interface IDestinationProvider
 {
     string DestinationPath { get; set; }
 }

@@ -12,6 +12,9 @@ public sealed class ClearSelectionStep : IPipelineStep
     public bool IsExecutable => false;
     public bool IsConfigurable => false;
 
+    public string AutoSummary => StepType.ForDisplay();
+    public string Description => "Deselect all files";
+
     public TransformStepConfig Config => new(StepType, new JsonObject());
 
     public void Validate(StepValidationContext context)

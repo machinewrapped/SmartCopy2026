@@ -17,6 +17,9 @@ public sealed class FlattenStep : IPipelineStep
     public StepKind StepType => StepKind.Flatten;
     public bool IsExecutable => false;
 
+    public string AutoSummary => StepType.ForDisplay();
+    public string Description => $"Conflict strategy: {ConflictStrategy}";
+
     public TransformStepConfig Config => new(StepType, new JsonObject { ["conflictStrategy"] = ConflictStrategy.ToString() });
 
     public void Validate(StepValidationContext context)

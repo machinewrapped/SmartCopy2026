@@ -42,7 +42,7 @@ public sealed class PipelineViewModelTests
         var count = 0;
         vm.PipelineChanged += (_, _) => count++;
 
-        vm.Steps[0].DestinationPath = "/mem/new";
+        vm.Steps[0].SetDestinationPath("/mem/new");
 
         Assert.True(count >= 1);
     }
@@ -105,7 +105,7 @@ public sealed class PipelineViewModelTests
 
         vm.AddStepFromResult(StepKind.Copy, new CopyStep("/mem/out"), "Music Mirror");
 
-        Assert.Equal("Music Mirror", vm.Steps[0].Summary);
+        Assert.Equal("Music Mirror", vm.Steps[0].Label);
         Assert.Equal("Music Mirror", vm.Steps[0].CustomName);
     }
 
@@ -137,7 +137,7 @@ public sealed class PipelineViewModelTests
         vm.LoadPreset(preset);
 
         Assert.Single(vm.Steps);
-        Assert.Equal("Audio Backup", vm.Steps[0].Summary);
+        Assert.Equal("Audio Backup", vm.Steps[0].Label);
         Assert.Equal("Audio Backup", vm.Steps[0].CustomName);
     }
 }

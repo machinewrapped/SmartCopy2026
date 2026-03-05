@@ -5,7 +5,7 @@ using SmartCopy.Core.Settings;
 
 namespace SmartCopy.UI.ViewModels.Pipeline;
 
-public partial class MoveStepEditorViewModel : StepEditorViewModelBase, IHasDestinationPath
+public partial class MoveStepEditorViewModel : StepEditorViewModelBase, IDestinationProvider
 {
     public PathPickerViewModel DestinationPathPicker { get; }
 
@@ -36,7 +36,7 @@ public partial class MoveStepEditorViewModel : StepEditorViewModelBase, IHasDest
     {
         if (stepViewModel.Step is MoveStep moveStep)
         {
-            DestinationPath = moveStep.DestinationPath;
+            DestinationPath = moveStep.DestinationPath ?? string.Empty;
         }
     }
 }

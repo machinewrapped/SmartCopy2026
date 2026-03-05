@@ -43,6 +43,9 @@ public sealed class RebaseStep : IPipelineStep
     public StepKind StepType => StepKind.Rebase;
     public bool IsExecutable => false;
 
+    public string AutoSummary => StepType.ForDisplay();
+    public string Description => $"Strip: '{StripPrefix}'  Add: '{AddPrefix}'";
+
     public TransformStepConfig Config => new(StepType,
         new JsonObject { ["stripPrefix"] = StripPrefix, ["addPrefix"] = AddPrefix, });
 

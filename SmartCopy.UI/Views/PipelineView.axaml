@@ -136,7 +136,7 @@
                                                            VerticalAlignment="Center"
                                                            Margin="0,0,6,0" />
                                                 <TextBlock Grid.Column="1"
-                                                           Text="{Binding Summary}"
+                                                           Text="{Binding Label}"
                                                            FontWeight="Medium"
                                                            TextWrapping="Wrap"
                                                            VerticalAlignment="Center" />
@@ -173,7 +173,7 @@
                                             </Grid>
 
                                             <TextBlock Grid.Row="1"
-                                                       IsVisible="{Binding HasDescription}"
+                                                       IsVisible="{Binding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                                                        Text="{Binding Description}"
                                                        FontSize="10"
                                                        Opacity="0.55"
