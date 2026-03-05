@@ -2,9 +2,7 @@ namespace SmartCopy.Core.Pipeline;
 
 public interface IHasDestinationPath
 {
-    string? DestinationPath { get; }
+    string? DestinationPath { get; set; }
 
     bool HasDestinationPath { get; }
-
-    void ChangeDestinationPath(string destinationPath);
 }

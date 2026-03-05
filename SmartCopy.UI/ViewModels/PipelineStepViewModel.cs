@@ -47,7 +47,7 @@ public partial class PipelineStepViewModel : ViewModelBase
     {
         if (Step is IHasDestinationPath pathProvider)
         {
-            pathProvider.ChangeDestinationPath(destinationPath ?? string.Empty);
+            pathProvider.DestinationPath = destinationPath ?? string.Empty;
 
             OnPropertyChanged();
             OnPropertyChanged(nameof(Label));

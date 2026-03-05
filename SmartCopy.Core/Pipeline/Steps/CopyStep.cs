@@ -29,11 +29,6 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath
 
     public bool HasDestinationPath => !string.IsNullOrWhiteSpace(DestinationPath);
 
-    public void ChangeDestinationPath(string destinationPath)
-    {
-        DestinationPath = destinationPath;
-    }
-
     public void Validate(StepValidationContext context)
     {
         context.ValidateHasSelectedInputs();
