@@ -4,7 +4,6 @@ namespace SmartCopy.Core.Settings;
 /// Single authority for all app-data file and directory paths.
 /// Construct via <see cref="ForCurrentUser"/> at the composition root;
 /// inject the instance wherever paths are needed.
-/// Tests construct <c>new AppDataPaths(tempDir)</c> — no static oracle exists.
 /// </summary>
 public sealed class AppDataPaths
 {
@@ -33,7 +32,7 @@ public sealed class AppDataPaths
 
     /// <summary>
     /// Deliberate factory — only call this at the composition root (<c>MainViewModel</c>).
-    /// Tests should use <c>new AppDataPaths(tempDir)</c> instead.
+    /// Tests should use <see cref="ForTests()"/> instead.
     /// </summary>
     public static AppDataPaths ForCurrentUser()
     {
@@ -42,5 +41,14 @@ public sealed class AppDataPaths
             : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config", "SmartCopy2026");
 
         return new AppDataPaths(baseDir);
+    }
+
+    /// <summary>
+    /// Create AppDataPaths in a temporary directory for tests or temporary usage.
+    /// </summary>
+    public static AppDataPaths ForTests()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "SmartCopy2026");
+        return new AppDataPaths(tempDir);
     }
 }

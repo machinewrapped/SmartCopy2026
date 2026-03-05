@@ -25,7 +25,7 @@ public partial class PipelineViewModel : ViewModelBase
     private const int MaxRecentTargets = 10;
     private readonly PipelinePresetStore _presetStore;
     private readonly StepPresetStore _stepPresetStore;
-    private readonly AppSettings? _appSettings;
+    private readonly AppSettings _appSettings;
     private int _selectedIncludedFileCount;
 
     public ObservableCollection<PipelineStepViewModel> Steps { get; } = [];
@@ -43,7 +43,7 @@ public partial class PipelineViewModel : ViewModelBase
 
     internal void RecordRecentTarget(string path)
     {
-        if (_appSettings is null || string.IsNullOrWhiteSpace(path)) return;
+        if (string.IsNullOrWhiteSpace(path)) return;
 
         _appSettings.RecentTargets.Remove(path);
         _appSettings.RecentTargets.Insert(0, path);
@@ -93,16 +93,18 @@ public partial class PipelineViewModel : ViewModelBase
 
     public PipelineViewModel() : this(
         new PipelinePresetStore(AppDataPaths.ForCurrentUser().Pipelines),
-        new StepPresetStore(AppDataPaths.ForCurrentUser().StepPresets)) { }
+        new StepPresetStore(AppDataPaths.ForCurrentUser().StepPresets),
+        new AppSettings()) 
+        { }
 
     public PipelineViewModel(
         PipelinePresetStore presetStore,
         StepPresetStore stepPresetStore,
-        AppSettings? appSettings = null)
+        AppSettings appSettings)
     {
         _presetStore = presetStore;
         _stepPresetStore = stepPresetStore;
-        _appSettings = appSettings ?? new AppSettings();
+        _appSettings = appSettings;
 
         AddStep = new AddStepViewModel(_stepPresetStore, appSettings);
         AddStep.StepPresetPicked += OnStepPresetPicked;

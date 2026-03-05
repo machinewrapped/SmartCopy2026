@@ -11,7 +11,6 @@ public partial class PathPickerViewModel : ViewModelBase
     private const int MaxRecentPaths = 10;
 
     private readonly AppSettings _settings;
-    private readonly AppSettingsStore _settingsStore;
     private readonly PathPickerMode _mode;
 
     [ObservableProperty]
@@ -28,10 +27,9 @@ public partial class PathPickerViewModel : ViewModelBase
     // Fired when the user explicitly commits a path (Enter key or combo selection)
     public event EventHandler<string>? PathCommitted;
 
-    public PathPickerViewModel(AppSettings settings, AppSettingsStore settingsStore, PathPickerMode mode)
+    public PathPickerViewModel(AppSettings settings, PathPickerMode mode)
     {
         _settings = settings;
-        _settingsStore = settingsStore;
         _mode = mode;
 
         RefreshBookmarks();
@@ -197,7 +195,8 @@ public partial class PathPickerViewModel : ViewModelBase
     {
         try
         {
-            await _settingsStore.SaveAsync(_settings);
+            var settingsStore = new AppSettingsStore();
+            await settingsStore.SaveAsync(_settings);
         }
         catch
         {

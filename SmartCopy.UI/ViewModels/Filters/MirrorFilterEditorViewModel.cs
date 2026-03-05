@@ -35,7 +35,7 @@ public partial class MirrorFilterEditorViewModel : FilterEditorViewModelBase
 
     public MirrorFilterEditorViewModel(AppSettings settings)
     {
-        ComparisonPathPicker = new PathPickerViewModel(settings, new AppSettingsStore(), PathPickerMode.Target);
+        ComparisonPathPicker = new PathPickerViewModel(settings, PathPickerMode.Target);
         ComparisonPathPicker.PropertyChanged += (s, e) =>
         {
             if (e.PropertyName == nameof(PathPickerViewModel.Path))

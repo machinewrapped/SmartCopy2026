@@ -15,7 +15,7 @@ public sealed class PathPickerViewModelTests
         OperatingSystem.IsWindows() ? $@"C:\{suffix}" : $"/{suffix}";
 
     private static PathPickerViewModel CreateVm(AppSettings? settings = null) =>
-        new(settings ?? new AppSettings(), new AppSettingsStore(), PathPickerMode.Source);
+        new(settings ?? new AppSettings(), PathPickerMode.Source);
 
     // ── Pitfall 1: selecting a bookmark must not commit the path ──────────────
 

@@ -17,7 +17,7 @@ public partial class MoveStepEditorViewModel : StepEditorViewModelBase, IDestina
 
     public MoveStepEditorViewModel(AppSettings settings)
     {
-        DestinationPathPicker = new PathPickerViewModel(settings, new AppSettingsStore(), PathPickerMode.Target);
+        DestinationPathPicker = new PathPickerViewModel(settings, PathPickerMode.Target);
         DestinationPathPicker.PropertyChanged += (s, e) => 
         {
             if (e.PropertyName == nameof(PathPickerViewModel.Path))

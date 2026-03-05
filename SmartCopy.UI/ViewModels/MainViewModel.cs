@@ -131,7 +131,7 @@ public partial class MainViewModel : ViewModelBase
             appSettings: _settings);
 
         // Create the source path picker
-        SourcePathPicker = new PathPickerViewModel(_settings, _settingsStore, PathPickerMode.Source);
+        SourcePathPicker = new PathPickerViewModel(_settings, PathPickerMode.Source);
 
         // TODO: we will need to be able to init the viewmodel without a provider
         DirectoryTree = new DirectoryTreeViewModel(_providerRegistry)
