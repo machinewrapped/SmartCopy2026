@@ -4,8 +4,6 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using SmartCopy.Core.Pipeline;
-using SmartCopy.Core.Pipeline.Steps;
-using SmartCopy.Core.Settings;
 using SmartCopy.UI.ViewModels;
 using SmartCopy.UI.ViewModels.Dialogs;
 using SmartCopy.UI.ViewModels.Pipeline;
