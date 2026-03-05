@@ -4,9 +4,12 @@ using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline;
 
+public record PipelineStepDisplayInfo(string Summary, string Description);
+
 public interface IPipelineStep
 {
     StepKind StepType { get; }
+    PipelineStepDisplayInfo Display { get; }
     bool IsExecutable { get; }
 
     /// <summary>

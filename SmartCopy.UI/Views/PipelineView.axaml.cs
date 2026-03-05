@@ -88,6 +88,7 @@ public partial class PipelineView : UserControl
 
             var destPath = (vm.ResultStep as CopyStep)?.DestinationPath
                 ?? (vm.ResultStep as MoveStep)?.DestinationPath;
+
             if (destPath is not null)
                 _currentViewModel.RecordRecentTarget(destPath);
 

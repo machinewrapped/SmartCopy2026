@@ -42,7 +42,7 @@ public sealed class PipelineViewModelTests
         var count = 0;
         vm.PipelineChanged += (_, _) => count++;
 
-        vm.Steps[0].DestinationPath = "/mem/new";
+        vm.Steps[0].SetDestinationPath("/mem/new");
 
         Assert.True(count >= 1);
     }

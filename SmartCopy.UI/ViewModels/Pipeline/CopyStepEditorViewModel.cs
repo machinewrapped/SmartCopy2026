@@ -1,11 +1,10 @@
-using CommunityToolkit.Mvvm.ComponentModel;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Settings;
 
 namespace SmartCopy.UI.ViewModels.Pipeline;
 
-public partial class CopyStepEditorViewModel : StepEditorViewModelBase, IHasDestinationPath
+public partial class CopyStepEditorViewModel : StepEditorViewModelBase, IDestinationProvider
 {
     public PathPickerViewModel DestinationPathPicker { get; }
 
@@ -36,7 +35,7 @@ public partial class CopyStepEditorViewModel : StepEditorViewModelBase, IHasDest
     {
         if (stepViewModel.Step is CopyStep copyStep)
         {
-            DestinationPath = copyStep.DestinationPath;
+            DestinationPath = copyStep.DestinationPath ?? string.Empty;
         }
     }
 }

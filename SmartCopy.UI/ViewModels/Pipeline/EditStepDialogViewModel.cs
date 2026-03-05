@@ -15,17 +15,7 @@ public partial class EditStepDialogViewModel : ObservableObject
 
     public StepKind Kind { get; }
 
-    public string Title => Kind switch
-    {
-        StepKind.Copy => "Copy Step",
-        StepKind.Move => "Move Step",
-        StepKind.Delete => "Delete Step",
-        StepKind.Flatten => "Flatten Step",
-        StepKind.Rename => "Rename Step",
-        StepKind.Rebase => "Rebase Step",
-        StepKind.Convert => "Convert Step",
-        _ => "Step",
-    };
+    public string Title => Kind.GetDefaultTitle() + " Step";
 
     [ObservableProperty]
     private IPipelineStep? _resultStep;
@@ -100,8 +90,9 @@ public partial class EditStepDialogViewModel : ObservableObject
     private void Ok()
     {
         ResultStep = Editor.BuildStep();
-        var autoName = PipelineStepDisplay.NormalizeCustomName(GenerateAutoName());
-        var finalName = PipelineStepDisplay.NormalizeCustomName(StepName);
+        var generated = GenerateAutoName();
+        var autoName = string.IsNullOrWhiteSpace(generated) ? string.Empty : generated.Trim();
+        var finalName = string.IsNullOrWhiteSpace(StepName) ? string.Empty : StepName.Trim();
         ResultCustomName =
             string.IsNullOrWhiteSpace(finalName) ||
             string.Equals(finalName, autoName, StringComparison.OrdinalIgnoreCase)
@@ -138,11 +129,11 @@ public partial class EditStepDialogViewModel : ObservableObject
     {
         try
         {
-            return PipelineStepDisplay.GetSummary(Editor.BuildStep());
+            return Editor.BuildStep().Display.Summary;
         }
         catch
         {
-            return PipelineStepDisplay.GetDefaultTitle(Kind);
+            return Kind.GetDefaultTitle();
         }
     }
 }

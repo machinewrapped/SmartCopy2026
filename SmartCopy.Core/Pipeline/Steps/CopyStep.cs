@@ -2,23 +2,40 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using System.Threading;
+using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
-public sealed class CopyStep : IPipelineStep
+public sealed class CopyStep : IPipelineStep, IHasDestinationPath
 {
+    public StepKind StepType => StepKind.Copy;
+    public bool IsExecutable => true;
+
     public CopyStep(string destinationPath)
     {
         DestinationPath = destinationPath;
     }
 
-    public string DestinationPath { get; set; }
-
-    public StepKind StepType => StepKind.Copy;
-    public bool IsExecutable => true;
-
     public TransformStepConfig Config => new(StepType, new JsonObject { ["destinationPath"] = DestinationPath });
+
+    public PipelineStepDisplayInfo Display => new(
+        HasDestinationPath ? "Copy files" : $"Copy to {PathHelper.GetFriendlyTarget(DestinationPath)}",
+        HasDestinationPath ? "Destination required" : $"Destination: {DestinationPath}");
+
+    private string? _destinationPath;
+    public string? DestinationPath 
+    { 
+        get => _destinationPath; 
+        set => _destinationPath = value; 
+    }
+
+    public bool HasDestinationPath => !string.IsNullOrWhiteSpace(DestinationPath);
+
+    public void ChangeDestinationPath(string destinationPath)
+    {
+        DestinationPath = destinationPath;
+    }
 
     public void Validate(StepValidationContext context)
     {
@@ -33,6 +50,11 @@ public sealed class CopyStep : IPipelineStep
     public async IAsyncEnumerable<TransformResult> PreviewAsync(
         IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
+        if (DestinationPath is null)
+        {
+            yield break;
+        }
+
         foreach (var node in context.GetPreviewSelectedDescendants())
         {
             ct.ThrowIfCancellationRequested();
@@ -72,6 +94,11 @@ public sealed class CopyStep : IPipelineStep
     public async IAsyncEnumerable<TransformResult> ApplyAsync(
         IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
+        if (DestinationPath is null)
+        {
+            throw new InvalidOperationException("DestinationPath must be set for CopyStep.");
+        }
+
         foreach (var node in context.RootNode.GetSelectedDescendants())
         {
             ct.ThrowIfCancellationRequested();

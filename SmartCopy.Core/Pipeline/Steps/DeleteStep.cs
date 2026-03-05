@@ -16,6 +16,9 @@ public sealed class DeleteStep : IPipelineStep
     public DeleteMode Mode { get; set; }
 
     public StepKind StepType => StepKind.Delete;
+    public PipelineStepDisplayInfo Display => new(
+        Mode == DeleteMode.Permanent ? "Delete permanently" : "Delete to Trash",
+        Mode == DeleteMode.Permanent ? "This cannot be undone." : string.Empty);
     public bool IsExecutable => true;
 
     public TransformStepConfig Config => new(StepType, new JsonObject { ["deleteMode"] = Mode.ToString() });

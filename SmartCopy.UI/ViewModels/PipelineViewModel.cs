@@ -29,24 +29,23 @@ public partial class PipelineStepViewModel : ViewModelBase
     public PipelineStepViewModel(IPipelineStep step, string? customName = null)
     {
         _step = step;
-        _customName = PipelineStepDisplay.NormalizeCustomName(customName);
+        _customName = string.IsNullOrWhiteSpace(customName) ? string.Empty : customName.Trim();
     }
 
     public IPipelineStep Step => _step;
 
     public StepKind Kind => _step.StepType;
 
-    public string? CustomName => string.IsNullOrWhiteSpace(_customName) ? null : _customName;
+    public string Summary => HasCustomName ? _customName : AutoSummary;
 
-    public string AutoSummary => PipelineStepDisplay.GetSummary(_step);
+    public string Description => _step.Display.Description;
 
-    public string Summary => string.IsNullOrWhiteSpace(_customName)
-        ? AutoSummary
-        : _customName;
+    public bool HasCustomName => !string.IsNullOrWhiteSpace(_customName);
 
-    public string Description => PipelineStepDisplay.GetDescription(_step);
+    public string? CustomName => HasCustomName ? _customName : null;
 
-    // Keep old names for compatibility with tests and any remaining bindings.
+    public string AutoSummary => _step.Display.Summary;
+
     public string Label => Summary;
 
     public string Icon => Kind switch
@@ -68,45 +67,30 @@ public partial class PipelineStepViewModel : ViewModelBase
 
     public bool HasDescription => !string.IsNullOrWhiteSpace(Description);
 
-    public bool HasDestination => _step is CopyStep or MoveStep;
+    public bool HasDestination => _step is IHasDestinationPath pathProvider && pathProvider.HasDestinationPath;
 
-    public string DestinationPath
+    public string DestinationPath => (_step as IHasDestinationPath)?.DestinationPath ?? string.Empty;
+
+    public void SetDestinationPath(string? destinationPath)
     {
-        get => _step switch
+        if (_step is IHasDestinationPath pathProvider)
         {
-            CopyStep copyStep => copyStep.DestinationPath,
-            MoveStep moveStep => moveStep.DestinationPath,
-            _ => string.Empty,
-        };
-        set
-        {
-            var destination = value ?? string.Empty;
-            var changed = false;
-            switch (_step)
-            {
-                case CopyStep copyStep when copyStep.DestinationPath != destination:
-                    copyStep.DestinationPath = destination;
-                    changed = true;
-                    break;
-                case MoveStep moveStep when moveStep.DestinationPath != destination:
-                    moveStep.DestinationPath = destination;
-                    changed = true;
-                    break;
-            }
+            pathProvider.ChangeDestinationPath(destinationPath ?? string.Empty);
 
-            if (changed)
-            {
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(AutoSummary));
-                OnPropertyChanged(nameof(Summary));
-                OnPropertyChanged(nameof(Label));
-                OnPropertyChanged(nameof(Details));
-                OnPropertyChanged(nameof(Description));
-                OnPropertyChanged(nameof(HasDescription));
-                OnPropertyChanged(nameof(ShowDeleteBadge));
-                OnPropertyChanged(nameof(DeleteBadge));
-                StepChanged?.Invoke(this, EventArgs.Empty);
-            }
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(AutoSummary));
+            OnPropertyChanged(nameof(Summary));
+            OnPropertyChanged(nameof(Label));
+            OnPropertyChanged(nameof(Details));
+            OnPropertyChanged(nameof(Description));
+            OnPropertyChanged(nameof(HasDescription));
+            OnPropertyChanged(nameof(HasDestination));
+            OnPropertyChanged(nameof(DestinationPath));
+            OnPropertyChanged(nameof(ShowDeleteBadge));
+            OnPropertyChanged(nameof(IsPermanentDelete));
+            OnPropertyChanged(nameof(DeleteBadge));
+
+            StepChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -130,7 +114,7 @@ public partial class PipelineStepViewModel : ViewModelBase
     public void ReplaceStep(IPipelineStep newStep, string? customName = null)
     {
         _step = newStep;
-        _customName = PipelineStepDisplay.NormalizeCustomName(customName);
+        _customName = string.IsNullOrWhiteSpace(customName) ? string.Empty : customName.Trim();
         OnPropertyChanged(nameof(Step));
         OnPropertyChanged(nameof(Kind));
         OnPropertyChanged(nameof(CustomName));
@@ -192,8 +176,10 @@ public partial class PipelineViewModel : ViewModelBase
     internal void RecordRecentTarget(string path)
     {
         if (_appSettings is null || string.IsNullOrWhiteSpace(path)) return;
+
         _appSettings.RecentTargets.Remove(path);
         _appSettings.RecentTargets.Insert(0, path);
+
         if (_appSettings.RecentTargets.Count > MaxRecentTargets)
             _appSettings.RecentTargets.RemoveAt(MaxRecentTargets);
     }
@@ -226,8 +212,8 @@ public partial class PipelineViewModel : ViewModelBase
     {
         get
         {
-            var step = Steps.FirstOrDefault(s => s.Step is CopyStep or MoveStep);
-            return step?.DestinationPath ?? string.Empty;
+            var step = Steps.FirstOrDefault(s => s.Step is IHasDestinationPath);
+            return (step?.Step as IHasDestinationPath)?.DestinationPath ?? string.Empty;
         }
     }
 
@@ -275,7 +261,7 @@ public partial class PipelineViewModel : ViewModelBase
     private void OnStepPresetPicked(StepPreset preset)
     {
         var step = PipelineStepFactory.FromConfig(preset.Config);
-        var autoName = PipelineStepDisplay.GetSummary(step);
+        var autoName = step.Display.Summary;
         var customName = string.Equals(preset.Name, autoName, StringComparison.OrdinalIgnoreCase)
             ? null
             : preset.Name;

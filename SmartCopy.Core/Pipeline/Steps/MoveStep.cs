@@ -9,25 +9,41 @@ using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
-public sealed class MoveStep : IPipelineStep
+public sealed class MoveStep : IPipelineStep, IHasDestinationPath
 {
+    public StepKind StepType => StepKind.Move;
+    public bool IsExecutable => true;
+
     public MoveStep(string destinationPath)
     {
         DestinationPath = destinationPath;
     }
 
-    public string DestinationPath { get; set; }
-
-    public StepKind StepType => StepKind.Move;
-    public bool IsExecutable => true;
-
     public TransformStepConfig Config => new(StepType, new JsonObject { ["destinationPath"] = DestinationPath });
+
+    public PipelineStepDisplayInfo Display => new(
+        string.IsNullOrWhiteSpace(DestinationPath) ? "Move files" : $"Move to {PathHelper.GetFriendlyTarget(DestinationPath)}",
+        string.IsNullOrWhiteSpace(DestinationPath) ? "Destination required" : $"Destination: {DestinationPath}");
+
+    private string? _destinationPath;
+    public string? DestinationPath
+    {
+        get => _destinationPath;
+        set => _destinationPath = value;
+    }
+
+    public bool HasDestinationPath => !string.IsNullOrWhiteSpace(DestinationPath);
+
+    public void ChangeDestinationPath(string destinationPath)
+    {
+        DestinationPath = destinationPath;
+    }
 
     public void Validate(StepValidationContext context)
     {
         context.ValidateHasSelectedInputs();
         context.ValidateSourceExists("Move");
-        if (string.IsNullOrWhiteSpace(DestinationPath))
+        if (!HasDestinationPath)
         {
             context.AddBlockingIssue("Step.MissingDestination", "Move requires a destination path.");
         }
@@ -37,6 +53,11 @@ public sealed class MoveStep : IPipelineStep
     public async IAsyncEnumerable<TransformResult> PreviewAsync(
         IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
+        if (DestinationPath is null)
+        {
+            yield break;
+        }
+
         foreach (var node in context.GetPreviewSelectedDescendants())
         {
             ct.ThrowIfCancellationRequested();
@@ -69,20 +90,26 @@ public sealed class MoveStep : IPipelineStep
     public async IAsyncEnumerable<TransformResult> ApplyAsync(
         IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
+        if (DestinationPath is null)
+        {
+            throw new InvalidOperationException("DestinationPath must be set for MoveStep.");
+        }
+
         var nodeCtx = context.GetNodeContext(context.RootNode);
         var targetProvider = nodeCtx.ResolveProvider(DestinationPath)
             ?? throw new InvalidOperationException("TargetProvider must be set for MoveStep.");
         var sameProvider = ReferenceEquals(targetProvider, context.SourceProvider);
         var canAtomicMove = targetProvider.Capabilities.CanAtomicMove;
 
-        await foreach (var result in WalkAndMoveAsync(context.RootNode, context, targetProvider, sameProvider, canAtomicMove, ct))
+        await foreach (var result in WalkAndMoveAsync(context.RootNode, context, DestinationPath, targetProvider, sameProvider, canAtomicMove, ct))
             yield return result;
     }
 
     // Depth-first recursive move: child directories first, then files in the current node.
     // Atomically moves entire subtrees where possible; falls back to piecewise otherwise.
-    private async IAsyncEnumerable<TransformResult> WalkAndMoveAsync(
+    private static async IAsyncEnumerable<TransformResult> WalkAndMoveAsync(
         DirectoryTreeNode node, IStepContext context,
+        string destinationPath,
         IFileSystemProvider targetProvider, bool sameProvider, bool canAtomicMove,
         [EnumeratorCancellation] CancellationToken ct)
     {
@@ -95,7 +122,7 @@ public sealed class MoveStep : IPipelineStep
             if (sameProvider && canAtomicMove && CanMoveEntireSubtree(child))
             {
                 var childCtx = context.GetNodeContext(child);
-                var dest = targetProvider.JoinPath(DestinationPath, childCtx.PathSegments);
+                var dest = targetProvider.JoinPath(destinationPath, childCtx.PathSegments);
                 var destExists = await targetProvider.ExistsAsync(dest, ct);
 
                 if (destExists && context.OverwriteMode == OverwriteMode.Skip)
@@ -124,7 +151,7 @@ public sealed class MoveStep : IPipelineStep
             else
             {
                 // Atomic move not possible (cross-provider or partial selection): recurse piecewise.
-                await foreach (var result in WalkAndMoveAsync(child, context, targetProvider, sameProvider, canAtomicMove, ct))
+                await foreach (var result in WalkAndMoveAsync(child, context, destinationPath, targetProvider, sameProvider, canAtomicMove, ct))
                     yield return result;
             }
         }
@@ -135,7 +162,7 @@ public sealed class MoveStep : IPipelineStep
             if (!file.IsSelected || context.IsNodeFailed(file)) continue;
 
             var fileCtx = context.GetNodeContext(file);
-            var fileDest = targetProvider.JoinPath(DestinationPath, fileCtx.PathSegments);
+            var fileDest = targetProvider.JoinPath(destinationPath, fileCtx.PathSegments);
             var fileDestExists = await targetProvider.ExistsAsync(fileDest, ct);
 
             if (fileDestExists && context.OverwriteMode == OverwriteMode.Skip)
