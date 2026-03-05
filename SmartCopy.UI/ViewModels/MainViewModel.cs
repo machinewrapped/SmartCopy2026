@@ -147,7 +147,7 @@ public partial class MainViewModel : ViewModelBase
             await ApplySourcePathCoreAsync(path);
         };
 
-        FileList = new FileListViewModel(_filterContext);
+        FileList = new FileListViewModel();
 
         WorkflowMenu = new WorkflowMenuViewModel(_workflowStore);
         WorkflowMenu.SaveRequested += async (_, _) => await SaveWorkflowAsync();
@@ -181,7 +181,7 @@ public partial class MainViewModel : ViewModelBase
                 {
                     try
                     {
-                        await FileList.LoadFilesForNodeAsync(selectedNode, FilterChain.BuildLiveChain());
+                        await FileList.LoadFilesForNodeAsync(selectedNode, FilterChain.BuildLiveChain(), _filterContext);
                     }
                     catch (Exception ex)
                     {
@@ -736,7 +736,7 @@ public partial class MainViewModel : ViewModelBase
     {
         var chain = FilterChain.BuildLiveChain();
 
-        await FileList.ApplyChainToFilesAsync(chain, ct);
+        await FileList.ApplyChainToFilesAsync(chain, _filterContext, ct);
         await DirectoryTree.ApplyFiltersAsync(chain, _filterContext, ct);
 
         RefreshIdleStats();
