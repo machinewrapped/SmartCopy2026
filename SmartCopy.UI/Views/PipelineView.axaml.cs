@@ -17,12 +17,8 @@ namespace SmartCopy.UI.Views;
 public partial class PipelineView : UserControl
 {
     private PipelineViewModel? _currentViewModel;
-    private AppSettings _appSettings;
-
-    public PipelineView(AppSettings appSettings)
+    public PipelineView()
     {
-        _appSettings = appSettings;
-
         InitializeComponent();
 
         DataContextChanged += (s, e) =>
@@ -70,7 +66,7 @@ public partial class PipelineView : UserControl
 
         Dispatcher.UIThread.Post(() => AddStepPopup.IsOpen = false);
 
-        var step = StepEditorViewModelFactory.Create(kind, _appSettings).BuildStep();
+        var step = StepEditorViewModelFactory.Create(kind, _currentViewModel.AppSettings).BuildStep();
         if (!step.IsConfigurable)
         {
             _currentViewModel.AddStepFromResult(kind, step);
