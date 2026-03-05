@@ -50,7 +50,6 @@ public static class PathHelper
     /// <summary>
     /// Normalizes user-entered source/destination paths for bookmark/MRU storage and comparison.
     /// - Canonicalizes local paths using <see cref="Path.GetFullPath(string)"/> when possible.
-    /// - Canonicalizes memory-provider paths ("/mem/...") with forward slashes.
     /// - Removes trailing separators while preserving root paths.
     /// </summary>
     public static string NormalizeUserPath(string? path)
@@ -62,9 +61,11 @@ public static class PathHelper
 
         var trimmed = path.Trim();
 
-        if (LooksLikeMemoryProviderPath(trimmed))
+        // If the path looks like a posix path but the OS does not use forward slashes,
+        // fall back to manual normalization.
+        if (LooksLikePosixPath(trimmed) && Path.PathSeparator != '/')
         {
-            return NormalizeMemoryProviderPath(trimmed);
+            return NormalizePosixPath(trimmed);
         }
 
         try
@@ -94,28 +95,41 @@ public static class PathHelper
             .ToList();
     }
 
-    private static bool LooksLikeMemoryProviderPath(string path)
+    private static bool LooksLikePosixPath(string path)
     {
-        var canonical = path.Replace('\\', '/').Trim();
-        return canonical.Equals("/mem", StringComparison.OrdinalIgnoreCase) ||
-               canonical.StartsWith("/mem/", StringComparison.OrdinalIgnoreCase);
+        return path.StartsWith("/", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string NormalizeMemoryProviderPath(string path)
+    private static string NormalizePosixPath(string path)
     {
-        var normalized = path.Replace('\\', '/').Trim();
-        if (!normalized.StartsWith('/'))
+        if (!LooksLikePosixPath(path))
         {
-            normalized = "/" + normalized;
+            throw new ArgumentException($"Path '{path}' is not a posix-style path.", nameof(path));
         }
 
-        while (normalized.Contains("//", StringComparison.Ordinal))
+        path = path.Trim();
+
+        while (path.Contains("//", StringComparison.Ordinal))
         {
-            normalized = normalized.Replace("//", "/", StringComparison.Ordinal);
+            path = path.Replace("//", "/", StringComparison.Ordinal);
         }
 
-        return normalized.Length > 1
-            ? normalized.TrimEnd('/')
-            : normalized;
+        return path.Length > 1 ? path.TrimEnd('/') : path;
+    }
+
+    /// <summary>
+    /// Gets a user-friendly name for a destination path.
+    /// Returns the last segment of the path, or "destination" if the path is empty.
+    /// </summary>
+    public static string GetFriendlyTarget(string? path)
+    {
+        var normalized = NormalizeUserPath(path);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return "destination";
+        }
+
+        var leaf = Path.GetFileName(normalized);
+        return string.IsNullOrWhiteSpace(leaf) ? normalized : leaf;
     }
 }
