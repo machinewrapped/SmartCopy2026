@@ -76,7 +76,7 @@ public partial class MainViewModel : ViewModelBase
         set => SourcePathPicker.ValidationMessage = value;
     }
 
-    private readonly AppDataPaths _paths = AppDataPaths.ForCurrentUser();
+    private readonly SmartCopyAppContext _appContext;
     private readonly MemoryFileSystemProvider _memoryProvider;
     private readonly FileSystemProviderRegistry _providerRegistry = new();
     private readonly FilterContext _filterContext;
@@ -106,9 +106,12 @@ public partial class MainViewModel : ViewModelBase
 
     public MainViewModel()
     {
-        _settings = new AppSettings { SettingsFilePath = _paths.Settings };
-        _operationJournal = new OperationJournal(_paths.Logs);
-        _workflowStore = new WorkflowPresetStore(_paths.Workflows);
+        var dataStore = LocalAppDataStore.ForCurrentUser();
+        _settings = new AppSettings { SettingsFilePath = dataStore.GetFilePath("settings.json") };
+        _appContext = new SmartCopyAppContext(_settings, dataStore);
+
+        _operationJournal = new OperationJournal(dataStore.GetDirectoryPath("Logs"));
+        _workflowStore = new WorkflowPresetStore(dataStore.GetDirectoryPath("Workflows"));
 
         // Create an in-memory virtual file system for testing.
         // TODO: this should be a debug option, not exposed in release builds
@@ -117,16 +120,10 @@ public partial class MainViewModel : ViewModelBase
 
         // Create the context and ViewModel for the filter chain
         _filterContext = new FilterContext(_providerRegistry);
-        FilterChain = new FilterChainViewModel(
-            new FilterPresetStore(_paths.FilterPresets),
-            _settings,
-            new FilterChainPresetStore(_paths.FilterChains));
+        FilterChain = new FilterChainViewModel(_appContext);
 
         // Create the pipeline view model
-        Pipeline = new PipelineViewModel(
-            presetStore: new PipelinePresetStore(_paths.Pipelines),
-            stepPresetStore: new StepPresetStore(_paths.StepPresets),
-            appSettings: _settings);
+        Pipeline = new PipelineViewModel(_appContext);
 
         // Create the source path picker
         SourcePathPicker = new PathPickerViewModel(_settings, PathPickerMode.Source);
@@ -1021,8 +1018,8 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     private string GetSessionPath()
         => _settings.SaveSessionLocally
-            ? Path.Combine(AppContext.BaseDirectory, "session.sc2session")
-            : _paths.Session;
+            ? Path.Combine(System.AppContext.BaseDirectory, "session.sc2session")
+            : _appContext.DataStore.GetFilePath("session.sc2session");
 
     private async Task ManageWorkflowsAsync()
     {

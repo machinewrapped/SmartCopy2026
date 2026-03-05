@@ -133,21 +133,14 @@ public partial class FilterChainViewModel : ViewModelBase
 
     public event EventHandler<string>? DeleteChainRequested;
 
-    public FilterChainViewModel() : this(
-        new FilterPresetStore(AppDataPaths.ForCurrentUser().FilterPresets),
-        new AppSettings(),
-        new FilterChainPresetStore(AppDataPaths.ForCurrentUser().FilterChains)) { }
-
-    public FilterChainViewModel(
-        FilterPresetStore presetStore,
-        AppSettings settings,
-        FilterChainPresetStore chainPresetStore)
+    public FilterChainViewModel(IAppContext appContext)
     {
-        PresetStore = presetStore;
-        AppSettings = settings;
-        _chainPresetStore = chainPresetStore;
-        _showExcludedNodesInTree = settings.ShowFilteredNodesInTree;
-        AddFilter = new AddFilterViewModel(presetStore, settings);
+        PresetStore = new FilterPresetStore(appContext.DataStore.GetFilePath("filter-presets.json"));
+        AppSettings = appContext.Settings;
+        _chainPresetStore = new FilterChainPresetStore(appContext.DataStore.GetDirectoryPath("FilterChains"));
+        
+        _showExcludedNodesInTree = AppSettings.ShowFilteredNodesInTree;
+        AddFilter = new AddFilterViewModel(appContext);
         AddFilter.PresetPicked += OnPresetPicked;
         AddFilter.NewFilterRequested += typeKey => NewFilterDialogRequested?.Invoke(this, typeKey);
 

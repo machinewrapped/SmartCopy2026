@@ -15,12 +15,9 @@ public sealed class AddStepViewModelTests
 
     private static (AddStepViewModel vm, AppSettings settings, string presetPath) CreateVm()
     {
-        var dir = Path.Combine(Path.GetTempPath(), "SmartCopy2026.Tests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
-        var presetPath = Path.Combine(dir, "step-presets.json");
-        var store = new StepPresetStore(presetPath);
-        var settings = new AppSettings();
-        return (new AddStepViewModel(store, settings), settings, presetPath);
+        var appContext = new TestAppContext();
+        var presetPath = appContext.DataStore.GetFilePath("step-presets.json");
+        return (new AddStepViewModel(appContext), appContext.Settings, presetPath);
     }
 
     // -------------------------------------------------------------------------
@@ -169,7 +166,7 @@ public sealed class AddStepViewModelTests
         await vm.SelectStepTypeCommand.ExecuteAsync(StepKind.Delete);
 
         // Pick the first preset (a built-in)
-        var firstPreset = vm.PresetsForType.First();
+        var firstPreset = vm.PresetsForType[0];
         vm.PickPresetCommand.Execute(firstPreset);
 
         Assert.NotNull(pickedPreset);

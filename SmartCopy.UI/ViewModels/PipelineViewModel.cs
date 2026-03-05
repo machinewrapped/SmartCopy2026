@@ -23,6 +23,7 @@ public partial class PipelineViewModel : ViewModelBase
 {
     private const string CustomNameParameter = "customName";
     private const int MaxRecentTargets = 10;
+    private readonly IAppContext _appContext;
     private readonly PipelinePresetStore _presetStore;
     private readonly StepPresetStore _stepPresetStore;
     private readonly AppSettings _appSettings;
@@ -91,22 +92,14 @@ public partial class PipelineViewModel : ViewModelBase
     public event EventHandler<PipelineStepViewModel>? EditStepRequested;
     public event EventHandler? SavePipelineRequested;
 
-    public PipelineViewModel() : this(
-        new PipelinePresetStore(AppDataPaths.ForCurrentUser().Pipelines),
-        new StepPresetStore(AppDataPaths.ForCurrentUser().StepPresets),
-        new AppSettings()) 
-        { }
-
-    public PipelineViewModel(
-        PipelinePresetStore presetStore,
-        StepPresetStore stepPresetStore,
-        AppSettings appSettings)
+    public PipelineViewModel(IAppContext appContext)
     {
-        _presetStore = presetStore;
-        _stepPresetStore = stepPresetStore;
-        _appSettings = appSettings;
+        _appContext = appContext;
+        _appSettings = appContext.Settings;
+        _presetStore = new PipelinePresetStore(appContext.DataStore.GetDirectoryPath("Pipelines"));
+        _stepPresetStore = new StepPresetStore(appContext.DataStore.GetFilePath("step-presets.json"));
 
-        AddStep = new AddStepViewModel(_stepPresetStore, appSettings);
+        AddStep = new AddStepViewModel(_appContext);
         AddStep.StepPresetPicked += OnStepPresetPicked;
 
         Steps.CollectionChanged += OnStepsCollectionChanged;

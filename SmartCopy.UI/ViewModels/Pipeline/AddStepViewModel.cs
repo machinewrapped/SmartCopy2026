@@ -34,12 +34,10 @@ public partial class AddStepViewModel : ObservableObject
     private readonly StepPresetStore _presetStore;
     private readonly AppSettings _settings;
 
-    public AddStepViewModel(
-        StepPresetStore presetStore,
-        AppSettings? settings = null)
+    public AddStepViewModel(IAppContext appContext)
     {
-        _presetStore = presetStore;
-        _settings = settings ?? new AppSettings();
+        _presetStore = new StepPresetStore(appContext.DataStore.GetFilePath("step-presets.json"));
+        _settings = appContext.Settings;
     }
 
     // -------------------------------------------------------------------------

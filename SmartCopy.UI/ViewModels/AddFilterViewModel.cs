@@ -34,12 +34,10 @@ public partial class AddFilterViewModel : ObservableObject
     private readonly FilterPresetStore _presetStore;
     private readonly AppSettings _settings;
 
-    public AddFilterViewModel(
-        FilterPresetStore presetStore,
-        AppSettings settings)
+    public AddFilterViewModel(IAppContext appContext)
     {
-        _presetStore = presetStore;
-        _settings = settings;
+        _presetStore = new FilterPresetStore(appContext.DataStore.GetFilePath("filter-presets.json"));
+        _settings = appContext.Settings;
     }
 
     // -------------------------------------------------------------------------
