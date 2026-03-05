@@ -53,8 +53,6 @@ public partial class PipelineStepViewModel : ViewModelBase
             OnPropertyChanged(nameof(Label));
             OnPropertyChanged(nameof(HasDestination));
             OnPropertyChanged(nameof(DestinationPath));
-            OnPropertyChanged(nameof(ShowDeleteBadge));
-            OnPropertyChanged(nameof(DeleteBadge));
 
             StepChanged?.Invoke(this, EventArgs.Empty);
         }
