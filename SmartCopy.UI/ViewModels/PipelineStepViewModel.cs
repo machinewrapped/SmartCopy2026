@@ -49,10 +49,10 @@ public partial class PipelineStepViewModel : ViewModelBase
         {
             pathProvider.DestinationPath = destinationPath ?? string.Empty;
 
-            OnPropertyChanged();
             OnPropertyChanged(nameof(Label));
             OnPropertyChanged(nameof(HasDestination));
             OnPropertyChanged(nameof(DestinationPath));
+            OnPropertyChanged(nameof(Description));
 
             StepChanged?.Invoke(this, EventArgs.Empty);
         }
