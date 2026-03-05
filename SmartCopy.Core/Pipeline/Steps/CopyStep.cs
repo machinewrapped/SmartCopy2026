@@ -19,9 +19,9 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath
 
     public TransformStepConfig Config => new(StepType, new JsonObject { ["destinationPath"] = DestinationPath });
 
-    public PipelineStepDisplayInfo Display => new(
-        HasDestinationPath ? "Copy files" : $"Copy to {PathHelper.GetFriendlyTarget(DestinationPath)}",
-        HasDestinationPath ? "Destination required" : $"Destination: {DestinationPath}");
+    public PipelineStepDisplayInfo Display => new(StepType.ForDisplay(), HasDestinationPath 
+        ? $"Copy to {PathHelper.GetFriendlyTarget(DestinationPath)}" 
+        : "Destination required");
 
     private string? _destinationPath;
     public string? DestinationPath 

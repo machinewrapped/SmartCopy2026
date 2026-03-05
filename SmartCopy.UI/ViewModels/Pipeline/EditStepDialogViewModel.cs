@@ -15,7 +15,7 @@ public partial class EditStepDialogViewModel : ObservableObject
 
     public StepKind Kind { get; }
 
-    public string Title => Kind.GetDefaultTitle() + " Step";
+    public string Title => Kind.ForDisplay() + " step";
 
     [ObservableProperty]
     private IPipelineStep? _resultStep;
@@ -133,7 +133,7 @@ public partial class EditStepDialogViewModel : ObservableObject
         }
         catch
         {
-            return Kind.GetDefaultTitle();
+            return Kind.ForDisplay();
         }
     }
 }

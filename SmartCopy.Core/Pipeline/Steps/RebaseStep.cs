@@ -41,7 +41,7 @@ public sealed class RebaseStep : IPipelineStep
     }
 
     public StepKind StepType => StepKind.Rebase;
-    public PipelineStepDisplayInfo Display => new("Rebase paths", $"Strip: '{StripPrefix}'  Add: '{AddPrefix}'");
+    public PipelineStepDisplayInfo Display => new(StepType.ForDisplay(), $"Strip: '{StripPrefix}'  Add: '{AddPrefix}'");
     public bool IsExecutable => false;
 
     public TransformStepConfig Config => new(StepType,

@@ -1,8 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
-using System.Threading;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline.Validation;
@@ -21,9 +18,9 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
 
     public TransformStepConfig Config => new(StepType, new JsonObject { ["destinationPath"] = DestinationPath });
 
-    public PipelineStepDisplayInfo Display => new(
-        string.IsNullOrWhiteSpace(DestinationPath) ? "Move files" : $"Move to {PathHelper.GetFriendlyTarget(DestinationPath)}",
-        string.IsNullOrWhiteSpace(DestinationPath) ? "Destination required" : $"Destination: {DestinationPath}");
+    public PipelineStepDisplayInfo Display => new(StepType.ForDisplay(), HasDestinationPath
+        ? $"Move to {PathHelper.GetFriendlyTarget(DestinationPath)}"
+        : "Destination required");
 
     private string? _destinationPath;
     public string? DestinationPath

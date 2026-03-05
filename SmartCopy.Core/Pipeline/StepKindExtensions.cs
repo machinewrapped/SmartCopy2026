@@ -5,7 +5,7 @@ namespace SmartCopy.Core.Pipeline;
 
 public static class StepKindExtensions
 {
-    public static string GetDefaultTitle(this StepKind kind)
+    public static string ForDisplay(this StepKind kind)
     {
         var member = typeof(StepKind).GetMember(kind.ToString());
         if (member.Length > 0)

@@ -15,7 +15,7 @@ public sealed class FlattenStep : IPipelineStep
     public FlattenConflictStrategy ConflictStrategy { get; set; }
 
     public StepKind StepType => StepKind.Flatten;
-    public PipelineStepDisplayInfo Display => new("Flatten folders", $"Conflict strategy: {ConflictStrategy}");
+    public PipelineStepDisplayInfo Display => new(StepType.ForDisplay(), $"Conflict strategy: {ConflictStrategy}");
     public bool IsExecutable => false;
 
     public TransformStepConfig Config => new(StepType, new JsonObject { ["conflictStrategy"] = ConflictStrategy.ToString() });

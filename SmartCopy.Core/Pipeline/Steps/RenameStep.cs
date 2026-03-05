@@ -17,7 +17,7 @@ public sealed class RenameStep : IPipelineStep
     public string Pattern { get; set; }
 
     public StepKind StepType => StepKind.Rename;
-    public PipelineStepDisplayInfo Display => new("Rename files", $"Pattern: {Pattern}");
+    public PipelineStepDisplayInfo Display => new(StepType.ForDisplay(), $"Pattern: {Pattern}");
     public bool IsExecutable => false;
 
     public TransformStepConfig Config => new(StepType, new JsonObject { ["pattern"] = Pattern });
