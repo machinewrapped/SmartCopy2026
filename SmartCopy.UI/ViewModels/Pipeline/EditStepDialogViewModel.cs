@@ -90,14 +90,14 @@ public partial class EditStepDialogViewModel : ObservableObject
     private void Ok()
     {
         ResultStep = Editor.BuildStep();
-        var generated = GenerateAutoName();
-        var autoName = string.IsNullOrWhiteSpace(generated) ? string.Empty : generated.Trim();
-        var finalName = string.IsNullOrWhiteSpace(StepName) ? string.Empty : StepName.Trim();
-        ResultCustomName =
-            string.IsNullOrWhiteSpace(finalName) ||
-            string.Equals(finalName, autoName, StringComparison.OrdinalIgnoreCase)
-                ? null
-                : finalName;
+
+        var finalName = StepName?.Trim();
+        var autoName = ResultStep.Display.Summary?.Trim();
+
+        ResultCustomName = string.IsNullOrEmpty(finalName) || string.Equals(finalName, autoName, StringComparison.OrdinalIgnoreCase)
+            ? null
+            : finalName;
+
         OkRequested?.Invoke();
     }
 
