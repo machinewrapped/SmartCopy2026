@@ -445,8 +445,9 @@ public partial class MainViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(normalizedPath))
             return;
 
-        var previousPath = _lastCommittedSourcePath;
-        if (normalizedPath == previousPath)
+        // Check if the path has actually changed        
+        var previousSourcePath = DirectoryTree.SourcePath;
+        if (normalizedPath == previousSourcePath)
             return;
 
         // Cancel any in-progress scan and start a fresh token for this one.
@@ -488,7 +489,7 @@ public partial class MainViewModel : ViewModelBase
             LogPanel.AddEntry(SourcePathValidationMessage, LogLevel.Error);
 
             // Revert path display on failure; do not attempt to re-scan the previous path.
-            SourcePath = previousPath;
+            SourcePath = previousSourcePath ?? string.Empty;
         }
     }
 

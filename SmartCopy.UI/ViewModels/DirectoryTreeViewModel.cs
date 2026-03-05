@@ -9,7 +9,7 @@ namespace SmartCopy.UI.ViewModels;
 
 public class DirectoryTreeViewModel : ViewModelBase
 {
-    private FileSystemProviderRegistry _providerRegistry;
+    private readonly FileSystemProviderRegistry _providerRegistry;
     private DirectoryTreeNode? _selectedNode;
     private bool _isLoading;
 
@@ -28,6 +28,9 @@ public class DirectoryTreeViewModel : ViewModelBase
 
     /// <summary>The filesystem that contains the root node</summary>
     public IFileSystemProvider? SourceProvider { get; private set; }
+
+    /// <summary>The root path of the directory tree</summary>
+    public string? SourcePath => RootNode?.FullPath;
 
     /// <summary>Raised when any node's <see cref="DirectoryTreeNode.CheckState"/> changes.</summary>
     public event EventHandler? SelectionChanged;
@@ -65,7 +68,6 @@ public class DirectoryTreeViewModel : ViewModelBase
     /// </summary>
     public async Task ChangeRootAsync(string newRootPath, CancellationToken ct = default)
     {
-        IsLoaded = false;
         await InitializeAsync(newRootPath, ct: ct);
     }
 
@@ -151,10 +153,7 @@ public class DirectoryTreeViewModel : ViewModelBase
             RootNode.BuildStats();
 
             // Default to root node, if user hasn't selected one during the scan
-            if (SelectedNode is null)
-            {
-                SelectedNode = RootNode;
-            }
+            SelectedNode ??= RootNode;
         }
     }
 
