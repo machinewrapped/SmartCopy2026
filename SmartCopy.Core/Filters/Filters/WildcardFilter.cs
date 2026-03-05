@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using SmartCopy.Core.FileSystem;
 using System.Threading;
 using System.Threading.Tasks;
 using SmartCopy.Core.DirectoryTree;
@@ -29,7 +30,7 @@ public sealed class WildcardFilter : FilterBase
 
     public override ValueTask<bool> MatchesAsync(
         DirectoryTreeNode node,
-        IFilterContext context,
+        IPathResolver context,
         CancellationToken ct = default)
     {
         if (_patterns.Length == 0)

@@ -3,14 +3,14 @@ using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Core.Pipeline;
 
-public sealed class PipelineContext
+public sealed class PipelineContext : IPathResolver
 {
     public required DirectoryTreeNode SourceNode { get; init; }
     public required IFileSystemProvider SourceProvider { get; init; }
     public required FileSystemProviderRegistry ProviderRegistry { get; init; }
 
     /// <summary>Resolves the appropriate file system provider for a fully-qualified path.</summary>
-    public IFileSystemProvider? ResolveProvider(string path) => ProviderRegistry.Resolve(path);
+    public IFileSystemProvider? ResolveProvider(string path) => ProviderRegistry.ResolveProvider(path);
 
     /// <summary>The path being built through the pipeline, expressed as separator-free segments.</summary>
     public required string[] PathSegments { get; set; }

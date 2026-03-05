@@ -1,4 +1,5 @@
 using SmartCopy.Core.DirectoryTree;
+using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
 
 namespace SmartCopy.UI.ViewModels;
@@ -38,11 +39,11 @@ public class FileListViewModel : ViewModelBase
     /// <summary>
     /// Applies the filter chain to the current file list.
     /// </summary>
-    public async Task ApplyChainToFilesAsync(FilterChain filterChain, FilterContext filterContext, CancellationToken ct = default)
+    public async Task ApplyChainToFilesAsync(FilterChain filterChain, IPathResolver pathResolver, CancellationToken ct = default)
     {
         if (_currentDirectoryNode != null)
         {
-            await filterChain.ApplyToTreeAsync(_currentDirectoryNode, filterContext, ct);
+            await filterChain.ApplyToTreeAsync(_currentDirectoryNode, pathResolver, ct);
         }
 
         RefreshVisibleFiles();
@@ -52,7 +53,7 @@ public class FileListViewModel : ViewModelBase
     /// Displays the files already scanned into <paramref name="directoryNode"/>,
     /// then applies the current filter chain.
     /// </summary>
-    public async Task LoadFilesForNodeAsync(DirectoryTreeNode directoryNode, FilterChain filterChain, FilterContext filterContext)
+    public async Task LoadFilesForNodeAsync(DirectoryTreeNode directoryNode, FilterChain filterChain, IPathResolver pathResolver)
     {
         _loadCts?.Cancel();
         _loadCts?.Dispose();
@@ -62,7 +63,7 @@ public class FileListViewModel : ViewModelBase
         _currentDirectoryNode = directoryNode;
         _files = [.. directoryNode.Files];
 
-        await ApplyChainToFilesAsync(filterChain, filterContext, ct);
+        await ApplyChainToFilesAsync(filterChain, pathResolver, ct);
     }
 
     public DirectoryTreeNode? FindFile(string fullPath)

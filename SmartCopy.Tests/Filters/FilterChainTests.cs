@@ -218,7 +218,7 @@ public sealed class FilterChainTests
         DirectoryTreeNode source = await provider.BuildDirectoryTree("/source");
 
         var chain = new FilterChain([new MirrorFilter("/mem/Mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude)]);
-        await chain.ApplyToTreeAsync(source, FilterContext.FromProvider(provider));
+        await chain.ApplyToTreeAsync(source, TestAppContext.FromProvider(provider));
 
         // Directory has a non-mirrored file → must stay visible (Mixed: some included, some excluded)
         DirectoryTreeNode alt = source.Children.Single(c => c.Name == "Alternative");
@@ -243,7 +243,7 @@ public sealed class FilterChainTests
         DirectoryTreeNode source = await provider.BuildDirectoryTree("/source");
 
         var chain = new FilterChain([new MirrorFilter("/mem/Mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude)]);
-        await chain.ApplyToTreeAsync(source, FilterContext.FromProvider(provider));
+        await chain.ApplyToTreeAsync(source, TestAppContext.FromProvider(provider));
 
         // All content is mirrored → directory should be Excluded
         Assert.Equal(FilterResult.Excluded, source.FilterResult);

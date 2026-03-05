@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using SmartCopy.Core.DirectoryTree;
+using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Core.Filters.Filters;
 
@@ -21,7 +22,7 @@ public sealed class ExtensionFilter : FilterBase
             .Select(extension => extension.ToLowerInvariant())
             .ToArray();
 
-        _extensions = new HashSet<string>(normalized);
+        _extensions = new(normalized);
         Extensions = normalized;
     }
 
@@ -33,7 +34,7 @@ public sealed class ExtensionFilter : FilterBase
 
     public override ValueTask<bool> MatchesAsync(
         DirectoryTreeNode node,
-        IFilterContext context,
+        IPathResolver context,
         CancellationToken ct = default)
     {
         if (node.IsDirectory)

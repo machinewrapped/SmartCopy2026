@@ -18,7 +18,7 @@ public sealed class FileListViewModelTests
         var musicDir = root.Children.Single(n => n.Name == "music");
 
         var vm = new FileListViewModel();
-        await vm.LoadFilesForNodeAsync(musicDir, FilterChain.Empty, FilterContext.LocalOnly);
+        await vm.LoadFilesForNodeAsync(musicDir, FilterChain.Empty, new TestAppContext());
         Assert.NotEmpty(vm.VisibleFiles);
 
         vm.Clear();
@@ -38,7 +38,7 @@ public sealed class FileListViewModelTests
         var musicDir = root.Children.Single(n => n.Name == "music");
 
         var vm = new FileListViewModel();
-        await vm.LoadFilesForNodeAsync(musicDir, FilterChain.Empty, FilterContext.LocalOnly);
+        await vm.LoadFilesForNodeAsync(musicDir, FilterChain.Empty, new TestAppContext());
 
         vm.ClearIfUnder(musicDir);
 
@@ -57,7 +57,7 @@ public sealed class FileListViewModelTests
         var child = parent.Children.Single(n => n.Name == "child");
 
         var vm = new FileListViewModel();
-        await vm.LoadFilesForNodeAsync(child, FilterChain.Empty, FilterContext.LocalOnly);
+        await vm.LoadFilesForNodeAsync(child, FilterChain.Empty, new TestAppContext());
         Assert.NotEmpty(vm.VisibleFiles);
 
         vm.ClearIfUnder(parent);
@@ -77,7 +77,7 @@ public sealed class FileListViewModelTests
         var dir2 = root.Children.Single(n => n.Name == "dir2");
 
         var vm = new FileListViewModel();
-        await vm.LoadFilesForNodeAsync(dir1, FilterChain.Empty, FilterContext.LocalOnly);
+        await vm.LoadFilesForNodeAsync(dir1, FilterChain.Empty, new TestAppContext());
         Assert.NotEmpty(vm.VisibleFiles);
 
         vm.ClearIfUnder(dir2);

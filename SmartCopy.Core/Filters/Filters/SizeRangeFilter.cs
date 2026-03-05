@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using SmartCopy.Core.DirectoryTree;
+using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Core.Filters.Filters;
 
@@ -23,7 +24,7 @@ public sealed class SizeRangeFilter : FilterBase
 
     public override ValueTask<bool> MatchesAsync(
         DirectoryTreeNode node,
-        IFilterContext context,
+        IPathResolver context,
         CancellationToken ct = default)
     {
         if (node.IsDirectory)

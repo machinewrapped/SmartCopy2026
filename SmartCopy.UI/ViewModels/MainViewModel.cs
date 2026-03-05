@@ -79,7 +79,6 @@ public partial class MainViewModel : ViewModelBase
     private readonly SmartCopyAppContext _appContext;
     private readonly MemoryFileSystemProvider _memoryProvider;
     private readonly FileSystemProviderRegistry _providerRegistry = new();
-    private readonly FilterContext _filterContext;
     private readonly AppSettings _settings;
     private readonly AppSettingsStore _settingsStore = new();
     private readonly SessionStore _sessionStore = new();
@@ -118,8 +117,7 @@ public partial class MainViewModel : ViewModelBase
         _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: _settings.AddArtificialDelay);
         _providerRegistry.Register(_memoryProvider);
 
-        // Create the context and ViewModel for the filter chain
-        _filterContext = new FilterContext(_providerRegistry);
+        // Create the ViewModel for the filter chain
         FilterChain = new FilterChainViewModel(_appContext);
 
         // Create the pipeline view model
@@ -178,7 +176,7 @@ public partial class MainViewModel : ViewModelBase
                 {
                     try
                     {
-                        await FileList.LoadFilesForNodeAsync(selectedNode, FilterChain.BuildLiveChain(), _filterContext);
+                        await FileList.LoadFilesForNodeAsync(selectedNode, FilterChain.BuildLiveChain(), _appContext);
                     }
                     catch (Exception ex)
                     {
@@ -733,8 +731,8 @@ public partial class MainViewModel : ViewModelBase
     {
         var chain = FilterChain.BuildLiveChain();
 
-        await FileList.ApplyChainToFilesAsync(chain, _filterContext, ct);
-        await DirectoryTree.ApplyFiltersAsync(chain, _filterContext, ct);
+        await FileList.ApplyChainToFilesAsync(chain, _appContext, ct);
+        await DirectoryTree.ApplyFiltersAsync(chain, _appContext, ct);
 
         RefreshIdleStats();
     }
