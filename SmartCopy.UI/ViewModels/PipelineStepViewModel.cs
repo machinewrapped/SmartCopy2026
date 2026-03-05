@@ -25,17 +25,7 @@ public partial class PipelineStepViewModel : ViewModelBase
 
     public string Description => Step.Description;
 
-    public string Icon => Kind switch
-    {
-        StepKind.Copy => "→",
-        StepKind.Move => "⇒",
-        StepKind.Delete => "🗑",
-        StepKind.Flatten => "⊞",
-        StepKind.Rename => "✏",
-        StepKind.Rebase => "⤢",
-        StepKind.Convert => "⚙",
-        _ => "?",
-    };
+    public string Icon => Kind.GetIcon();
 
     public bool IsConfigurable => Step.IsConfigurable;
 

@@ -18,4 +18,11 @@ public static class StepKindExtensions
         }
         return kind.ToString();
     }
+
+    public static string GetIcon(this StepKind kind)
+    {
+        var field = kind.GetType().GetField(kind.ToString());
+        var attribute = field?.GetCustomAttribute<StepIconAttribute>();
+        return attribute?.Icon ?? "?";
+    }
 }
