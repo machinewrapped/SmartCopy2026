@@ -1,9 +1,17 @@
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace SmartCopy.Core.Settings;
 
 public sealed class AppSettings
 {
+    /// <summary>
+    /// The file path this instance was loaded from / should be saved to.
+    /// Not persisted to JSON. When null, <see cref="AppSettingsStore.SaveAsync"/> is a no-op.
+    /// </summary>
+    [JsonIgnore]
+    public string? SettingsFilePath { get; set; }
+
     public int SchemaVersion { get; set; } = 1;
     public string? LastSourcePath { get; set; }
     public bool IncludeHidden { get; set; }

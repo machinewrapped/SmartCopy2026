@@ -11,7 +11,6 @@ namespace SmartCopy.UI.ViewModels.Workflows;
 public partial class WorkflowMenuViewModel : ViewModelBase
 {
     private readonly WorkflowPresetStore _store;
-    private readonly string? _storeDirectory;
 
     public ObservableCollection<WorkflowPreset> SavedWorkflows { get; } = [];
 
@@ -23,10 +22,9 @@ public partial class WorkflowMenuViewModel : ViewModelBase
     public event EventHandler<string>? LoadRequested;
     public event EventHandler? ManageRequested;
 
-    public WorkflowMenuViewModel(WorkflowPresetStore store, string? storeDirectory = null)
+    public WorkflowMenuViewModel(WorkflowPresetStore store)
     {
         _store = store;
-        _storeDirectory = storeDirectory;
     }
 
     [RelayCommand(CanExecute = nameof(CanSave))]
@@ -40,7 +38,7 @@ public partial class WorkflowMenuViewModel : ViewModelBase
 
     public async Task RefreshAsync(CancellationToken ct = default)
     {
-        var presets = await _store.GetUserPresetsAsync(_storeDirectory, ct);
+        var presets = await _store.GetUserPresetsAsync(ct);
         SavedWorkflows.Clear();
         foreach (var p in presets)
         {

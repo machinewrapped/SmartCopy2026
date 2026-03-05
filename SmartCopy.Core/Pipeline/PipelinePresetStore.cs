@@ -12,17 +12,22 @@ namespace SmartCopy.Core.Pipeline;
 
 public sealed class PipelinePresetStore
 {
+    private readonly string _directory;
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         WriteIndented = true,
     };
 
+    public PipelinePresetStore(string directory)
+    {
+        _directory = directory;
+    }
+
     public async Task<IReadOnlyList<PipelinePreset>> GetUserPresetsAsync(
-        string? explicitDirectory = null,
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var directory = explicitDirectory ?? GetDefaultPresetDirectory();
+        var directory = _directory;
         if (!Directory.Exists(directory))
         {
             return [];
@@ -61,7 +66,6 @@ public sealed class PipelinePresetStore
     public async Task SaveUserPresetAsync(
         string name,
         PipelineConfig config,
-        string? explicitDirectory = null,
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -70,7 +74,7 @@ public sealed class PipelinePresetStore
             throw new ArgumentException("Preset name must not be empty.", nameof(name));
         }
 
-        var directory = explicitDirectory ?? GetDefaultPresetDirectory();
+        var directory = _directory;
         Directory.CreateDirectory(directory);
         var fileName = $"{ToSafeId(name)}.sc2pipe";
         var filePath = Path.Combine(directory, fileName);
@@ -82,7 +86,6 @@ public sealed class PipelinePresetStore
 
     public async Task DeleteUserPresetAsync(
         string name,
-        string? explicitDirectory = null,
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -91,7 +94,7 @@ public sealed class PipelinePresetStore
             return;
         }
 
-        var directory = explicitDirectory ?? GetDefaultPresetDirectory();
+        var directory = _directory;
         if (!Directory.Exists(directory))
         {
             return;
@@ -104,7 +107,7 @@ public sealed class PipelinePresetStore
             return;
         }
 
-        var presets = await GetUserPresetsAsync(directory, ct);
+        var presets = await GetUserPresetsAsync(ct);
         var matching = presets.FirstOrDefault(preset =>
             string.Equals(preset.Name, name, StringComparison.OrdinalIgnoreCase));
         if (matching is not null)
@@ -115,20 +118,6 @@ public sealed class PipelinePresetStore
                 File.Delete(path);
             }
         }
-    }
-
-    public static string GetDefaultPresetDirectory()
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            return Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "SmartCopy2026",
-                "pipelines");
-        }
-
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        return Path.Combine(home, ".config", "SmartCopy2026", "pipelines");
     }
 
     private static string ToSafeId(string value)

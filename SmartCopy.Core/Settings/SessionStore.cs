@@ -26,10 +26,9 @@ public sealed class SessionStore
     /// </summary>
     public async Task SaveAsync(
         WorkflowConfig config,
-        string? explicitPath = null,
+        string path,
         CancellationToken ct = default)
     {
-        var path = explicitPath ?? GetDefaultSessionPath();
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var json = JsonSerializer.Serialize(config, _jsonOptions);
         await File.WriteAllTextAsync(path, json, ct);
@@ -39,10 +38,9 @@ public sealed class SessionStore
     /// Loads the session snapshot, or returns <c>null</c> if none exists or it is unreadable.
     /// </summary>
     public async Task<WorkflowConfig?> LoadAsync(
-        string? explicitPath = null,
+        string path,
         CancellationToken ct = default)
     {
-        var path = explicitPath ?? GetDefaultSessionPath();
         if (!File.Exists(path))
             return null;
 
@@ -56,14 +54,5 @@ public sealed class SessionStore
             Debug.WriteLine($"[SessionStore] Failed to load session: {ex.Message}");
             return null;
         }
-    }
-
-    public static string GetDefaultSessionPath()
-    {
-        var dir = OperatingSystem.IsWindows()
-            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SmartCopy2026")
-            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config", "SmartCopy2026");
-
-        return Path.Combine(dir, SessionFileName);
     }
 }

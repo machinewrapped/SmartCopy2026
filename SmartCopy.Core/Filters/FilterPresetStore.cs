@@ -16,10 +16,16 @@ namespace SmartCopy.Core.Filters;
 /// </summary>
 public sealed class FilterPresetStore
 {
+    private readonly string _presetPath;
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         WriteIndented = true,
     };
+
+    public FilterPresetStore(string presetPath)
+    {
+        _presetPath = presetPath;
+    }
 
     /// <summary>
     /// Returns built-in presets (prepended, <see cref="FilterPreset.IsBuiltIn"/> = true)
@@ -27,10 +33,9 @@ public sealed class FilterPresetStore
     /// </summary>
     public async Task<IReadOnlyList<FilterPreset>> GetPresetsForTypeAsync(
         string filterType,
-        string? explicitPath = null,
         CancellationToken ct = default)
     {
-        var collection = await LoadCollectionAsync(explicitPath, ct);
+        var collection = await LoadCollectionAsync(ct);
         var builtIns = GetBuiltInPresets(filterType);
 
         if (!collection.UserPresets.TryGetValue(filterType, out var userList))
@@ -48,10 +53,9 @@ public sealed class FilterPresetStore
     public async Task SaveUserPresetAsync(
         string filterType,
         FilterPreset preset,
-        string? explicitPath = null,
         CancellationToken ct = default)
     {
-        var collection = await LoadCollectionAsync(explicitPath, ct);
+        var collection = await LoadCollectionAsync(ct);
 
         if (!collection.UserPresets.TryGetValue(filterType, out var list))
         {
@@ -69,7 +73,7 @@ public sealed class FilterPresetStore
             list.Add(preset);
         }
 
-        await SaveCollectionAsync(collection, explicitPath, ct);
+        await SaveCollectionAsync(collection, ct);
     }
 
     /// <summary>
@@ -78,10 +82,9 @@ public sealed class FilterPresetStore
     public async Task DeleteUserPresetAsync(
         string filterType,
         string presetId,
-        string? explicitPath = null,
         CancellationToken ct = default)
     {
-        var collection = await LoadCollectionAsync(explicitPath, ct);
+        var collection = await LoadCollectionAsync(ct);
 
         if (!collection.UserPresets.TryGetValue(filterType, out var list))
         {
@@ -89,21 +92,7 @@ public sealed class FilterPresetStore
         }
 
         list.RemoveAll(p => p.Id == presetId);
-        await SaveCollectionAsync(collection, explicitPath, ct);
-    }
-
-    public static string GetDefaultPresetPath()
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            return Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "SmartCopy2026",
-                "filter-presets.json");
-        }
-
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        return Path.Combine(home, ".config", "SmartCopy2026", "filter-presets.json");
+        await SaveCollectionAsync(collection, ct);
     }
 
     // -------------------------------------------------------------------------
@@ -153,18 +142,17 @@ public sealed class FilterPresetStore
     // Persistence
     // -------------------------------------------------------------------------
 
-    private async Task<FilterPresetCollection> LoadCollectionAsync(string? explicitPath, CancellationToken ct)
+    private async Task<FilterPresetCollection> LoadCollectionAsync(CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var path = explicitPath ?? GetDefaultPresetPath();
-        if (!File.Exists(path))
+        if (!File.Exists(_presetPath))
         {
             return new FilterPresetCollection();
         }
 
         try
         {
-            var json = await File.ReadAllTextAsync(path, ct);
+            var json = await File.ReadAllTextAsync(_presetPath, ct);
             var collection = JsonSerializer.Deserialize<FilterPresetCollection>(json, _jsonOptions);
             return collection ?? new FilterPresetCollection();
         }
@@ -182,12 +170,11 @@ public sealed class FilterPresetStore
         }
     }
 
-    private async Task SaveCollectionAsync(FilterPresetCollection collection, string? explicitPath, CancellationToken ct)
+    private async Task SaveCollectionAsync(FilterPresetCollection collection, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var path = explicitPath ?? GetDefaultPresetPath();
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(_presetPath)!);
         var json = JsonSerializer.Serialize(collection, _jsonOptions);
-        await File.WriteAllTextAsync(path, json, ct);
+        await File.WriteAllTextAsync(_presetPath, json, ct);
     }
 }

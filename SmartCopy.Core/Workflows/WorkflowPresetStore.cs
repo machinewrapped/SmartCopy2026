@@ -11,17 +11,22 @@ namespace SmartCopy.Core.Workflows;
 
 public sealed class WorkflowPresetStore
 {
+    private readonly string _directory;
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         WriteIndented = true,
     };
 
+    public WorkflowPresetStore(string directory)
+    {
+        _directory = directory;
+    }
+
     public async Task<IReadOnlyList<WorkflowPreset>> GetUserPresetsAsync(
-        string? explicitDirectory = null,
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var directory = explicitDirectory ?? GetDefaultPresetDirectory();
+        var directory = _directory;
         if (!Directory.Exists(directory))
         {
             return [];
@@ -59,7 +64,6 @@ public sealed class WorkflowPresetStore
     public async Task SaveUserPresetAsync(
         string name,
         WorkflowConfig config,
-        string? explicitDirectory = null,
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -68,7 +72,7 @@ public sealed class WorkflowPresetStore
             throw new ArgumentException("Preset name must not be empty.", nameof(name));
         }
 
-        var directory = explicitDirectory ?? GetDefaultPresetDirectory();
+        var directory = _directory;
         Directory.CreateDirectory(directory);
         var fileName = $"{ToSafeId(name)}.sc2workflow";
         var filePath = Path.Combine(directory, fileName);
@@ -80,7 +84,6 @@ public sealed class WorkflowPresetStore
 
     public async Task DeleteUserPresetAsync(
         string name,
-        string? explicitDirectory = null,
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -89,7 +92,7 @@ public sealed class WorkflowPresetStore
             return;
         }
 
-        var directory = explicitDirectory ?? GetDefaultPresetDirectory();
+        var directory = _directory;
         if (!Directory.Exists(directory))
         {
             return;
@@ -102,7 +105,7 @@ public sealed class WorkflowPresetStore
             return;
         }
 
-        var presets = await GetUserPresetsAsync(directory, ct);
+        var presets = await GetUserPresetsAsync(ct);
         var matching = presets.FirstOrDefault(preset =>
             string.Equals(preset.Name, name, StringComparison.OrdinalIgnoreCase));
         if (matching is not null)
@@ -118,7 +121,6 @@ public sealed class WorkflowPresetStore
     public async Task RenameUserPresetAsync(
         string oldName,
         string newName,
-        string? explicitDirectory = null,
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -132,8 +134,8 @@ public sealed class WorkflowPresetStore
             throw new ArgumentException("New name must not be empty.", nameof(newName));
         }
 
-        var directory = explicitDirectory ?? GetDefaultPresetDirectory();
-        var presets = await GetUserPresetsAsync(directory, ct);
+        var directory = _directory;
+        var presets = await GetUserPresetsAsync(ct);
         var existing = presets.FirstOrDefault(p =>
             string.Equals(p.Name, oldName, StringComparison.OrdinalIgnoreCase));
 
@@ -143,7 +145,7 @@ public sealed class WorkflowPresetStore
         }
 
         // Save the new configuration. This will either create a new file or overwrite an existing one.
-        await SaveUserPresetAsync(newName, existing.Config, directory, ct);
+        await SaveUserPresetAsync(newName, existing.Config, ct);
 
         // If the rename resulted in a new file path, delete the old one.
         var oldPath = Path.Combine(directory, $"{existing.Id}.sc2workflow");
@@ -152,20 +154,6 @@ public sealed class WorkflowPresetStore
         {
             File.Delete(oldPath);
         }
-    }
-
-    public static string GetDefaultPresetDirectory()
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            return Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "SmartCopy2026",
-                "workflows");
-        }
-
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        return Path.Combine(home, ".config", "SmartCopy2026", "workflows");
     }
 
     private static string ToSafeId(string value)

@@ -18,9 +18,9 @@ public sealed class AddStepViewModelTests
         var dir = Path.Combine(Path.GetTempPath(), "SmartCopy2026.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         var presetPath = Path.Combine(dir, "step-presets.json");
-        var store = new StepPresetStore();
+        var store = new StepPresetStore(presetPath);
         var settings = new AppSettings();
-        return (new AddStepViewModel(store, settings, presetPath), settings, presetPath);
+        return (new AddStepViewModel(store, settings), settings, presetPath);
     }
 
     // -------------------------------------------------------------------------

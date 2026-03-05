@@ -133,16 +133,19 @@ public partial class FilterChainViewModel : ViewModelBase
 
     public event EventHandler<string>? DeleteChainRequested;
 
-    public FilterChainViewModel() : this(new FilterPresetStore(), new AppSettings()) { }
+    public FilterChainViewModel() : this(
+        new FilterPresetStore(AppDataPaths.ForCurrentUser().FilterPresets),
+        new AppSettings(),
+        new FilterChainPresetStore(AppDataPaths.ForCurrentUser().FilterChains)) { }
 
     public FilterChainViewModel(
         FilterPresetStore presetStore,
         AppSettings settings,
-        FilterChainPresetStore? chainPresetStore = null)
+        FilterChainPresetStore chainPresetStore)
     {
         PresetStore = presetStore;
         AppSettings = settings;
-        _chainPresetStore = chainPresetStore ?? new FilterChainPresetStore();
+        _chainPresetStore = chainPresetStore;
         _showExcludedNodesInTree = settings.ShowFilteredNodesInTree;
         AddFilter = new AddFilterViewModel(presetStore, settings);
         AddFilter.PresetPicked += OnPresetPicked;

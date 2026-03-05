@@ -31,10 +31,10 @@ public sealed class FilterPresetStoreTests
     public async Task GetPresetsForType_WhenNoUserFile_ReturnsBuiltIns()
     {
         using var dir = new TempDirectory();
-        var store = new FilterPresetStore();
         var presetPath = Path.Combine(dir.Path, "presets.json");
+        var store = new FilterPresetStore(presetPath);
 
-        var presets = await store.GetPresetsForTypeAsync("Extension", presetPath);
+        var presets = await store.GetPresetsForTypeAsync("Extension");
 
         Assert.Equal(4, presets.Count);
         Assert.All(presets, p => Assert.True(p.IsBuiltIn));
@@ -44,13 +44,13 @@ public sealed class FilterPresetStoreTests
     public async Task SaveUserPreset_ThenGet_ReturnsUserPreset()
     {
         using var dir = new TempDirectory();
-        var store = new FilterPresetStore();
         var presetPath = Path.Combine(dir.Path, "presets.json");
+        var store = new FilterPresetStore(presetPath);
 
         var userPreset = MakeUserPreset("My Extensions");
-        await store.SaveUserPresetAsync("Extension", userPreset, presetPath);
+        await store.SaveUserPresetAsync("Extension", userPreset);
 
-        var presets = await store.GetPresetsForTypeAsync("Extension", presetPath);
+        var presets = await store.GetPresetsForTypeAsync("Extension");
 
         // Built-ins (4) + 1 user preset
         Assert.Equal(5, presets.Count);
@@ -64,16 +64,16 @@ public sealed class FilterPresetStoreTests
     public async Task SaveUserPreset_SameName_Overwrites()
     {
         using var dir = new TempDirectory();
-        var store = new FilterPresetStore();
         var presetPath = Path.Combine(dir.Path, "presets.json");
+        var store = new FilterPresetStore(presetPath);
 
         var first = MakeUserPreset("Duplicate Name");
-        await store.SaveUserPresetAsync("Extension", first, presetPath);
+        await store.SaveUserPresetAsync("Extension", first);
 
         var second = MakeUserPreset("Duplicate Name");
-        await store.SaveUserPresetAsync("Extension", second, presetPath);
+        await store.SaveUserPresetAsync("Extension", second);
 
-        var presets = await store.GetPresetsForTypeAsync("Extension", presetPath);
+        var presets = await store.GetPresetsForTypeAsync("Extension");
 
         // Should still be 4 built-ins + exactly 1 user preset
         var userPresets = presets.Where(p => !p.IsBuiltIn).ToList();
@@ -85,19 +85,19 @@ public sealed class FilterPresetStoreTests
     public async Task DeleteUserPreset_RemovesIt()
     {
         using var dir = new TempDirectory();
-        var store = new FilterPresetStore();
         var presetPath = Path.Combine(dir.Path, "presets.json");
+        var store = new FilterPresetStore(presetPath);
 
         var preset = MakeUserPreset("To Be Deleted");
-        await store.SaveUserPresetAsync("Extension", preset, presetPath);
+        await store.SaveUserPresetAsync("Extension", preset);
 
         // Confirm it was saved
-        var before = await store.GetPresetsForTypeAsync("Extension", presetPath);
+        var before = await store.GetPresetsForTypeAsync("Extension");
         var savedPreset = before.First(p => p.Name == "To Be Deleted");
 
-        await store.DeleteUserPresetAsync("Extension", savedPreset.Id, presetPath);
+        await store.DeleteUserPresetAsync("Extension", savedPreset.Id);
 
-        var after = await store.GetPresetsForTypeAsync("Extension", presetPath);
+        var after = await store.GetPresetsForTypeAsync("Extension");
         Assert.DoesNotContain(after, p => p.Name == "To Be Deleted");
     }
 
@@ -105,13 +105,13 @@ public sealed class FilterPresetStoreTests
     public async Task BuiltIns_AlwaysPrecedeUserPresets()
     {
         using var dir = new TempDirectory();
-        var store = new FilterPresetStore();
         var presetPath = Path.Combine(dir.Path, "presets.json");
+        var store = new FilterPresetStore(presetPath);
 
         var userPreset = MakeUserPreset("User First");
-        await store.SaveUserPresetAsync("Extension", userPreset, presetPath);
+        await store.SaveUserPresetAsync("Extension", userPreset);
 
-        var presets = await store.GetPresetsForTypeAsync("Extension", presetPath);
+        var presets = await store.GetPresetsForTypeAsync("Extension");
 
         // All built-ins come before any user preset
         var firstUserIndex = presets

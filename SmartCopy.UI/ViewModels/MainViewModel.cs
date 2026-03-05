@@ -76,14 +76,15 @@ public partial class MainViewModel : ViewModelBase
         set => SourcePathPicker.ValidationMessage = value;
     }
 
+    private readonly AppDataPaths _paths = AppDataPaths.ForCurrentUser();
     private readonly MemoryFileSystemProvider _memoryProvider;
     private readonly FileSystemProviderRegistry _providerRegistry = new();
     private readonly FilterContext _filterContext;
-    private readonly AppSettings _settings = new();
+    private readonly AppSettings _settings;
     private readonly AppSettingsStore _settingsStore = new();
     private readonly SessionStore _sessionStore = new();
-    private readonly OperationJournal _operationJournal = new();
-    private readonly WorkflowPresetStore _workflowStore = new();
+    private readonly OperationJournal _operationJournal;
+    private readonly WorkflowPresetStore _workflowStore;
     private readonly SelectionManager _selectionManager = new();
     private readonly SelectionSerializer _selectionSerializer = new();
     private CancellationTokenSource? _filterCts;
@@ -105,20 +106,28 @@ public partial class MainViewModel : ViewModelBase
 
     public MainViewModel()
     {
-        var presetStore = new FilterPresetStore();
+        _settings = new AppSettings { SettingsFilePath = _paths.Settings };
+        _operationJournal = new OperationJournal(_paths.Logs);
+        _workflowStore = new WorkflowPresetStore(_paths.Workflows);
 
-        // Create an in-memory virtual file system for testing. 
+        var filterPresetStore = new FilterPresetStore(_paths.FilterPresets);
+
+        // Create an in-memory virtual file system for testing.
         // TODO: this should be a debug option, not exposed in release builds
         _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: _settings.AddArtificialDelay);
         _providerRegistry.Register(_memoryProvider);
 
         // Create the context and ViewModel for the filter chain
         _filterContext = new FilterContext(_providerRegistry);
-        FilterChain = new FilterChainViewModel(presetStore, _settings);
-        
+        FilterChain = new FilterChainViewModel(
+            filterPresetStore,
+            _settings,
+            new FilterChainPresetStore(_paths.FilterChains));
+
         // Create the pipeline view model
         Pipeline = new PipelineViewModel(
-            presetStore: new PipelinePresetStore(),
+            presetStore: new PipelinePresetStore(_paths.Pipelines),
+            stepPresetStore: new StepPresetStore(_paths.StepPresets),
             appSettings: _settings);
 
         // Create the source path picker
@@ -679,7 +688,7 @@ public partial class MainViewModel : ViewModelBase
     {
         // Load persisted settings; merge into existing _settings instance
         // (FilterChainViewModel holds a ref to the same instance).
-        var saved = await _settingsStore.LoadAsync();
+        var saved = await _settingsStore.LoadAsync(_settings.SettingsFilePath!);
         _settings.RecentSources = saved.RecentSources;
         _settings.FavouritePaths = saved.FavouritePaths;
         _settings.LastSourcePath = saved.LastSourcePath;
@@ -1019,7 +1028,7 @@ public partial class MainViewModel : ViewModelBase
     private string GetSessionPath()
         => _settings.SaveSessionLocally
             ? Path.Combine(AppContext.BaseDirectory, "session.sc2session")
-            : SessionStore.GetDefaultSessionPath();
+            : _paths.Session;
 
     private async Task ManageWorkflowsAsync()
     {

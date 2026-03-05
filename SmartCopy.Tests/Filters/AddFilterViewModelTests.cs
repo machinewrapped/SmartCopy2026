@@ -24,9 +24,9 @@ public sealed class AddFilterViewModelTests
             Guid.NewGuid().ToString("N"),
             "presets.json");
 
-        var store = new FilterPresetStore();
+        var store = new FilterPresetStore(presetPath);
         var settings = new AppSettings();
-        var vm = new AddFilterViewModel(store, settings, presetPath);
+        var vm = new AddFilterViewModel(store, settings);
         return (vm, settings);
     }
 

@@ -33,16 +33,13 @@ public partial class AddStepViewModel : ObservableObject
 {
     private readonly StepPresetStore _presetStore;
     private readonly AppSettings _settings;
-    private readonly string? _presetStorePath;
 
     public AddStepViewModel(
-        StepPresetStore? presetStore = null,
-        AppSettings? settings = null,
-        string? presetStorePath = null)
+        StepPresetStore presetStore,
+        AppSettings? settings = null)
     {
-        _presetStore = presetStore ?? new StepPresetStore();
+        _presetStore = presetStore;
         _settings = settings ?? new AppSettings();
-        _presetStorePath = presetStorePath;
     }
 
     // -------------------------------------------------------------------------
@@ -175,7 +172,7 @@ public partial class AddStepViewModel : ObservableObject
     private async Task DeletePresetAsync(StepPresetItem item)
     {
         await _presetStore.DeleteUserPresetAsync(
-            SelectedStepType!.Kind.ToString(), item.Preset.Id, _presetStorePath);
+            SelectedStepType!.Kind.ToString(), item.Preset.Id);
 
         if (_settings.StepTypeMruPresetIds.TryGetValue(SelectedStepType.Kind.ToString(), out var mru))
             mru.Remove(item.Preset.Id);
@@ -235,7 +232,7 @@ public partial class AddStepViewModel : ObservableObject
 
     private async Task LoadPresetsAsync(string stepType, CancellationToken ct = default)
     {
-        var all = await _presetStore.GetPresetsForTypeAsync(stepType, _presetStorePath, ct);
+        var all = await _presetStore.GetPresetsForTypeAsync(stepType, ct);
 
         var mruIds = _settings.StepTypeMruPresetIds.TryGetValue(stepType, out var ids)
             ? ids

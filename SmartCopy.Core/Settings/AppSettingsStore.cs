@@ -13,55 +13,45 @@ public sealed class AppSettingsStore
         WriteIndented = true,
     };
 
-    public async Task<AppSettings> LoadAsync(string? explicitPath = null, CancellationToken ct = default)
+    public async Task<AppSettings> LoadAsync(string path, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var path = explicitPath ?? GetDefaultSettingsPath();
         if (!File.Exists(path))
         {
-            return new AppSettings();
+            return new AppSettings { SettingsFilePath = path };
         }
 
         try
         {
             var json = await File.ReadAllTextAsync(path, ct);
-            var settings = JsonSerializer.Deserialize<AppSettings>(json, _jsonOptions);
-            return settings ?? new AppSettings();
+            var settings = JsonSerializer.Deserialize<AppSettings>(json, _jsonOptions) ?? new AppSettings();
+            settings.SettingsFilePath = path;
+            return settings;
         }
         catch (JsonException)
         {
-            return new AppSettings();
+            return new AppSettings { SettingsFilePath = path };
         }
         catch (IOException)
         {
-            return new AppSettings();
+            return new AppSettings { SettingsFilePath = path };
         }
         catch (UnauthorizedAccessException)
         {
-            return new AppSettings();
+            return new AppSettings { SettingsFilePath = path };
         }
     }
 
-    public async Task SaveAsync(AppSettings settings, string? explicitPath = null, CancellationToken ct = default)
+    public async Task SaveAsync(AppSettings settings, CancellationToken ct = default)
     {
+        if (string.IsNullOrEmpty(settings.SettingsFilePath))
+            return;
+
         ct.ThrowIfCancellationRequested();
-        var path = explicitPath ?? GetDefaultSettingsPath();
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(settings.SettingsFilePath)!);
         var json = JsonSerializer.Serialize(settings, _jsonOptions);
-        await File.WriteAllTextAsync(path, json, ct);
+        await File.WriteAllTextAsync(settings.SettingsFilePath, json, ct);
     }
 
-    public static string GetDefaultSettingsPath()
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            return Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "SmartCopy2026",
-                "settings.json");
-        }
 
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        return Path.Combine(home, ".config", "SmartCopy2026", "settings.json");
-    }
 }

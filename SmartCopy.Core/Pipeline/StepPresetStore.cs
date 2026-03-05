@@ -16,10 +16,16 @@ namespace SmartCopy.Core.Pipeline;
 /// </summary>
 public sealed class StepPresetStore
 {
+    private readonly string _presetPath;
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         WriteIndented = true,
     };
+
+    public StepPresetStore(string presetPath)
+    {
+        _presetPath = presetPath;
+    }
 
     /// <summary>
     /// Returns built-in presets (prepended, <see cref="StepPreset.IsBuiltIn"/> = true)
@@ -27,10 +33,9 @@ public sealed class StepPresetStore
     /// </summary>
     public async Task<IReadOnlyList<StepPreset>> GetPresetsForTypeAsync(
         string stepType,
-        string? explicitPath = null,
         CancellationToken ct = default)
     {
-        var collection = await LoadCollectionAsync(explicitPath, ct);
+        var collection = await LoadCollectionAsync(ct);
         var builtIns = GetBuiltInPresets(stepType);
 
         if (!collection.UserPresets.TryGetValue(stepType, out var userList))
@@ -48,10 +53,9 @@ public sealed class StepPresetStore
     public async Task SaveUserPresetAsync(
         string stepType,
         StepPreset preset,
-        string? explicitPath = null,
         CancellationToken ct = default)
     {
-        var collection = await LoadCollectionAsync(explicitPath, ct);
+        var collection = await LoadCollectionAsync(ct);
 
         if (!collection.UserPresets.TryGetValue(stepType, out var list))
         {
@@ -69,7 +73,7 @@ public sealed class StepPresetStore
             list.Add(preset);
         }
 
-        await SaveCollectionAsync(collection, explicitPath, ct);
+        await SaveCollectionAsync(collection, ct);
     }
 
     /// <summary>
@@ -78,10 +82,9 @@ public sealed class StepPresetStore
     public async Task DeleteUserPresetAsync(
         string stepType,
         string presetId,
-        string? explicitPath = null,
         CancellationToken ct = default)
     {
-        var collection = await LoadCollectionAsync(explicitPath, ct);
+        var collection = await LoadCollectionAsync(ct);
 
         if (!collection.UserPresets.TryGetValue(stepType, out var list))
         {
@@ -89,21 +92,7 @@ public sealed class StepPresetStore
         }
 
         list.RemoveAll(p => p.Id == presetId);
-        await SaveCollectionAsync(collection, explicitPath, ct);
-    }
-
-    public static string GetDefaultPresetPath()
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            return Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "SmartCopy2026",
-                "step-presets.json");
-        }
-
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        return Path.Combine(home, ".config", "SmartCopy2026", "step-presets.json");
+        await SaveCollectionAsync(collection, ct);
     }
 
     // -------------------------------------------------------------------------
@@ -149,32 +138,30 @@ public sealed class StepPresetStore
     // Persistence
     // -------------------------------------------------------------------------
 
-    private async Task<StepPresetCollection> LoadCollectionAsync(string? explicitPath, CancellationToken ct)
+    private async Task<StepPresetCollection> LoadCollectionAsync(CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var path = explicitPath ?? GetDefaultPresetPath();
-        if (!File.Exists(path))
+        if (!File.Exists(_presetPath))
         {
             return new StepPresetCollection();
         }
 
         try
         {
-            var json = await File.ReadAllTextAsync(path, ct);
+            var json = await File.ReadAllTextAsync(_presetPath, ct);
             var collection = JsonSerializer.Deserialize<StepPresetCollection>(json, _jsonOptions);
             return collection ?? new StepPresetCollection();
         }
-        catch (JsonException ex)            { Debug.WriteLine($"[StepPresetStore] Skipping preset file '{path}': {ex.Message}"); return new StepPresetCollection(); }
-        catch (IOException ex)              { Debug.WriteLine($"[StepPresetStore] Skipping preset file '{path}': {ex.Message}"); return new StepPresetCollection(); }
-        catch (UnauthorizedAccessException ex) { Debug.WriteLine($"[StepPresetStore] Skipping preset file '{path}': {ex.Message}"); return new StepPresetCollection(); }
+        catch (JsonException ex)            { Debug.WriteLine($"[StepPresetStore] Skipping preset file '{_presetPath}': {ex.Message}"); return new StepPresetCollection(); }
+        catch (IOException ex)              { Debug.WriteLine($"[StepPresetStore] Skipping preset file '{_presetPath}': {ex.Message}"); return new StepPresetCollection(); }
+        catch (UnauthorizedAccessException ex) { Debug.WriteLine($"[StepPresetStore] Skipping preset file '{_presetPath}': {ex.Message}"); return new StepPresetCollection(); }
     }
 
-    private async Task SaveCollectionAsync(StepPresetCollection collection, string? explicitPath, CancellationToken ct)
+    private async Task SaveCollectionAsync(StepPresetCollection collection, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var path = explicitPath ?? GetDefaultPresetPath();
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(_presetPath)!);
         var json = JsonSerializer.Serialize(collection, _jsonOptions);
-        await File.WriteAllTextAsync(path, json, ct);
+        await File.WriteAllTextAsync(_presetPath, json, ct);
     }
 }

@@ -19,8 +19,8 @@ public sealed class PipelinePresetStoreTests
     [Fact]
     public async Task SaveGetDeleteUserPreset_RoundTrips()
     {
-        var store = new PipelinePresetStore();
         var dir = CreateTempDirectory();
+        var store = new PipelinePresetStore(dir);
         var config = new PipelineConfig(
             Name: "Music Copy",
             Description: "copy music",
@@ -31,22 +31,22 @@ public sealed class PipelinePresetStoreTests
             OverwriteMode: OverwriteMode.IfNewer.ToString(),
             DeleteMode: DeleteMode.Trash.ToString());
 
-        await store.SaveUserPresetAsync("Music Copy", config, dir);
-        var loaded = await store.GetUserPresetsAsync(dir);
+        await store.SaveUserPresetAsync("Music Copy", config);
+        var loaded = await store.GetUserPresetsAsync();
         Assert.Single(loaded);
         Assert.Equal("Music Copy", loaded[0].Name);
         Assert.False(loaded[0].IsBuiltIn);
 
-        await store.DeleteUserPresetAsync("Music Copy", dir);
-        var afterDelete = await store.GetUserPresetsAsync(dir);
+        await store.DeleteUserPresetAsync("Music Copy");
+        var afterDelete = await store.GetUserPresetsAsync();
         Assert.Empty(afterDelete);
     }
 
     [Fact]
     public async Task SaveUserPreset_SameName_Overwrites()
     {
-        var store = new PipelinePresetStore();
         var dir = CreateTempDirectory();
+        var store = new PipelinePresetStore(dir);
 
         var copyConfig = new PipelineConfig(
             Name: "My Pipeline",
@@ -66,10 +66,10 @@ public sealed class PipelinePresetStoreTests
             ],
         };
 
-        await store.SaveUserPresetAsync("My Pipeline", copyConfig, dir);
-        await store.SaveUserPresetAsync("My Pipeline", moveConfig, dir);
+        await store.SaveUserPresetAsync("My Pipeline", copyConfig);
+        await store.SaveUserPresetAsync("My Pipeline", moveConfig);
 
-        var loaded = await store.GetUserPresetsAsync(dir);
+        var loaded = await store.GetUserPresetsAsync();
         Assert.Single(loaded);
         Assert.Equal(StepKind.Move, loaded[0].Config.Steps[0].StepType);
     }

@@ -24,8 +24,6 @@ public partial class PipelineViewModel : ViewModelBase
     private const string CustomNameParameter = "customName";
     private const int MaxRecentTargets = 10;
     private readonly PipelinePresetStore _presetStore;
-
-    private readonly string? _presetDirectory;
     private readonly StepPresetStore _stepPresetStore;
     private readonly AppSettings? _appSettings;
     private int _selectedIncludedFileCount;
@@ -93,20 +91,20 @@ public partial class PipelineViewModel : ViewModelBase
     public event EventHandler<PipelineStepViewModel>? EditStepRequested;
     public event EventHandler? SavePipelineRequested;
 
-    public PipelineViewModel(
-        AppSettings? appSettings = null,
-        PipelinePresetStore? presetStore = null,
-        StepPresetStore? stepPresetStore = null,
-        string? presetDirectory = null,
-        string? stepPresetStorePath = null)
-    {
-        _presetStore = presetStore ?? new PipelinePresetStore();
+    public PipelineViewModel() : this(
+        new PipelinePresetStore(AppDataPaths.ForCurrentUser().Pipelines),
+        new StepPresetStore(AppDataPaths.ForCurrentUser().StepPresets)) { }
 
-        _presetDirectory = presetDirectory;
-        _stepPresetStore = stepPresetStore ?? new StepPresetStore();
+    public PipelineViewModel(
+        PipelinePresetStore presetStore,
+        StepPresetStore stepPresetStore,
+        AppSettings? appSettings = null)
+    {
+        _presetStore = presetStore;
+        _stepPresetStore = stepPresetStore;
         _appSettings = appSettings ?? new AppSettings();
 
-        AddStep = new AddStepViewModel(_stepPresetStore, appSettings, stepPresetStorePath);
+        AddStep = new AddStepViewModel(_stepPresetStore, appSettings);
         AddStep.StepPresetPicked += OnStepPresetPicked;
 
         Steps.CollectionChanged += OnStepsCollectionChanged;
@@ -137,7 +135,7 @@ public partial class PipelineViewModel : ViewModelBase
     {
         try
         {
-            await _presetStore.DeleteUserPresetAsync(name, _presetDirectory);
+            await _presetStore.DeleteUserPresetAsync(name);
             await RefreshPresetsAsync();
         }
         catch (Exception ex)
@@ -197,7 +195,7 @@ public partial class PipelineViewModel : ViewModelBase
     [RelayCommand]
     private async Task LoadPresetAsync(string name)
     {
-        var all = await _presetStore.GetUserPresetsAsync(_presetDirectory);
+        var all = await _presetStore.GetUserPresetsAsync();
         var preset = all.FirstOrDefault(p =>
             string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
         if (preset is null)
@@ -227,8 +225,7 @@ public partial class PipelineViewModel : ViewModelBase
 
         await _presetStore.SaveUserPresetAsync(
             pipelineName,
-            ToConfig(pipelineName),
-            _presetDirectory);
+            ToConfig(pipelineName));
 
         await RefreshPresetsAsync();
     }
@@ -303,7 +300,7 @@ public partial class PipelineViewModel : ViewModelBase
 
     private async Task RefreshPresetsAsync()
     {
-        var users = await _presetStore.GetUserPresetsAsync(_presetDirectory);
+        var users = await _presetStore.GetUserPresetsAsync();
 
         UserPresets.Clear();
         foreach (var preset in users)

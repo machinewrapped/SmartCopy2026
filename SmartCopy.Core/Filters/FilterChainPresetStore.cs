@@ -11,17 +11,22 @@ namespace SmartCopy.Core.Filters;
 
 public sealed class FilterChainPresetStore
 {
+    private readonly string _directory;
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         WriteIndented = true,
     };
 
+    public FilterChainPresetStore(string directory)
+    {
+        _directory = directory;
+    }
+
     public async Task<IReadOnlyList<FilterChainPreset>> GetUserPresetsAsync(
-        string? explicitDirectory = null,
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var directory = explicitDirectory ?? GetDefaultPresetDirectory();
+        var directory = _directory;
         if (!Directory.Exists(directory))
         {
             return [];
@@ -60,7 +65,6 @@ public sealed class FilterChainPresetStore
     public async Task SaveUserPresetAsync(
         string name,
         FilterChainConfig config,
-        string? explicitDirectory = null,
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -69,7 +73,7 @@ public sealed class FilterChainPresetStore
             throw new ArgumentException("Preset name must not be empty.", nameof(name));
         }
 
-        var directory = explicitDirectory ?? GetDefaultPresetDirectory();
+        var directory = _directory;
         Directory.CreateDirectory(directory);
         var fileName = $"{ToSafeId(name)}.sc2filterchain";
         var filePath = Path.Combine(directory, fileName);
@@ -81,7 +85,6 @@ public sealed class FilterChainPresetStore
 
     public Task DeleteUserPresetAsync(
         string name,
-        string? explicitDirectory = null,
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -90,7 +93,7 @@ public sealed class FilterChainPresetStore
             throw new ArgumentException("Preset name must not be empty.", nameof(name));
         }
 
-        var directory = explicitDirectory ?? GetDefaultPresetDirectory();
+        var directory = _directory;
         if (!Directory.Exists(directory))
         {
             Debug.WriteLine($"[FilterChainPresetStore] Cannot delete preset '{name}': directory not found at '{directory}'");
@@ -108,20 +111,6 @@ public sealed class FilterChainPresetStore
         }
 
         return Task.CompletedTask;
-    }
-
-    public static string GetDefaultPresetDirectory()
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            return Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "SmartCopy2026",
-                "filterchains");
-        }
-
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        return Path.Combine(home, ".config", "SmartCopy2026", "filterchains");
     }
 
     private static string ToSafeId(string value)

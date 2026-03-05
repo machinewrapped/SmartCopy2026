@@ -1,3 +1,4 @@
+using System.IO;
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
@@ -25,11 +26,11 @@ public sealed class WorkflowMenuViewModelTests
     public async Task RefreshAsync_PopulatesSavedWorkflows()
     {
         using var tmp = new TempDirectory();
-        var store = new WorkflowPresetStore();
-        await store.SaveUserPresetAsync("Workflow A", MakeConfig("Workflow A"), tmp.Path);
-        await store.SaveUserPresetAsync("Workflow B", MakeConfig("Workflow B"), tmp.Path);
+        var store = new WorkflowPresetStore(tmp.Path);
+        await store.SaveUserPresetAsync("Workflow A", MakeConfig("Workflow A"));
+        await store.SaveUserPresetAsync("Workflow B", MakeConfig("Workflow B"));
 
-        var vm = new WorkflowMenuViewModel(store, tmp.Path);
+        var vm = new WorkflowMenuViewModel(store);
         await vm.RefreshAsync();
 
         Assert.Equal(2, vm.SavedWorkflows.Count);
@@ -41,14 +42,14 @@ public sealed class WorkflowMenuViewModelTests
     public async Task RefreshAsync_ClearsPreviousItems()
     {
         using var tmp = new TempDirectory();
-        var store = new WorkflowPresetStore();
-        await store.SaveUserPresetAsync("First", MakeConfig("First"), tmp.Path);
+        var store = new WorkflowPresetStore(tmp.Path);
+        await store.SaveUserPresetAsync("First", MakeConfig("First"));
 
-        var vm = new WorkflowMenuViewModel(store, tmp.Path);
+        var vm = new WorkflowMenuViewModel(store);
         await vm.RefreshAsync();
         Assert.Single(vm.SavedWorkflows);
 
-        await store.DeleteUserPresetAsync("First", tmp.Path);
+        await store.DeleteUserPresetAsync("First");
         await vm.RefreshAsync();
         Assert.Empty(vm.SavedWorkflows);
     }
@@ -56,7 +57,7 @@ public sealed class WorkflowMenuViewModelTests
     [Fact]
     public void SaveWorkflow_RaisesSaveRequested()
     {
-        var vm = new WorkflowMenuViewModel(new WorkflowPresetStore());
+        var vm = new WorkflowMenuViewModel(new WorkflowPresetStore(Path.GetTempPath()));
         vm.CanSave = true;
 
         var raised = false;
@@ -70,7 +71,7 @@ public sealed class WorkflowMenuViewModelTests
     [Fact]
     public void LoadWorkflow_RaisesLoadRequestedWithName()
     {
-        var vm = new WorkflowMenuViewModel(new WorkflowPresetStore());
+        var vm = new WorkflowMenuViewModel(new WorkflowPresetStore(Path.GetTempPath()));
 
         string? received = null;
         vm.LoadRequested += (_, name) => received = name;
@@ -83,7 +84,7 @@ public sealed class WorkflowMenuViewModelTests
     [Fact]
     public void ManageWorkflows_RaisesManageRequested()
     {
-        var vm = new WorkflowMenuViewModel(new WorkflowPresetStore());
+        var vm = new WorkflowMenuViewModel(new WorkflowPresetStore(Path.GetTempPath()));
 
         var raised = false;
         vm.ManageRequested += (_, _) => raised = true;
@@ -96,7 +97,7 @@ public sealed class WorkflowMenuViewModelTests
     [Fact]
     public void CanSave_ControlsSaveCommandCanExecute()
     {
-        var vm = new WorkflowMenuViewModel(new WorkflowPresetStore());
+        var vm = new WorkflowMenuViewModel(new WorkflowPresetStore(Path.GetTempPath()));
 
         vm.CanSave = false;
         Assert.False(vm.SaveWorkflowCommand.CanExecute(null));
