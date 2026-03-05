@@ -110,8 +110,6 @@ public partial class MainViewModel : ViewModelBase
         _operationJournal = new OperationJournal(_paths.Logs);
         _workflowStore = new WorkflowPresetStore(_paths.Workflows);
 
-        var filterPresetStore = new FilterPresetStore(_paths.FilterPresets);
-
         // Create an in-memory virtual file system for testing.
         // TODO: this should be a debug option, not exposed in release builds
         _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: _settings.AddArtificialDelay);
@@ -120,7 +118,7 @@ public partial class MainViewModel : ViewModelBase
         // Create the context and ViewModel for the filter chain
         _filterContext = new FilterContext(_providerRegistry);
         FilterChain = new FilterChainViewModel(
-            filterPresetStore,
+            new FilterPresetStore(_paths.FilterPresets),
             _settings,
             new FilterChainPresetStore(_paths.FilterChains));
 
@@ -699,10 +697,6 @@ public partial class MainViewModel : ViewModelBase
         var normalizedPath = PathHelper.NormalizeUserPath(path);
         return list.RemoveAll(existing => PathHelper.AreEquivalentUserPaths(existing, normalizedPath)) > 0;
     }
-
-    private IFileSystemProvider ResolveSourceProvider(string normalizedPath) =>
-        _providerRegistry.Resolve(normalizedPath)
-        ?? throw new NotSupportedException($"No provider for path: {normalizedPath}");
 
     private static string BuildSourcePathValidationMessage(string path, Exception ex)
     {
