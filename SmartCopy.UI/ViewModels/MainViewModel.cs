@@ -209,6 +209,102 @@ public partial class MainViewModel : ViewModelBase
         InitializeInBackground();
     }
 
+    private async void InitializeInBackground()
+    {
+        try
+        {
+            await InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Initialization failed: {ex}");
+        }
+    }
+
+    private async Task InitializeAsync()
+    {
+        // Load persisted settings; merge into existing _settings instance
+        // (FilterChainViewModel holds a ref to the same instance).
+        var saved = await _settingsStore.LoadAsync(_settings.SettingsFilePath!);
+        _settings.RecentSources = saved.RecentSources;
+        _settings.FavouritePaths = saved.FavouritePaths;
+        _settings.LastSourcePath = saved.LastSourcePath;
+        _settings.LogRetentionDays = saved.LogRetentionDays;
+        _settings.UseAbsolutePathsForSelectionSave = saved.UseAbsolutePathsForSelectionSave;
+        _settings.AutoOpenLogOnRun = saved.AutoOpenLogOnRun;
+        _settings.ShowFilteredNodesInTree = saved.ShowFilteredNodesInTree;
+        _settings.RestoreLastWorkflow = saved.RestoreLastWorkflow;
+        _settings.RestoreLastSourcePath = saved.RestoreLastSourcePath;
+        _settings.DisableDestructivePreview = saved.DisableDestructivePreview;
+        _settings.DeleteToRecycleBin = saved.DeleteToRecycleBin;
+        _settings.DefaultDeleteMode = saved.DeleteToRecycleBin ? "Trash" : "Permanent";
+        _settings.FullPreScan = saved.FullPreScan;
+        _settings.LazyExpandScan = saved.LazyExpandScan;
+        _settings.DefaultOverwriteMode = saved.DefaultOverwriteMode;
+
+        _settings.SaveSessionLocally = saved.SaveSessionLocally;
+
+        UseAbsolutePathsForSelection = _settings.UseAbsolutePathsForSelectionSave;
+        AutoOpenLogOnRun = _settings.AutoOpenLogOnRun;
+        ShowExcludedNodesByDefault = _settings.ShowFilteredNodesInTree;
+        RestoreLastWorkflow = _settings.RestoreLastWorkflow;
+        RestoreLastSourcePath = _settings.RestoreLastSourcePath;
+        DisableDestructivePreview = _settings.DisableDestructivePreview;
+        DeleteToRecycleBin = _settings.DeleteToRecycleBin;
+        SaveSessionLocally = _settings.SaveSessionLocally;
+        FullPreScan = _settings.FullPreScan;
+        LazyExpandScan = _settings.LazyExpandScan;
+        DefaultOverwriteMode = _settings.DefaultOverwriteMode;
+
+        SourcePathPicker.RefreshSettings();
+
+        await _operationJournal.RotateAsync(_settings.LogRetentionDays);
+        await WorkflowMenu.RefreshAsync();
+
+        // Restore last workflow if the option is enabled and a session snapshot exists.
+        if (saved.RestoreLastWorkflow)
+        {
+            try
+            {
+                var session = await _sessionStore.LoadAsync(GetSessionPath());
+                if (session is not null)
+                {
+                    ApplyWorkflowConfig(session);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
+            {
+                Debug.WriteLine($"Failed to restore session snapshot: {ex}");
+            }
+        }
+        else if (saved.RestoreLastSourcePath && saved.LastSourcePath is { Length: > 0 })
+        {
+            SourcePath = saved.LastSourcePath;
+        }
+        else
+        {
+            // TEMP: set a safe default path
+            SourcePath = MockMemoryFileSystemFactory.SourcePath;
+        }
+
+        RefreshSourceBookmarks();
+
+        if (SourcePath is { Length: > 0 })
+        {
+            try
+            {
+                await ApplySourcePathCoreAsync(SourcePath);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to set initial source path to '{SourcePath}': {ex}");
+                RevertSourcePath();
+            }
+        }
+
+        LogPanel.AddEntry("SmartCopy 2026 ready");
+    }
+
     partial void OnSelectedSourceBookmarkChanged(SourceBookmarkItem? value)
     {
         // Only populate the text field — don't apply until the user commits
@@ -670,102 +766,6 @@ public partial class MainViewModel : ViewModelBase
 
         Pipeline.SetSelectedIncludedFileCount(selected);
         StatusBar.Selection.UpdateStats(selected, totalBytes, filteredOut);
-    }
-
-    private async void InitializeInBackground()
-    {
-        try
-        {
-            await InitializeAsync();
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"Initialization failed: {ex}");
-        }
-    }
-
-    private async Task InitializeAsync()
-    {
-        // Load persisted settings; merge into existing _settings instance
-        // (FilterChainViewModel holds a ref to the same instance).
-        var saved = await _settingsStore.LoadAsync(_settings.SettingsFilePath!);
-        _settings.RecentSources = saved.RecentSources;
-        _settings.FavouritePaths = saved.FavouritePaths;
-        _settings.LastSourcePath = saved.LastSourcePath;
-        _settings.LogRetentionDays = saved.LogRetentionDays;
-        _settings.UseAbsolutePathsForSelectionSave = saved.UseAbsolutePathsForSelectionSave;
-        _settings.AutoOpenLogOnRun = saved.AutoOpenLogOnRun;
-        _settings.ShowFilteredNodesInTree = saved.ShowFilteredNodesInTree;
-        _settings.RestoreLastWorkflow = saved.RestoreLastWorkflow;
-        _settings.RestoreLastSourcePath = saved.RestoreLastSourcePath;
-        _settings.DisableDestructivePreview = saved.DisableDestructivePreview;
-        _settings.DeleteToRecycleBin = saved.DeleteToRecycleBin;
-        _settings.DefaultDeleteMode = saved.DeleteToRecycleBin ? "Trash" : "Permanent";
-        _settings.FullPreScan = saved.FullPreScan;
-        _settings.LazyExpandScan = saved.LazyExpandScan;
-        _settings.DefaultOverwriteMode = saved.DefaultOverwriteMode;
-
-        _settings.SaveSessionLocally = saved.SaveSessionLocally;
-
-        UseAbsolutePathsForSelection = _settings.UseAbsolutePathsForSelectionSave;
-        AutoOpenLogOnRun = _settings.AutoOpenLogOnRun;
-        ShowExcludedNodesByDefault = _settings.ShowFilteredNodesInTree;
-        RestoreLastWorkflow = _settings.RestoreLastWorkflow;
-        RestoreLastSourcePath = _settings.RestoreLastSourcePath;
-        DisableDestructivePreview = _settings.DisableDestructivePreview;
-        DeleteToRecycleBin = _settings.DeleteToRecycleBin;
-        SaveSessionLocally = _settings.SaveSessionLocally;
-        FullPreScan = _settings.FullPreScan;
-        LazyExpandScan = _settings.LazyExpandScan;
-        DefaultOverwriteMode = _settings.DefaultOverwriteMode;
-
-        SourcePathPicker.RefreshSettings();
-
-        await _operationJournal.RotateAsync(_settings.LogRetentionDays);
-        await WorkflowMenu.RefreshAsync();
-
-        // Restore last workflow if the option is enabled and a session snapshot exists.
-        if (saved.RestoreLastWorkflow)
-        {
-            try
-            {
-                var session = await _sessionStore.LoadAsync(GetSessionPath());
-                if (session is not null)
-                {
-                    ApplyWorkflowConfig(session);
-                }
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
-            {
-                Debug.WriteLine($"Failed to restore session snapshot: {ex}");
-            }
-        }
-        else if (saved.RestoreLastSourcePath && saved.LastSourcePath is { Length: > 0 })
-        {
-            SourcePath = saved.LastSourcePath;
-        }
-        else
-        {
-            // TEMP: set a safe default path
-            SourcePath = MockMemoryFileSystemFactory.SourcePath;
-        }
-
-        RefreshSourceBookmarks();
-
-        if (SourcePath is { Length: > 0 })
-        {
-            try
-            {
-                await ApplySourcePathCoreAsync(SourcePath);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Failed to set initial source path to '{SourcePath}': {ex}");
-                RevertSourcePath();
-            }
-        }
-
-        LogPanel.AddEntry("SmartCopy 2026 ready");
     }
 
     private async Task PreviewPipelineAsync()
