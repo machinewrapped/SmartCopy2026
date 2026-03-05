@@ -17,8 +17,10 @@ public sealed class RenameStep : IPipelineStep
     public string Pattern { get; set; }
 
     public StepKind StepType => StepKind.Rename;
-    public PipelineStepDisplayInfo Display => new(StepType.ForDisplay(), $"Pattern: {Pattern}");
     public bool IsExecutable => false;
+
+    public string AutoSummary => StepType.ForDisplay();
+    public string Description => $"Pattern: {Pattern}";
 
     public TransformStepConfig Config => new(StepType, new JsonObject { ["pattern"] = Pattern });
 

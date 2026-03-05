@@ -9,9 +9,11 @@ namespace SmartCopy.Core.Pipeline.Steps;
 public sealed class ClearSelectionStep : IPipelineStep
 {
     public StepKind StepType => StepKind.ClearSelection;
-    public PipelineStepDisplayInfo Display => new(StepType.ForDisplay(), "Unmark all files");
     public bool IsExecutable => false;
     public bool IsConfigurable => false;
+
+    public string AutoSummary => StepType.ForDisplay();
+    public string Description => "Deselect all files";
 
     public TransformStepConfig Config => new(StepType, new JsonObject());
 

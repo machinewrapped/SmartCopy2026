@@ -1,34 +1,36 @@
-using System.Collections.Generic;
-using System.Threading;
 using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline;
 
-public record PipelineStepDisplayInfo(string Summary, string Description);
-
+/// <summary>
+/// Represents an individual step in a workflow pipeline.
+/// </summary>
 public interface IPipelineStep
 {
+    /// <summary>The type of this step.</summary>
     StepKind StepType { get; }
-    PipelineStepDisplayInfo Display { get; }
+
+    /// <summary>Whether this step can be executed.</summary>
     bool IsExecutable { get; }
 
-    /// <summary>
-    /// Whether this step has configurable parameters. Steps that return <see langword="false"/>
-    /// are added to the pipeline directly without opening the editor dialog.
-    /// </summary>
+    /// <summary>Whether this step has any configurable parameters.</summary>
     bool IsConfigurable => true;
 
+    /// <summary>A short summary of the actions this step will perform.</summary>
+    string AutoSummary { get; }
+
+    /// <summary>A more verbose description of the actions the step will take </summary>
+    string Description { get; }
+
+    /// <summary>Serializable configuration for this step.</summary>
     TransformStepConfig Config { get; }
 
+    /// <summary>Preview the results of this step in a pipeline job.</summary>
     IAsyncEnumerable<TransformResult> PreviewAsync(IStepContext context, CancellationToken ct);
+
+    /// <summary>Apply this step to a pipeline job.</summary>
     IAsyncEnumerable<TransformResult> ApplyAsync(IStepContext context, CancellationToken ct);
 
-    /// <summary>
-    /// Validates this step within the pipeline.
-    /// <list type="bullet">
-    ///   <item>Validate preconditions from <paramref name="context"/>.</item>
-    ///   <item>Update postconditions on <paramref name="context"/>.</item>
-    /// </list>
-    /// </summary>
+    /// <summary>Validates whether this step is logically valid within the pipeline.</summary>
     void Validate(StepValidationContext context);
 }

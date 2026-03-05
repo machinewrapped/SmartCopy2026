@@ -1,7 +1,5 @@
-using System;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
-using System.Threading;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline.Validation;
 
@@ -19,9 +17,8 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath
 
     public TransformStepConfig Config => new(StepType, new JsonObject { ["destinationPath"] = DestinationPath });
 
-    public PipelineStepDisplayInfo Display => new(StepType.ForDisplay(), HasDestinationPath 
-        ? $"Copy to {PathHelper.GetFriendlyTarget(DestinationPath)}" 
-        : "Destination required");
+    public string AutoSummary => HasDestinationPath ? $"Copy to {PathHelper.GetFriendlyTarget(DestinationPath)}" : StepType.ForDisplay();
+    public string Description => HasDestinationPath ? $"Copy to {DestinationPath}" : "Destination required";
 
     private string? _destinationPath;
     public string? DestinationPath 

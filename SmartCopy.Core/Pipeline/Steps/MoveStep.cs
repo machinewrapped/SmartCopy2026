@@ -18,9 +18,9 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
 
     public TransformStepConfig Config => new(StepType, new JsonObject { ["destinationPath"] = DestinationPath });
 
-    public PipelineStepDisplayInfo Display => new(StepType.ForDisplay(), HasDestinationPath
-        ? $"Move to {PathHelper.GetFriendlyTarget(DestinationPath)}"
-        : "Destination required");
+    public string AutoSummary => HasDestinationPath ? $"Move to {PathHelper.GetFriendlyTarget(DestinationPath)}" : StepType.ForDisplay();
+
+    public string Description => HasDestinationPath ? $"Move to {DestinationPath}" : "Destination required";
 
     private string? _destinationPath;
     public string? DestinationPath

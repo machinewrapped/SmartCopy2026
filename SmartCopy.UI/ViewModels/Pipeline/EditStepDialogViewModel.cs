@@ -43,7 +43,10 @@ public partial class EditStepDialogViewModel : ObservableObject
         Editor = editor;
         Editor.PropertyChanged += (_, e) =>
         {
-            AutoUpdateStepName();
+            if (!_userHasEditedStepName)
+            {
+                AutoUpdateStepName();                
+            }
 
             if (e.PropertyName == nameof(StepEditorViewModelBase.IsValid))
             {
@@ -52,14 +55,14 @@ public partial class EditStepDialogViewModel : ObservableObject
             }
         };
 
-        if (string.IsNullOrWhiteSpace(initialCustomName))
+        if (!string.IsNullOrWhiteSpace(initialCustomName))
         {
-            AutoUpdateStepName(force: true);
+            StepName = initialCustomName.Trim();
+            _userHasEditedStepName = true;
         }
         else
         {
-            _userHasEditedStepName = true;
-            StepName = initialCustomName.Trim();
+            AutoUpdateStepName();
         }
 
         OnPropertyChanged(nameof(IsValid));
@@ -80,10 +83,8 @@ public partial class EditStepDialogViewModel : ObservableObject
 
     partial void OnStepNameChanged(string value)
     {
-        if (!_isAutoUpdatingStepName && !string.IsNullOrWhiteSpace(value))
-        {
-            _userHasEditedStepName = true;
-        }
+        // Disable auto-naming if user edits the name, re-neable it if they delete it
+        _userHasEditedStepName = !_isAutoUpdatingStepName && !string.IsNullOrWhiteSpace(value);
     }
 
     [RelayCommand(CanExecute = nameof(IsValid))]
@@ -91,12 +92,12 @@ public partial class EditStepDialogViewModel : ObservableObject
     {
         ResultStep = Editor.BuildStep();
 
-        var finalName = StepName?.Trim();
-        var autoName = ResultStep.Display.Summary?.Trim();
+        var stepName = StepName?.Trim();
+        var autoName = ResultStep.AutoSummary;
 
-        ResultCustomName = string.IsNullOrEmpty(finalName) || string.Equals(finalName, autoName, StringComparison.OrdinalIgnoreCase)
+        ResultCustomName = string.IsNullOrEmpty(stepName) || string.Equals(stepName, autoName, StringComparison.OrdinalIgnoreCase)
             ? null
-            : finalName;
+            : stepName;
 
         OkRequested?.Invoke();
     }
@@ -107,33 +108,16 @@ public partial class EditStepDialogViewModel : ObservableObject
         CancelRequested?.Invoke();
     }
 
-    private void AutoUpdateStepName(bool force = false)
+    private void AutoUpdateStepName()
     {
-        if (!force && _userHasEditedStepName)
-        {
-            return;
-        }
-
         _isAutoUpdatingStepName = true;
         try
         {
-            StepName = GenerateAutoName();
+            StepName = Editor.BuildStep().AutoSummary;
         }
         finally
         {
             _isAutoUpdatingStepName = false;
-        }
-    }
-
-    private string GenerateAutoName()
-    {
-        try
-        {
-            return Editor.BuildStep().Display.Summary;
-        }
-        catch
-        {
-            return Kind.ForDisplay();
         }
     }
 }

@@ -9,9 +9,11 @@ namespace SmartCopy.Core.Pipeline.Steps;
 public sealed class InvertSelectionStep : IPipelineStep
 {
     public StepKind StepType => StepKind.InvertSelection;
-    public PipelineStepDisplayInfo Display => new("Invert selection", "Toggle selection on each file");
     public bool IsExecutable => false;
     public bool IsConfigurable => false;
+
+    public string AutoSummary => StepType.ForDisplay();
+    public string Description => "Toggle selection status of each file";
 
     public TransformStepConfig Config => new(StepType, new JsonObject());
 

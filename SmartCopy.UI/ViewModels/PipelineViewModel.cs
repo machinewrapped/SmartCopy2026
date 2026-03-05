@@ -11,142 +11,12 @@ using SmartCopy.UI.ViewModels.Pipeline;
 
 namespace SmartCopy.UI.ViewModels;
 
-
-
 public enum StepCategory
 {
     Executable,
     Path,
     Content,
     Selection,
-}
-
-public partial class PipelineStepViewModel : ViewModelBase
-{
-    private IPipelineStep _step;
-    private string _customName;
-
-    public PipelineStepViewModel(IPipelineStep step, string? customName = null)
-    {
-        _step = step;
-        _customName = string.IsNullOrWhiteSpace(customName) ? string.Empty : customName.Trim();
-    }
-
-    public IPipelineStep Step => _step;
-
-    public StepKind Kind => _step.StepType;
-
-    public string Summary => HasCustomName ? _customName : AutoSummary;
-
-    public string Description => _step.Display.Description;
-
-    public bool HasCustomName => !string.IsNullOrWhiteSpace(_customName);
-
-    public string? CustomName => HasCustomName ? _customName : null;
-
-    public string AutoSummary => _step.Display.Summary;
-
-    public string Label => Summary;
-
-    public string Icon => Kind switch
-    {
-        StepKind.Copy => "→",
-        StepKind.Move => "⇒",
-        StepKind.Delete => "🗑",
-        StepKind.Flatten => "⊞",
-        StepKind.Rename => "✏",
-        StepKind.Rebase => "⤢",
-        StepKind.Convert => "⚙",
-        _ => "?",
-    };
-
-    // Keep old names for compatibility with tests and any remaining bindings.
-    public string Details => Description;
-
-    public bool IsConfigurable => _step.IsConfigurable;
-
-    public bool HasDescription => !string.IsNullOrWhiteSpace(Description);
-
-    public bool HasDestination => _step is IHasDestinationPath pathProvider && pathProvider.HasDestinationPath;
-
-    public string DestinationPath => (_step as IHasDestinationPath)?.DestinationPath ?? string.Empty;
-
-    public void SetDestinationPath(string? destinationPath)
-    {
-        if (_step is IHasDestinationPath pathProvider)
-        {
-            pathProvider.ChangeDestinationPath(destinationPath ?? string.Empty);
-
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(AutoSummary));
-            OnPropertyChanged(nameof(Summary));
-            OnPropertyChanged(nameof(Label));
-            OnPropertyChanged(nameof(Details));
-            OnPropertyChanged(nameof(Description));
-            OnPropertyChanged(nameof(HasDescription));
-            OnPropertyChanged(nameof(HasDestination));
-            OnPropertyChanged(nameof(DestinationPath));
-            OnPropertyChanged(nameof(ShowDeleteBadge));
-            OnPropertyChanged(nameof(IsPermanentDelete));
-            OnPropertyChanged(nameof(DeleteBadge));
-
-            StepChanged?.Invoke(this, EventArgs.Empty);
-        }
-    }
-
-    public bool ShowDeleteBadge => _step is DeleteStep { Mode: DeleteMode.Permanent };
-
-    public bool IsPermanentDelete => _step is DeleteStep { Mode: DeleteMode.Permanent };
-
-    public string? DeleteBadge =>
-        _step is DeleteStep deleteStep
-            ? deleteStep.Mode == DeleteMode.Permanent ? "⚠ Permanent delete" : null
-            : null;
-
-    [ObservableProperty]
-    public string? _validationMessage;
-
-    [ObservableProperty]
-    public bool _hasValidationError;
-
-    public event EventHandler? StepChanged;
-
-    public void ReplaceStep(IPipelineStep newStep, string? customName = null)
-    {
-        _step = newStep;
-        _customName = string.IsNullOrWhiteSpace(customName) ? string.Empty : customName.Trim();
-        OnPropertyChanged(nameof(Step));
-        OnPropertyChanged(nameof(Kind));
-        OnPropertyChanged(nameof(CustomName));
-        OnPropertyChanged(nameof(AutoSummary));
-        OnPropertyChanged(nameof(Summary));
-        OnPropertyChanged(nameof(Label));
-        OnPropertyChanged(nameof(Icon));
-        OnPropertyChanged(nameof(Details));
-        OnPropertyChanged(nameof(Description));
-        OnPropertyChanged(nameof(HasDescription));
-        OnPropertyChanged(nameof(HasDestination));
-        OnPropertyChanged(nameof(DestinationPath));
-        OnPropertyChanged(nameof(ShowDeleteBadge));
-        OnPropertyChanged(nameof(IsPermanentDelete));
-        OnPropertyChanged(nameof(DeleteBadge));
-        StepChanged?.Invoke(this, EventArgs.Empty);
-    }
-
-    internal static StepKind @ToKind(string stepType)
-    {
-        return stepType switch
-        {
-            "Flatten" => StepKind.Flatten,
-            "Rebase" => StepKind.Rebase,
-            "Rename" => StepKind.Rename,
-            "Convert" => StepKind.Convert,
-            "Copy" => StepKind.Copy,
-            "Move" => StepKind.Move,
-            "Delete" => StepKind.Delete,
-            _ => StepKind.Custom,
-        };
-    }
 }
 
 public partial class PipelineViewModel : ViewModelBase
@@ -261,11 +131,7 @@ public partial class PipelineViewModel : ViewModelBase
     private void OnStepPresetPicked(StepPreset preset)
     {
         var step = PipelineStepFactory.FromConfig(preset.Config);
-        var autoName = step.Display.Summary;
-        var customName = string.Equals(preset.Name, autoName, StringComparison.OrdinalIgnoreCase)
-            ? null
-            : preset.Name;
-        AddStepFromResult(step.StepType, step, customName);
+        AddStepFromResult(step.StepType, step, preset.Name);
     }
 
     public async Task DeletePipelinePresetAsync(string name)

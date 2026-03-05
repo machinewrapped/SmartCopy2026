@@ -9,9 +9,11 @@ namespace SmartCopy.Core.Pipeline.Steps;
 public sealed class SelectAllStep : IPipelineStep
 {
     public StepKind StepType => StepKind.SelectAll;
-    public PipelineStepDisplayInfo Display => new(StepType.ForDisplay(), "Mark all files as selected");
     public bool IsExecutable => false;
     public bool IsConfigurable => false;
+
+    public string AutoSummary => StepType.ForDisplay();
+    public string Description => "Mark all files as selected";
 
     public void Validate(StepValidationContext context)
     {
