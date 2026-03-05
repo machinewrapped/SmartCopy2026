@@ -1,5 +1,6 @@
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
+using SmartCopy.Core.Settings;
 using SmartCopy.UI.ViewModels;
 using SmartCopy.UI.ViewModels.Pipeline;
 
@@ -10,7 +11,7 @@ public sealed class StepEditorViewModelTests
     [Fact]
     public void CopyEditor_LoadFromBuildStep_RoundTripsDestination()
     {
-        var editor = new CopyStepEditorViewModel();
+        var editor = new CopyStepEditorViewModel(new AppSettings());
         editor.LoadFrom(new PipelineStepViewModel(new CopyStep("/mem/out")));
 
         var step = Assert.IsType<CopyStep>(editor.BuildStep());
@@ -20,7 +21,7 @@ public sealed class StepEditorViewModelTests
     [Fact]
     public void MoveEditor_LoadFromBuildStep_RoundTripsDestination()
     {
-        var editor = new MoveStepEditorViewModel();
+        var editor = new MoveStepEditorViewModel(new AppSettings());
         editor.LoadFrom(new PipelineStepViewModel(new MoveStep("/mem/archive")));
 
         var step = Assert.IsType<MoveStep>(editor.BuildStep());
@@ -54,7 +55,7 @@ public sealed class StepEditorViewModelTests
     [Fact]
     public void IsValid_GatesCopyAndRebaseEditors()
     {
-        var copy = new CopyStepEditorViewModel { DestinationPath = "" };
+        var copy = new CopyStepEditorViewModel(new AppSettings()) { DestinationPath = "" };
         var rebase = new RebaseStepEditorViewModel { StripPrefix = "", AddPrefix = "" };
 
         Assert.False(copy.IsValid);

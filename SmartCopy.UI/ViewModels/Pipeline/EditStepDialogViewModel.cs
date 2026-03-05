@@ -69,12 +69,12 @@ public partial class EditStepDialogViewModel : ObservableObject
         OkCommand.NotifyCanExecuteChanged();
     }
 
-    public static EditStepDialogViewModel ForNew(StepKind kind, AppSettings? settings = null)
+    public static EditStepDialogViewModel ForNew(StepKind kind, AppSettings settings)
     {
         return new EditStepDialogViewModel(kind, StepEditorViewModelFactory.Create(kind, settings));
     }
 
-    public static EditStepDialogViewModel ForEdit(PipelineStepViewModel existing, AppSettings? settings = null)
+    public static EditStepDialogViewModel ForEdit(PipelineStepViewModel existing, AppSettings settings)
     {
         var editor = StepEditorViewModelFactory.Create(existing.Kind, settings);
         editor.LoadFrom(existing);

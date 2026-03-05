@@ -41,7 +41,7 @@ public partial class PipelineViewModel : ViewModelBase
 
     public StepPresetStore StepPresetStore => _stepPresetStore;
 
-    internal AppSettings? AppSettings => _appSettings;
+    internal AppSettings AppSettings => _appSettings;
 
     internal void RecordRecentTarget(string path)
     {
@@ -94,18 +94,17 @@ public partial class PipelineViewModel : ViewModelBase
     public event EventHandler? SavePipelineRequested;
 
     public PipelineViewModel(
-        PipelinePresetStore? presetStore = null,
-
-        string? presetDirectory = null,
-        StepPresetStore? stepPresetStore = null,
         AppSettings? appSettings = null,
+        PipelinePresetStore? presetStore = null,
+        StepPresetStore? stepPresetStore = null,
+        string? presetDirectory = null,
         string? stepPresetStorePath = null)
     {
         _presetStore = presetStore ?? new PipelinePresetStore();
 
         _presetDirectory = presetDirectory;
         _stepPresetStore = stepPresetStore ?? new StepPresetStore();
-        _appSettings = appSettings;
+        _appSettings = appSettings ?? new AppSettings();
 
         AddStep = new AddStepViewModel(_stepPresetStore, appSettings, stepPresetStorePath);
         AddStep.StepPresetPicked += OnStepPresetPicked;

@@ -5,6 +5,7 @@ using Avalonia.Interactivity;
 using Avalonia.Threading;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
+using SmartCopy.Core.Settings;
 using SmartCopy.UI.ViewModels;
 using SmartCopy.UI.ViewModels.Dialogs;
 using SmartCopy.UI.ViewModels.Pipeline;
@@ -66,7 +67,7 @@ public partial class PipelineView : UserControl
 
         Dispatcher.UIThread.Post(() => AddStepPopup.IsOpen = false);
 
-        var step = StepEditorViewModelFactory.Create(kind).BuildStep();
+        var step = StepEditorViewModelFactory.Create(kind, new AppSettings()).BuildStep();
         if (!step.IsConfigurable)
         {
             _currentViewModel.AddStepFromResult(kind, step);

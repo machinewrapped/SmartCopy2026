@@ -1,6 +1,7 @@
 using System.IO;
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Filters.Filters;
+using SmartCopy.Core.Settings;
 using SmartCopy.UI.ViewModels.Filters;
 
 namespace SmartCopy.Tests.Filters;
@@ -93,7 +94,7 @@ public sealed class FilterEditorViewModelTests
     {
         var original = new ExtensionFilter(["mp3", "flac"], FilterMode.Only);
 
-        var editor = (ExtensionFilterEditorViewModel)FilterEditorViewModelFactory.CreateFrom(original);
+        var editor = (ExtensionFilterEditorViewModel)FilterEditorViewModelFactory.CreateFrom(original, new AppSettings());
         var rebuilt = (ExtensionFilter)editor.BuildFilter();
 
         Assert.Equal(2, rebuilt.Extensions.Count);

@@ -9,7 +9,7 @@ namespace SmartCopy.UI.ViewModels.Filters;
 /// </summary>
 public static class FilterEditorViewModelFactory
 {
-    public static FilterEditorViewModelBase Create(string filterType, AppSettings? settings = null) => filterType switch
+    public static FilterEditorViewModelBase Create(string filterType, AppSettings settings) => filterType switch
     {
         "Extension" => new ExtensionFilterEditorViewModel(),
         "Wildcard"  => new WildcardFilterEditorViewModel(),
@@ -20,7 +20,7 @@ public static class FilterEditorViewModelFactory
         _ => throw new InvalidOperationException($"Unknown filter type: {filterType}")
     };
 
-    public static FilterEditorViewModelBase CreateFrom(IFilter filter, AppSettings? settings = null)
+    public static FilterEditorViewModelBase CreateFrom(IFilter filter, AppSettings settings)
     {
         var editor = Create(filter.Config.FilterType, settings);
         editor.LoadFrom(filter);
