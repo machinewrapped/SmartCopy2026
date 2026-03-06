@@ -5,7 +5,7 @@ namespace SmartCopy.Core.Scanning;
 
 public static class DirectoryTreePatcher
 {
-    private static readonly StringComparer SortComparer = StringComparer.OrdinalIgnoreCase;
+    private static readonly StringComparer SortComparer = StringComparer.Ordinal;
 
     public static DirectoryTreePatchApplyResult Apply(
         DirectoryTreeNode rootNode,
