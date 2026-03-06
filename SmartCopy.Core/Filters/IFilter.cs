@@ -1,4 +1,5 @@
 using SmartCopy.Core.DirectoryTree;
+using SmartCopy.Core.FileSystem;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -18,6 +19,6 @@ public interface IFilter
 
     ValueTask<bool> MatchesAsync(
         DirectoryTreeNode node,
-        IFilterContext context,
+        IPathResolver context,
         CancellationToken ct = default);
 }

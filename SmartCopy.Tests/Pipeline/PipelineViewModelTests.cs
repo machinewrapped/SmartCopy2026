@@ -10,7 +10,7 @@ public sealed class PipelineViewModelTests
     [Fact]
     public void BuildLivePipeline_ReturnsStepSequence()
     {
-        var vm = new PipelineViewModel();
+        var vm = new PipelineViewModel(new TestAppContext());
         vm.AddStepFromResult(StepKind.Flatten, new FlattenStep());
         vm.AddStepFromResult(StepKind.Copy, new CopyStep("/mem/out"));
 
@@ -24,7 +24,7 @@ public sealed class PipelineViewModelTests
     [Fact]
     public void AddRemoveStep_RaisesPipelineChanged()
     {
-        var vm = new PipelineViewModel();
+        var vm = new PipelineViewModel(new TestAppContext());
         var count = 0;
         vm.PipelineChanged += (_, _) => count++;
 
@@ -37,7 +37,7 @@ public sealed class PipelineViewModelTests
     [Fact]
     public void DestinationPathInlineEdit_RaisesPipelineChanged()
     {
-        var vm = new PipelineViewModel();
+        var vm = new PipelineViewModel(new TestAppContext());
         vm.AddStepFromResult(StepKind.Copy, new CopyStep("/mem/out"));
         var count = 0;
         vm.PipelineChanged += (_, _) => count++;
@@ -50,7 +50,7 @@ public sealed class PipelineViewModelTests
     [Fact]
     public void ReplaceStep_UpdatesViewModelStep()
     {
-        var vm = new PipelineViewModel();
+        var vm = new PipelineViewModel(new TestAppContext());
         vm.AddStepFromResult(StepKind.Copy, new CopyStep("/mem/out"));
         var first = vm.Steps[0];
 
@@ -63,7 +63,7 @@ public sealed class PipelineViewModelTests
     [Fact]
     public void FirstDestinationPath_TracksFirstCopyMove()
     {
-        var vm = new PipelineViewModel();
+        var vm = new PipelineViewModel(new TestAppContext());
         vm.AddStepFromResult(StepKind.Flatten, new FlattenStep());
         vm.AddStepFromResult(StepKind.Move, new MoveStep("/mem/archive"));
         vm.AddStepFromResult(StepKind.Copy, new CopyStep("/mem/backup"));
@@ -74,7 +74,7 @@ public sealed class PipelineViewModelTests
     [Fact]
     public void InvalidStep_ShowsValidationMessageAndBlocksRun()
     {
-        var vm = new PipelineViewModel();
+        var vm = new PipelineViewModel(new TestAppContext());
         vm.AddStepFromResult(StepKind.Copy, new CopyStep(""));
 
         Assert.False(vm.CanRun);
@@ -86,7 +86,7 @@ public sealed class PipelineViewModelTests
     [Fact]
     public void ExecutablePipeline_RequiresSelectedIncludedFiles()
     {
-        var vm = new PipelineViewModel();
+        var vm = new PipelineViewModel(new TestAppContext());
         vm.AddStepFromResult(StepKind.Copy, new CopyStep("/mem/out"));
 
         Assert.False(vm.CanRun);
@@ -101,7 +101,7 @@ public sealed class PipelineViewModelTests
     [Fact]
     public void AddStep_CustomName_OverridesAutoSummary()
     {
-        var vm = new PipelineViewModel();
+        var vm = new PipelineViewModel(new TestAppContext());
 
         vm.AddStepFromResult(StepKind.Copy, new CopyStep("/mem/out"), "Music Mirror");
 
@@ -112,7 +112,7 @@ public sealed class PipelineViewModelTests
     [Fact]
     public void LoadPreset_ReadsCustomNameMetadata()
     {
-        var vm = new PipelineViewModel();
+        var vm = new PipelineViewModel(new TestAppContext());
         var preset = new PipelinePreset
         {
             Name = "Named step",

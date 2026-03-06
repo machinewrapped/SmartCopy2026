@@ -23,10 +23,10 @@ public sealed class WorkflowPresetStoreTests
     [Fact]
     public async Task GetUserPresets_EmptyForMissingDirectory()
     {
-        var store = new WorkflowPresetStore();
         var dir = Path.Combine(Path.GetTempPath(), "SmartCopy2026.Tests", Guid.NewGuid().ToString("N"), "missing");
+        var store = new WorkflowPresetStore(dir);
 
-        var presets = await store.GetUserPresetsAsync(dir);
+        var presets = await store.GetUserPresetsAsync();
 
         Assert.Empty(presets);
     }
@@ -35,11 +35,11 @@ public sealed class WorkflowPresetStoreTests
     public async Task SaveAndGet_RoundTrip()
     {
         using var tmp = new TempDirectory();
-        var store = new WorkflowPresetStore();
+        var store = new WorkflowPresetStore(tmp.Path);
 
-        await store.SaveUserPresetAsync("My Workflow", MakeConfig("My Workflow"), tmp.Path);
+        await store.SaveUserPresetAsync("My Workflow", MakeConfig("My Workflow"));
 
-        var loaded = await store.GetUserPresetsAsync(tmp.Path);
+        var loaded = await store.GetUserPresetsAsync();
         Assert.Single(loaded);
         Assert.Equal("My Workflow", loaded[0].Name);
         Assert.Equal("/mem/Source", loaded[0].Config.SourcePath);
@@ -49,13 +49,13 @@ public sealed class WorkflowPresetStoreTests
     public async Task SaveAndGet_MultiplePresets_SortedByName()
     {
         using var tmp = new TempDirectory();
-        var store = new WorkflowPresetStore();
+        var store = new WorkflowPresetStore(tmp.Path);
 
-        await store.SaveUserPresetAsync("Zed", MakeConfig("Zed"), tmp.Path);
-        await store.SaveUserPresetAsync("Alpha", MakeConfig("Alpha"), tmp.Path);
-        await store.SaveUserPresetAsync("Mango", MakeConfig("Mango"), tmp.Path);
+        await store.SaveUserPresetAsync("Zed", MakeConfig("Zed"));
+        await store.SaveUserPresetAsync("Alpha", MakeConfig("Alpha"));
+        await store.SaveUserPresetAsync("Mango", MakeConfig("Mango"));
 
-        var loaded = await store.GetUserPresetsAsync(tmp.Path);
+        var loaded = await store.GetUserPresetsAsync();
         Assert.Equal(["Alpha", "Mango", "Zed"], loaded.Select(p => p.Name));
     }
 
@@ -63,12 +63,12 @@ public sealed class WorkflowPresetStoreTests
     public async Task Save_SameName_Overwrites()
     {
         using var tmp = new TempDirectory();
-        var store = new WorkflowPresetStore();
+        var store = new WorkflowPresetStore(tmp.Path);
 
-        await store.SaveUserPresetAsync("Workflow", MakeConfig("Workflow") with { SourcePath = "/mem/A" }, tmp.Path);
-        await store.SaveUserPresetAsync("Workflow", MakeConfig("Workflow") with { SourcePath = "/mem/B" }, tmp.Path);
+        await store.SaveUserPresetAsync("Workflow", MakeConfig("Workflow") with { SourcePath = "/mem/A" });
+        await store.SaveUserPresetAsync("Workflow", MakeConfig("Workflow") with { SourcePath = "/mem/B" });
 
-        var loaded = await store.GetUserPresetsAsync(tmp.Path);
+        var loaded = await store.GetUserPresetsAsync();
         Assert.Single(loaded);
         Assert.Equal("/mem/B", loaded[0].Config.SourcePath);
     }
@@ -77,12 +77,12 @@ public sealed class WorkflowPresetStoreTests
     public async Task DeleteUserPreset_RemovesFile()
     {
         using var tmp = new TempDirectory();
-        var store = new WorkflowPresetStore();
+        var store = new WorkflowPresetStore(tmp.Path);
 
-        await store.SaveUserPresetAsync("ToDelete", MakeConfig("ToDelete"), tmp.Path);
-        await store.DeleteUserPresetAsync("ToDelete", tmp.Path);
+        await store.SaveUserPresetAsync("ToDelete", MakeConfig("ToDelete"));
+        await store.DeleteUserPresetAsync("ToDelete");
 
-        var loaded = await store.GetUserPresetsAsync(tmp.Path);
+        var loaded = await store.GetUserPresetsAsync();
         Assert.Empty(loaded);
     }
 
@@ -90,21 +90,21 @@ public sealed class WorkflowPresetStoreTests
     public async Task DeleteUserPreset_NonExistent_DoesNotThrow()
     {
         using var tmp = new TempDirectory();
-        var store = new WorkflowPresetStore();
+        var store = new WorkflowPresetStore(tmp.Path);
 
-        await store.DeleteUserPresetAsync("NonExistent", tmp.Path);
+        await store.DeleteUserPresetAsync("NonExistent");
     }
 
     [Fact]
     public async Task RenameUserPreset_UpdatesNameAndContent()
     {
         using var tmp = new TempDirectory();
-        var store = new WorkflowPresetStore();
+        var store = new WorkflowPresetStore(tmp.Path);
 
-        await store.SaveUserPresetAsync("Old Name", MakeConfig("Old Name"), tmp.Path);
-        await store.RenameUserPresetAsync("Old Name", "New Name", tmp.Path);
+        await store.SaveUserPresetAsync("Old Name", MakeConfig("Old Name"));
+        await store.RenameUserPresetAsync("Old Name", "New Name");
 
-        var loaded = await store.GetUserPresetsAsync(tmp.Path);
+        var loaded = await store.GetUserPresetsAsync();
         Assert.Single(loaded);
         Assert.Equal("New Name", loaded[0].Name);
     }
@@ -113,21 +113,13 @@ public sealed class WorkflowPresetStoreTests
     public async Task GetUserPresets_SkipsCorruptFiles()
     {
         using var tmp = new TempDirectory();
-        var store = new WorkflowPresetStore();
+        var store = new WorkflowPresetStore(tmp.Path);
 
-        await store.SaveUserPresetAsync("Good", MakeConfig("Good"), tmp.Path);
+        await store.SaveUserPresetAsync("Good", MakeConfig("Good"));
         File.WriteAllText(Path.Combine(tmp.Path, "corrupt.sc2workflow"), "not valid json {{{{");
 
-        var loaded = await store.GetUserPresetsAsync(tmp.Path);
+        var loaded = await store.GetUserPresetsAsync();
         Assert.Single(loaded);
         Assert.Equal("Good", loaded[0].Name);
-    }
-
-    [Fact]
-    public void GetDefaultPresetDirectory_ReturnsNonEmpty()
-    {
-        var dir = WorkflowPresetStore.GetDefaultPresetDirectory();
-        Assert.False(string.IsNullOrWhiteSpace(dir));
-        Assert.Contains("SmartCopy2026", dir);
     }
 }

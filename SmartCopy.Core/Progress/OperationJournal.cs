@@ -10,9 +10,9 @@ namespace SmartCopy.Core.Progress;
 
 public sealed class OperationJournal
 {
-    public OperationJournal(string? explicitDirectory = null)
+    public OperationJournal(string logDirectory)
     {
-        LogDirectory = explicitDirectory ?? GetDefaultLogDirectory();
+        LogDirectory = logDirectory;
     }
 
     public string LogDirectory { get; }
@@ -69,20 +69,6 @@ public sealed class OperationJournal
 
         await writer.FlushAsync(ct);
         return path;
-    }
-
-    public static string GetDefaultLogDirectory()
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            return Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "SmartCopy2026",
-                "logs");
-        }
-
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        return Path.Combine(home, ".config", "SmartCopy2026", "logs");
     }
 
     private static string SanitizeField(string value) =>

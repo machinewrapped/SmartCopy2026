@@ -1,5 +1,6 @@
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Filters.Filters;
+using SmartCopy.Core.Settings;
 using SmartCopy.UI.ViewModels;
 using SmartCopy.UI.ViewModels.Filters;
 
@@ -14,7 +15,7 @@ public sealed class EditFilterDialogViewModelTests
     [Fact]
     public void ForNew_ExtensionType_EditorIsExtensionEditor()
     {
-        var vm = EditFilterDialogViewModel.ForNew("Extension");
+        var vm = EditFilterDialogViewModel.ForNew("Extension", new AppSettings());
 
         Assert.IsType<ExtensionFilterEditorViewModel>(vm.Editor);
     }
@@ -22,7 +23,7 @@ public sealed class EditFilterDialogViewModelTests
     [Fact]
     public void ForNew_IsValid_FalseWhenNoExtensions()
     {
-        var vm = EditFilterDialogViewModel.ForNew("Extension");
+        var vm = EditFilterDialogViewModel.ForNew("Extension", new AppSettings());
         var editor = (ExtensionFilterEditorViewModel)vm.Editor;
 
         // No extensions added yet
@@ -36,7 +37,7 @@ public sealed class EditFilterDialogViewModelTests
     {
         var existingFilter = new ExtensionFilter(["mp3", "flac"], FilterMode.Only);
 
-        var vm = EditFilterDialogViewModel.ForEdit(existingFilter);
+        var vm = EditFilterDialogViewModel.ForEdit(existingFilter, new AppSettings());
         var editor = (ExtensionFilterEditorViewModel)vm.Editor;
 
         Assert.Equal(2, editor.Extensions.Count);
@@ -47,7 +48,7 @@ public sealed class EditFilterDialogViewModelTests
     [Fact]
     public void Ok_SetsResultFilter()
     {
-        var vm = EditFilterDialogViewModel.ForNew("Extension");
+        var vm = EditFilterDialogViewModel.ForNew("Extension", new AppSettings());
         var editor = (ExtensionFilterEditorViewModel)vm.Editor;
 
         editor.InputText = "wav";
@@ -63,7 +64,7 @@ public sealed class EditFilterDialogViewModelTests
     [Fact]
     public void ModeIsAdd_SetToTrue_ChangesModeOnEditor()
     {
-        var vm = EditFilterDialogViewModel.ForNew("Extension");
+        var vm = EditFilterDialogViewModel.ForNew("Extension", new AppSettings());
 
         vm.ModeIsAdd = true;
 
@@ -74,7 +75,7 @@ public sealed class EditFilterDialogViewModelTests
     [Fact]
     public void ModeIsExclude_SetToTrue_ChangesModeOnEditor()
     {
-        var vm = EditFilterDialogViewModel.ForNew("Extension");
+        var vm = EditFilterDialogViewModel.ForNew("Extension", new AppSettings());
 
         vm.ModeIsExclude = true;
 
@@ -85,7 +86,7 @@ public sealed class EditFilterDialogViewModelTests
     [Fact]
     public void ForNew_MirrorType_SetsComparisonPathSuggestion()
     {
-        var vm = EditFilterDialogViewModel.ForNew("Mirror", pipelineDestinationPath: "/mem/Mirror");
+        var vm = EditFilterDialogViewModel.ForNew("Mirror", new AppSettings(), pipelineDestinationPath: "/mem/Mirror");
         var editor = (MirrorFilterEditorViewModel)vm.Editor;
 
         Assert.IsType<MirrorFilterEditorViewModel>(editor);

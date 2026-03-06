@@ -33,16 +33,11 @@ public partial class AddFilterViewModel : ObservableObject
 {
     private readonly FilterPresetStore _presetStore;
     private readonly AppSettings _settings;
-    private readonly string? _presetStorePath;
 
-    public AddFilterViewModel(
-        FilterPresetStore presetStore,
-        AppSettings settings,
-        string? presetStorePath = null)
+    public AddFilterViewModel(IAppContext appContext)
     {
-        _presetStore = presetStore;
-        _settings = settings;
-        _presetStorePath = presetStorePath;
+        _presetStore = new FilterPresetStore(appContext.DataStore.GetFilePath("filter-presets.json"));
+        _settings = appContext.Settings;
     }
 
     // -------------------------------------------------------------------------
@@ -130,7 +125,7 @@ public partial class AddFilterViewModel : ObservableObject
     [RelayCommand]
     private async Task DeletePresetAsync(PresetItem item)
     {
-        await _presetStore.DeleteUserPresetAsync(SelectedType!.TypeKey, item.Preset.Id, _presetStorePath);
+        await _presetStore.DeleteUserPresetAsync(SelectedType!.TypeKey, item.Preset.Id);
 
         // Remove from MRU if present
         if (_settings.FilterTypeMruPresetIds.TryGetValue(SelectedType.TypeKey, out var mru))
@@ -166,7 +161,7 @@ public partial class AddFilterViewModel : ObservableObject
 
     private async Task LoadPresetsAsync(string filterType, CancellationToken ct = default)
     {
-        var all = await _presetStore.GetPresetsForTypeAsync(filterType, _presetStorePath, ct);
+        var all = await _presetStore.GetPresetsForTypeAsync(filterType, ct);
 
         var mruIds = _settings.FilterTypeMruPresetIds.TryGetValue(filterType, out var ids)
             ? ids

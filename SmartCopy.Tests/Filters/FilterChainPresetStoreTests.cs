@@ -23,9 +23,9 @@ public sealed class FilterChainPresetStoreTests
     [Fact]
     public async Task SaveGetDeleteUserPreset_RoundTrips()
     {
-        var store = new FilterChainPresetStore();
         var dir = CreateTempDirectory();
-        
+        var store = new FilterChainPresetStore(dir);
+
         var config = new FilterChainConfig(
             Name: "Test Chain",
             Description: "A chain for testing",
@@ -39,10 +39,10 @@ public sealed class FilterChainPresetStoreTests
             ]);
 
         // Save
-        await store.SaveUserPresetAsync("Test Chain", config, dir);
-        
+        await store.SaveUserPresetAsync("Test Chain", config);
+
         // Get
-        var loaded = await store.GetUserPresetsAsync(dir);
+        var loaded = await store.GetUserPresetsAsync();
         Assert.Single(loaded);
         Assert.Equal("Test Chain", loaded[0].Name);
         Assert.Equal("Test Chain", loaded[0].Config.Name);
@@ -51,16 +51,16 @@ public sealed class FilterChainPresetStoreTests
         Assert.Equal("Extension", loaded[0].Config.Filters[0].FilterType);
 
         // Delete
-        await store.DeleteUserPresetAsync("Test Chain", dir);
-        var afterDelete = await store.GetUserPresetsAsync(dir);
+        await store.DeleteUserPresetAsync("Test Chain");
+        var afterDelete = await store.GetUserPresetsAsync();
         Assert.Empty(afterDelete);
     }
 
     [Fact]
     public async Task SaveUserPreset_SameName_Overwrites()
     {
-        var store = new FilterChainPresetStore();
         var dir = CreateTempDirectory();
+        var store = new FilterChainPresetStore(dir);
 
         var config1 = new FilterChainConfig(
             Name: "My Chain",
@@ -86,10 +86,10 @@ public sealed class FilterChainPresetStoreTests
             ]
         };
 
-        await store.SaveUserPresetAsync("My Chain", config1, dir);
-        await store.SaveUserPresetAsync("My Chain", config2, dir);
+        await store.SaveUserPresetAsync("My Chain", config1);
+        await store.SaveUserPresetAsync("My Chain", config2);
 
-        var loaded = await store.GetUserPresetsAsync(dir);
+        var loaded = await store.GetUserPresetsAsync();
         Assert.Single(loaded);
         Assert.Equal("My Chain", loaded[0].Name);
         Assert.Equal("Attribute", loaded[0].Config.Filters[0].FilterType);
@@ -99,18 +99,18 @@ public sealed class FilterChainPresetStoreTests
     [Fact]
     public async Task GetUserPresetsAsync_SkipsMalformedFiles()
     {
-        var store = new FilterChainPresetStore();
         var dir = CreateTempDirectory();
+        var store = new FilterChainPresetStore(dir);
 
         // Write a valid preset
         var validConfig = new FilterChainConfig("Valid", null, []);
-        await store.SaveUserPresetAsync("Valid", validConfig, dir);
+        await store.SaveUserPresetAsync("Valid", validConfig);
 
         // Write a malformed preset
         await File.WriteAllTextAsync(Path.Combine(dir, "malformed.sc2filterchain"), "{ invalid json ]");
 
-        var loaded = await store.GetUserPresetsAsync(dir);
-        
+        var loaded = await store.GetUserPresetsAsync();
+
         // Should only load the valid one
         Assert.Single(loaded);
         Assert.Equal("Valid", loaded[0].Name);

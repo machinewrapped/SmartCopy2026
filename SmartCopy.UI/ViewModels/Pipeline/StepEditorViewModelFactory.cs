@@ -5,7 +5,7 @@ namespace SmartCopy.UI.ViewModels.Pipeline;
 
 public static class StepEditorViewModelFactory
 {
-    public static StepEditorViewModelBase Create(StepKind kind, AppSettings? settings = null)
+    public static StepEditorViewModelBase Create(StepKind kind, AppSettings settings)
     {
         return kind switch
         {

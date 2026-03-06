@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using SmartCopy.Core.DirectoryTree;
+using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Core.Filters;
 
@@ -24,10 +25,10 @@ public sealed class FilterChain
 
     public async Task<IReadOnlyList<DirectoryTreeNode>> ApplyAsync(
         IEnumerable<DirectoryTreeNode> nodes,
-        IFilterContext? context = null,
+        IPathResolver? context = null,
         CancellationToken ct = default)
     {
-        var resolvedContext = context ?? FilterContext.LocalOnly;
+        var resolvedContext = context ?? FileSystemProviderRegistry.Empty;
         var result = new List<DirectoryTreeNode>();
         foreach (var node in nodes)
         {
@@ -44,10 +45,10 @@ public sealed class FilterChain
 
     public async Task ApplyToTreeAsync(
         DirectoryTreeNode root,
-        IFilterContext? context = null,
+        IPathResolver? context = null,
         CancellationToken ct = default)
     {
-        var resolvedContext = context ?? FilterContext.LocalOnly;
+        var resolvedContext = context ?? FileSystemProviderRegistry.Empty;
         var stack = new Stack<DirectoryTreeNode>([root]);
         var postOrderList = new List<DirectoryTreeNode>();
 
@@ -134,7 +135,7 @@ public sealed class FilterChain
     public static FilterChain FromConfig(FilterChainConfig config)
         => FromConfig(config, FilterFactory.FromConfig);
 
-    private async Task<FilterResult> EvaluateNodeAsync(DirectoryTreeNode node, IFilterContext context, CancellationToken ct)
+    private async Task<FilterResult> EvaluateNodeAsync(DirectoryTreeNode node, IPathResolver context, CancellationToken ct)
     {
         FilterResult result = FilterResult.Included;
 

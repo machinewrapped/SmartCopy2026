@@ -76,7 +76,7 @@ public class DirectoryTreeViewModel : ViewModelBase
     /// </summary>
     public async Task ApplyFiltersAsync(
         FilterChain chain,
-        IFilterContext? context = null,
+        IPathResolver? context = null,
         CancellationToken ct = default)
     {
         if (RootNode == null) 
@@ -120,7 +120,7 @@ public class DirectoryTreeViewModel : ViewModelBase
 
             var scanOptions = new ScanOptions { LazyExpand = false, IncludeHidden = true };
 
-            var sourceProvider = _providerRegistry.Resolve(rootPath)
+            var sourceProvider = _providerRegistry.ResolveProvider(rootPath)
                 ?? throw new ArgumentException("Source path cannot be mapped to a FileSystemProvider");
 
             var scanner = new DirectoryScanner(sourceProvider);

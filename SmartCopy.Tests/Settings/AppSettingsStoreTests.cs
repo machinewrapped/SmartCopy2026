@@ -14,13 +14,14 @@ public sealed class AppSettingsStoreTests
 
         var settings = new AppSettings
         {
+            SettingsFilePath = filePath,
             LastSourcePath = "/music",
             IncludeHidden = true,
             CopyChunkSizeKb = 1024,
             RecentSources = ["/one", "/two"],
         };
 
-        await store.SaveAsync(settings, filePath, CancellationToken.None);
+        await store.SaveAsync(settings, CancellationToken.None);
         var loaded = await store.LoadAsync(filePath, CancellationToken.None);
 
         Assert.Equal("/music", loaded.LastSourcePath);
@@ -52,6 +53,7 @@ public sealed class AppSettingsStoreTests
 
         var settings = new AppSettings
         {
+            SettingsFilePath = filePath,
             RestoreLastWorkflow     = true,
             RestoreLastSourcePath   = false,
             DisableDestructivePreview = true,
@@ -61,7 +63,7 @@ public sealed class AppSettingsStoreTests
             LazyExpandScan          = true,
         };
 
-        await store.SaveAsync(settings, filePath, CancellationToken.None);
+        await store.SaveAsync(settings, CancellationToken.None);
         var loaded = await store.LoadAsync(filePath, CancellationToken.None);
 
         Assert.True(loaded.RestoreLastWorkflow);

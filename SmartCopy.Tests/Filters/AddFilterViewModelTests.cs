@@ -18,16 +18,9 @@ public sealed class AddFilterViewModelTests
     /// </summary>
     private static (AddFilterViewModel vm, AppSettings settings) CreateVm()
     {
-        var presetPath = Path.Combine(
-            Path.GetTempPath(),
-            "SmartCopy2026.Tests",
-            Guid.NewGuid().ToString("N"),
-            "presets.json");
-
-        var store = new FilterPresetStore();
-        var settings = new AppSettings();
-        var vm = new AddFilterViewModel(store, settings, presetPath);
-        return (vm, settings);
+        var appContext = new TestAppContext();
+        var vm = new AddFilterViewModel(appContext);
+        return (vm, appContext.Settings);
     }
 
     private static FilterTypeItem ExtensionTypeItem(AddFilterViewModel vm) =>

@@ -47,9 +47,9 @@ public sealed class FilterLiveWiringTests
         var chain = new FilterChain([new ExtensionFilter(["mp3"], FilterMode.Only)]);
 
         var dirNode = await BuildMusicDirNode(defaultFiles);
-        var vm = new FileListViewModel(FilterContext.LocalOnly);
+        var vm = new FileListViewModel();
 
-        await vm.LoadFilesForNodeAsync(dirNode, chain);
+        await vm.LoadFilesForNodeAsync(dirNode, chain, new TestAppContext());
 
         var jpg = vm.VisibleFiles.FirstOrDefault(f => f.Name == "photo.jpg");
         Assert.NotNull(jpg);
@@ -75,8 +75,8 @@ public sealed class FilterLiveWiringTests
             new SizeRangeFilter(minBytes: 1_000_000, maxBytes: null, FilterMode.Exclude),
         ]);
 
-        var vm = new FileListViewModel(FilterContext.LocalOnly);
-        await vm.LoadFilesForNodeAsync(dirNode, chain);
+        var vm = new FileListViewModel();
+        await vm.LoadFilesForNodeAsync(dirNode, chain, new TestAppContext());
 
         var small = vm.VisibleFiles.First(f => f.Name == "small.mp3");
         var large = vm.VisibleFiles.First(f => f.Name == "large.mp3");
@@ -93,8 +93,8 @@ public sealed class FilterLiveWiringTests
         var dirNode = await BuildMusicDirNode(defaultFiles);
         var chain = new FilterChain([new ExtensionFilter(["mp3"], FilterMode.Only)]);
 
-        var vm = new FileListViewModel(FilterContext.LocalOnly);
-        await vm.LoadFilesForNodeAsync(dirNode, chain);
+        var vm = new FileListViewModel();
+        await vm.LoadFilesForNodeAsync(dirNode, chain, new TestAppContext());
 
         vm.ShowFilteredFiles = false;
 
@@ -108,8 +108,8 @@ public sealed class FilterLiveWiringTests
         var dirNode = await BuildMusicDirNode(defaultFiles);
         var chain = new FilterChain([new ExtensionFilter(["mp3"], FilterMode.Only)]);
 
-        var vm = new FileListViewModel(FilterContext.LocalOnly);
-        await vm.LoadFilesForNodeAsync(dirNode, chain);
+        var vm = new FileListViewModel();
+        await vm.LoadFilesForNodeAsync(dirNode, chain, new TestAppContext());
 
         // Default is true
         vm.ShowFilteredFiles = true;
@@ -125,8 +125,8 @@ public sealed class FilterLiveWiringTests
         var activeFilter = new ExtensionFilter(["mp3"], FilterMode.Only);
         var activeChain = new FilterChain([activeFilter]);
 
-        var vm = new FileListViewModel(FilterContext.LocalOnly);
-        await vm.LoadFilesForNodeAsync(dirNode, activeChain);
+        var vm = new FileListViewModel();
+        await vm.LoadFilesForNodeAsync(dirNode, activeChain, new TestAppContext());
 
         // Confirm jpg is excluded
         var jpg = vm.VisibleFiles.First(f => f.Name == "photo.jpg");
@@ -135,7 +135,7 @@ public sealed class FilterLiveWiringTests
         // Now replace the chain with a disabled version of the same filter
         var disabledFilter = new ExtensionFilter(["mp3"], FilterMode.Only, isEnabled: false);
         var disabledChain = new FilterChain([disabledFilter]);
-        await vm.LoadFilesForNodeAsync(dirNode, disabledChain);
+        await vm.LoadFilesForNodeAsync(dirNode, disabledChain, new TestAppContext());
 
         // With filter disabled, every file should now be Included
         Assert.All(vm.VisibleFiles, f => Assert.Equal(FilterResult.Included, f.FilterResult));
@@ -146,15 +146,15 @@ public sealed class FilterLiveWiringTests
     {
         var dirNode = await BuildMusicDirNode(defaultFiles);
 
-        var vm = new FileListViewModel(FilterContext.LocalOnly);
+        var vm = new FileListViewModel();
         // Load with no chain — all Included by default
-        await vm.LoadFilesForNodeAsync(dirNode, FilterChain.Empty);
+        await vm.LoadFilesForNodeAsync(dirNode, FilterChain.Empty, new TestAppContext());
 
         Assert.All(vm.VisibleFiles, f => Assert.Equal(FilterResult.Included, f.FilterResult));
 
         // Now apply a chain that excludes jpg
         var chain = new FilterChain([new ExtensionFilter(["mp3"], FilterMode.Only)]);
-        await vm.LoadFilesForNodeAsync(dirNode, chain);
+        await vm.LoadFilesForNodeAsync(dirNode, chain, new TestAppContext());
 
         var jpg = vm.VisibleFiles.First(f => f.Name == "photo.jpg");
         Assert.Equal(FilterResult.Excluded, jpg.FilterResult);

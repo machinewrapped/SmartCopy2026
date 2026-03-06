@@ -190,8 +190,6 @@ public sealed class PipelineRunner
             return context;
         }
 
-        public IFileSystemProvider? ResolveProvider(string path) => ProviderRegistry.Resolve(path);
-
         public bool IsNodeFailed(DirectoryTreeNode node) => _failedNodes.Contains(node);
         public void MarkFailed(DirectoryTreeNode node) => _failedNodes.Add(node);
     }

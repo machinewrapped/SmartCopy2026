@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using SmartCopy.Core.DirectoryTree;
+using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Core.Filters;
 
@@ -24,7 +25,7 @@ public abstract class FilterBase : IFilter
     public abstract string Description { get; }
     public abstract ValueTask<bool> MatchesAsync(
         DirectoryTreeNode node,
-        IFilterContext context,
+        IPathResolver context,
         CancellationToken ct = default);
 
     public virtual FilterConfig Config => new(

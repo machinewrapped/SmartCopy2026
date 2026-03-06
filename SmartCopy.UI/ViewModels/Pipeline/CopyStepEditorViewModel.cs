@@ -14,9 +14,9 @@ public partial class CopyStepEditorViewModel : StepEditorViewModelBase, IDestina
         set => DestinationPathPicker.Path = value;
     }
 
-    public CopyStepEditorViewModel(AppSettings? settings = null)
+    public CopyStepEditorViewModel(AppSettings settings)
     {
-        DestinationPathPicker = new PathPickerViewModel(settings ?? new AppSettings(), new AppSettingsStore(), PathPickerMode.Target);
+        DestinationPathPicker = new PathPickerViewModel(settings, PathPickerMode.Target);
         DestinationPathPicker.PropertyChanged += (s, e) => 
         {
             if (e.PropertyName == nameof(PathPickerViewModel.Path))

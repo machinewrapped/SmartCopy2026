@@ -17,8 +17,8 @@ public sealed class FileListViewModelTests
         var root = await provider.BuildDirectoryTree();
         var musicDir = root.Children.Single(n => n.Name == "music");
 
-        var vm = new FileListViewModel(FilterContext.LocalOnly);
-        await vm.LoadFilesForNodeAsync(musicDir, FilterChain.Empty);
+        var vm = new FileListViewModel();
+        await vm.LoadFilesForNodeAsync(musicDir, FilterChain.Empty, new TestAppContext());
         Assert.NotEmpty(vm.VisibleFiles);
 
         vm.Clear();
@@ -37,8 +37,8 @@ public sealed class FileListViewModelTests
         var root = await provider.BuildDirectoryTree();
         var musicDir = root.Children.Single(n => n.Name == "music");
 
-        var vm = new FileListViewModel(FilterContext.LocalOnly);
-        await vm.LoadFilesForNodeAsync(musicDir, FilterChain.Empty);
+        var vm = new FileListViewModel();
+        await vm.LoadFilesForNodeAsync(musicDir, FilterChain.Empty, new TestAppContext());
 
         vm.ClearIfUnder(musicDir);
 
@@ -56,8 +56,8 @@ public sealed class FileListViewModelTests
         var parent = root.Children.Single(n => n.Name == "parent");
         var child = parent.Children.Single(n => n.Name == "child");
 
-        var vm = new FileListViewModel(FilterContext.LocalOnly);
-        await vm.LoadFilesForNodeAsync(child, FilterChain.Empty);
+        var vm = new FileListViewModel();
+        await vm.LoadFilesForNodeAsync(child, FilterChain.Empty, new TestAppContext());
         Assert.NotEmpty(vm.VisibleFiles);
 
         vm.ClearIfUnder(parent);
@@ -76,8 +76,8 @@ public sealed class FileListViewModelTests
         var dir1 = root.Children.Single(n => n.Name == "dir1");
         var dir2 = root.Children.Single(n => n.Name == "dir2");
 
-        var vm = new FileListViewModel(FilterContext.LocalOnly);
-        await vm.LoadFilesForNodeAsync(dir1, FilterChain.Empty);
+        var vm = new FileListViewModel();
+        await vm.LoadFilesForNodeAsync(dir1, FilterChain.Empty, new TestAppContext());
         Assert.NotEmpty(vm.VisibleFiles);
 
         vm.ClearIfUnder(dir2);

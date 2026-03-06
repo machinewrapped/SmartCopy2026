@@ -20,7 +20,7 @@ public sealed class FilterChainViewModelTests
     [Fact]
     public void BuildLiveChain_ContainsAllFilterInstances()
     {
-        var vm = new FilterChainViewModel();
+        var vm = new FilterChainViewModel(new TestAppContext());
         var filterA = MakeExtensionFilter("mp3");
         var filterB = MakeExtensionFilter("flac");
 
@@ -37,7 +37,7 @@ public sealed class FilterChainViewModelTests
     [Fact]
     public void AddFilterFromResult_FiresChainChanged()
     {
-        var vm = new FilterChainViewModel();
+        var vm = new FilterChainViewModel(new TestAppContext());
         var raised = false;
         vm.ChainChanged += (_, _) => raised = true;
 
@@ -49,7 +49,7 @@ public sealed class FilterChainViewModelTests
     [Fact]
     public void RemoveFilter_FiresChainChanged()
     {
-        var vm = new FilterChainViewModel();
+        var vm = new FilterChainViewModel(new TestAppContext());
         vm.AddFilterFromResult(MakeExtensionFilter("mp3"));
 
         var filterVm = vm.Filters[0];
@@ -65,7 +65,7 @@ public sealed class FilterChainViewModelTests
     [Fact]
     public void IsEnabledToggle_FiresChainChanged()
     {
-        var vm = new FilterChainViewModel();
+        var vm = new FilterChainViewModel(new TestAppContext());
         vm.AddFilterFromResult(MakeExtensionFilter());
 
         var filterVm = vm.Filters[0];
@@ -80,7 +80,7 @@ public sealed class FilterChainViewModelTests
     [Fact]
     public void ReplaceFilter_UpdatesBackingFilterAndProperties()
     {
-        var vm = new FilterChainViewModel();
+        var vm = new FilterChainViewModel(new TestAppContext());
         var original = MakeExtensionFilter("mp3");
         vm.AddFilterFromResult(original);
 
@@ -96,7 +96,7 @@ public sealed class FilterChainViewModelTests
     [Fact]
     public void MoveFilter_ReordersCollection()
     {
-        var vm = new FilterChainViewModel();
+        var vm = new FilterChainViewModel(new TestAppContext());
         var filterA = MakeExtensionFilter("mp3");
         var filterB = MakeExtensionFilter("flac");
         var filterC = MakeExtensionFilter("wav");

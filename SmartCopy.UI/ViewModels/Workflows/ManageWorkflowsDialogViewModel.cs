@@ -10,7 +10,6 @@ namespace SmartCopy.UI.ViewModels.Workflows;
 public partial class ManageWorkflowsDialogViewModel : ViewModelBase
 {
     private readonly WorkflowPresetStore _store;
-    private readonly string? _storeDirectory;
 
     [ObservableProperty]
     private WorkflowPreset? _selectedWorkflow;
@@ -37,15 +36,14 @@ public partial class ManageWorkflowsDialogViewModel : ViewModelBase
     /// <summary>Raised when a delete needs confirmation (handled in code-behind).</summary>
     public event Func<string, Task<bool>>? DeleteConfirmRequested;
 
-    public ManageWorkflowsDialogViewModel(WorkflowPresetStore store, string? storeDirectory = null)
+    public ManageWorkflowsDialogViewModel(WorkflowPresetStore store)
     {
         _store = store;
-        _storeDirectory = storeDirectory;
     }
 
     public async Task LoadAsync()
     {
-        var presets = await _store.GetUserPresetsAsync(_storeDirectory);
+        var presets = await _store.GetUserPresetsAsync();
         Workflows.Clear();
         foreach (var p in presets)
         {
@@ -64,7 +62,7 @@ public partial class ManageWorkflowsDialogViewModel : ViewModelBase
             if (!confirmed) return;
         }
 
-        await _store.DeleteUserPresetAsync(workflow.Name, _storeDirectory);
+        await _store.DeleteUserPresetAsync(workflow.Name);
         Workflows.Remove(workflow);
         HasChanges = true;
     }
@@ -82,7 +80,7 @@ public partial class ManageWorkflowsDialogViewModel : ViewModelBase
 
         if (string.IsNullOrWhiteSpace(newName)) return;
 
-        await _store.RenameUserPresetAsync(workflow.Name, newName, _storeDirectory);
+        await _store.RenameUserPresetAsync(workflow.Name, newName);
         workflow.Name = newName;
         HasChanges = true;
 

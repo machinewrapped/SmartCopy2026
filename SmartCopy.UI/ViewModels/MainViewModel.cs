@@ -76,14 +76,14 @@ public partial class MainViewModel : ViewModelBase
         set => SourcePathPicker.ValidationMessage = value;
     }
 
+    private readonly SmartCopyAppContext _appContext;
     private readonly MemoryFileSystemProvider _memoryProvider;
     private readonly FileSystemProviderRegistry _providerRegistry = new();
-    private readonly FilterContext _filterContext;
-    private readonly AppSettings _settings = new();
+    private readonly AppSettings _settings;
     private readonly AppSettingsStore _settingsStore = new();
     private readonly SessionStore _sessionStore = new();
-    private readonly OperationJournal _operationJournal = new();
-    private readonly WorkflowPresetStore _workflowStore = new();
+    private readonly OperationJournal _operationJournal;
+    private readonly WorkflowPresetStore _workflowStore;
     private readonly SelectionManager _selectionManager = new();
     private readonly SelectionSerializer _selectionSerializer = new();
     private CancellationTokenSource? _filterCts;
@@ -105,24 +105,26 @@ public partial class MainViewModel : ViewModelBase
 
     public MainViewModel()
     {
-        var presetStore = new FilterPresetStore();
+        var dataStore = LocalAppDataStore.ForCurrentUser();
+        _settings = new AppSettings { SettingsFilePath = dataStore.GetFilePath("settings.json") };
+        _appContext = new SmartCopyAppContext(_settings, dataStore);
 
-        // Create an in-memory virtual file system for testing. 
+        _operationJournal = new OperationJournal(dataStore.GetDirectoryPath("Logs"));
+        _workflowStore = new WorkflowPresetStore(dataStore.GetDirectoryPath("Workflows"));
+
+        // Create an in-memory virtual file system for testing.
         // TODO: this should be a debug option, not exposed in release builds
         _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: _settings.AddArtificialDelay);
         _providerRegistry.Register(_memoryProvider);
 
-        // Create the context and ViewModel for the filter chain
-        _filterContext = new FilterContext(_providerRegistry);
-        FilterChain = new FilterChainViewModel(presetStore, _settings);
-        
+        // Create the ViewModel for the filter chain
+        FilterChain = new FilterChainViewModel(_appContext);
+
         // Create the pipeline view model
-        Pipeline = new PipelineViewModel(
-            presetStore: new PipelinePresetStore(),
-            appSettings: _settings);
+        Pipeline = new PipelineViewModel(_appContext);
 
         // Create the source path picker
-        SourcePathPicker = new PathPickerViewModel(_settings, _settingsStore, PathPickerMode.Source);
+        SourcePathPicker = new PathPickerViewModel(_settings, PathPickerMode.Source);
 
         // TODO: we will need to be able to init the viewmodel without a provider
         DirectoryTree = new DirectoryTreeViewModel(_providerRegistry)
@@ -140,7 +142,7 @@ public partial class MainViewModel : ViewModelBase
             await ApplySourcePathCoreAsync(path);
         };
 
-        FileList = new FileListViewModel(_filterContext);
+        FileList = new FileListViewModel();
 
         WorkflowMenu = new WorkflowMenuViewModel(_workflowStore);
         WorkflowMenu.SaveRequested += async (_, _) => await SaveWorkflowAsync();
@@ -174,7 +176,7 @@ public partial class MainViewModel : ViewModelBase
                 {
                     try
                     {
-                        await FileList.LoadFilesForNodeAsync(selectedNode, FilterChain.BuildLiveChain());
+                        await FileList.LoadFilesForNodeAsync(selectedNode, FilterChain.BuildLiveChain(), _appContext);
                     }
                     catch (Exception ex)
                     {
@@ -198,6 +200,85 @@ public partial class MainViewModel : ViewModelBase
         StatusBar.CancelScanRequested += (_, _) => _scanCts?.Cancel();
 
         InitializeInBackground();
+    }
+
+    private async void InitializeInBackground()
+    {
+        try
+        {
+            await InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Initialization failed: {ex}");
+        }
+    }
+
+    private async Task InitializeAsync()
+    {
+        // Load persisted settings into the existing instance so that ViewModels holding a
+        // reference to _settings see the updated values without object replacement.
+        await _settingsStore.LoadIntoAsync(_settings);
+
+        UseAbsolutePathsForSelection = _settings.UseAbsolutePathsForSelectionSave;
+        AutoOpenLogOnRun = _settings.AutoOpenLogOnRun;
+        ShowExcludedNodesByDefault = _settings.ShowFilteredNodesInTree;
+        RestoreLastWorkflow = _settings.RestoreLastWorkflow;
+        RestoreLastSourcePath = _settings.RestoreLastSourcePath;
+        DisableDestructivePreview = _settings.DisableDestructivePreview;
+        DeleteToRecycleBin = _settings.DeleteToRecycleBin;
+        SaveSessionLocally = _settings.SaveSessionLocally;
+        FullPreScan = _settings.FullPreScan;
+        LazyExpandScan = _settings.LazyExpandScan;
+        DefaultOverwriteMode = _settings.DefaultOverwriteMode;
+
+        SourcePathPicker.RefreshSettings();
+
+        await _operationJournal.RotateAsync(_settings.LogRetentionDays);
+        await WorkflowMenu.RefreshAsync();
+
+        // Restore last workflow if the option is enabled and a session snapshot exists.
+        if (_settings.RestoreLastWorkflow)
+        {
+            try
+            {
+                var session = await _sessionStore.LoadAsync(GetSessionPath());
+                if (session is not null)
+                {
+                    ApplyWorkflowConfig(session);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
+            {
+                Debug.WriteLine($"Failed to restore session snapshot: {ex}");
+            }
+        }
+        else if (_settings.RestoreLastSourcePath && _settings.LastSourcePath is { Length: > 0 })
+        {
+            SourcePath = _settings.LastSourcePath;
+        }
+        else
+        {
+            // TEMP: set a safe default path
+            SourcePath = MockMemoryFileSystemFactory.SourcePath;
+        }
+
+        RefreshSourceBookmarks();
+
+        if (SourcePath is { Length: > 0 })
+        {
+            try
+            {
+                await ApplySourcePathCoreAsync(SourcePath);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to set initial source path to '{SourcePath}': {ex}");
+                RevertSourcePath();
+            }
+        }
+
+        LogPanel.AddEntry("SmartCopy 2026 ready");
     }
 
     partial void OnSelectedSourceBookmarkChanged(SourceBookmarkItem? value)
@@ -595,10 +676,6 @@ public partial class MainViewModel : ViewModelBase
         return list.RemoveAll(existing => PathHelper.AreEquivalentUserPaths(existing, normalizedPath)) > 0;
     }
 
-    private IFileSystemProvider ResolveSourceProvider(string normalizedPath) =>
-        _providerRegistry.Resolve(normalizedPath)
-        ?? throw new NotSupportedException($"No provider for path: {normalizedPath}");
-
     private static string BuildSourcePathValidationMessage(string path, Exception ex)
     {
         return ex switch
@@ -637,8 +714,8 @@ public partial class MainViewModel : ViewModelBase
     {
         var chain = FilterChain.BuildLiveChain();
 
-        await FileList.ApplyChainToFilesAsync(chain, ct);
-        await DirectoryTree.ApplyFiltersAsync(chain, _filterContext, ct);
+        await FileList.ApplyChainToFilesAsync(chain, _appContext, ct);
+        await DirectoryTree.ApplyFiltersAsync(chain, _appContext, ct);
 
         RefreshIdleStats();
     }
@@ -661,102 +738,6 @@ public partial class MainViewModel : ViewModelBase
 
         Pipeline.SetSelectedIncludedFileCount(selected);
         StatusBar.Selection.UpdateStats(selected, totalBytes, filteredOut);
-    }
-
-    private async void InitializeInBackground()
-    {
-        try
-        {
-            await InitializeAsync();
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"Initialization failed: {ex}");
-        }
-    }
-
-    private async Task InitializeAsync()
-    {
-        // Load persisted settings; merge into existing _settings instance
-        // (FilterChainViewModel holds a ref to the same instance).
-        var saved = await _settingsStore.LoadAsync();
-        _settings.RecentSources = saved.RecentSources;
-        _settings.FavouritePaths = saved.FavouritePaths;
-        _settings.LastSourcePath = saved.LastSourcePath;
-        _settings.LogRetentionDays = saved.LogRetentionDays;
-        _settings.UseAbsolutePathsForSelectionSave = saved.UseAbsolutePathsForSelectionSave;
-        _settings.AutoOpenLogOnRun = saved.AutoOpenLogOnRun;
-        _settings.ShowFilteredNodesInTree = saved.ShowFilteredNodesInTree;
-        _settings.RestoreLastWorkflow = saved.RestoreLastWorkflow;
-        _settings.RestoreLastSourcePath = saved.RestoreLastSourcePath;
-        _settings.DisableDestructivePreview = saved.DisableDestructivePreview;
-        _settings.DeleteToRecycleBin = saved.DeleteToRecycleBin;
-        _settings.DefaultDeleteMode = saved.DeleteToRecycleBin ? "Trash" : "Permanent";
-        _settings.FullPreScan = saved.FullPreScan;
-        _settings.LazyExpandScan = saved.LazyExpandScan;
-        _settings.DefaultOverwriteMode = saved.DefaultOverwriteMode;
-
-        _settings.SaveSessionLocally = saved.SaveSessionLocally;
-
-        UseAbsolutePathsForSelection = _settings.UseAbsolutePathsForSelectionSave;
-        AutoOpenLogOnRun = _settings.AutoOpenLogOnRun;
-        ShowExcludedNodesByDefault = _settings.ShowFilteredNodesInTree;
-        RestoreLastWorkflow = _settings.RestoreLastWorkflow;
-        RestoreLastSourcePath = _settings.RestoreLastSourcePath;
-        DisableDestructivePreview = _settings.DisableDestructivePreview;
-        DeleteToRecycleBin = _settings.DeleteToRecycleBin;
-        SaveSessionLocally = _settings.SaveSessionLocally;
-        FullPreScan = _settings.FullPreScan;
-        LazyExpandScan = _settings.LazyExpandScan;
-        DefaultOverwriteMode = _settings.DefaultOverwriteMode;
-
-        SourcePathPicker.RefreshSettings();
-
-        await _operationJournal.RotateAsync(_settings.LogRetentionDays);
-        await WorkflowMenu.RefreshAsync();
-
-        // Restore last workflow if the option is enabled and a session snapshot exists.
-        if (saved.RestoreLastWorkflow)
-        {
-            try
-            {
-                var session = await _sessionStore.LoadAsync(GetSessionPath());
-                if (session is not null)
-                {
-                    ApplyWorkflowConfig(session);
-                }
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
-            {
-                Debug.WriteLine($"Failed to restore session snapshot: {ex}");
-            }
-        }
-        else if (saved.RestoreLastSourcePath && saved.LastSourcePath is { Length: > 0 })
-        {
-            SourcePath = saved.LastSourcePath;
-        }
-        else
-        {
-            // TEMP: set a safe default path
-            SourcePath = MockMemoryFileSystemFactory.SourcePath;
-        }
-
-        RefreshSourceBookmarks();
-
-        if (SourcePath is { Length: > 0 })
-        {
-            try
-            {
-                await ApplySourcePathCoreAsync(SourcePath);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Failed to set initial source path to '{SourcePath}': {ex}");
-                RevertSourcePath();
-            }
-        }
-
-        LogPanel.AddEntry("SmartCopy 2026 ready");
     }
 
     private async Task PreviewPipelineAsync()
@@ -1018,8 +999,8 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     private string GetSessionPath()
         => _settings.SaveSessionLocally
-            ? Path.Combine(AppContext.BaseDirectory, "session.sc2session")
-            : SessionStore.GetDefaultSessionPath();
+            ? Path.Combine(System.AppContext.BaseDirectory, "session.sc2session")
+            : _appContext.DataStore.GetFilePath("session.sc2session");
 
     private async Task ManageWorkflowsAsync()
     {
