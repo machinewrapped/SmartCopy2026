@@ -326,10 +326,27 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
             normalized.TryAdd(string.Join("/", relativeSegments), relativeSegments);
         }
 
-        return normalized.Values
-            .OrderBy(segments => segments.Length)
-            .Where(candidate => !normalized.Values.Any(existing =>
-                !ReferenceEquals(existing, candidate) && IsSameOrAncestor(existing, candidate)));
+        if (normalized.Count == 0)
+        {
+            return [];
+        }
+
+        var sortedPaths = normalized.Values.OrderBy(s => string.Join("/", s), StringComparer.Ordinal).ToList();
+        
+        var minimalRoots = new List<string[]>();
+        var lastAdded = sortedPaths[0];
+        minimalRoots.Add(lastAdded);
+
+        foreach (var path in sortedPaths.Skip(1))
+        {
+            if (!IsSameOrAncestor(lastAdded, path))
+            {
+                minimalRoots.Add(path);
+                lastAdded = path;
+            }
+        }
+
+        return minimalRoots;
     }
 
     private string[]? TryNormalizePath(string path)
