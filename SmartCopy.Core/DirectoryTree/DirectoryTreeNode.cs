@@ -291,14 +291,14 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
         for (int i = 0; i < pathSegments.Length; i++)
         {
             var segment = pathSegments[i];
-            var nextNode = currentNode.Children.FirstOrDefault(c => string.Equals(c.Name, segment, StringComparison.OrdinalIgnoreCase));
+            var nextNode = currentNode.Children.FirstOrDefault(c => string.Equals(c.Name, segment, StringComparison.Ordinal));
 
             if (nextNode is null)
             {
                 // If we can't find a directory, check for a file, but only if it's the last segment.
                 if (i == pathSegments.Length - 1)
                 {
-                    return currentNode.Files.FirstOrDefault(f => string.Equals(f.Name, segment, StringComparison.OrdinalIgnoreCase));
+                    return currentNode.Files.FirstOrDefault(f => string.Equals(f.Name, segment, StringComparison.Ordinal));
                 }
                 // A directory segment in the middle of the path was not found.
                 return null;

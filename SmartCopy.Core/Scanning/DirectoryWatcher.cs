@@ -108,7 +108,6 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
                 QueueRefreshPath(e.FullPath);
                 break;
             case WatcherChangeTypes.Deleted:
-                // TODO: we don't need to queue mark for deletes
                 QueueDeletedPath(e.FullPath);
                 break;
         }
@@ -156,11 +155,8 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
 
         lock (_sync)
         {
-            if (!_pendingDeletedPaths.Contains(path))
-            {
-                _pendingPathsToAdd.Add(path);
-            }
-
+            _pendingPathsToAdd.Add(path);
+            _pendingPathsToRefresh.Remove(path);
             _debounceTimer.Change(DebounceWindow, Timeout.InfiniteTimeSpan);
         }
     }

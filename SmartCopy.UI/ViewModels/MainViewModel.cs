@@ -1100,15 +1100,16 @@ public partial class MainViewModel : ViewModelBase
 
     private void OnDirectoryWatcherPendingBatchesAvailable(object? sender, EventArgs e)
     {
-        _ = ApplyPendingWatcherBatchesAsync();
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = ApplyPendingWatcherBatchesAsync());
     }
 
     private void OnDirectoryWatcherError(object? sender, Exception error)
     {
         Debug.WriteLine($"[Watcher] {error}");
-        LogPanel.AddEntry(
-            $"Filesystem watcher warning: {error.Message}. Live updates may be incomplete; use Rescan to refresh.",
-            LogLevel.Warning);
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            LogPanel.AddEntry(
+                $"Filesystem watcher warning: {error.Message}. Live updates may be incomplete; use Rescan to refresh.",
+                LogLevel.Warning));
     }
 
     private void OnDirectoryWatcherNodeWillBeRemoved(object? sender, string[] relativeSegments)

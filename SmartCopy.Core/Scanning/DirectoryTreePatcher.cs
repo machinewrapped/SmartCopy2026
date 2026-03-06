@@ -126,7 +126,8 @@ public static class DirectoryTreePatcher
     {
         if (node.IsDirectory)
         {
-            if (parentNode.Children.Any(child => string.Equals(child.Name, node.Name, StringComparison.Ordinal)))
+            if (parentNode.Children.Any(child =>
+                    !child.IsMarkedForRemoval && string.Equals(child.Name, node.Name, StringComparison.Ordinal)))
             {
                 return false;
             }
@@ -135,7 +136,8 @@ public static class DirectoryTreePatcher
             return true;
         }
 
-        if (parentNode.Files.Any(file => string.Equals(file.Name, node.Name, StringComparison.Ordinal)))
+        if (parentNode.Files.Any(file =>
+                !file.IsMarkedForRemoval && string.Equals(file.Name, node.Name, StringComparison.Ordinal)))
         {
             return false;
         }

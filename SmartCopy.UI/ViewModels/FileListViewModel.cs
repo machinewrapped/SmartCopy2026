@@ -72,7 +72,7 @@ public class FileListViewModel : ViewModelBase
     public DirectoryTreeNode? FindFile(string fullPath)
     {
         return _currentDirectoryNode?.Files.FirstOrDefault(f =>
-            string.Equals(f.FullPath, fullPath, StringComparison.OrdinalIgnoreCase));
+            string.Equals(f.FullPath, fullPath, StringComparison.Ordinal));
     }
 
     public void RemoveFile(string fullPath)
