@@ -15,6 +15,7 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
     private readonly Queue<DirectoryWatcherBatch> _pendingBatches = new();
     private readonly SemaphoreSlim _buildGate = new(1, 1);
     private readonly DirectoryScanner _scanner;
+    private readonly CancellationTokenSource _disposeCts = new();
 
     public DirectoryWatcher(IFileSystemProvider provider, string path, TimeSpan? debounceWindow = null)
     {
@@ -85,6 +86,7 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
     public void Dispose()
     {
         Stop();
+        _disposeCts.Cancel();
         _watcher.Created -= OnFileSystemEvent;
         _watcher.Deleted -= OnFileSystemEvent;
         _watcher.Changed -= OnFileSystemEvent;
@@ -93,6 +95,7 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
         _watcher.Dispose();
         _debounceTimer.Dispose();
         _buildGate.Dispose();
+        _disposeCts.Dispose();
     }
 
     private void OnFileSystemEvent(object sender, FileSystemEventArgs e)
@@ -180,12 +183,12 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
 
     private void OnDebounceElapsed(object? state)
     {
-        _ = BuildAndEmitPendingBatchesAsync();
+        _ = BuildAndEmitPendingBatchesAsync(_disposeCts.Token);
     }
 
-    private async Task BuildAndEmitPendingBatchesAsync()
+    private async Task BuildAndEmitPendingBatchesAsync(CancellationToken ct)
     {
-        if (!await _buildGate.WaitAsync(0))
+        if (!await _buildGate.WaitAsync(0, ct))
         {
             return;
         }
@@ -194,6 +197,8 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
         {
             while (true)
             {
+                ct.ThrowIfCancellationRequested();
+
                 string[] deletedPaths;
                 string[] pathsToAdd;
                 string[] pathsToRefresh;
@@ -207,7 +212,7 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
                     deletedPaths = [.. _pendingDeletedPaths];
                     pathsToAdd = [.. _pendingPathsToAdd];
                     pathsToRefresh = [.. _pendingPathsToRefresh];
-                    
+
                     _pendingDeletedPaths.Clear();
                     _pendingPathsToAdd.Clear();
                     _pendingPathsToRefresh.Clear();
@@ -216,7 +221,11 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
                 DirectoryWatcherBatch batch;
                 try
                 {
-                    batch = await BuildBatchAsync(deletedPaths, pathsToAdd, pathsToRefresh);
+                    batch = await BuildBatchAsync(deletedPaths, pathsToAdd, pathsToRefresh, ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -244,7 +253,8 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
     private async Task<DirectoryWatcherBatch> BuildBatchAsync(
         IReadOnlyList<string> deletedPaths,
         IReadOnlyList<string> pathsToScan,
-        IReadOnlyList<string> pathsToRefresh)
+        IReadOnlyList<string> pathsToRefresh,
+        CancellationToken ct)
     {
         var deletions = deletedPaths
             .Select(TryNormalizePath)
@@ -259,7 +269,7 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
         foreach (var relativeSegments in NormalizeScanTargets(pathsToScan))
         {
             var fullPath = _provider.JoinPath(_rootPath, relativeSegments);
-            if (!await _provider.ExistsAsync(fullPath, CancellationToken.None))
+            if (!await _provider.ExistsAsync(fullPath, ct))
             {
                 continue;
             }
@@ -270,7 +280,11 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
                 snapshot = await _scanner.BuildScannedSubtreeAsync(
                     fullPath,
                     new ScanOptions { LazyExpand = false, IncludeHidden = true },
-                    CancellationToken.None);
+                    ct);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -291,7 +305,7 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
             }
 
             var fullPath = _provider.JoinPath(_rootPath, relativeSegments);
-            var node = await _provider.GetNodeAsync(fullPath, CancellationToken.None);
+            var node = await _provider.GetNodeAsync(fullPath, ct);
             if (node is null)
             {
                 continue;
