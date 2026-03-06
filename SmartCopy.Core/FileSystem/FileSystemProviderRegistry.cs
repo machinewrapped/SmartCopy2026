@@ -3,12 +3,12 @@ namespace SmartCopy.Core.FileSystem;
 public sealed class FileSystemProviderRegistry : IPathResolver
 {
     // Instance state — per-registry registered providers
-    private readonly Lock _lock = new();
+    private readonly System.Threading.Lock _lock = new();
     private readonly Dictionary<string, IFileSystemProvider> _registered
         = new(StringComparer.OrdinalIgnoreCase);
 
     // Static state — safe: LocalFileSystemProvider is stateless, shared across all registries
-    private static readonly Lock LocalSync = new();
+    private static readonly System.Threading.Lock LocalSync = new();
     private static readonly Dictionary<string, LocalFileSystemProvider> LocalProviders
         = new(StringComparer.OrdinalIgnoreCase);
 
