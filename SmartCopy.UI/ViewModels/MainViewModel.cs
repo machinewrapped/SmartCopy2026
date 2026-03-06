@@ -216,26 +216,9 @@ public partial class MainViewModel : ViewModelBase
 
     private async Task InitializeAsync()
     {
-        // Load persisted settings; merge into existing _settings instance
-        // (FilterChainViewModel holds a ref to the same instance).
-        var saved = await _settingsStore.LoadAsync(_settings.SettingsFilePath!);
-        _settings.RecentSources = saved.RecentSources;
-        _settings.FavouritePaths = saved.FavouritePaths;
-        _settings.LastSourcePath = saved.LastSourcePath;
-        _settings.LogRetentionDays = saved.LogRetentionDays;
-        _settings.UseAbsolutePathsForSelectionSave = saved.UseAbsolutePathsForSelectionSave;
-        _settings.AutoOpenLogOnRun = saved.AutoOpenLogOnRun;
-        _settings.ShowFilteredNodesInTree = saved.ShowFilteredNodesInTree;
-        _settings.RestoreLastWorkflow = saved.RestoreLastWorkflow;
-        _settings.RestoreLastSourcePath = saved.RestoreLastSourcePath;
-        _settings.DisableDestructivePreview = saved.DisableDestructivePreview;
-        _settings.DeleteToRecycleBin = saved.DeleteToRecycleBin;
-        _settings.DefaultDeleteMode = saved.DeleteToRecycleBin ? "Trash" : "Permanent";
-        _settings.FullPreScan = saved.FullPreScan;
-        _settings.LazyExpandScan = saved.LazyExpandScan;
-        _settings.DefaultOverwriteMode = saved.DefaultOverwriteMode;
-
-        _settings.SaveSessionLocally = saved.SaveSessionLocally;
+        // Load persisted settings into the existing instance so that ViewModels holding a
+        // reference to _settings see the updated values without object replacement.
+        await _settingsStore.LoadIntoAsync(_settings);
 
         UseAbsolutePathsForSelection = _settings.UseAbsolutePathsForSelectionSave;
         AutoOpenLogOnRun = _settings.AutoOpenLogOnRun;
@@ -255,7 +238,7 @@ public partial class MainViewModel : ViewModelBase
         await WorkflowMenu.RefreshAsync();
 
         // Restore last workflow if the option is enabled and a session snapshot exists.
-        if (saved.RestoreLastWorkflow)
+        if (_settings.RestoreLastWorkflow)
         {
             try
             {
@@ -270,9 +253,9 @@ public partial class MainViewModel : ViewModelBase
                 Debug.WriteLine($"Failed to restore session snapshot: {ex}");
             }
         }
-        else if (saved.RestoreLastSourcePath && saved.LastSourcePath is { Length: > 0 })
+        else if (_settings.RestoreLastSourcePath && _settings.LastSourcePath is { Length: > 0 })
         {
-            SourcePath = saved.LastSourcePath;
+            SourcePath = _settings.LastSourcePath;
         }
         else
         {

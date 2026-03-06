@@ -42,6 +42,26 @@ public sealed class AppSettingsStore
         }
     }
 
+    /// <summary>
+    /// Loads persisted settings from <see cref="AppSettings.SettingsFilePath"/> and merges them
+    /// into <paramref name="settings"/> in-place via <see cref="AppSettings.MergeFrom"/>.
+    /// Use this when other objects already hold a reference to the same <paramref name="settings"/>
+    /// instance and replacing it is not practical.
+    /// </summary>
+    public async Task LoadIntoAsync(AppSettings settings, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(settings.SettingsFilePath))
+            return;
+
+        var saved = await LoadAsync(settings.SettingsFilePath, ct);
+        settings.MergeFrom(saved);
+    }
+
+    /// <remarks>
+    /// If <see cref="AppSettings.SettingsFilePath"/> is <see langword="null"/> or empty the call
+    /// is a deliberate no-op — this is the expected behaviour in test contexts where no path is
+    /// configured and silently writing to disk would be harmful.
+    /// </remarks>
     public async Task SaveAsync(AppSettings settings, CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(settings.SettingsFilePath))

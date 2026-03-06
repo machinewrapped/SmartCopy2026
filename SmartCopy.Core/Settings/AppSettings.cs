@@ -66,5 +66,45 @@ public sealed class AppSettings
 
     public bool UseAbsolutePathsForSelectionSave { get; set; }
     public bool AutoOpenLogOnRun { get; set; } = true;
+
+    /// <summary>
+    /// Copies all persisted properties from <paramref name="saved"/> into this instance,
+    /// preserving <see cref="SettingsFilePath"/> which is not serialised to JSON.
+    /// Use this after loading a file to update an existing shared instance (e.g. one already
+    /// referenced by ViewModels) without replacing the object reference.
+    /// </summary>
+    public void MergeFrom(AppSettings saved)
+    {
+        SchemaVersion = saved.SchemaVersion;
+        LastSourcePath = saved.LastSourcePath;
+        IncludeHidden = saved.IncludeHidden;
+        ShowFilteredFiles = saved.ShowFilteredFiles;
+        ShowFilteredNodesInTree = saved.ShowFilteredNodesInTree;
+        AutoSelectOnSelectionRestore = saved.AutoSelectOnSelectionRestore;
+        AllowOverwrite = saved.AllowOverwrite;
+        AllowDeleteReadOnly = saved.AllowDeleteReadOnly;
+        LazyExpandScan = saved.LazyExpandScan;
+        FullPreScan = saved.FullPreScan;
+        EnableFilesystemWatcher = saved.EnableFilesystemWatcher;
+        CopyChunkSizeKb = saved.CopyChunkSizeKb;
+        DefaultOverwriteMode = saved.DefaultOverwriteMode;
+        DefaultDeleteMode = saved.DefaultDeleteMode;
+        RestoreLastWorkflow = saved.RestoreLastWorkflow;
+        RestoreLastSourcePath = saved.RestoreLastSourcePath;
+        DisableDestructivePreview = saved.DisableDestructivePreview;
+        DeleteToRecycleBin = saved.DeleteToRecycleBin;
+        SaveSessionLocally = saved.SaveSessionLocally;
+        AddArtificialDelay = saved.AddArtificialDelay;
+        LogRetentionDays = saved.LogRetentionDays;
+        RecentSources = saved.RecentSources;
+        RecentTargets = saved.RecentTargets;
+        FavouritePaths = saved.FavouritePaths;
+        RecentFilterChains = saved.RecentFilterChains;
+        RecentPipelines = saved.RecentPipelines;
+        FilterTypeMruPresetIds = saved.FilterTypeMruPresetIds;
+        StepTypeMruPresetIds = saved.StepTypeMruPresetIds;
+        UseAbsolutePathsForSelectionSave = saved.UseAbsolutePathsForSelectionSave;
+        AutoOpenLogOnRun = saved.AutoOpenLogOnRun;
+    }
 }
 
