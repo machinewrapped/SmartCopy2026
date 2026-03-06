@@ -51,7 +51,9 @@ SmartCopy2026 follows a strict separation of concerns, heavily utilizing Depende
 
 ### 2.5 Scanning & Watching
 *   **Principle**: Progressively loaded, non-blocking asynchronous directories.
-*   **Details**: `DirectoryScanner` streams folders directly in, presenting them immediately to maintain responsive UI while recursively background-scanning. `DirectoryWatcher` is a debounced local-filesystem change source that also performs off-tree scans for created/changed paths. It queues ready-to-apply watcher batches internally; `MainViewModel` decides when those batches are drained and applied, especially around pipeline execution. Live-tree mutation is patch-based: deletions reuse `MarkForRemoval`, creates/changes arrive as prebuilt snapshot nodes, and `DirectoryTreePatcher` applies them without filesystem IO.
+*   **Details**: `DirectoryScanner` streams folders directly in, presenting them immediately to maintain responsive UI while recursively background-scanning. 
+
+`DirectoryWatcher` monitors the filesystem for changes and performs off-tree scans. It queues ready-to-apply batches; `MainViewModel` decides when batches are drained and applied. Deletions `MarkForRemoval`, creates/changes arrive as prebuilt nodes that can be patched into the tree. Watcher behavior is best-effort; failures are logged so the user can manually rescan.
 *   **Signpost**: Examine `DirectoryScanner.cs` and `DirectoryWatcher.cs`.
 
 ### 2.6 Workflows

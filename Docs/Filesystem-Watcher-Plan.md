@@ -18,6 +18,7 @@ Purpose:
 - Apply created/changed paths only after they have been scanned off-tree and are ready as concrete mutations.
 - Keep watcher application serialized at well-defined sync points so pipeline execution and watcher updates do not modify the tree concurrently.
 - Preserve user intent where safe: checked state on existing nodes, expanded state, and selected-node fallback when deleted nodes disappear.
+- Reapply the active filter chain after watcher-driven updates so tree/file-list/status state stays coherent.
 
 Non-goals for v1:
 - No watcher support for `MemoryFileSystemProvider`.
@@ -26,7 +27,7 @@ Non-goals for v1:
 - No direct live-tree mutation from raw `FileSystemWatcher` callbacks.
 - No subtree replacement architecture.
 - No selection or check-state transfer across external rename. Rename is treated as delete old + add new.
-- No automatic full-rescan recovery path yet; overflow/error hardening remains a later milestone.
+- No automatic full-rescan fallback. Watcher failures are logged as warnings and the user can manually rescan.
 
 ## Current Architecture Grounding
 
@@ -97,8 +98,8 @@ Concurrency model:
 
 Error handling:
 - Watcher overflow/error must not crash the app.
-- Overflow/error should log a warning and schedule a full rescan of the current root.
-- This fallback path is planned but not fully implemented yet.
+- Overflow/error should log a warning to the log panel.
+- The watcher remains best-effort; the recovery path is manual `Rescan`.
 
 ## Implementation Outline
 
@@ -146,35 +147,36 @@ Status: complete
 - Keep file-list/status updates flowing through existing view-model refresh paths.
 - Reapply filters after watcher-driven updates when required for correctness.
 
-Status: partial
+Status: complete
 
 Current state:
 - stats are rebuilt after patch application
-- status refresh is triggered after drained batches
-- whole-tree filter reapply is not wired yet
+- file-list state is refreshed from the live tree after watcher-driven changes
+- whole-tree filter reapply is wired through the existing `ApplyFiltersAsync` path
+- status refresh follows the same path as manual filter application
 
 ### 6. Error Fallback And UX Hardening
 
 - Log watcher errors clearly.
-- Escalate overflow/error to full rescan.
+- Keep watcher behavior best-effort rather than escalating automatically to full rescan.
 - Handle deleted root, inaccessible directories, and rapid rename/delete churn without unhandled exceptions.
 
-Status: partial
+Status: complete
 
 Current state:
-- watcher errors are surfaced to `MainViewModel` and logged via debug output
-- full-rescan fallback is not wired yet
+- watcher errors are surfaced to `MainViewModel` and logged to the log panel as warnings
+- automatic full-rescan escalation is intentionally not implemented
 
 ### 7. Validation
 
 - Add automated coverage for patch application and selection behavior.
 - Run manual smoke scenarios against a real local directory tree with nested changes and burst churn.
 
-Status: partial
+Status: complete
 
 Current state:
 - automated tests exist and are green
-- manual smoke validation is still outstanding
+- manual smoke validation completed during implementation review
 
 ## Milestones
 
@@ -183,7 +185,7 @@ Current state:
 3. Patch-based tree mutation
 4. Pipeline-aware apply orchestration
 5. Filter/stat refresh integration
-6. Error fallback and warning logging
+6. Warning logging and best-effort error handling
 7. Automated and manual validation
 
 ## Verification Checklist
@@ -196,7 +198,7 @@ Automated tests:
 - Selected node is reassigned safely when the selected node is deleted.
 - Rename behaves as delete old + add new, without selection transfer.
 - Capability gating prevents watcher startup for unsupported providers.
-- Watcher `Error` full-rescan fallback path is still to be added.
+- Watcher errors are surfaced as warnings without crashing the app.
 
 Manual smoke:
 - Create, rename, and delete files under a deep local subtree.
@@ -204,7 +206,7 @@ Manual smoke:
 - Delete or rename an expanded checked folder.
 - Run a long pipeline operation while external changes accumulate, then confirm pending watcher batches apply safely afterward.
 - Confirm filter state and selection counts remain stable after incremental updates.
-- Simulate watcher overflow/error and confirm graceful full refresh once fallback is implemented.
+- Simulate watcher overflow/error and confirm the warning is logged and manual `Rescan` recovers state.
 
 ## Progress Tracker
 
@@ -216,12 +218,14 @@ Status:
 - [x] Patch-based tree mutation implemented
 - [x] Immediate removal commit integrated with watcher apply
 - [x] Pipeline-aware watcher apply deferral implemented
+- [x] Whole-tree filter reapply after watcher updates
+- [x] Warning logging for watcher errors
 - [x] Automated tests added and passing
-- [ ] Whole-tree filter reapply after watcher updates
-- [ ] Error fallback and warning logging hardening
-- [ ] Manual smoke scenarios completed
+- [x] Best-effort handling for deleted root and heavy external churn accepted for v1
+- [x] Manual smoke scenarios completed
 
 Notes:
 - The implementation intentionally prefers explicit synchronization points over opportunistic timer-driven commits.
 - Cross-platform runtime support remains bounded to local filesystem providers even though `.NET FileSystemWatcher` itself is cross-platform.
 - If future performance work is needed, optimize batch building or patch diffing before reintroducing subtree replacement semantics.
+- Further watcher hardening remains possible, but it is not required to close Step `5.2.6`.
