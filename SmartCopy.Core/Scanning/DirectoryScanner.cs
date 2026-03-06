@@ -75,6 +75,16 @@ public sealed class DirectoryScanner
         }
     }
 
+    public Task<DirectoryTreeNode> BuildSubtreeAsync(
+        string rootPath,
+        DirectoryTreeNode? parent,
+        CheckState initialCheckState,
+        ScanOptions options,
+        CancellationToken ct = default)
+    {
+        return BuildSubtreeCoreAsync(rootPath, parent, initialCheckState, options, ct);
+    }
+
     private static bool ShouldIncludeNode(FileSystemNode node, ScanOptions options)
     {
         if (options.IncludeHidden)
@@ -83,5 +93,68 @@ public sealed class DirectoryScanner
         }
 
         return (node.Attributes & FileAttributes.Hidden) == 0;
+    }
+
+    private async Task<DirectoryTreeNode> BuildSubtreeCoreAsync(
+        string rootPath,
+        DirectoryTreeNode? parent,
+        CheckState initialCheckState,
+        ScanOptions options,
+        CancellationToken ct)
+    {
+        var rootNode = new DirectoryTreeNode(
+            await _provider.GetNodeAsync(rootPath, ct),
+            parent,
+            initialCheckState);
+
+        if (!rootNode.IsDirectory)
+        {
+            return rootNode;
+        }
+
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { rootNode.FullPath };
+        var queue = new Queue<(DirectoryTreeNode Node, int Depth)>();
+        queue.Enqueue((rootNode, 0));
+
+        while (queue.Count > 0)
+        {
+            ct.ThrowIfCancellationRequested();
+            var (currentDirectory, depth) = queue.Dequeue();
+
+            if (options.MaxDepth.HasValue && depth > options.MaxDepth.Value)
+            {
+                continue;
+            }
+
+            var children = await _provider.GetChildrenAsync(currentDirectory.FullPath, ct);
+            foreach (var child in children)
+            {
+                ct.ThrowIfCancellationRequested();
+                if (!ShouldIncludeNode(child, options))
+                {
+                    continue;
+                }
+
+                CheckState childCheckState = currentDirectory.CheckState == CheckState.Checked
+                    ? CheckState.Checked
+                    : CheckState.Unchecked;
+
+                var childNode = new DirectoryTreeNode(child, currentDirectory, childCheckState);
+                if (childNode.IsDirectory)
+                {
+                    currentDirectory.Children.Add(childNode);
+                    if (!options.LazyExpand && visited.Add(childNode.FullPath))
+                    {
+                        queue.Enqueue((childNode, depth + 1));
+                    }
+                }
+                else
+                {
+                    currentDirectory.Files.Add(childNode);
+                }
+            }
+        }
+
+        return rootNode;
     }
 }

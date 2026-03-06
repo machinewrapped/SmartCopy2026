@@ -11,6 +11,6 @@ public sealed class LocalDirectoryWatcherFactory : IDirectoryWatcherFactory
             throw new InvalidOperationException("Directory watchers are only supported for local filesystem providers.");
         }
 
-        return new DirectoryWatcher(path);
+        return new DirectoryWatcher(provider, path);
     }
 }

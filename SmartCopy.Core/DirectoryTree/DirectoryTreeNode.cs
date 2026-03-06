@@ -21,7 +21,7 @@ namespace SmartCopy.Core.DirectoryTree;
 /// </summary>
 public sealed class DirectoryTreeNode : INotifyPropertyChanged
 {
-    private readonly FileSystemNode _filesystemNode;
+    private FileSystemNode _filesystemNode;
     private CheckState _checkState;
 
     public DirectoryTreeNode(
@@ -169,6 +169,42 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
     }
 
     public void ClearDirty() => IsDirty = false;
+
+    public void UpdateFrom(FileSystemNode filesystemNode)
+    {
+        if (IsDirectory != filesystemNode.IsDirectory)
+        {
+            throw new InvalidOperationException("Cannot update a node with a different node type.");
+        }
+
+        if (!string.Equals(FullPath, filesystemNode.FullPath, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Cannot update a node with a different full path.");
+        }
+
+        _filesystemNode = filesystemNode;
+        MarkDirty();
+        OnPropertyChanged(nameof(Name));
+        OnPropertyChanged(nameof(FullPath));
+        OnPropertyChanged(nameof(Size));
+        OnPropertyChanged(nameof(CreatedAt));
+        OnPropertyChanged(nameof(ModifiedAt));
+        OnPropertyChanged(nameof(Attributes));
+    }
+
+    public FileSystemNode ToFileSystemNode()
+    {
+        return new FileSystemNode
+        {
+            Name = Name,
+            FullPath = FullPath,
+            IsDirectory = IsDirectory,
+            Size = Size,
+            CreatedAt = CreatedAt,
+            ModifiedAt = ModifiedAt,
+            Attributes = Attributes,
+        };
+    }
 
     public void BuildStats()
     {

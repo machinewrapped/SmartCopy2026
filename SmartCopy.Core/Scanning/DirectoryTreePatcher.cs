@@ -1,0 +1,186 @@
+using SmartCopy.Core.DirectoryTree;
+
+namespace SmartCopy.Core.Scanning;
+
+public sealed class DirectoryTreePatcher
+{
+    public DirectoryTreePatchApplyResult Apply(
+        DirectoryTreeNode rootNode,
+        DirectoryWatcherBatch batch,
+        DirectoryTreeNode? selectedNode)
+    {
+        ArgumentNullException.ThrowIfNull(rootNode);
+        ArgumentNullException.ThrowIfNull(batch);
+
+        DirectoryTreeNode? nextSelectedNode = selectedNode;
+
+        foreach (var deletion in batch.Deletions)
+        {
+            var node = FindExactNode(rootNode, deletion.RelativePathSegments);
+            if (node is null)
+            {
+                continue;
+            }
+
+            node.MarkForRemoval();
+            if (nextSelectedNode is not null && IsDescendantOrSelf(nextSelectedNode, node))
+            {
+                nextSelectedNode = node.Parent ?? rootNode;
+            }
+        }
+
+        foreach (var upsert in batch.Upserts.OrderBy(u => u.RelativePathSegments.Count))
+        {
+            var existingNode = FindExactNode(rootNode, upsert.RelativePathSegments);
+            if (existingNode is not null && existingNode.IsDirectory == upsert.Node.IsDirectory)
+            {
+                existingNode.UpdateFrom(upsert.Node.ToFileSystemNode());
+                continue;
+            }
+
+            if (existingNode is not null)
+            {
+                existingNode.MarkForRemoval();
+                if (nextSelectedNode is not null && IsDescendantOrSelf(nextSelectedNode, existingNode))
+                {
+                    nextSelectedNode = existingNode.Parent ?? rootNode;
+                }
+            }
+
+            var parentNode = FindNearestExistingParent(rootNode, upsert.RelativePathSegments);
+            if (parentNode is null || parentNode.IsMarkedForRemoval)
+            {
+                continue;
+            }
+
+            var insertedNode = CloneForInsertion(upsert.Node, parentNode);
+            InsertNodeIfMissing(parentNode, insertedNode);
+        }
+
+        rootNode.BuildStats();
+        return new DirectoryTreePatchApplyResult(nextSelectedNode);
+    }
+
+    private static DirectoryTreeNode? FindExactNode(DirectoryTreeNode rootNode, IReadOnlyList<string> relativeSegments)
+    {
+        if (relativeSegments.Count == 0)
+        {
+            return rootNode;
+        }
+
+        var currentNode = rootNode;
+        for (int i = 0; i < relativeSegments.Count; i++)
+        {
+            var segment = relativeSegments[i];
+            var nextDirectory = currentNode.Children.FirstOrDefault(child =>
+                string.Equals(child.Name, segment, StringComparison.Ordinal));
+
+            if (nextDirectory is not null)
+            {
+                currentNode = nextDirectory;
+                continue;
+            }
+
+            if (i == relativeSegments.Count - 1)
+            {
+                return currentNode.Files.FirstOrDefault(file =>
+                    string.Equals(file.Name, segment, StringComparison.Ordinal));
+            }
+
+            return null;
+        }
+
+        return currentNode;
+    }
+
+    private static DirectoryTreeNode? FindNearestExistingParent(DirectoryTreeNode rootNode, IReadOnlyList<string> relativeSegments)
+    {
+        if (relativeSegments.Count == 0)
+        {
+            return rootNode.Parent;
+        }
+
+        var currentNode = rootNode;
+        for (int i = 0; i < relativeSegments.Count - 1; i++)
+        {
+            var segment = relativeSegments[i];
+            var nextDirectory = currentNode.Children.FirstOrDefault(child =>
+                string.Equals(child.Name, segment, StringComparison.Ordinal));
+
+            if (nextDirectory is null)
+            {
+                return currentNode;
+            }
+
+            currentNode = nextDirectory;
+        }
+
+        return currentNode;
+    }
+
+    private static bool InsertNodeIfMissing(DirectoryTreeNode parentNode, DirectoryTreeNode node)
+    {
+        if (node.IsDirectory)
+        {
+            if (parentNode.Children.Any(child => string.Equals(child.Name, node.Name, StringComparison.Ordinal)))
+            {
+                return false;
+            }
+
+            parentNode.Children.Add(node);
+            return true;
+        }
+
+        if (parentNode.Files.Any(file => string.Equals(file.Name, node.Name, StringComparison.Ordinal)))
+        {
+            return false;
+        }
+
+        parentNode.Files.Add(node);
+        return true;
+    }
+
+    private static bool IsDescendantOrSelf(DirectoryTreeNode node, DirectoryTreeNode ancestor)
+    {
+        for (var current = node; current is not null; current = current.Parent)
+        {
+            if (ReferenceEquals(current, ancestor))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static DirectoryTreeNode CloneForInsertion(DirectoryTreeNode snapshotNode, DirectoryTreeNode parentNode)
+    {
+        var initialCheckState = parentNode.CheckState == CheckState.Checked
+            ? CheckState.Checked
+            : CheckState.Unchecked;
+
+        var clone = new DirectoryTreeNode(snapshotNode.ToFileSystemNode(), parentNode, initialCheckState)
+        {
+            IsExpanded = snapshotNode.IsExpanded,
+        };
+
+        foreach (var childDirectory in snapshotNode.Children)
+        {
+            clone.Children.Add(CloneForInsertion(childDirectory, clone));
+        }
+
+        foreach (var childFile in snapshotNode.Files)
+        {
+            var childCheckState = clone.CheckState == CheckState.Checked
+                ? CheckState.Checked
+                : CheckState.Unchecked;
+
+            clone.Files.Add(new DirectoryTreeNode(childFile.ToFileSystemNode(), clone, childCheckState)
+            {
+                IsExpanded = childFile.IsExpanded,
+            });
+        }
+
+        return clone;
+    }
+}

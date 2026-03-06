@@ -10,8 +10,6 @@ namespace SmartCopy.UI.ViewModels;
 public class DirectoryTreeViewModel : ViewModelBase
 {
     private readonly FileSystemProviderRegistry _providerRegistry;
-    private readonly IDirectoryWatcherFactory _watcherFactory;
-    private IDirectoryWatcher? _watcher;
     private DirectoryTreeNode? _selectedNode;
     private bool _isLoading;
 
@@ -44,12 +42,9 @@ public class DirectoryTreeViewModel : ViewModelBase
     public void RequestSetAsSourcePath(string path) =>
         SetAsSourcePathRequested?.Invoke(this, path);
 
-    public DirectoryTreeViewModel(
-        FileSystemProviderRegistry providerRegistry,
-        IDirectoryWatcherFactory? watcherFactory = null)
+    public DirectoryTreeViewModel(FileSystemProviderRegistry providerRegistry)
     {
         _providerRegistry = providerRegistry;
-        _watcherFactory = watcherFactory ?? new LocalDirectoryWatcherFactory();
     }
 
     public DirectoryTreeNode? SelectedNode
@@ -104,7 +99,6 @@ public class DirectoryTreeViewModel : ViewModelBase
 
     internal void Reset()
     {
-        DisposeWatcher();
         ItemsSource.Clear();
         SourceProvider = null;
         IsLoaded = false;
@@ -160,8 +154,6 @@ public class DirectoryTreeViewModel : ViewModelBase
 
             // Default to root node, if user hasn't selected one during the scan
             SelectedNode ??= RootNode;
-
-            StartWatcherIfSupported(RootNode);
         }
     }
 
@@ -191,69 +183,22 @@ public class DirectoryTreeViewModel : ViewModelBase
         catch (OperationCanceledException) { }
     }
 
-    private void StartWatcherIfSupported(DirectoryTreeNode rootNode)
-    {
-        DisposeWatcher();
-
-        if (SourceProvider is null)
-        {
-            return;
-        }
-
-        if (!SourceProvider.Capabilities.CanWatch)
-        {
-            return;
-        }
-
-        _watcher = _watcherFactory.Create(SourceProvider, rootNode.FullPath);
-        _watcher.ChangesBatched += OnWatcherChangesBatched;
-        _watcher.WatcherError += OnWatcherError;
-        _watcher.Start();
-    }
-
-    private void DisposeWatcher()
-    {
-        if (_watcher is null)
-        {
-            return;
-        }
-
-        _watcher.ChangesBatched -= OnWatcherChangesBatched;
-        _watcher.WatcherError -= OnWatcherError;
-        _watcher.Stop();
-        _watcher.Dispose();
-        _watcher = null;
-    }
-
-    private void OnWatcherChangesBatched(object? sender, IReadOnlyCollection<string> paths)
+    internal void ApplyWatcherBatch(DirectoryWatcherBatch batch)
     {
         if (RootNode is null)
         {
             return;
         }
 
-        if (SourceProvider is null)
-        {
-            return;
-        }
-
-        var plan = WatcherRefreshPlanner.CreatePlan(SourceProvider, RootNode, paths);
-        if (plan.RequiresFullRescan)
+        if (batch.RequiresFullRescan)
         {
             // Error handling and full-rescan fallback are implemented in a later milestone.
             return;
         }
 
-        if (plan.RefreshTargets.Count == 0)
-        {
-            return;
-        }
-
-        // Incremental subtree refresh is implemented in a later milestone.
-    }
-
-    private void OnWatcherError(object? sender, Exception error)
-    {
-        // Error handling and full-rescan fallback are implemented in a later milestone.
+        var patcher = new DirectoryTreePatcher();
+        var result = patcher.Apply(RootNode, batch, SelectedNode);
+        SelectedNode = result.SelectedNode ?? SelectedNode;
+        RemoveNodesMarkedForRemoval();
     }
 }
