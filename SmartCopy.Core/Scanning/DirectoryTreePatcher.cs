@@ -46,7 +46,7 @@ public static class DirectoryTreePatcher
                 continue;
             }
 
-            var insertedNode = CloneForInsertion(insert.Node, parentNode);
+            var insertedNode = MakeDirectoryNode(insert.Node, parentNode);
             InsertNodeIfMissing(parentNode, insertedNode);
         }
 
@@ -169,28 +169,20 @@ public static class DirectoryTreePatcher
         return false;
     }
 
-    private static DirectoryTreeNode CloneForInsertion(DirectoryTreeNode snapshotNode, DirectoryTreeNode parentNode)
+    private static DirectoryTreeNode MakeDirectoryNode(ScannedNode snapshotNode, DirectoryTreeNode parentNode)
     {
         var initialCheckState = parentNode.CheckState == CheckState.Checked
             ? CheckState.Checked
             : CheckState.Unchecked;
 
-        var clone = new DirectoryTreeNode(snapshotNode.ToFileSystemNode(), parentNode, initialCheckState)
-        {
-            IsExpanded = snapshotNode.IsExpanded,
-        };
+        var clone = new DirectoryTreeNode(snapshotNode.FileSystemNode, parentNode, initialCheckState);
 
-        foreach (var childDirectory in snapshotNode.Children)
+        foreach (var child in snapshotNode.Children)
         {
-            clone.Children.Add(CloneForInsertion(childDirectory, clone));
-        }
-
-        foreach (var childFile in snapshotNode.Files)
-        {
-            clone.Files.Add(new DirectoryTreeNode(childFile.ToFileSystemNode(), clone, initialCheckState)
-            {
-                IsExpanded = childFile.IsExpanded,
-            });
+            if (child.FileSystemNode.IsDirectory)
+                clone.Children.Add(MakeDirectoryNode(child, clone));
+            else
+                clone.Files.Add(new DirectoryTreeNode(child.FileSystemNode, clone, initialCheckState));
         }
 
         return clone;

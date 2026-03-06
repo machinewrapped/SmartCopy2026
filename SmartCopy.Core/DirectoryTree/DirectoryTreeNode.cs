@@ -1,4 +1,3 @@
-using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -190,20 +189,6 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
         OnPropertyChanged(nameof(CreatedAt));
         OnPropertyChanged(nameof(ModifiedAt));
         OnPropertyChanged(nameof(Attributes));
-    }
-
-    public FileSystemNode ToFileSystemNode()
-    {
-        return new FileSystemNode
-        {
-            Name = Name,
-            FullPath = FullPath,
-            IsDirectory = IsDirectory,
-            Size = Size,
-            CreatedAt = CreatedAt,
-            ModifiedAt = ModifiedAt,
-            Attributes = Attributes,
-        };
     }
 
     public void BuildStats()

@@ -77,15 +77,35 @@ public sealed class DirectoryScanner
         }
     }
 
-    public async Task<DirectoryTreeNode> BuildSubtreeAsync(
+    public async Task<ScannedNode> BuildScannedSubtreeAsync(
         string rootPath,
         ScanOptions options,
         CancellationToken ct = default)
     {
-        DirectoryTreeNode? root = null;
-        await foreach (var node in ScanAsync(rootPath, options, ct: ct))
-            root ??= node;
-        return root!;
+        var root = await _provider.GetNodeAsync(rootPath, ct);
+        return await BuildScannedNodeAsync(root, options, 0, ct);
+    }
+
+    private async Task<ScannedNode> BuildScannedNodeAsync(
+        FileSystemNode node,
+        ScanOptions options,
+        int depth,
+        CancellationToken ct)
+    {
+        if (!node.IsDirectory || (options.MaxDepth.HasValue && depth >= options.MaxDepth.Value))
+            return new ScannedNode(node, []);
+
+        var rawChildren = await _provider.GetChildrenAsync(node.FullPath, ct);
+        var children = new List<ScannedNode>();
+        foreach (var child in rawChildren)
+        {
+            if (!ShouldIncludeNode(child, options)) continue;
+            if (child.IsDirectory)
+                children.Add(await BuildScannedNodeAsync(child, options, depth + 1, ct));
+            else
+                children.Add(new ScannedNode(child, []));
+        }
+        return new ScannedNode(node, [.. children]);
     }
 
     private static bool ShouldIncludeNode(FileSystemNode node, ScanOptions options)

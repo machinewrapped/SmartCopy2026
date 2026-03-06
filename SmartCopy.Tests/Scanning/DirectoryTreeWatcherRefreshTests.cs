@@ -43,7 +43,7 @@ public sealed class DirectoryTreeWatcherRefreshTests
                 [
                     new DirectoryWatcherInsert(
                         ["albums", "beatles", "song2.mp3"],
-                        await scanner.BuildSubtreeAsync(
+                        await scanner.BuildScannedSubtreeAsync(
                             Path.Combine(beatlesPath, "song2.mp3"),
                             new ScanOptions { LazyExpand = false, IncludeHidden = true }))
                 ],
@@ -153,7 +153,7 @@ public sealed class DirectoryTreeWatcherRefreshTests
                 [
                     new DirectoryWatcherInsert(
                         ["albums", "beatles", "song-a.mp3"],
-                        await scanner.BuildSubtreeAsync(
+                        await scanner.BuildScannedSubtreeAsync(
                             Path.Combine(beatlesPath, "song-a.mp3"),
                             new ScanOptions { LazyExpand = false, IncludeHidden = true }))
                 ],

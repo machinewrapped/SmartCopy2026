@@ -1,4 +1,3 @@
-using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Core.Scanning;
@@ -31,10 +30,10 @@ public sealed class DirectoryWatcherDeletion(IReadOnlyList<string> relativePathS
     public override string ToString() => $"Deletion({CanonicalRelativePath})";
 }
 
-public sealed class DirectoryWatcherInsert(IReadOnlyList<string> relativePathSegments, DirectoryTreeNode node)
+public sealed class DirectoryWatcherInsert(IReadOnlyList<string> relativePathSegments, ScannedNode node)
 {
     public IReadOnlyList<string> RelativePathSegments { get; } = [.. relativePathSegments];
-    public DirectoryTreeNode Node { get; } = node;
+    public ScannedNode Node { get; } = node;
     public string CanonicalRelativePath => string.Join("/", RelativePathSegments);
     public override string ToString() => $"Insert({CanonicalRelativePath})";
 }

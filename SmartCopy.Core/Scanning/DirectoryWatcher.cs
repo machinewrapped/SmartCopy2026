@@ -1,4 +1,3 @@
-using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Core.Scanning;
@@ -269,16 +268,17 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
                 continue;
             }
 
-            DirectoryTreeNode snapshot;
+            ScannedNode snapshot;
             try
             {
-                snapshot = await _scanner.BuildSubtreeAsync(
+                snapshot = await _scanner.BuildScannedSubtreeAsync(
                     fullPath,
                     new ScanOptions { LazyExpand = false, IncludeHidden = true },
                     CancellationToken.None);
             }
-            catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+            catch (Exception ex)
             {
+                WatcherError?.Invoke(this, ex);
                 continue;
             }
 
