@@ -31,9 +31,4 @@ public sealed class LocalAppDataStore : IAppDataStore
         return new LocalAppDataStore(baseDir);
     }
 
-    public static LocalAppDataStore ForTests()
-    {
-        var tempDir = Path.Combine(Path.GetTempPath(), "SmartCopy2026");
-        return new LocalAppDataStore(tempDir);
-    }
 }
