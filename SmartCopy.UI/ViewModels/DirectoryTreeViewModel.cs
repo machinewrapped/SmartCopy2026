@@ -227,6 +227,28 @@ public class DirectoryTreeViewModel : ViewModelBase
 
     private void OnWatcherChangesBatched(object? sender, IReadOnlyCollection<string> paths)
     {
+        if (RootNode is null)
+        {
+            return;
+        }
+
+        if (SourceProvider is null)
+        {
+            return;
+        }
+
+        var plan = WatcherRefreshPlanner.CreatePlan(SourceProvider, RootNode, paths);
+        if (plan.RequiresFullRescan)
+        {
+            // Error handling and full-rescan fallback are implemented in a later milestone.
+            return;
+        }
+
+        if (plan.RefreshTargets.Count == 0)
+        {
+            return;
+        }
+
         // Incremental subtree refresh is implemented in a later milestone.
     }
 
