@@ -722,7 +722,15 @@ public partial class MainViewModel : ViewModelBase
     {
         var chain = FilterChain.BuildLiveChain();
 
-        await FileList.ApplyChainToFilesAsync(chain, _appContext, ct);
+        if (DirectoryTree.SelectedNode is { IsDirectory: true } selectedDirectory)
+        {
+            await FileList.LoadFilesForNodeAsync(selectedDirectory, chain, _appContext);
+        }
+        else
+        {
+            await FileList.ApplyChainToFilesAsync(chain, _appContext, ct);
+        }
+
         await DirectoryTree.ApplyFiltersAsync(chain, _appContext, ct);
 
         RefreshIdleStats();
@@ -1096,6 +1104,9 @@ public partial class MainViewModel : ViewModelBase
     private void OnDirectoryWatcherError(object? sender, Exception error)
     {
         Debug.WriteLine($"[Watcher] {error}");
+        LogPanel.AddEntry(
+            $"Filesystem watcher warning: {error.Message}. Live updates may be incomplete; use Rescan to refresh.",
+            LogLevel.Warning);
     }
 
     private async Task ApplyPendingWatcherBatchesAsync(CancellationToken ct = default)
@@ -1112,6 +1123,7 @@ public partial class MainViewModel : ViewModelBase
 
         try
         {
+            var appliedAny = false;
             while (!Pipeline.IsRunning)
             {
                 var watcher = _directoryWatcher;
@@ -1128,9 +1140,13 @@ public partial class MainViewModel : ViewModelBase
                     }
 
                     DirectoryTree.ApplyWatcherBatch(batch);
+                    appliedAny = true;
                 }
+            }
 
-                RefreshIdleStats();
+            if (appliedAny && !Pipeline.IsRunning && !ct.IsCancellationRequested)
+            {
+                await ApplyFiltersAsync(ct);
             }
         }
         finally

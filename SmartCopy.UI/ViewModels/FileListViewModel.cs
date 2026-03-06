@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
@@ -9,9 +10,6 @@ public class FileListViewModel : ViewModelBase
     private CancellationTokenSource? _loadCts;
 
     private DirectoryTreeNode? _currentDirectoryNode;
-
-    // The full unfiltered set of file nodes for the current directory.
-    private List<DirectoryTreeNode> _files = [];
 
     // The subset (or whole set) exposed to the DataGrid, respecting ShowFilteredFiles.
     private IReadOnlyList<DirectoryTreeNode> _visibleFiles = [];
@@ -43,6 +41,12 @@ public class FileListViewModel : ViewModelBase
     {
         if (_currentDirectoryNode != null)
         {
+            if (_currentDirectoryNode.IsMarkedForRemoval)
+            {
+                Clear();
+                return;
+            }
+
             await filterChain.ApplyToTreeAsync(_currentDirectoryNode, pathResolver, ct);
         }
 
@@ -60,15 +64,14 @@ public class FileListViewModel : ViewModelBase
         _loadCts = new CancellationTokenSource();
         var ct = _loadCts.Token;
 
-        _currentDirectoryNode = directoryNode;
-        _files = [.. directoryNode.Files];
+        SetCurrentDirectoryNode(directoryNode);
 
         await ApplyChainToFilesAsync(filterChain, pathResolver, ct);
     }
 
     public DirectoryTreeNode? FindFile(string fullPath)
     {
-        return _files.FirstOrDefault(f =>
+        return _currentDirectoryNode?.Files.FirstOrDefault(f =>
             string.Equals(f.FullPath, fullPath, StringComparison.OrdinalIgnoreCase));
     }
 
@@ -77,9 +80,7 @@ public class FileListViewModel : ViewModelBase
         var node = FindFile(fullPath);
         if (node is null) return;
 
-        _files.Remove(node);
         _currentDirectoryNode?.Files.Remove(node);
-        RefreshVisibleFiles();
     }
 
     public void RemoveAllMarkedForRemoval()
@@ -88,20 +89,16 @@ public class FileListViewModel : ViewModelBase
 
         if (_currentDirectoryNode.IsMarkedForRemoval)
         {
-            _files.Clear();
-            _currentDirectoryNode = null;
-            VisibleFiles = [];
+            Clear();
             return;
         }
 
-        _files.RemoveAll(f => f.IsMarkedForRemoval);
         RefreshVisibleFiles();
     }
 
     public void Clear()
     {
-        _files.Clear();
-        _currentDirectoryNode = null;
+        SetCurrentDirectoryNode(null);
         RefreshVisibleFiles();
     }
 
@@ -112,9 +109,7 @@ public class FileListViewModel : ViewModelBase
         {
             if (node == removedDirectory)
             {
-                _files.Clear();
-                _currentDirectoryNode = null;
-                RefreshVisibleFiles();
+                Clear();
                 return;
             }
             node = node.Parent;
@@ -123,8 +118,34 @@ public class FileListViewModel : ViewModelBase
 
     private void RefreshVisibleFiles()
     {
+        var files = _currentDirectoryNode?.Files ?? [];
         VisibleFiles = _showFilteredFiles
-            ? [.. _files]
-            : [.. _files.Where(f => f.FilterResult == FilterResult.Included)];
+            ? [.. files]
+            : [.. files.Where(f => f.FilterResult == FilterResult.Included)];
+    }
+
+    private void SetCurrentDirectoryNode(DirectoryTreeNode? directoryNode)
+    {
+        if (ReferenceEquals(_currentDirectoryNode, directoryNode))
+        {
+            return;
+        }
+
+        if (_currentDirectoryNode is not null)
+        {
+            _currentDirectoryNode.Files.CollectionChanged -= OnCurrentDirectoryFilesChanged;
+        }
+
+        _currentDirectoryNode = directoryNode;
+
+        if (_currentDirectoryNode is not null)
+        {
+            _currentDirectoryNode.Files.CollectionChanged += OnCurrentDirectoryFilesChanged;
+        }
+    }
+
+    private void OnCurrentDirectoryFilesChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        RefreshVisibleFiles();
     }
 }

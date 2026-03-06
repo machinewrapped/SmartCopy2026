@@ -1,3 +1,5 @@
+using SmartCopy.Core.DirectoryTree;
+using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
 using SmartCopy.Tests.TestInfrastructure;
 using SmartCopy.UI.ViewModels;
@@ -83,5 +85,33 @@ public sealed class FileListViewModelTests
         vm.ClearIfUnder(dir2);
 
         Assert.NotEmpty(vm.VisibleFiles);
+    }
+
+    [Fact]
+    public async Task CurrentDirectoryFileCollectionChange_RefreshesVisibleFiles()
+    {
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithDirectory("/music")
+            .WithFile("/music/track.mp3", new byte[100]));
+        var root = await provider.BuildDirectoryTree();
+        var musicDir = root.Children.Single(n => n.Name == "music");
+
+        var vm = new FileListViewModel();
+        await vm.LoadFilesForNodeAsync(musicDir, FilterChain.Empty, new TestAppContext());
+
+        musicDir.Files.Add(new DirectoryTreeNode(
+            new FileSystemNode
+            {
+                Name = "bonus.mp3",
+                FullPath = "/music/bonus.mp3",
+                IsDirectory = false,
+                Size = 50,
+                CreatedAt = DateTime.UtcNow,
+                ModifiedAt = DateTime.UtcNow,
+                Attributes = FileAttributes.Normal,
+            },
+            musicDir));
+
+        Assert.Contains(vm.VisibleFiles, file => file.Name == "bonus.mp3");
     }
 }
