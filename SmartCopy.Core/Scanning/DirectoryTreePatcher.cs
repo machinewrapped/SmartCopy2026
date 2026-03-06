@@ -32,32 +32,33 @@ public static class DirectoryTreePatcher
             }
         }
 
-        foreach (var upsert in batch.Inserts.OrderBy(u => u.RelativePathSegments.Count))
+        foreach (var insert in batch.Inserts.OrderBy(u => u.RelativePathSegments.Count))
         {
-            var existingNode = FindExactNode(rootNode, upsert.RelativePathSegments);
-            if (existingNode is not null && existingNode.IsDirectory == upsert.Node.IsDirectory)
+            var existingNode = FindExactNode(rootNode, insert.RelativePathSegments);
+            if (existingNode is not null)
             {
-                existingNode.UpdateFrom(upsert.Node.ToFileSystemNode());
                 continue;
             }
 
-            var parentNode = FindNearestExistingParent(rootNode, upsert.RelativePathSegments);
+            var parentNode = FindNearestExistingParent(rootNode, insert.RelativePathSegments);
             if (parentNode is null || parentNode.IsMarkedForRemoval)
             {
                 continue;
             }
 
-            if (existingNode is not null)
+            var insertedNode = CloneForInsertion(insert.Node, parentNode);
+            InsertNodeIfMissing(parentNode, insertedNode);
+        }
+
+        foreach (var refresh in batch.Refreshes)
+        {
+            var node = FindExactNode(rootNode, refresh.RelativePathSegments);
+            if (node is null)
             {
-                existingNode.MarkForRemoval();
-                if (nextSelectedNode is not null && IsDescendantOrSelf(nextSelectedNode, existingNode))
-                {
-                    nextSelectedNode = existingNode.Parent ?? rootNode;
-                }
+                continue;
             }
 
-            var insertedNode = CloneForInsertion(upsert.Node, parentNode);
-            InsertNodeIfMissing(parentNode, insertedNode);
+            node.UpdateFrom(refresh.Node);
         }
 
         rootNode.BuildStats();
@@ -186,11 +187,7 @@ public static class DirectoryTreePatcher
 
         foreach (var childFile in snapshotNode.Files)
         {
-            var childCheckState = clone.CheckState == CheckState.Checked
-                ? CheckState.Checked
-                : CheckState.Unchecked;
-
-            clone.Files.Add(new DirectoryTreeNode(childFile.ToFileSystemNode(), clone, childCheckState)
+            clone.Files.Add(new DirectoryTreeNode(childFile.ToFileSystemNode(), clone, initialCheckState)
             {
                 IsExpanded = childFile.IsExpanded,
             });

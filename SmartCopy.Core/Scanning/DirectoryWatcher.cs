@@ -52,6 +52,7 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
 
     public event EventHandler? PendingBatchesAvailable;
     public event EventHandler<Exception>? WatcherError;
+    public event EventHandler<string[]>? NotifyNodeWillBeRemoved;
     public bool HasPendingBatches
     {
         get
@@ -130,6 +131,12 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
         if (string.IsNullOrWhiteSpace(path))
         {
             return;
+        }
+
+        var relativeSegments = TryNormalizePath(path);
+        if (relativeSegments is not null)
+        {
+            NotifyNodeWillBeRemoved?.Invoke(this, relativeSegments);
         }
 
         lock (_sync)
