@@ -124,4 +124,42 @@ public sealed class DirectoryTreeWatcherRefreshTests
         Assert.Null(vm.RootNode.FindNodeByPathSegments("albums", "beatles"));
         Assert.Same(albums, vm.SelectedNode);
     }
+
+    [Fact]
+    public async Task ApplyWatcherBatch_InsertsNewNodesAlphabetically()
+    {
+        using var temp = new TempDirectory();
+        var rootPath = Path.Combine(temp.Path, "root");
+        var beatlesPath = Path.Combine(rootPath, "albums", "beatles");
+        Directory.CreateDirectory(beatlesPath);
+        await File.WriteAllTextAsync(Path.Combine(beatlesPath, "song-b.mp3"), "b");
+
+        var registry = new FileSystemProviderRegistry();
+        var provider = new LocalFileSystemProvider(rootPath);
+        registry.Register(provider);
+
+        var vm = new DirectoryTreeViewModel(registry);
+        await vm.ChangeRootAsync(rootPath);
+
+        await File.WriteAllTextAsync(Path.Combine(beatlesPath, "song-a.mp3"), "a");
+
+        var scanner = new DirectoryScanner(provider);
+        vm.ApplyWatcherBatch(
+            new DirectoryWatcherBatch(
+                requiresFullRescan: false,
+                deletions: [],
+                upserts:
+                [
+                    new DirectoryWatcherUpsert(
+                        ["albums", "beatles", "song-a.mp3"],
+                        await scanner.BuildSubtreeAsync(
+                            Path.Combine(beatlesPath, "song-a.mp3"),
+                            parent: null,
+                            initialCheckState: CheckState.Unchecked,
+                            new ScanOptions { LazyExpand = false, IncludeHidden = true }))
+                ]));
+
+        var beatles = vm.RootNode!.FindNodeByPathSegments("albums", "beatles")!;
+        Assert.Equal(["song-a.mp3", "song-b.mp3"], beatles.Files.Select(file => file.Name));
+    }
 }

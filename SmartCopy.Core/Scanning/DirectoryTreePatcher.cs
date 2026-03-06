@@ -1,9 +1,12 @@
+using System.Collections.ObjectModel;
 using SmartCopy.Core.DirectoryTree;
 
 namespace SmartCopy.Core.Scanning;
 
 public sealed class DirectoryTreePatcher
 {
+    private static readonly StringComparer SortComparer = StringComparer.OrdinalIgnoreCase;
+
     public DirectoryTreePatchApplyResult Apply(
         DirectoryTreeNode rootNode,
         DirectoryWatcherBatch batch,
@@ -127,7 +130,7 @@ public sealed class DirectoryTreePatcher
                 return false;
             }
 
-            parentNode.Children.Add(node);
+            InsertAlphabetically(parentNode.Children, node);
             return true;
         }
 
@@ -136,8 +139,20 @@ public sealed class DirectoryTreePatcher
             return false;
         }
 
-        parentNode.Files.Add(node);
+        InsertAlphabetically(parentNode.Files, node);
         return true;
+    }
+
+    private static void InsertAlphabetically(ObservableCollection<DirectoryTreeNode> collection, DirectoryTreeNode node)
+    {
+        var insertIndex = 0;
+        while (insertIndex < collection.Count
+               && SortComparer.Compare(collection[insertIndex].Name, node.Name) <= 0)
+        {
+            insertIndex++;
+        }
+
+        collection.Insert(insertIndex, node);
     }
 
     private static bool IsDescendantOrSelf(DirectoryTreeNode node, DirectoryTreeNode ancestor)
