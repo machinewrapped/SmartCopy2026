@@ -1079,6 +1079,7 @@ public partial class MainViewModel : ViewModelBase
         _directoryWatcher = _watcherFactory.Create(provider, rootNode.FullPath);
         _directoryWatcher.PendingBatchesAvailable += OnDirectoryWatcherPendingBatchesAvailable;
         _directoryWatcher.WatcherError += OnDirectoryWatcherError;
+        _directoryWatcher.NotifyNodeWillBeRemoved += OnDirectoryWatcherNodeWillBeRemoved;
         _directoryWatcher.Start();
     }
 
@@ -1091,6 +1092,7 @@ public partial class MainViewModel : ViewModelBase
 
         _directoryWatcher.PendingBatchesAvailable -= OnDirectoryWatcherPendingBatchesAvailable;
         _directoryWatcher.WatcherError -= OnDirectoryWatcherError;
+        _directoryWatcher.NotifyNodeWillBeRemoved -= OnDirectoryWatcherNodeWillBeRemoved;
         _directoryWatcher.Stop();
         _directoryWatcher.Dispose();
         _directoryWatcher = null;
@@ -1107,6 +1109,12 @@ public partial class MainViewModel : ViewModelBase
         LogPanel.AddEntry(
             $"Filesystem watcher warning: {error.Message}. Live updates may be incomplete; use Rescan to refresh.",
             LogLevel.Warning);
+    }
+
+    private void OnDirectoryWatcherNodeWillBeRemoved(object? sender, string[] relativeSegments)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            DirectoryTree.RootNode?.FindNodeByPathSegments(relativeSegments)?.MarkForRemoval());
     }
 
     private async Task ApplyPendingWatcherBatchesAsync(CancellationToken ct = default)
