@@ -64,12 +64,8 @@ public partial class PipelineView : UserControl
 
         Dispatcher.UIThread.Post(() => AddStepPopup.IsOpen = false);
 
-        var step = StepEditorViewModelFactory.Create(kind, _currentViewModel.AppSettings).BuildStep();
-        if (!step.IsConfigurable)
-        {
-            _currentViewModel.AddStepFromResult(kind, step);
+        if (_currentViewModel.TryAddStepWithoutConfiguration(kind))
             return;
-        }
 
         if (this.VisualRoot is not Window parentWindow)
             return;

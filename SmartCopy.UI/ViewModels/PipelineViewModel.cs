@@ -144,6 +144,14 @@ public partial class PipelineViewModel : ViewModelBase
         return new TransformPipeline(Steps.Select(step => step.Step));
     }
 
+    public bool TryAddStepWithoutConfiguration(StepKind kind)
+    {
+        var step = StepEditorViewModelFactory.Create(kind, _appSettings).BuildStep();
+        if (step.IsConfigurable) return false;
+        AddStepFromResult(kind, step);
+        return true;
+    }
+
     public void AddStepFromResult(StepKind kind, IPipelineStep step, string? customName = null)
     {
         _ = kind;
