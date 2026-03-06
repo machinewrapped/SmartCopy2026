@@ -59,6 +59,13 @@ SmartCopy2026 follows a strict separation of concerns, heavily utilizing Depende
 *   **Details**: `WorkflowConfig` instances encapsulate source paths, target destinations, active filter chains, and pipeline pipelines into unified, single-click presets.
 *   **Signpost**: Find `WorkflowConfig.cs` and `WorkflowPresetStore.cs`.
 
+### 2.7 Context & Data Storage (`IAppContext` and `IPathResolver`)
+*   **Principle**: Application settings, data store paths, and file system provider resolution are isolated behind abstractions to enable zero-friction unit testing and dependency injection.
+*   **Details**: `IAppContext` serves as the central bundle containing global `AppSettings`, an `IAppDataStore`, and implementing `IPathResolver`. 
+    * The `IAppDataStore` virtualizes physical paths (like user directories or Temp folders) so that preset stores (like `FilterPresetStore`) can request directories by name (e.g., "FilterPresets" or "Pipelines") without hardcoding OS-level concepts. 
+    * The `IPathResolver` translates string paths to `IFileSystemProvider` instances, supplying the needed context for pipelines and filters. UI ViewModels simply take an `IAppContext` to instantiate their requisite stores, or supply resolution logic to components. In test environments, tests configure and inject `TestAppContext` (which also implements `IPathResolver`) seamlessly simulating different file systems.
+*   **Signpost**: Examine `IAppContext.cs`, `IPathResolver.cs`, `IAppDataStore.cs`, and `TestAppContext.cs` (for test-specific file system and path isolation).
+
 ## 3. Rules & Constraints
 
 1.  **Cross-provider moves** (e.g., Local to MTP) cannot be atomic. Strategies must gracefully degrade to Copy-then-Delete.
