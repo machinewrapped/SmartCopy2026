@@ -132,7 +132,7 @@ public sealed class MoveStepFallbackTests
     {
         var memory = MemoryFileSystemFixtures.Create(s => s.WithFile("/src/file.txt", "fallback"u8));
         var noAtomicMove = new CapabilityOverrideProvider(memory,
-            new ProviderCapabilities(CanSeek: true, CanAtomicMove: false, MaxPathLength: int.MaxValue));
+            new ProviderCapabilities(CanSeek: true, CanAtomicMove: false, CanWatch: false, MaxPathLength: int.MaxValue));
 
         var root = await memory.BuildDirectoryTree("/src");
         root.Files[0].CheckState = CheckState.Checked;
@@ -293,7 +293,7 @@ public sealed class MoveStepFallbackTests
         var memory = MemoryFileSystemFixtures.Create(s => s
             .WithFile("/src/dir/file.txt", "content"u8));
         var noAtomicMove = new CapabilityOverrideProvider(memory,
-            new ProviderCapabilities(CanSeek: true, CanAtomicMove: false, MaxPathLength: int.MaxValue));
+            new ProviderCapabilities(CanSeek: true, CanAtomicMove: false, CanWatch: false, MaxPathLength: int.MaxValue));
 
         var root = await memory.BuildDirectoryTree("/src");
         var dir = root.Children.Single();

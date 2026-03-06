@@ -3,7 +3,7 @@ using System.Linq;
 
 namespace SmartCopy.Core.Scanning;
 
-public sealed class DirectoryWatcher : IDisposable
+public sealed class DirectoryWatcher : IDirectoryWatcher
 {
     private readonly FileSystemWatcher _watcher;
     private readonly Timer _debounceTimer;
@@ -106,4 +106,3 @@ public sealed class DirectoryWatcher : IDisposable
         ChangesBatched?.Invoke(this, batched);
     }
 }
-

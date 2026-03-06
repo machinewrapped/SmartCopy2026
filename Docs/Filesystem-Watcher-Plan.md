@@ -146,8 +146,8 @@ Manual smoke:
 ## Progress Tracker
 
 Status:
-- [ ] Capability contract updated with `CanWatch`
-- [ ] Watcher lifecycle wired into `DirectoryTreeViewModel`
+- [x] Capability contract updated with `CanWatch`
+- [x] Watcher lifecycle wired into `DirectoryTreeViewModel`
 - [ ] Batched path reduction implemented
 - [ ] Incremental subtree rescan and replacement implemented
 - [ ] Selection/expanded-state restore implemented

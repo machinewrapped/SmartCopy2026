@@ -28,6 +28,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
     public ProviderCapabilities Capabilities => new(
         CanSeek: true,
         CanAtomicMove: true,
+        CanWatch: false,
         MaxPathLength: int.MaxValue);
 
     public Task<IReadOnlyList<FileSystemNode>> GetChildrenAsync(string path, CancellationToken ct)
