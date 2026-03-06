@@ -183,22 +183,22 @@ public class DirectoryTreeViewModel : ViewModelBase
         catch (OperationCanceledException) { }
     }
 
-    internal void ApplyWatcherBatch(DirectoryWatcherBatch batch)
+    internal bool ApplyWatcherBatch(DirectoryWatcherBatch batch)
     {
         if (RootNode is null)
         {
-            return;
+            return false;
         }
 
         if (batch.RequiresFullRescan)
         {
             // Error handling and full-rescan fallback are implemented in a later milestone.
-            return;
+            return false;
         }
 
-        var patcher = new DirectoryTreePatcher();
-        var result = patcher.Apply(RootNode, batch, SelectedNode);
+        var result = DirectoryTreePatcher.Apply(RootNode, batch, SelectedNode);
         SelectedNode = result.SelectedNode ?? SelectedNode;
         RemoveNodesMarkedForRemoval();
+        return true;
     }
 }

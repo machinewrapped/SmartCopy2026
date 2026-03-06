@@ -1124,24 +1124,28 @@ public partial class MainViewModel : ViewModelBase
         try
         {
             var appliedAny = false;
-            while (!Pipeline.IsRunning)
+            var watcher = _directoryWatcher;
+            if (watcher is null)
             {
-                var watcher = _directoryWatcher;
-                if (watcher is null || !watcher.HasPendingBatches)
-                {
-                    break;
-                }
+                return;
+            }
 
+            while (watcher.HasPendingBatches)
+            {
                 foreach (var batch in watcher.DrainPendingBatches())
                 {
-                    if (ct.IsCancellationRequested || Pipeline.IsRunning)
+                    if (ct.IsCancellationRequested)
                     {
                         return;
                     }
 
-                    DirectoryTree.ApplyWatcherBatch(batch);
-                    appliedAny = true;
-                }
+                    Debug.Assert(!Pipeline.IsRunning);
+
+                    if (DirectoryTree.ApplyWatcherBatch(batch))
+                    {
+                        appliedAny = true;                        
+                    }
+                }                
             }
 
             if (appliedAny && !Pipeline.IsRunning && !ct.IsCancellationRequested)

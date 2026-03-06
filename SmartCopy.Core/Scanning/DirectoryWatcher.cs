@@ -9,9 +9,10 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
     private readonly string _rootPath;
     private readonly FileSystemWatcher _watcher;
     private readonly Timer _debounceTimer;
-    private readonly object _sync = new();
+    private readonly System.Threading.Lock _sync = new();
     private readonly HashSet<string> _pendingDeletedPaths = new(StringComparer.Ordinal);
-    private readonly HashSet<string> _pendingPathsToScan = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _pendingPathsToAdd = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _pendingPathsToRefresh = new(StringComparer.Ordinal);
     private readonly Queue<DirectoryWatcherBatch> _pendingBatches = new();
     private readonly SemaphoreSlim _buildGate = new(1, 1);
     private readonly DirectoryScanner _scanner;
@@ -99,10 +100,15 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
         switch (e.ChangeType)
         {
             case WatcherChangeTypes.Created:
-            case WatcherChangeTypes.Changed:
+                // Scan the path to build a subtree
                 QueueScanPath(e.FullPath);
                 break;
+            case WatcherChangeTypes.Changed:
+                // Just refresh filesystem metadata
+                QueueRefreshPath(e.FullPath);
+                break;
             case WatcherChangeTypes.Deleted:
+                // TODO: we don't need to queue mark for deletes
                 QueueDeletedPath(e.FullPath);
                 break;
         }
@@ -129,7 +135,8 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
         lock (_sync)
         {
             _pendingDeletedPaths.Add(path);
-            _pendingPathsToScan.Remove(path);
+            _pendingPathsToAdd.Remove(path);
+            _pendingPathsToRefresh.Remove(path);
             _debounceTimer.Change(DebounceWindow, Timeout.InfiniteTimeSpan);
         }
     }
@@ -145,9 +152,26 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
         {
             if (!_pendingDeletedPaths.Contains(path))
             {
-                _pendingPathsToScan.Add(path);
+                _pendingPathsToAdd.Add(path);
             }
 
+            _debounceTimer.Change(DebounceWindow, Timeout.InfiniteTimeSpan);
+        }
+    }
+
+    private void QueueRefreshPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        lock (_sync)
+        {
+            if (!_pendingDeletedPaths.Contains(path) && !_pendingPathsToAdd.Contains(path))
+            {
+                _pendingPathsToRefresh.Add(path);
+            }
             _debounceTimer.Change(DebounceWindow, Timeout.InfiniteTimeSpan);
         }
     }
@@ -169,24 +193,28 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
             while (true)
             {
                 string[] deletedPaths;
-                string[] pathsToScan;
+                string[] pathsToAdd;
+                string[] pathsToRefresh;
                 lock (_sync)
                 {
-                    if (_pendingDeletedPaths.Count == 0 && _pendingPathsToScan.Count == 0)
+                    if (_pendingDeletedPaths.Count == 0 && _pendingPathsToAdd.Count == 0 && _pendingPathsToRefresh.Count == 0)
                     {
                         break;
                     }
 
                     deletedPaths = [.. _pendingDeletedPaths];
-                    pathsToScan = [.. _pendingPathsToScan];
+                    pathsToAdd = [.. _pendingPathsToAdd];
+                    pathsToRefresh = [.. _pendingPathsToRefresh];
+                    
                     _pendingDeletedPaths.Clear();
-                    _pendingPathsToScan.Clear();
+                    _pendingPathsToAdd.Clear();
+                    _pendingPathsToRefresh.Clear();
                 }
 
                 DirectoryWatcherBatch batch;
                 try
                 {
-                    batch = await BuildBatchAsync(deletedPaths, pathsToScan);
+                    batch = await BuildBatchAsync(deletedPaths, pathsToAdd, pathsToRefresh);
                 }
                 catch (Exception ex)
                 {
@@ -213,7 +241,8 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
 
     private async Task<DirectoryWatcherBatch> BuildBatchAsync(
         IReadOnlyList<string> deletedPaths,
-        IReadOnlyList<string> pathsToScan)
+        IReadOnlyList<string> pathsToScan,
+        IReadOnlyList<string> pathsToRefresh)
     {
         var deletions = deletedPaths
             .Select(TryNormalizePath)
@@ -223,7 +252,8 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
             .Select(group => group.First())
             .ToList();
 
-        var upserts = new List<DirectoryWatcherUpsert>();
+        var inserts = new List<DirectoryWatcherInsert>();
+
         foreach (var relativeSegments in NormalizeScanTargets(pathsToScan))
         {
             var fullPath = _provider.JoinPath(_rootPath, relativeSegments);
@@ -237,8 +267,6 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
             {
                 snapshot = await _scanner.BuildSubtreeAsync(
                     fullPath,
-                    parent: null,
-                    initialCheckState: CheckState.Unchecked,
                     new ScanOptions { LazyExpand = false, IncludeHidden = true },
                     CancellationToken.None);
             }
@@ -247,13 +275,33 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
                 continue;
             }
 
-            upserts.Add(new DirectoryWatcherUpsert(relativeSegments, snapshot));
+            inserts.Add(new DirectoryWatcherInsert(relativeSegments, snapshot));
+        }
+
+        var refreshes = new List<DirectoryWatcherRefresh>();
+        foreach (var path in pathsToRefresh)
+        {
+            var relativeSegments = TryNormalizePath(path);
+            if (relativeSegments is null)
+            {
+                continue;
+            }
+
+            var fullPath = _provider.JoinPath(_rootPath, relativeSegments);
+            var node = await _provider.GetNodeAsync(fullPath, CancellationToken.None);
+            if (node is null)
+            {
+                continue;
+            }
+
+            refreshes.Add(new DirectoryWatcherRefresh(relativeSegments, node));
         }
 
         return new DirectoryWatcherBatch(
             requiresFullRescan: false,
-            deletions: deletions,
-            upserts: upserts);
+            deletions: [..deletions],
+            inserts: [..inserts],
+            refreshes: [..refreshes]);
     }
 
     private IEnumerable<string[]> NormalizeScanTargets(IEnumerable<string> paths)
@@ -294,14 +342,14 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
         return relativeSegments;
     }
 
-    private static bool IsSameOrAncestor(IReadOnlyList<string> ancestorSegments, IReadOnlyList<string> candidateSegments)
+    private static bool IsSameOrAncestor(string[] ancestorSegments, string[] candidateSegments)
     {
-        if (ancestorSegments.Count > candidateSegments.Count)
+        if (ancestorSegments.Length > candidateSegments.Length)
         {
             return false;
         }
 
-        for (int i = 0; i < ancestorSegments.Count; i++)
+        for (int i = 0; i < ancestorSegments.Length; i++)
         {
             if (!string.Equals(ancestorSegments[i], candidateSegments[i], StringComparison.Ordinal))
             {

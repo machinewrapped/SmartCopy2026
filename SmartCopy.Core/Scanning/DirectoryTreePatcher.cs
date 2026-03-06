@@ -3,11 +3,11 @@ using SmartCopy.Core.DirectoryTree;
 
 namespace SmartCopy.Core.Scanning;
 
-public sealed class DirectoryTreePatcher
+public static class DirectoryTreePatcher
 {
     private static readonly StringComparer SortComparer = StringComparer.OrdinalIgnoreCase;
 
-    public DirectoryTreePatchApplyResult Apply(
+    public static DirectoryTreePatchApplyResult Apply(
         DirectoryTreeNode rootNode,
         DirectoryWatcherBatch batch,
         DirectoryTreeNode? selectedNode)
@@ -32,12 +32,18 @@ public sealed class DirectoryTreePatcher
             }
         }
 
-        foreach (var upsert in batch.Upserts.OrderBy(u => u.RelativePathSegments.Count))
+        foreach (var upsert in batch.Inserts.OrderBy(u => u.RelativePathSegments.Count))
         {
             var existingNode = FindExactNode(rootNode, upsert.RelativePathSegments);
             if (existingNode is not null && existingNode.IsDirectory == upsert.Node.IsDirectory)
             {
                 existingNode.UpdateFrom(upsert.Node.ToFileSystemNode());
+                continue;
+            }
+
+            var parentNode = FindNearestExistingParent(rootNode, upsert.RelativePathSegments);
+            if (parentNode is null || parentNode.IsMarkedForRemoval)
+            {
                 continue;
             }
 
@@ -48,12 +54,6 @@ public sealed class DirectoryTreePatcher
                 {
                     nextSelectedNode = existingNode.Parent ?? rootNode;
                 }
-            }
-
-            var parentNode = FindNearestExistingParent(rootNode, upsert.RelativePathSegments);
-            if (parentNode is null || parentNode.IsMarkedForRemoval)
-            {
-                continue;
             }
 
             var insertedNode = CloneForInsertion(upsert.Node, parentNode);

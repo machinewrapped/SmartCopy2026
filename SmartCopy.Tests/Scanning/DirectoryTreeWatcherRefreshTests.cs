@@ -39,16 +39,15 @@ public sealed class DirectoryTreeWatcherRefreshTests
             new DirectoryWatcherBatch(
                 requiresFullRescan: false,
                 deletions: [],
-                upserts:
+                inserts:
                 [
-                    new DirectoryWatcherUpsert(
+                    new DirectoryWatcherInsert(
                         ["albums", "beatles", "song2.mp3"],
                         await scanner.BuildSubtreeAsync(
                             Path.Combine(beatlesPath, "song2.mp3"),
-                            parent: null,
-                            initialCheckState: CheckState.Unchecked,
                             new ScanOptions { LazyExpand = false, IncludeHidden = true }))
-                ]));
+                ],
+                refreshes: []));
 
         var refreshedBeatles = vm.RootNode.FindNodeByPathSegments("albums", "beatles")!;
         var refreshedSong1 = vm.RootNode.FindNodeByPathSegments("albums", "beatles", "song1.mp3")!;
@@ -86,7 +85,8 @@ public sealed class DirectoryTreeWatcherRefreshTests
             new DirectoryWatcherBatch(
                 requiresFullRescan: false,
                 deletions: [new DirectoryWatcherDeletion(["albums", "beatles", "song1.mp3"])],
-                upserts: []));
+                inserts: [],
+                refreshes: []));
 
         var refreshedBeatles = vm.RootNode.FindNodeByPathSegments("albums", "beatles")!;
         Assert.Same(refreshedBeatles, vm.SelectedNode);
@@ -119,7 +119,8 @@ public sealed class DirectoryTreeWatcherRefreshTests
             new DirectoryWatcherBatch(
                 requiresFullRescan: false,
                 deletions: [new DirectoryWatcherDeletion(["albums", "beatles"])],
-                upserts: []));
+                inserts: [],
+                refreshes: []));
 
         Assert.Null(vm.RootNode.FindNodeByPathSegments("albums", "beatles"));
         Assert.Same(albums, vm.SelectedNode);
@@ -148,16 +149,15 @@ public sealed class DirectoryTreeWatcherRefreshTests
             new DirectoryWatcherBatch(
                 requiresFullRescan: false,
                 deletions: [],
-                upserts:
+                inserts:
                 [
-                    new DirectoryWatcherUpsert(
+                    new DirectoryWatcherInsert(
                         ["albums", "beatles", "song-a.mp3"],
                         await scanner.BuildSubtreeAsync(
                             Path.Combine(beatlesPath, "song-a.mp3"),
-                            parent: null,
-                            initialCheckState: CheckState.Unchecked,
                             new ScanOptions { LazyExpand = false, IncludeHidden = true }))
-                ]));
+                ],
+                refreshes: []));
 
         var beatles = vm.RootNode!.FindNodeByPathSegments("albums", "beatles")!;
         Assert.Equal(["song-a.mp3", "song-b.mp3"], beatles.Files.Select(file => file.Name));
