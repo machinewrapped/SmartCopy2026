@@ -474,6 +474,8 @@ Verification:
 
 #### 5.2.6 — Watcher and Incremental Rescan (selection-preserving)
 
+Authoritative design and progress tracking for this step lives in `Docs/Filesystem-Watcher-Plan.md`.
+
 Deliverables:
 - [ ] Gate watcher startup by provider capability and path suitability
 - [ ] Integrate `DirectoryWatcher` batching into directory tree update flow
