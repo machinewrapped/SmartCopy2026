@@ -1,7 +1,4 @@
-using System.Collections.Generic;
-using System.IO;
 using System.Runtime.CompilerServices;
-using System.Threading;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 

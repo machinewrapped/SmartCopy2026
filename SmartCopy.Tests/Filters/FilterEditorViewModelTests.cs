@@ -1,4 +1,3 @@
-using System.IO;
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Filters.Filters;
 using SmartCopy.Core.Settings;

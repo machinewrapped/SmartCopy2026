@@ -1,4 +1,3 @@
-using System.IO;
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;

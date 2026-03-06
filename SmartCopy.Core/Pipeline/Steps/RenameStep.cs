@@ -1,8 +1,6 @@
 using System;
-using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
-using System.Threading;
 using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;

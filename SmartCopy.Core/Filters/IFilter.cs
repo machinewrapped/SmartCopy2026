@@ -1,7 +1,5 @@
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace SmartCopy.Core.Filters;
 

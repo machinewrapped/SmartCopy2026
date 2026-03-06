@@ -11,7 +11,7 @@ public sealed class FilterChainViewModelTests
     // -------------------------------------------------------------------------
 
     private static ExtensionFilter MakeExtensionFilter(string ext = "mp3") =>
-        new ExtensionFilter([ext], FilterMode.Only);
+        new ([ext], FilterMode.Only);
 
     // -------------------------------------------------------------------------
     // Tests

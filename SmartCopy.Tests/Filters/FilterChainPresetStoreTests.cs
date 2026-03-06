@@ -1,8 +1,6 @@
 using System;
-using System.IO;
 using System.Linq;
 using System.Text.Json.Nodes;
-using System.Threading.Tasks;
 using SmartCopy.Core.Filters;
 using Xunit;
 

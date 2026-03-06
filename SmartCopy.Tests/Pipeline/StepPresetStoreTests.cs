@@ -1,4 +1,3 @@
-using System.IO;
 using System.Text.Json.Nodes;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Tests.TestInfrastructure;

@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using System.IO;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;

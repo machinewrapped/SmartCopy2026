@@ -1,4 +1,3 @@
-using System.IO;
 using CommunityToolkit.Mvvm.Input;
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Settings;

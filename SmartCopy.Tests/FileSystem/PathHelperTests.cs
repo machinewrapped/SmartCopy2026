@@ -1,4 +1,3 @@
-using System.IO;
 using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Tests.FileSystem;

@@ -1,6 +1,3 @@
-using System;
-using System.IO;
-
 namespace SmartCopy.Core.Settings;
 
 public sealed class LocalAppDataStore : IAppDataStore

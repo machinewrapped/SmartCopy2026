@@ -1,4 +1,3 @@
-using System.IO;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Settings;
 using SmartCopy.Tests.TestInfrastructure;

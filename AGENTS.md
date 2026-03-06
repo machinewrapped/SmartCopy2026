@@ -4,7 +4,19 @@ This file provides guidance to AI agents when working with code in this reposito
 
 ## Project Overview
 
-SmartCopy2026 is a cross-platform file manager (Windows/Linux/macOS) rewritten from SmartCopy 2015 (WinForms/.NET 4.8). It intelligently copies large directories via composable filters and transform pipelines. Stack: C#/.NET 10, Avalonia UI 11, CommunityToolkit.Mvvm, Microsoft.Extensions.DependencyInjection.
+SmartCopy2026 is a cross-platform file manager (Windows/Linux/macOS) rewritten from SmartCopy 2015 (WinForms/.NET 4.8). It intelligently copies large directories via composable filters and transform pipelines. Stack: C#/.NET 10, Avalonia UI 11, CommunityToolkit.Mvvm.
+
+## Project Status
+Current progress and outstanding tasks are recorded in `Docs/SmartCopy2026-Plan.md`. 
+
+Refer to this document when you need to get up to speed and update it when a deliverable is completed and validated.
+
+## System Architecture
+Architectural overview and design principles: `Docs/Architecture.md` This document should be reviewed when designing a solution and updated after changes affect the application's architecture.
+
+## UI/UX Design Documentation
+
+Canonical UI and interaction designs can be found in `Docs/UI+UX.md`. Refer to this document for UI consistency, update it after UI/UX decisions are made.
 
 ## Commands
 
@@ -26,18 +38,6 @@ dotnet test --filter "FullyQualifiedName~TestClassName" | Out-String
 dotnet publish -c Release --self-contained true -p:PublishSingleFile=true | Out-String
 ```
 
-## Project Status
-Current progress and outstanding tasks are recorded in `Docs/SmartCopy2026-Plan.md`. 
-
-It is focussed on planning and tracking deliverables. Refer to it when you need to get up to speed, update it when a deliverable is completed and validated.
-
-## System Architecture
-Architectural overview and design principles: `Docs/Architecture.md` This document should be reviewed when designing a solution and updated when changes affect the architecture, design, or implementation.
-
-## UI/UX Design Documentation
-
-Canonical UI and interaction designs can be found in `Docs/UI+UX.md`. Refer to this document for UI consistency, update it after UI/UX decisions are made.
-
 ## Solution Structure
 
 Four projects in `SmartCopy2026.slnx`:
@@ -52,6 +52,11 @@ Four projects in `SmartCopy2026.slnx`:
 - **IFileSystemProvider** — unified interface for local disk, MTP devices, and in-memory (tests). Capabilities are declared via `ProviderCapabilities` flags.
 - **FilterChain** — composable `IFilter` chain for filesystem view (Wildcard, Mirror, DateRange, etc.)
 - **TransformPipeline** — ordered sequence of `IPipelineStep` to apply to the selected filesystem nodes.
+
+## C# Coding Conventions
+
+### Implicit Usings
+All projects have `<ImplicitUsings>enable</ImplicitUsings>` in their `.csproj` files. The SDK automatically includes common namespaces (`System`, `System.IO`, `System.Collections.Generic`, `System.Threading`, `System.Threading.Tasks`, etc.). Do **not** add explicit `using` directives for these.
 
 ## UI Guidelines & Anti-Patterns
 

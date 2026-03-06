@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace SmartCopy.Core.Filters;
 
 public sealed record FilterChainConfig(

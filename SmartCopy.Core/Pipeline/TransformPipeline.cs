@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline.Validation;

@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace SmartCopy.Core.Pipeline.Validation;
 
 public sealed class PipelineValidator

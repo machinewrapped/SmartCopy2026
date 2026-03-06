@@ -1,5 +1,3 @@
-using System.IO;
-
 namespace SmartCopy.Tests;
 
 public class TestAppDataStore : SmartCopy.Core.Settings.IAppDataStore

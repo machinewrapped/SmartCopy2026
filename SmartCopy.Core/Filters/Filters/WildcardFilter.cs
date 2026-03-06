@@ -3,8 +3,6 @@ using System.Linq;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using SmartCopy.Core.FileSystem;
-using System.Threading;
-using System.Threading.Tasks;
 using SmartCopy.Core.DirectoryTree;
 
 namespace SmartCopy.Core.Filters.Filters;

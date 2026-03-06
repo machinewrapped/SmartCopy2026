@@ -1,9 +1,6 @@
 using System;
 using System.Diagnostics;
-using System.IO;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
 using SmartCopy.Core.Workflows;
 
 namespace SmartCopy.Core.Settings;
