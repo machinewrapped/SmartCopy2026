@@ -22,7 +22,7 @@ public sealed class DirectoryTreeWatcherRefreshTests
         registry.Register(provider);
 
         var vm = new DirectoryTreeViewModel(registry);
-        await vm.ChangeRootAsync(rootPath);
+        await vm.ChangeRootAsync(rootPath, new ScanOptions {});
 
         var albums = vm.RootNode!.FindNodeByPathSegments("albums")!;
         var beatles = vm.RootNode.FindNodeByPathSegments("albums", "beatles")!;
@@ -74,7 +74,7 @@ public sealed class DirectoryTreeWatcherRefreshTests
         registry.Register(provider);
 
         var vm = new DirectoryTreeViewModel(registry);
-        await vm.ChangeRootAsync(rootPath);
+        await vm.ChangeRootAsync(rootPath, new ScanOptions {});
 
         var song1 = vm.RootNode!.FindNodeByPathSegments("albums", "beatles", "song1.mp3")!;
         vm.SelectedNode = song1;
@@ -107,7 +107,7 @@ public sealed class DirectoryTreeWatcherRefreshTests
         registry.Register(provider);
 
         var vm = new DirectoryTreeViewModel(registry);
-        await vm.ChangeRootAsync(rootPath);
+        await vm.ChangeRootAsync(rootPath, new ScanOptions {});
 
         var albums = vm.RootNode!.FindNodeByPathSegments("albums")!;
         var beatles = vm.RootNode.FindNodeByPathSegments("albums", "beatles")!;
@@ -140,7 +140,7 @@ public sealed class DirectoryTreeWatcherRefreshTests
         registry.Register(provider);
 
         var vm = new DirectoryTreeViewModel(registry);
-        await vm.ChangeRootAsync(rootPath);
+        await vm.ChangeRootAsync(rootPath, new ScanOptions {});
 
         await File.WriteAllTextAsync(Path.Combine(beatlesPath, "song-a.mp3"), "a");
 

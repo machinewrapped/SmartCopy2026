@@ -60,6 +60,9 @@ public partial class MainViewModel : ViewModelBase
     private bool _lazyExpandScan;
 
     [ObservableProperty]
+    private bool _followSymlinks;
+
+    [ObservableProperty]
     private string _defaultOverwriteMode = "Skip";
 
     [ObservableProperty]
@@ -234,6 +237,7 @@ public partial class MainViewModel : ViewModelBase
         SaveSessionLocally = _settings.SaveSessionLocally;
         FullPreScan = _settings.FullPreScan;
         LazyExpandScan = _settings.LazyExpandScan;
+        FollowSymlinks = _settings.FollowSymlinks;
         DefaultOverwriteMode = _settings.DefaultOverwriteMode;
 
         SourcePathPicker.RefreshSettings();
@@ -356,6 +360,19 @@ public partial class MainViewModel : ViewModelBase
         _settings.LazyExpandScan = value;
         _ = SaveSettingsAsync();
     }
+
+    partial void OnFollowSymlinksChanged(bool value)
+    {
+        _settings.FollowSymlinks = value;
+        _ = SaveSettingsAsync();
+    }
+
+    private ScanOptions BuildScanOptions() => new()
+    {
+        LazyExpand = LazyExpandScan,
+        IncludeHidden = true,
+        FollowSymlinks = FollowSymlinks,
+    };
 
     partial void OnDefaultOverwriteModeChanged(string value)
     {
@@ -550,7 +567,7 @@ public partial class MainViewModel : ViewModelBase
 
             FileList.Clear();
 
-            await DirectoryTree.ChangeRootAsync(normalizedPath, ct);
+            await DirectoryTree.ChangeRootAsync(normalizedPath, BuildScanOptions(), ct);
 
             _lastCommittedSourcePath = normalizedPath;
 

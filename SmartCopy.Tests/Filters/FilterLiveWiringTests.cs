@@ -2,6 +2,7 @@ using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Filters.Filters;
+using SmartCopy.Core.Scanning;
 using SmartCopy.Tests.TestInfrastructure;
 using SmartCopy.UI.ViewModels;
 
@@ -174,7 +175,7 @@ public sealed class FilterLiveWiringTests
              .WithSimulatedFile("/root/child2/track.mp3", 100));
 
         var vm = new DirectoryTreeViewModel(fs.CreateRegistry());
-        await vm.ChangeRootAsync(fs.RootPath);
+        await vm.ChangeRootAsync(fs.RootPath, new ScanOptions {});
         Assert.NotNull(vm.RootNode);
 
         var chain = new FilterChain([new ExtensionFilter(["mp3"], FilterMode.Only)]);

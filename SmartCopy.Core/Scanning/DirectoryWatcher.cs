@@ -279,7 +279,7 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
             {
                 snapshot = await _scanner.BuildScannedSubtreeAsync(
                     fullPath,
-                    new ScanOptions { LazyExpand = false, IncludeHidden = true },
+                    new ScanOptions { LazyExpand = false, IncludeHidden = true, MaxDepth = 64 },
                     ct);
             }
             catch (OperationCanceledException)

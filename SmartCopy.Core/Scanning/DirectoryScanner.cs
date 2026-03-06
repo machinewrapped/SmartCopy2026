@@ -60,7 +60,8 @@ public sealed class DirectoryScanner
                 if (node.IsDirectory)
                 {
                     currentDirectory.Children.Add(node);
-                    if (!options.LazyExpand && visited.Add(node.FullPath))
+
+                    if (!options.LazyExpand && ShouldTraverse(options, child) && visited.Add(node.FullPath))
                     {
                         queue.Enqueue((node, depth + 1));
                     }
@@ -77,6 +78,9 @@ public sealed class DirectoryScanner
         }
     }
 
+    private static bool ShouldTraverse(ScanOptions options, FileSystemNode child) 
+        => options.FollowSymlinks || !IsReparsePoint(child);
+    
     public async Task<ScannedNode> BuildScannedSubtreeAsync(
         string rootPath,
         ScanOptions options,
@@ -92,7 +96,7 @@ public sealed class DirectoryScanner
         int depth,
         CancellationToken ct)
     {
-        if (!node.IsDirectory || (options.MaxDepth.HasValue && depth >= options.MaxDepth.Value))
+        if (!node.IsDirectory || !ShouldTraverse(options, node) || (options.MaxDepth.HasValue && depth >= options.MaxDepth.Value))
             return new ScannedNode(node, []);
 
         var rawChildren = await _provider.GetChildrenAsync(node.FullPath, ct);
@@ -117,5 +121,8 @@ public sealed class DirectoryScanner
 
         return (node.Attributes & FileAttributes.Hidden) == 0;
     }
+
+    private static bool IsReparsePoint(FileSystemNode node) =>
+        (node.Attributes & FileAttributes.ReparsePoint) != 0;
 
 }
