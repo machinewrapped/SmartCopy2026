@@ -14,6 +14,7 @@ using SmartCopy.Core.Progress;
 using SmartCopy.Core.Scanning;
 using SmartCopy.Core.Selection;
 using SmartCopy.Core.Settings;
+using SmartCopy.Core.Trash;
 using SmartCopy.Core.Workflows;
 using SmartCopy.UI.Services;
 using SmartCopy.UI.ViewModels.Workflows;
@@ -93,6 +94,7 @@ public partial class MainViewModel : ViewModelBase
     }
 
     private readonly SmartCopyAppContext _appContext;
+    private readonly ITrashService _trashService;
     private readonly MemoryFileSystemProvider _memoryProvider;
     private readonly FileSystemProviderRegistry _providerRegistry = new();
     private readonly LocalDirectoryWatcherFactory _watcherFactory = new();
@@ -127,6 +129,15 @@ public partial class MainViewModel : ViewModelBase
         var dataStore = LocalAppDataStore.ForCurrentUser();
         _settings = new AppSettings { SettingsFilePath = dataStore.GetFilePath("settings.json") };
         _appContext = new SmartCopyAppContext(_settings, dataStore);
+
+        if (OperatingSystem.IsWindows())
+            _trashService = new WindowsTrashService();
+        else if (OperatingSystem.IsLinux())
+            _trashService = new FreedesktopTrashService();
+        else if (OperatingSystem.IsMacOS())
+            _trashService = new MacOsTrashService();
+        else
+            _trashService = new NullTrashService();
 
         _operationJournal = new OperationJournal(dataStore.GetDirectoryPath("Logs"));
         _workflowStore = new WorkflowPresetStore(dataStore.GetDirectoryPath("Workflows"));
@@ -833,6 +844,7 @@ public partial class MainViewModel : ViewModelBase
             RootNode         = rootNode,
             SourceProvider   = sourceProvider,
             ProviderRegistry = _providerRegistry,
+            TrashService     = _trashService,
         };
 
         var plan = await runner.PreviewAsync(job, CancellationToken.None);
@@ -886,6 +898,7 @@ public partial class MainViewModel : ViewModelBase
             RootNode         = rootNode,
             SourceProvider   = sourceProvider,
             ProviderRegistry = _providerRegistry,
+            TrashService     = _trashService,
         };
 
         await ExecutePipelineAsync(runner, job);

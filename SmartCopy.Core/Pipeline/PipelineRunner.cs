@@ -3,6 +3,7 @@ using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline.Validation;
 using SmartCopy.Core.Progress;
+using SmartCopy.Core.Trash;
 
 namespace SmartCopy.Core.Pipeline;
 
@@ -151,6 +152,7 @@ public sealed class PipelineRunner
         public FileSystemProviderRegistry ProviderRegistry { get; }
         public bool ShowHiddenFiles { get; }
         public bool AllowDeleteReadOnly { get; }
+        public ITrashService TrashService { get; }
 
         public StepContext(PipelineJob job)
         {
@@ -159,6 +161,7 @@ public sealed class PipelineRunner
             ProviderRegistry = job.ProviderRegistry;
             ShowHiddenFiles = job.ShowHiddenFiles;
             AllowDeleteReadOnly = job.AllowDeleteReadOnly;
+            TrashService = job.TrashService;
         }
 
         public PipelineContext GetNodeContext(DirectoryTreeNode node)

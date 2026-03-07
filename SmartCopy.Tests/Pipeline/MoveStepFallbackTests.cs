@@ -2,6 +2,7 @@ using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
+using SmartCopy.Core.Trash;
 using SmartCopy.Tests.TestInfrastructure;
 
 namespace SmartCopy.Tests.Pipeline;
@@ -26,7 +27,7 @@ public sealed class MoveStepFallbackTests
         public FileSystemProviderRegistry ProviderRegistry { get; }
         public bool ShowHiddenFiles { get; }
         public bool AllowDeleteReadOnly { get; }
-
+        public ITrashService TrashService { get; } = new NullTrashService();
 
         public MoveTestContext(DirectoryTreeNode root, IFileSystemProvider source, IFileSystemProvider? target = null)
         {
