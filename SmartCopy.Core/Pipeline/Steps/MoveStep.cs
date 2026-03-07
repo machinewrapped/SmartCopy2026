@@ -175,8 +175,17 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
             else
             {
                 // Destination exists (merge needed), cross-provider, or partial selection: recurse piecewise.
+                var allMoved = true;
                 await foreach (var result in WalkAndMoveAsync(child, context, destinationPath, targetProvider, canAtomicMove, overwriteMode, ct))
+                {
+                    if (result.SourceNodeResult == SourceResult.Skipped)
+                        allMoved = false;
                     yield return result;
+                }
+
+                // Delete the now-empty source directory when the subtree was fully selected and nothing was skipped.
+                if (allMoved && !context.IsNodeFailed(child) && CanMoveEntireSubtree(child))
+                    await context.SourceProvider.DeleteAsync(child.FullPath, ct);
             }
         }
 

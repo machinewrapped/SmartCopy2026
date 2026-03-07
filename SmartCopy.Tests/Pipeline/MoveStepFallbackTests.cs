@@ -183,6 +183,7 @@ public sealed class MoveStepFallbackTests
         Assert.All(results, r => Assert.Equal(SourceResult.Moved, r.SourceNodeResult));
         Assert.False(await sourceProvider.ExistsAsync("/src/dir/a.txt", CancellationToken.None));
         Assert.False(await sourceProvider.ExistsAsync("/src/dir/b.txt", CancellationToken.None));
+        Assert.False(await sourceProvider.ExistsAsync("/src/dir", CancellationToken.None));
         Assert.True(await targetProvider.ExistsAsync("/dest/dir/a.txt", CancellationToken.None));
         Assert.True(await targetProvider.ExistsAsync("/dest/dir/b.txt", CancellationToken.None));
     }
@@ -214,6 +215,7 @@ public sealed class MoveStepFallbackTests
         Assert.Single(results);
         Assert.Equal(SourceResult.Moved, results[0].SourceNodeResult);
         Assert.True(await sourceProvider.ExistsAsync("/src/dir/keep.txt", CancellationToken.None));
+        Assert.True(await sourceProvider.ExistsAsync("/src/dir", CancellationToken.None)); // partial selection: dir must remain
         Assert.False(await sourceProvider.ExistsAsync("/src/dir/move.txt", CancellationToken.None));
         Assert.True(await targetProvider.ExistsAsync("/dest/dir/move.txt", CancellationToken.None));
     }
@@ -281,6 +283,8 @@ public sealed class MoveStepFallbackTests
         Assert.All(results, r => Assert.Equal(SourceResult.Moved, r.SourceNodeResult));
         Assert.False(await sourceProvider.ExistsAsync("/src/dir/top.txt", CancellationToken.None));
         Assert.False(await sourceProvider.ExistsAsync("/src/dir/sub/nested.txt", CancellationToken.None));
+        Assert.False(await sourceProvider.ExistsAsync("/src/dir/sub", CancellationToken.None));
+        Assert.False(await sourceProvider.ExistsAsync("/src/dir", CancellationToken.None));
         Assert.True(await targetProvider.ExistsAsync("/dest/dir/top.txt", CancellationToken.None));
         Assert.True(await targetProvider.ExistsAsync("/dest/dir/sub/nested.txt", CancellationToken.None));
     }
@@ -313,6 +317,7 @@ public sealed class MoveStepFallbackTests
         Assert.True(results[0].IsSuccess);
         Assert.Equal(SourceResult.Moved, results[0].SourceNodeResult);
         Assert.False(await memory.ExistsAsync("/src/dir/file.txt", CancellationToken.None));
+        Assert.False(await memory.ExistsAsync("/src/dir", CancellationToken.None));
         Assert.True(await memory.ExistsAsync("/dest/dir/file.txt", CancellationToken.None));
     }
 
