@@ -35,19 +35,6 @@ public sealed class PipelineViewModelTests
     }
 
     [Fact]
-    public void DestinationPathInlineEdit_RaisesPipelineChanged()
-    {
-        var vm = new PipelineViewModel(new TestAppContext());
-        vm.AddStepFromResult(new CopyStep("/mem/out"));
-        var count = 0;
-        vm.PipelineChanged += (_, _) => count++;
-
-        vm.Steps[0].SetDestinationPath("/mem/new");
-
-        Assert.True(count >= 1);
-    }
-
-    [Fact]
     public void ReplaceStep_UpdatesViewModelStep()
     {
         var vm = new PipelineViewModel(new TestAppContext());

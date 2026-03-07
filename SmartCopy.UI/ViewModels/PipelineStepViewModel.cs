@@ -33,21 +33,6 @@ public partial class PipelineStepViewModel : ViewModelBase
 
     public string DestinationPath => (Step as IHasDestinationPath)?.DestinationPath ?? string.Empty;
 
-    public void SetDestinationPath(string? destinationPath)
-    {
-        if (Step is IHasDestinationPath pathProvider)
-        {
-            pathProvider.DestinationPath = destinationPath ?? string.Empty;
-
-            OnPropertyChanged(nameof(Label));
-            OnPropertyChanged(nameof(HasDestination));
-            OnPropertyChanged(nameof(DestinationPath));
-            OnPropertyChanged(nameof(Description));
-
-            StepChanged?.Invoke(this, EventArgs.Empty);
-        }
-    }
-
     public bool ShowDeleteBadge => Step is DeleteStep { Mode: DeleteMode.Permanent };
 
     public string? DeleteBadge => ShowDeleteBadge ? "⚠ Permanent delete" : null;
