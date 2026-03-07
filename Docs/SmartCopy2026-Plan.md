@@ -491,69 +491,65 @@ Verification:
 - [x] Automated tests for debounce/coalescing and branch-local updates
 - [x] Manual smoke with scripted file churn in nested directories
 
-#### 5.2.7 — Capability-Gated Delete/Trash and Move Semantics
+### 5.2.7 Capability gates and cross-filesystem hardening
 
-Deliverables:
+Add filesystem-aware features that adapt to the capabilities of the source and target systems.
+
+Scope:
+- [ ] Windows MTP provider (`MtpFileSystemProvider`) + device picker integration
+- [ ] SMB/Network share provider-aware operations
 - [ ] Introduce `TrashService` abstraction/adapters with timeout and fallback behavior
 - [ ] Route delete behavior through capability/availability checks (trash when available, permanent when explicitly chosen or fallback required)
+- [ ] Atomic move enabled within the same volume, even when IFileSystemProvider roots are different
 - [ ] Handle non-atomic move scenarios explicitly and record outcome in operation journal
 - [ ] Surface capability-derived safety messaging in preview/run UX
-
-Acceptance criteria:
-- [ ] Delete operations are deterministic and journaled as `Trashed` vs `Deleted`
-- [ ] Cross-volume moves do not fail silently; fallback path is visible and tested
-- [ ] Destructive-operation guardrails from Phase 1 are preserved
 
 Verification:
 - [ ] Unit tests for trash fallback, timeout, and move fallback paths
 - [ ] Manual smoke: delete-to-trash and permanent delete on local files
 
-#### 5.2.X Phase 2 Validation Matrix (must pass before closing phase)
+Exit criteria:
+- [ ] MTP copy round-trip validated
+- [ ] SMB/Network share provider-aware operations validated
+- [ ] Operations across file systems (local, network, MTP) validated
+- [ ] Delete operations are deterministic and journaled as `Trashed` vs `Deleted`
 
+### Phase 5.2.8 - UI/UXPolish
+
+Scope:
+- [ ] Disable Pipeline Run & Preview whilst scan is in progress
+- [ ] Active step highlighted during pipeline execution
+- [ ] Open PreviewView and show a progress bar whilst OperationPlan is being prepared
+- [ ] Lock Pipeline view whilst execution is in progress (no run, preview, remove or edit steps)
+- [ ] Lock Filter view whilst execution is in progress (no add, remove, edit or re-arrange filters)
+- [ ] Confirm quit whilst pipeline execution is in progress
+- [ ] Disable changing source path whilst pipeline execution is in progress (or confirm + cancel)
+
+Exit criteria:
+- [ ] User acceptance tests
+
+#### 5.3 Validation and initial release
+
+Validation:
+
+- [ ] End-to-end scan/filter/preview/run flows validated against real file systems
 - [ ] Large tree scan (>100k nodes) remains responsive with cancellable scan
 - [ ] Long-path and non-ASCII filename handling validated
 - [ ] Locked/in-use file behavior validated (copy/move/delete error reporting)
 - [ ] Cross-volume/local-network move/copy behavior validated
 - [ ] Watcher overflow/error path handled without app crash
 - [ ] Operation journal correctness validated for copy/move/delete/trash outcomes
-
-Exit criteria:
-- [ ] End-to-end scan/filter/preview/run flows validated against real file systems
 - [ ] Automated suites cover provider contract, watcher behavior, and capability-gated operations
-- [ ] Cross-platform CI execution validates local file system tests on Windows, Linux, and macOS
-
-### Phase 3 — Modernisation
-
-Add modern features that extend the capabilities of the application compared to the original SmartCopy.
-
-Scope:
-- [ ] Windows MTP provider (`MtpFileSystemProvider`) + device picker integration
-- [ ] SMB/Network share provider-aware operations
-- [ ] Multi-source merge workflow
+- [ ] Cross-platform CI execution validates local file system tests on Windows, macOS and Linux
 
 Exit criteria:
-- [ ] MTP copy round-trip validated
-- [ ] SMB/Network share provider-aware operations validated
-- [ ] Operations across file systems (local, network, MTP) validated
-
-### Phase 4 — Polish and Extensibility
-
-Scope:
-- [ ] Theming, localization infrastructure, update checks
-- [ ] Confirm quit whilst pipeline execution is in progress
-- [ ] Disable changing source path whilst pipeline execution is in progress (or confirm + cancel)
-- [ ] Disable Pipeline Run & Preview whilst scan is in progress
-- [ ] Lock Pipeline view whilst execution is in progress (no run, preview, remove or edit steps)
-- [ ] Open PreviewView and show a progress bar whilst OperationPlan is being prepared
-
-Exit criteria:
-- [ ] User acceptance test confirms ready to launch
+- [ ] User acceptance tests confirms ready to launch
 - [ ] Release candidate passes cross-platform smoke checklist
+- [ ] Initial release published
 
-### Phase 5 — Pipeline Plug-Ins
+### 5.4 — Plug-Ins and Extensibility
 
 Scope:
-- [ ] `RenameStep` token engine (`{name}`, `{ext}`, `{date}`, `{artist}`, `{album}`, `{track:00}`, `{title}`)
 - [ ] `ConvertStep` + plugin loader + per-plugin settings UI
 - [ ] FFmpeg reference plugin
 - [ ] Public plugin SDK documentation
@@ -562,6 +558,15 @@ Exit criteria:
 - [ ] At least one conversion plugin with tests
 - [ ] Plugin isolation and loading failures handled without app crash
 - [ ] Plugin SDK docs are sufficient for a third party to build a basic plugin
+
+
+### Phase X - Future opportunities
+
+Possible
+- [ ] Theming, localization infrastructure, update checks
+- [ ] `RenameStep` metadata token engine (`{name}`, `{ext}`, `{date}`, `{artist}`, `{album}`, `{track:00}`, `{title}`)
+- [ ] Multi-source merge workflow
+
 
 ## 6. Open Questions
 
