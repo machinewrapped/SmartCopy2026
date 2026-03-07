@@ -72,6 +72,12 @@ public partial class PreviewViewModel : ViewModelBase
     [ObservableProperty]
     private int _totalFoldersAffected;
 
+    [ObservableProperty]
+    private int _totalFilesSkipped;
+
+    [ObservableProperty]
+    private int _totalFoldersSkipped;
+
     public ObservableCollection<PreviewGroupViewModel> Groups { get; } = [];
 
     private enum GroupKey
@@ -140,8 +146,8 @@ public partial class PreviewViewModel : ViewModelBase
         {
             if (actions.Count == 0) return;
 
-            var files = actions.Sum(a => a.NumberOfFilesAffected + a.NumberOfFilesSkipped);
-            var folders = actions.Sum(a => a.NumberOfFoldersAffected + a.NumberOfFoldersSkipped);
+            var files = key == GroupKey.Skip ? actions.Sum(a => a.NumberOfFilesSkipped) : actions.Sum(a => a.NumberOfFilesAffected);
+            var folders = key == GroupKey.Skip ? actions.Sum(a => a.NumberOfFoldersSkipped) : actions.Sum(a => a.NumberOfFoldersAffected);
 
             var title = FormatTitle(key.ToString().ToLowerInvariant(), files, folders);
 
@@ -203,7 +209,9 @@ public partial class PreviewViewModel : ViewModelBase
         sb.AppendLine();
         sb.AppendLine($"**Total Actions:** {TotalActionCount}");
         sb.AppendLine($"**Files Affected:** {TotalFilesAffected}");
+        sb.AppendLine($"**Files Skipped:** {TotalFilesSkipped}");
         sb.AppendLine($"**Folders Affected:** {TotalFoldersAffected}");
+        sb.AppendLine($"**Folders Skipped:** {TotalFoldersSkipped}");
         sb.AppendLine($"**Total Input Size:** { FileSizeFormatter.FormatBytes(TotalEstimatedInputBytes)}");
         sb.AppendLine($"**Estimated Output Size:** {FileSizeFormatter.FormatBytes(TotalEstimatedOutputBytes)}");
         sb.AppendLine();
