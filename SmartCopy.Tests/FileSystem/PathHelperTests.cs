@@ -40,6 +40,13 @@ public sealed class PathHelperTests
     }
 
     [Fact]
+    public void NormalizeUserPath_UriSchemePath_ReturnedAsIs()
+    {
+        Assert.Equal("mtp://Motorola Edge 60 Fusion/", PathHelper.NormalizeUserPath("mtp://Motorola Edge 60 Fusion/"));
+        Assert.Equal("mtp://device/DCIM/Photos", PathHelper.NormalizeUserPath("mtp://device/DCIM/Photos"));
+    }
+
+    [Fact]
     public void AreEquivalentUserPaths_RecognizesWindowsLocalVariants()
     {
         if (!OperatingSystem.IsWindows())

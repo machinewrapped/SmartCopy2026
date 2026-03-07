@@ -4,7 +4,7 @@
              x:Class="SmartCopy.UI.Views.PathPickerControl"
              x:DataType="vm:PathPickerViewModel">
 
-    <Grid RowDefinitions="Auto, Auto" ColumnDefinitions="*, Auto, Auto" DragDrop.AllowDrop="True">
+    <Grid RowDefinitions="Auto, Auto" ColumnDefinitions="*, Auto, Auto, Auto" DragDrop.AllowDrop="True">
         <!-- Input Row -->
         <ComboBox x:Name="PathComboBox"
                   Grid.Row="0"
@@ -55,10 +55,20 @@
                 ToolTip.Tip="{Binding $parent[UserControl].BrowseButtonToolTip}"
                 AutomationProperties.Name="{Binding $parent[UserControl].BrowseButtonToolTip}"/>
 
+        <Button Grid.Row="0"
+                Grid.Column="3"
+                Content="📱"
+                Click="OnMtpPickerClick"
+                CornerRadius="4"
+                Margin="5,0,0,0"
+                IsVisible="{OnPlatform Windows=True, Default=False}"
+                ToolTip.Tip="Pick MTP device (Android, camera)"
+                AutomationProperties.Name="Pick MTP device"/>
+
         <!-- Validation Row -->
         <TextBlock Grid.Row="1"
                    Grid.Column="0"
-                   Grid.ColumnSpan="3"
+                   Grid.ColumnSpan="4"
                    Text="{Binding ValidationMessage}"
                    IsVisible="{Binding ValidationMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                    Foreground="#f48771"

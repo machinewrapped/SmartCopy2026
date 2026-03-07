@@ -70,17 +70,17 @@ public partial class EditStepDialogViewModel : ObservableObject
         OkCommand.NotifyCanExecuteChanged();
     }
 
-    public static EditStepDialogViewModel ForNew(StepKind kind, AppSettings settings, ProviderCapabilities? sourceCapabilities = null)
+    public static EditStepDialogViewModel ForNew(StepKind kind, IAppContext ctx, ProviderCapabilities? sourceCapabilities = null)
     {
-        var editor = StepEditorViewModelFactory.Create(kind, settings);
+        var editor = StepEditorViewModelFactory.Create(kind, ctx);
         if (sourceCapabilities.HasValue && editor is DeleteStepEditorViewModel deleteEditor)
             deleteEditor.SetSourceCapabilities(sourceCapabilities.Value);
         return new EditStepDialogViewModel(kind, editor);
     }
 
-    public static EditStepDialogViewModel ForEdit(PipelineStepViewModel existing, AppSettings settings, ProviderCapabilities? sourceCapabilities = null)
+    public static EditStepDialogViewModel ForEdit(PipelineStepViewModel existing, IAppContext ctx, ProviderCapabilities? sourceCapabilities = null)
     {
-        var editor = StepEditorViewModelFactory.Create(existing.Kind, settings);
+        var editor = StepEditorViewModelFactory.Create(existing.Kind, ctx);
         editor.LoadFrom(existing);
         if (sourceCapabilities.HasValue && editor is DeleteStepEditorViewModel deleteEditor)
             deleteEditor.SetSourceCapabilities(sourceCapabilities.Value);

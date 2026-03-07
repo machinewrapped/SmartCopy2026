@@ -127,7 +127,7 @@ public partial class MainViewModel : ViewModelBase
     {
         var dataStore = LocalAppDataStore.ForCurrentUser();
         _settings = new AppSettings { SettingsFilePath = dataStore.GetFilePath("settings.json") };
-        _appContext = new SmartCopyAppContext(_settings, dataStore);
+        _appContext = new SmartCopyAppContext(_settings, dataStore, _providerRegistry);
 
         _trashService = CreateTrashService();
 
@@ -147,6 +147,7 @@ public partial class MainViewModel : ViewModelBase
 
         // Create the source path picker
         SourcePathPicker = new PathPickerViewModel(_settings, PathPickerMode.Source);
+        SourcePathPicker.RegisterProvider = _appContext.Register;
 
         // TODO: we will need to be able to init the viewmodel without a provider
         DirectoryTree = new DirectoryTreeViewModel(_providerRegistry)

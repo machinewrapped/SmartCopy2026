@@ -16,6 +16,11 @@ public sealed class SmartCopyAppContext : IAppContext, IPathResolver
         _providerRegistry = providerRegistry ?? new FileSystemProviderRegistry();
     }
 
+    public void Register(IFileSystemProvider provider)
+    {
+        _providerRegistry.Register(provider);
+    }
+
     public IFileSystemProvider? ResolveProvider(string path)
     {
         return _providerRegistry.ResolveProvider(path);

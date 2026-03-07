@@ -42,6 +42,7 @@ public partial class PipelineViewModel : ViewModelBase
     public StepPresetStore StepPresetStore => _stepPresetStore;
 
     internal AppSettings AppSettings => _appSettings;
+    internal IAppContext AppContext => _appContext;
 
     // Default to full capabilities so editors show no false-positive warning before source is set.
     internal ProviderCapabilities SourceCapabilities { get; private set; } =
@@ -160,7 +161,7 @@ public partial class PipelineViewModel : ViewModelBase
 
     public bool TryAddStepWithoutConfiguration(StepKind kind)
     {
-        var step = StepEditorViewModelFactory.Create(kind, _appSettings).BuildStep();
+        var step = StepEditorViewModelFactory.Create(kind, _appContext).BuildStep();
         if (step.IsConfigurable) return false;
         AddStepFromResult(step);
         return true;

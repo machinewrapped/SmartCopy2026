@@ -27,6 +27,12 @@ public partial class PathPickerViewModel : ViewModelBase
     // Fired when the user explicitly commits a path (Enter key or combo selection)
     public event EventHandler<string>? PathCommitted;
 
+    /// <summary>
+    /// Called by the code-behind when a new provider (e.g. MTP) is created and must be
+    /// registered before PathCommitted fires. Set by the parent ViewModel at construction.
+    /// </summary>
+    public Action<IFileSystemProvider>? RegisterProvider { get; set; }
+
     public PathPickerViewModel(AppSettings settings, PathPickerMode mode)
     {
         _settings = settings;

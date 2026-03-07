@@ -152,6 +152,26 @@ public partial class PathPickerControl : UserControl
         e.Handled = true;
     }
 
+    private async void OnMtpPickerClick(object? sender, RoutedEventArgs e)
+    {
+#if WINDOWS
+        if (DataContext is not SmartCopy.UI.ViewModels.PathPickerViewModel vm) return;
+        if (TopLevel.GetTopLevel(this) is not Window window) return;
+
+        var pickerVm = new SmartCopy.UI.ViewModels.Dialogs.MtpDevicePickerViewModel();
+        var dialog = new SmartCopy.UI.Views.Dialogs.MtpDevicePickerDialog { DataContext = pickerVm };
+        var device = await dialog.ShowDialog<MediaDevices.MediaDevice?>(window);
+        if (device is null) return;
+
+        var provider = new SmartCopy.Core.FileSystem.MtpFileSystemProvider(device);
+        vm.RegisterProvider?.Invoke(provider);
+        vm.Path = provider.RootPath;
+        vm.ApplyPathCommand.Execute(null);
+#else
+        await System.Threading.Tasks.Task.CompletedTask;
+#endif
+    }
+
     private async void OnBrowseClick(object? sender, RoutedEventArgs e)
     {
         if (TopLevel.GetTopLevel(this) is not TopLevel topLevel)

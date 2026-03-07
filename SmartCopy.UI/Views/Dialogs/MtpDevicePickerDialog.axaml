@@ -1,0 +1,29 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="SmartCopy.UI.Views.Dialogs.MtpDevicePickerDialog"
+        Title="Select MTP Device"
+        Width="400" Height="300"
+        CanResize="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#1e1e1e">
+    <StackPanel Spacing="12" Margin="20">
+        <TextBlock Text="Connected MTP devices (Android, cameras):" FontSize="12" Opacity="0.7" />
+
+        <ListBox ItemsSource="{Binding DeviceNames}"
+                 SelectedIndex="{Binding SelectedIndex}"
+                 Height="180" />
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button Content="Cancel"
+                    Command="{Binding CancelCommand}"
+                    Width="80"
+                    IsCancel="True" />
+            <Button Content="OK"
+                    Command="{Binding ConfirmCommand}"
+                    Width="80"
+                    IsDefault="True" />
+        </StackPanel>
+    </StackPanel>
+</Window>

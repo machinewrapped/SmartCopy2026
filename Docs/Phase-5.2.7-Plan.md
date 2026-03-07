@@ -1,7 +1,7 @@
 # Phase 5.2.7 — Capability Gates and Cross-Filesystem Hardening
 
 **Prepared:** 2026-03-07
-**Status:** In progress — A–B complete, C–E pending
+**Status:** A–E complete — E.1 (MTP folder picker) pending
 
 ## Execution rules
 - One sub-step per session. Do not start the next sub-step until the current one is manually validated.
@@ -125,31 +125,60 @@ Provider type boundaries track *implementation* divergence, not conceptual owner
 
 ## Sub-step E — MTP provider + device picker (Windows-only)
 
-**Status:** [ ] Pending
-**Manual validation gate:** connect Android device, select via MTP picker, copy files to local destination — round-trip completes without error.
+**Status:** [x] Complete — 2026-03-07
+**Manual validation gate:** connect Android device, select via MTP picker, copy files to local destination — round-trip completes without error. Confirmed working; root-only selection identified as follow-up (see E.1 below).
 
 **Goal:** Users can select a connected MTP device as source; SmartCopy scans and copies from it via
 the existing pipeline.
 
 ### NuGet dependency
-Add `MediaDevices` to `SmartCopy.Core.csproj` (Windows WPD API wrapper).
+`MediaDevices` v1.10.0 added to `SmartCopy.Core.csproj` (Windows WPD API wrapper, Windows TFM only).
+Note: plan originally cited v3.3.0 which does not exist on NuGet; v1.10.0 is the actual latest.
 
-### Files to create
-- `SmartCopy.Core/FileSystem/MtpFileSystemProvider.cs`
-  - `RootPath = "mtp://{device.FriendlyName}/"`
-  - `VolumeId = null`
-  - `Capabilities`: all false (CanSeek, CanAtomicMove, CanWatch, CanTrash = false)
-  - `MoveAsync` throws `NotSupportedException` (MoveStep will copy+delete via fallback)
-- `SmartCopy.UI/ViewModels/Dialogs/MtpDevicePickerViewModel.cs` — lists `MediaDevice.GetDevices()`
-- `SmartCopy.UI/Views/Dialogs/MtpDevicePickerDialog.axaml` + `.axaml.cs` — ListBox of device names
+### Build strategy (revised from plan)
+Multi-target Core, UI, and App: `net10.0;net10.0-windows10.0.17763.0`. App was originally changed to Windows-only but restored to multi-target so Linux/macOS builds remain possible (MTP button hidden via `OnPlatform`, `#if WINDOWS` code compiled out). Tests remain `net10.0` only.
 
-### Files to modify
-- `SmartCopy.Core/FileSystem/FileSystemProviderRegistry.cs` — add `RegisterMtpDevice(MediaDevice)`
-- `SmartCopy.UI/ViewModels/MainViewModel.cs` — add `OpenMtpDevicePicker` command
-- `SmartCopy.UI/Views/MainWindow.axaml` — "MTP Device..." source option, Windows-only
+### What was built
+- `SmartCopy.Core/FileSystem/MtpFileSystemProvider.cs` — full `IFileSystemProvider` impl (`#if WINDOWS`); `RootPath = "mtp://{device.FriendlyName}/"` with `device.Model` fallback; correct 1.10.0 API: `EnumerateDirectories()`/`EnumerateFiles()`, `fileInfo.OpenRead()`, `UploadFile(Stream, path)`, `Length` cast from `ulong`
+- `SmartCopy.UI/ViewModels/Dialogs/MtpDevicePickerViewModel.cs` — lists `MediaDevice.GetDevices()` (`#if WINDOWS`, excluded from net10.0 build)
+- `SmartCopy.UI/Views/Dialogs/MtpDevicePickerDialog.axaml` + `.axaml.cs` — simple device list; no `x:DataType` (avoids Avalonia name-generator failure on net10.0 slice); code-behind always compiles, `#if WINDOWS` inside handler only
+- `SmartCopy.Core/Settings/IAppContext` + `SmartCopyAppContext` — `Register(IFileSystemProvider)` method; `MainViewModel` now passes shared `_providerRegistry` to `_appContext` so both resolve the same set of providers
+- `PathPickerViewModel.RegisterProvider` callback wired in `MainViewModel` (source), `CopyStepEditorViewModel`, and `MoveStepEditorViewModel` (destinations) — MTP available in every path picker
+- `EditStepDialogViewModel.ForNew/ForEdit`, `StepEditorViewModelFactory.Create`, `CopyStepEditorViewModel`, `MoveStepEditorViewModel` — all changed from `AppSettings` to `IAppContext`
+- 📱 button added to `PathPickerControl` (col 3, `IsVisible="{OnPlatform Windows=True, Default=False}"`)
+- `PathHelper.NormalizeUserPath` — early-return for `://` scheme paths so `mtp://...` is never passed to `Path.GetFullPath` (which would resolve it against CWD)
+- `.vscode/launch.json` — two configurations: Windows (net10.0-windows, MTP enabled) and Cross-platform (net10.0, no MTP)
 
 ### Tests
-- `SmartCopy.Tests/FileSystem/MtpProviderTests.cs` — mock `MediaDevice` via NSubstitute; test capabilities, MoveAsync throws, path operations
+- 369 tests passing
+- `PathHelperTests.NormalizeUserPath_UriSchemePath_ReturnedAsIs` added to cover the `://` fix
+- No MTP unit tests (MediaDevice is not mockable without a real COM object); manual validation is the gate
+
+---
+
+## Sub-step E.1 — MTP folder picker / browse before scan (follow-up)
+
+**Status:** [ ] Pending
+**Priority:** High — without this, selecting a device root on a phone with a 1 TB MicroSD card triggers a full recursive scan that could take extremely long.
+
+**Goal:** After selecting a device in `MtpDevicePickerDialog`, the user can navigate the device tree and select a sub-folder as the scan root, rather than being forced to use the device root.
+
+### Proposed design
+Extend `MtpDevicePickerDialog` with a two-panel layout:
+1. **Device list** (left / top) — existing `ListBox` of `DeviceNames`
+2. **Folder browser** (right / bottom) — a `TreeView` or drill-down `ListBox` that populates lazily from `MediaDevice.GetDirectoryInfo(path).EnumerateDirectories()` as the user navigates
+
+The selected path is the confirmed output (not necessarily the root). `MtpDevicePickerViewModel` would expose:
+- `ObservableCollection<MtpFolderNode> RootFolders` — populated when a device is selected
+- `MtpFolderNode? SelectedFolder` — tracks current selection
+- `string SelectedPath` — `SelectedFolder?.FullName ?? "/"` — what gets committed to the path picker
+
+`MtpFolderNode` wraps a `MediaDirectoryInfo` with lazy `Children` loading (expand-on-demand).
+
+### Notes
+- Keep folder enumeration off the UI thread (`Task.Run` + `Dispatcher.UIThread.Post`)
+- Show a loading indicator while children are being fetched
+- "Select this folder" button confirms; double-click navigates into; breadcrumb or back button for navigation
 
 ---
 
