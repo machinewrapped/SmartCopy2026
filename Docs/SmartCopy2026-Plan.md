@@ -496,15 +496,15 @@ Verification:
 Add filesystem-aware features that adapt to the capabilities of the source and target systems.
 
 Scope:
-- [ ] Windows MTP provider (`MtpFileSystemProvider`) + device picker integration
 - [ ] SMB/Network share provider-aware operations
+- [ ] Windows MTP provider (`MtpFileSystemProvider`) + device picker integration
+- [ ] Atomic move enabled within the same volume, even when roots are different (rationalise IFileSystemProvider.RootPath vs DirectoryTreeNode.RootPath)
 - [ ] Introduce `TrashService` abstraction/adapters with timeout and fallback behavior
-- [ ] Route delete behavior through capability/availability checks (trash when available, permanent when explicitly chosen or fallback required)
-- [ ] Atomic move enabled within the same volume, even when IFileSystemProvider roots are different
-- [ ] Handle non-atomic move scenarios explicitly and record outcome in operation journal
+- [ ] Route delete behavior through capability/availability checks (trash when available, permanent fallback)
 - [ ] Surface capability-derived safety messaging in preview/run UX
 
 Verification:
+- [ ] Manual validation of operations over MTP and SMB
 - [ ] Unit tests for trash fallback, timeout, and move fallback paths
 - [ ] Manual smoke: delete-to-trash and permanent delete on local files
 
@@ -524,6 +524,7 @@ Scope:
 - [ ] Lock Filter view whilst execution is in progress (no add, remove, edit or re-arrange filters)
 - [ ] Confirm quit whilst pipeline execution is in progress
 - [ ] Disable changing source path whilst pipeline execution is in progress (or confirm + cancel)
+- [ ] Free space validation for Copy and Move-To-Different-Volume steps
 
 Exit criteria:
 - [ ] User acceptance tests
