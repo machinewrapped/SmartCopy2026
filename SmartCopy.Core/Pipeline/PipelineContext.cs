@@ -20,7 +20,6 @@ public sealed class PipelineContext : IPathResolver
 
     public required string CurrentExtension { get; set; }
     public Stream? ContentStream { get; set; }
-    public OverwriteMode OverwriteMode { get; init; } = OverwriteMode.IfNewer;
 
     /// <summary>
     /// Per-run virtual check state used by selection steps' PreviewAsync.

@@ -10,15 +10,22 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath
     public StepKind StepType => StepKind.Copy;
     public bool IsExecutable => true;
 
-    public CopyStep(string destinationPath)
+    public CopyStep(string destinationPath, OverwriteMode overwriteMode = OverwriteMode.Skip)
     {
         DestinationPath = destinationPath;
+        OverwriteMode = overwriteMode;
     }
 
-    public TransformStepConfig Config => new(StepType, new JsonObject { ["destinationPath"] = DestinationPath });
+    public OverwriteMode OverwriteMode { get; set; }
+
+    public TransformStepConfig Config => new(StepType, new JsonObject 
+    { 
+        ["destinationPath"] = DestinationPath,
+        ["overwriteMode"] = OverwriteMode.ToString()
+    });
 
     public string AutoSummary => HasDestinationPath ? $"Copy to {PathHelper.GetFriendlyTarget(DestinationPath)}" : StepType.ForDisplay();
-    public string Description => HasDestinationPath ? $"Copy to {DestinationPath}" : "Destination required";
+    public string Description => HasDestinationPath ? $"Copy to {DestinationPath} ({OverwriteMode})" : "Destination required";
 
     private string? _destinationPath;
     public string? DestinationPath 
@@ -67,7 +74,19 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath
 
             var destination = targetProvider.JoinPath(DestinationPath, nodeCtx.PathSegments);
 
-            var destResult = await targetProvider.ExistsAsync(destination, ct)
+            var destinationExists = await targetProvider.ExistsAsync(destination, ct);
+            if (destinationExists && OverwriteMode == OverwriteMode.Skip)
+            {
+                yield return new TransformResult(
+                    IsSuccess: true,
+                    SourceNode: node,
+                    SourceNodeResult: SourceResult.None,
+                    DestinationPath: destination,
+                    InputBytes: node.Size);
+                continue;
+            }
+
+            var destResult = destinationExists
                 ? DestinationResult.Overwritten
                 : DestinationResult.Created;
 
@@ -112,7 +131,7 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath
             var destination = targetProvider.JoinPath(DestinationPath, nodeCtx.PathSegments);
             var destinationExists = await targetProvider.ExistsAsync(destination, ct);
 
-            if (destinationExists && context.OverwriteMode == OverwriteMode.Skip)
+            if (destinationExists && OverwriteMode == OverwriteMode.Skip)
             {
                 yield return new TransformResult(
                     IsSuccess: true,

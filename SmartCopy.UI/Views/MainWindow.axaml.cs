@@ -48,9 +48,7 @@ public partial class MainWindow : Window
     // Options menu — Pipeline
     private MenuItem? _disableDestructivePreviewMenuItem;
     private MenuItem? _deleteToRecycleBinMenuItem;
-    private MenuItem? _overwriteSkipMenuItem;
-    private MenuItem? _overwriteAlwaysMenuItem;
-    private MenuItem? _overwriteIfNewerMenuItem;
+
 
     // Options menu — Scan
     private MenuItem? _fullPreScanMenuItem;
@@ -243,17 +241,7 @@ public partial class MainWindow : Window
             () => { if (_mainVm is not null) _mainVm.DeleteToRecycleBin = !_mainVm.DeleteToRecycleBin; });
         OptionsMenu.Items.Add(_deleteToRecycleBinMenuItem);
 
-        // Overwrite mode submenu
-        var currentMode = _mainVm?.DefaultOverwriteMode ?? "Skip";
-        _overwriteSkipMenuItem   = OverwriteRadio("_Skip (keep existing)",    "Skip",     currentMode);
-        _overwriteAlwaysMenuItem  = OverwriteRadio("_Always Overwrite",        "Always",   currentMode);
-        _overwriteIfNewerMenuItem = OverwriteRadio("Overwrite _if Newer",      "IfNewer",  currentMode);
 
-        var overwriteSubMenu = new MenuItem { Header = "Default _Overwrite Mode" };
-        overwriteSubMenu.Items.Add(_overwriteSkipMenuItem);
-        overwriteSubMenu.Items.Add(_overwriteAlwaysMenuItem);
-        overwriteSubMenu.Items.Add(_overwriteIfNewerMenuItem);
-        OptionsMenu.Items.Add(overwriteSubMenu);
 
         // ── Section: Scan ─────────────────────────────────────────────────────
         OptionsMenu.Items.Add(new Separator());
@@ -315,21 +303,7 @@ public partial class MainWindow : Window
             return item;
         }
 
-        MenuItem OverwriteRadio(string header, string mode, string currentMode)
-        {
-            var item = new MenuItem
-            {
-                Header = header,
-                ToggleType = MenuItemToggleType.CheckBox,
-                IsChecked = string.Equals(currentMode, mode, StringComparison.OrdinalIgnoreCase),
-            };
-            item.Click += (_, _) =>
-            {
-                if (_mainVm is null) return;
-                _mainVm.DefaultOverwriteMode = mode;
-            };
-            return item;
-        }
+
     }
 
     private void OnMainViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -380,13 +354,6 @@ public partial class MainWindow : Window
             case nameof(MainViewModel.DeleteToRecycleBin):
                 if (_deleteToRecycleBinMenuItem is not null)
                     _deleteToRecycleBinMenuItem.IsChecked = _mainVm?.DeleteToRecycleBin ?? true;
-                break;
-
-            case nameof(MainViewModel.DefaultOverwriteMode):
-                var mode = _mainVm?.DefaultOverwriteMode ?? "Skip";
-                if (_overwriteSkipMenuItem    is not null) _overwriteSkipMenuItem.IsChecked    = mode == "Skip";
-                if (_overwriteAlwaysMenuItem  is not null) _overwriteAlwaysMenuItem.IsChecked  = mode == "Always";
-                if (_overwriteIfNewerMenuItem is not null) _overwriteIfNewerMenuItem.IsChecked = mode == "IfNewer";
                 break;
 
             case nameof(MainViewModel.FullPreScan):

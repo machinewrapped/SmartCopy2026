@@ -1,6 +1,4 @@
-using System;
 using System.Diagnostics;
-using System.Linq;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline.Validation;
@@ -148,14 +146,12 @@ public sealed class PipelineRunner
 
         public DirectoryTreeNode RootNode { get; }
         public IFileSystemProvider SourceProvider { get; }
-        public OverwriteMode OverwriteMode { get; }
         public FileSystemProviderRegistry ProviderRegistry { get; }
 
         public StepContext(PipelineJob job)
         {
             RootNode = job.RootNode;
             SourceProvider = job.SourceProvider;
-            OverwriteMode = job.OverwriteMode;
             ProviderRegistry = job.ProviderRegistry;
         }
 
@@ -176,7 +172,6 @@ public sealed class PipelineRunner
                 ProviderRegistry = ProviderRegistry,
                 PathSegments = segments,
                 CurrentExtension = extension,
-                OverwriteMode = OverwriteMode,
                 VirtualCheckState = node.CheckState,
             };
             _contexts[node] = context;

@@ -63,9 +63,6 @@ public partial class MainViewModel : ViewModelBase
     private bool _followSymlinks;
 
     [ObservableProperty]
-    private string _defaultOverwriteMode = "Skip";
-
-    [ObservableProperty]
     private bool _addArtificialDelay = false;
 
     public string SourcePath
@@ -238,7 +235,6 @@ public partial class MainViewModel : ViewModelBase
         FullPreScan = _settings.FullPreScan;
         LazyExpandScan = _settings.LazyExpandScan;
         FollowSymlinks = _settings.FollowSymlinks;
-        DefaultOverwriteMode = _settings.DefaultOverwriteMode;
 
         SourcePathPicker.RefreshSettings();
 
@@ -374,11 +370,6 @@ public partial class MainViewModel : ViewModelBase
         FollowSymlinks = FollowSymlinks,
     };
 
-    partial void OnDefaultOverwriteModeChanged(string value)
-    {
-        _settings.DefaultOverwriteMode = value;
-        _ = SaveSettingsAsync();
-    }
 
     partial void OnAddArtificialDelayChanged(bool value)
     {
@@ -794,7 +785,6 @@ public partial class MainViewModel : ViewModelBase
             RootNode         = rootNode,
             SourceProvider   = sourceProvider,
             ProviderRegistry = _providerRegistry,
-            OverwriteMode    = ParseOverwriteMode(_settings.DefaultOverwriteMode),
         };
 
         var plan = await runner.PreviewAsync(job, CancellationToken.None);
@@ -844,7 +834,6 @@ public partial class MainViewModel : ViewModelBase
             RootNode         = rootNode,
             SourceProvider   = sourceProvider,
             ProviderRegistry = _providerRegistry,
-            OverwriteMode    = ParseOverwriteMode(_settings.DefaultOverwriteMode),
         };
 
         await ExecutePipelineAsync(runner, job);
@@ -1059,20 +1048,6 @@ public partial class MainViewModel : ViewModelBase
         {
             await LoadWorkflowAsync(vm.LoadRequestedWorkflowName);
         }
-    }
-
-    private static OverwriteMode ParseOverwriteMode(string raw)
-    {
-        return Enum.TryParse<OverwriteMode>(raw, out var mode)
-            ? mode
-            : OverwriteMode.IfNewer;
-    }
-
-    private static DeleteMode ParseDeleteMode(string raw)
-    {
-        return Enum.TryParse<DeleteMode>(raw, out var mode)
-            ? mode
-            : DeleteMode.Trash;
     }
 
     private void StartDirectoryWatcherIfSupported()

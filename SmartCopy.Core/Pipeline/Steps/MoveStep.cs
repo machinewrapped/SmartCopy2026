@@ -11,16 +11,23 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
     public StepKind StepType => StepKind.Move;
     public bool IsExecutable => true;
 
-    public MoveStep(string destinationPath)
+    public MoveStep(string destinationPath, OverwriteMode overwriteMode = OverwriteMode.Skip)
     {
         DestinationPath = destinationPath;
+        OverwriteMode = overwriteMode;
     }
 
-    public TransformStepConfig Config => new(StepType, new JsonObject { ["destinationPath"] = DestinationPath });
+    public OverwriteMode OverwriteMode { get; set; }
+
+    public TransformStepConfig Config => new(StepType, new JsonObject 
+    { 
+        ["destinationPath"] = DestinationPath,
+        ["overwriteMode"] = OverwriteMode.ToString()
+    });
 
     public string AutoSummary => HasDestinationPath ? $"Move to {PathHelper.GetFriendlyTarget(DestinationPath)}" : StepType.ForDisplay();
 
-    public string Description => HasDestinationPath ? $"Move to {DestinationPath}" : "Destination required";
+    public string Description => HasDestinationPath ? $"Move to {DestinationPath} ({OverwriteMode})" : "Destination required";
 
     private string? _destinationPath;
     public string? DestinationPath
@@ -62,7 +69,19 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
                 ?? throw new InvalidOperationException("TargetProvider must be set for MoveStep.");
 
             var destination = targetProvider.JoinPath(DestinationPath, nodeCtx.PathSegments);
-            var destResult = await targetProvider.ExistsAsync(destination, ct)
+            var destinationExists = await targetProvider.ExistsAsync(destination, ct);
+            if (destinationExists && OverwriteMode == OverwriteMode.Skip)
+            {
+                yield return new TransformResult(
+                    IsSuccess: true,
+                    SourceNode: node,
+                    SourceNodeResult: SourceResult.None,
+                    DestinationPath: destination,
+                    InputBytes: node.Size);
+                continue;
+            }
+
+            var destResult = destinationExists
                 ? DestinationResult.Overwritten
                 : DestinationResult.Created;
 
@@ -93,7 +112,7 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
         var sameProvider = ReferenceEquals(targetProvider, context.SourceProvider);
         var canAtomicMove = targetProvider.Capabilities.CanAtomicMove;
 
-        await foreach (var result in WalkAndMoveAsync(context.RootNode, context, DestinationPath, targetProvider, sameProvider, canAtomicMove, ct))
+        await foreach (var result in WalkAndMoveAsync(context.RootNode, context, DestinationPath, targetProvider, sameProvider, canAtomicMove, OverwriteMode, ct))
             yield return result;
     }
 
@@ -103,6 +122,7 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
         DirectoryTreeNode node, IStepContext context,
         string destinationPath,
         IFileSystemProvider targetProvider, bool sameProvider, bool canAtomicMove,
+        OverwriteMode overwriteMode,
         [EnumeratorCancellation] CancellationToken ct)
     {
         foreach (var child in node.Children)
@@ -117,7 +137,7 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
                 var dest = targetProvider.JoinPath(destinationPath, childCtx.PathSegments);
                 var destExists = await targetProvider.ExistsAsync(dest, ct);
 
-                if (destExists && context.OverwriteMode == OverwriteMode.Skip)
+                if (destExists && overwriteMode == OverwriteMode.Skip)
                 {
                     yield return new TransformResult(
                         IsSuccess: true,
@@ -143,7 +163,7 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
             else
             {
                 // Atomic move not possible (cross-provider or partial selection): recurse piecewise.
-                await foreach (var result in WalkAndMoveAsync(child, context, destinationPath, targetProvider, sameProvider, canAtomicMove, ct))
+                await foreach (var result in WalkAndMoveAsync(child, context, destinationPath, targetProvider, sameProvider, canAtomicMove, overwriteMode, ct))
                     yield return result;
             }
         }
@@ -157,7 +177,7 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
             var fileDest = targetProvider.JoinPath(destinationPath, fileCtx.PathSegments);
             var fileDestExists = await targetProvider.ExistsAsync(fileDest, ct);
 
-            if (fileDestExists && context.OverwriteMode == OverwriteMode.Skip)
+            if (fileDestExists && overwriteMode == OverwriteMode.Skip)
             {
                 yield return new TransformResult(
                     IsSuccess: true,

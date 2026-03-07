@@ -24,7 +24,7 @@ public sealed class MoveStepFallbackTests
         public DirectoryTreeNode RootNode { get; }
         public IFileSystemProvider SourceProvider { get; }
         public FileSystemProviderRegistry ProviderRegistry { get; }
-        public OverwriteMode OverwriteMode => OverwriteMode.Always;
+
 
         public MoveTestContext(DirectoryTreeNode root, IFileSystemProvider source, IFileSystemProvider? target = null)
         {
@@ -51,7 +51,6 @@ public sealed class MoveStepFallbackTests
                         ? node.RelativePathSegments
                         : [node.Name],
                     CurrentExtension = Path.GetExtension(node.Name).TrimStart('.'),
-                    OverwriteMode = OverwriteMode,
                     VirtualCheckState = node.CheckState,
                 };
                 _contexts[node] = ctx;

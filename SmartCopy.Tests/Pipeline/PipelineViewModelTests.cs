@@ -129,8 +129,7 @@ public sealed class PipelineViewModelTests
                             ["destinationPath"] = "/mem/out",
                             ["customName"] = "Audio Backup",
                         }),
-                ],
-                OverwriteMode: OverwriteMode.IfNewer.ToString()),
+                ]),
         };
 
         vm.LoadPreset(preset);

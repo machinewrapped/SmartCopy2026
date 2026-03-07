@@ -88,7 +88,6 @@ public sealed class PipelineRunnerSelectionTests
                 RootNode       = root,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
-                OverwriteMode  = OverwriteMode.Always,
             });
 
         // D and E should have been copied (they were unchecked → inverted to checked)
@@ -118,7 +117,6 @@ public sealed class PipelineRunnerSelectionTests
             RootNode       = root,
             SourceProvider = provider,
             ProviderRegistry = provider.CreateRegistry(),
-            OverwriteMode  = OverwriteMode.Always,
         };
 
         var runner = new PipelineRunner(new TransformPipeline(
@@ -167,7 +165,6 @@ public sealed class PipelineRunnerSelectionTests
                 RootNode       = root,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
-                OverwriteMode  = OverwriteMode.Always,
             });
 
         // All three files should be copied after SelectAll
@@ -202,7 +199,6 @@ public sealed class PipelineRunnerSelectionTests
                 RootNode       = root,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
-                OverwriteMode  = OverwriteMode.Always,
             });
 
         // Nothing should be copied — ClearSelection empties the working set
@@ -246,7 +242,6 @@ public sealed class PipelineRunnerSelectionTests
                 RootNode       = root,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
-                OverwriteMode  = OverwriteMode.Always,
             },
             ct: CancellationToken.None);
 

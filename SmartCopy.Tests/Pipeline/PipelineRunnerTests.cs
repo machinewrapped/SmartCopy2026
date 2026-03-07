@@ -29,7 +29,6 @@ public sealed class PipelineRunnerTests
             RootNode       = sourceRoot,
             SourceProvider = provider,
             ProviderRegistry = provider.CreateRegistry(),
-            OverwriteMode  = OverwriteMode.IfNewer,
         };
 
         var plan = await runner.PreviewAsync(job, CancellationToken.None);
@@ -63,7 +62,6 @@ public sealed class PipelineRunnerTests
             RootNode       = root,
             SourceProvider = provider,
             ProviderRegistry = registry,
-            OverwriteMode  = OverwriteMode.Always,
         };
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -89,7 +87,6 @@ public sealed class PipelineRunnerTests
             RootNode       = root,
             SourceProvider = provider,
             ProviderRegistry = registry,
-            OverwriteMode  = OverwriteMode.Always,
         };
 
         await runner.PreviewAsync(job, ct: CancellationToken.None);
@@ -122,7 +119,6 @@ public sealed class PipelineRunnerTests
             RootNode       = root,
             SourceProvider = provider,
             ProviderRegistry = registry,
-            OverwriteMode  = OverwriteMode.Always,
         };
 
         var plan = await runner.PreviewAsync(job, CancellationToken.None);
@@ -162,7 +158,6 @@ public sealed class PipelineRunnerTests
                 RootNode       = sourceRoot,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
-                OverwriteMode  = OverwriteMode.Always,
             });
 
         Assert.True(await provider.ExistsAsync("/out/track.mp3", CancellationToken.None));
@@ -192,7 +187,6 @@ public sealed class PipelineRunnerTests
                 RootNode       = sourceRoot,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
-                OverwriteMode  = OverwriteMode.Always,
             },
             CancellationToken.None);
 
@@ -221,7 +215,7 @@ public sealed class PipelineRunnerTests
                 RootNode       = sourceRoot,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
-                OverwriteMode  = OverwriteMode.Skip,
+
             });
 
         Assert.Contains(results, r => r.SourceNodeResult == SourceResult.None);
@@ -248,7 +242,7 @@ public sealed class PipelineRunnerTests
             RootNode       = root,
             SourceProvider = provider,
             ProviderRegistry = provider.CreateRegistry(),
-            OverwriteMode  = OverwriteMode.Always,
+
         };
 
         var previewError = await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -301,7 +295,7 @@ public sealed class PipelineRunnerTests
             RootNode       = root,
             SourceProvider = sourceProvider,
             ProviderRegistry = registry,
-            OverwriteMode  = OverwriteMode.Always,
+
         };
 
         var results = await runner.ExecuteAsync(job);
@@ -348,7 +342,7 @@ public sealed class PipelineRunnerTests
             RootNode       = root,
             SourceProvider = sourceProvider,
             ProviderRegistry = registry,
-            OverwriteMode  = OverwriteMode.Always,
+
         };
 
         var plan = await runner.PreviewAsync(job, CancellationToken.None);

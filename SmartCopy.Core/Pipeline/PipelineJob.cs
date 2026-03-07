@@ -21,9 +21,6 @@ public sealed record PipelineJob
     /// <summary>Provider registry for resolving paths during pipeline execution.</summary>
     public required FileSystemProviderRegistry ProviderRegistry { get; init; }
 
-    /// <summary>Controls how pre-existing destination files are handled.</summary>
-    public OverwriteMode OverwriteMode { get; init; } = OverwriteMode.IfNewer;
-
     /// <summary>Progress reporter for overall pipeline execution.</summary>
     public IProgress<OperationProgress>? Progress { get; init; }
 
