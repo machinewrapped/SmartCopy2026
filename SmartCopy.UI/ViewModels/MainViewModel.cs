@@ -45,7 +45,10 @@ public partial class MainViewModel : ViewModelBase
     private bool _restoreLastSourcePath = true;
 
     [ObservableProperty]
-    private bool _disableDestructivePreview;
+    private bool _allowDeleteWithoutPreview;
+
+    [ObservableProperty]
+    private bool _allowOverwriteWithoutPreview;
 
     [ObservableProperty]
     private bool _deleteToRecycleBin = true;
@@ -241,7 +244,8 @@ public partial class MainViewModel : ViewModelBase
         ShowExcludedNodesByDefault = _settings.ShowFilteredNodesInTree;
         RestoreLastWorkflow = _settings.RestoreLastWorkflow;
         RestoreLastSourcePath = _settings.RestoreLastSourcePath;
-        DisableDestructivePreview = _settings.DisableDestructivePreview;
+        AllowDeleteWithoutPreview = _settings.AllowDeleteWithoutPreview;
+        AllowOverwriteWithoutPreview = _settings.AllowOverwriteWithoutPreview;
         SaveSessionLocally = _settings.SaveSessionLocally;
         FullPreScan = _settings.FullPreScan;
         LazyExpandScan = _settings.LazyExpandScan;
@@ -341,9 +345,15 @@ public partial class MainViewModel : ViewModelBase
         _ = SaveSettingsAsync();
     }
 
-    partial void OnDisableDestructivePreviewChanged(bool value)
+    partial void OnAllowDeleteWithoutPreviewChanged(bool value)
     {
-        _settings.DisableDestructivePreview = value;
+        _settings.AllowDeleteWithoutPreview = value;
+        _ = SaveSettingsAsync();
+    }
+
+    partial void OnAllowOverwriteWithoutPreviewChanged(bool value)
+    {
+        _settings.AllowOverwriteWithoutPreview = value;
         _ = SaveSettingsAsync();
     }
 
@@ -846,7 +856,11 @@ public partial class MainViewModel : ViewModelBase
         var pipeline = Pipeline.BuildLivePipeline();
 
         // Mandatory preview for destructive pipelines, unless the user has opted out.
-        if (pipeline.HasDeleteStep && !_settings.DisableDestructivePreview)
+        bool needsPreview = false;
+        if (pipeline.HasDeleteStep && !_settings.AllowDeleteWithoutPreview) needsPreview = true;
+        if (pipeline.HasOverwriteStep && !_settings.AllowOverwriteWithoutPreview) needsPreview = true;
+
+        if (needsPreview)
         {
             await PreviewPipelineAsync();
             return;

@@ -47,7 +47,8 @@ public partial class MainWindow : Window
     private MenuItem? _saveSessionLocallyMenuItem;
 
     // Options menu — Pipeline
-    private MenuItem? _disableDestructivePreviewMenuItem;
+    private MenuItem? _allowDeleteWithoutPreviewMenuItem;
+    private MenuItem? _allowOverwriteWithoutPreviewMenuItem;
     private MenuItem? _allowDeleteReadOnlyMenuItem;
     private MenuItem? _defaultOverwriteModeMenu;
     private MenuItem? _defaultDeleteModeMenu;
@@ -232,11 +233,17 @@ public partial class MainWindow : Window
         OptionsMenu.Items.Add(new Separator());
         OptionsMenu.Items.Add(SectionHeader("Pipeline"));
 
-        _disableDestructivePreviewMenuItem = Toggle(
-            "_Skip Destructive Preview",
-            _mainVm?.DisableDestructivePreview ?? false,
-            () => { if (_mainVm is not null) _mainVm.DisableDestructivePreview = !_mainVm.DisableDestructivePreview; });
-        OptionsMenu.Items.Add(_disableDestructivePreviewMenuItem);
+        _allowDeleteWithoutPreviewMenuItem = Toggle(
+            "Skip Preview for _Deletes",
+            _mainVm?.AllowDeleteWithoutPreview ?? false,
+            () => { if (_mainVm is not null) _mainVm.AllowDeleteWithoutPreview = !_mainVm.AllowDeleteWithoutPreview; });
+        OptionsMenu.Items.Add(_allowDeleteWithoutPreviewMenuItem);
+
+        _allowOverwriteWithoutPreviewMenuItem = Toggle(
+            "Skip Preview for _Overwrites",
+            _mainVm?.AllowOverwriteWithoutPreview ?? false,
+            () => { if (_mainVm is not null) _mainVm.AllowOverwriteWithoutPreview = !_mainVm.AllowOverwriteWithoutPreview; });
+        OptionsMenu.Items.Add(_allowOverwriteWithoutPreviewMenuItem);
 
         _allowDeleteReadOnlyMenuItem = Toggle(
             "Allow Deleting _Read-Only Files",
@@ -391,9 +398,14 @@ public partial class MainWindow : Window
                     _saveSessionLocallyMenuItem.IsChecked = _mainVm?.SaveSessionLocally ?? false;
                 break;
 
-            case nameof(MainViewModel.DisableDestructivePreview):
-                if (_disableDestructivePreviewMenuItem is not null)
-                    _disableDestructivePreviewMenuItem.IsChecked = _mainVm?.DisableDestructivePreview ?? false;
+            case nameof(MainViewModel.AllowDeleteWithoutPreview):
+                if (_allowDeleteWithoutPreviewMenuItem is not null)
+                    _allowDeleteWithoutPreviewMenuItem.IsChecked = _mainVm?.AllowDeleteWithoutPreview ?? false;
+                break;
+
+            case nameof(MainViewModel.AllowOverwriteWithoutPreview):
+                if (_allowOverwriteWithoutPreviewMenuItem is not null)
+                    _allowOverwriteWithoutPreviewMenuItem.IsChecked = _mainVm?.AllowOverwriteWithoutPreview ?? false;
                 break;
 
             case nameof(MainViewModel.FullPreScan):

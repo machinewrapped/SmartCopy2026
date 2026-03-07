@@ -33,8 +33,10 @@ public sealed class AppSettings
     public bool RestoreLastWorkflow { get; set; } = false;
     /// <summary>Restore the last source path on startup (suppressed when <see cref="RestoreLastWorkflow"/> is true).</summary>
     public bool RestoreLastSourcePath { get; set; } = true;
-    /// <summary>Skip the mandatory preview confirmation for delete/destructive pipelines.</summary>
-    public bool DisableDestructivePreview { get; set; } = false;
+    /// <summary>Skip the mandatory preview confirmation for delete pipelines.</summary>
+    public bool AllowDeleteWithoutPreview { get; set; } = false;
+    /// <summary>Skip the mandatory preview confirmation for overwrite pipelines.</summary>
+    public bool AllowOverwriteWithoutPreview { get; set; } = false;
     /// <summary>Write session.sc2session next to the executable instead of in %APPDATA%.
     /// Lets each portable copy of the app remember its own last-used session.</summary>
     public bool SaveSessionLocally { get; set; } = false;
@@ -89,7 +91,8 @@ public sealed class AppSettings
         DefaultDeleteMode = saved.DefaultDeleteMode;
         RestoreLastWorkflow = saved.RestoreLastWorkflow;
         RestoreLastSourcePath = saved.RestoreLastSourcePath;
-        DisableDestructivePreview = saved.DisableDestructivePreview;
+        AllowDeleteWithoutPreview = saved.AllowDeleteWithoutPreview;
+        AllowOverwriteWithoutPreview = saved.AllowOverwriteWithoutPreview;
         SaveSessionLocally = saved.SaveSessionLocally;
         AddArtificialDelay = saved.AddArtificialDelay;
         LogRetentionDays = saved.LogRetentionDays;

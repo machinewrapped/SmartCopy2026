@@ -1,6 +1,4 @@
-using System;
-using System.Linq;
-using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline;
@@ -17,6 +15,10 @@ public sealed class TransformPipeline
     public IReadOnlyList<IPipelineStep> Steps => _steps;
 
     public bool HasDeleteStep => _steps.Any(step => step.StepType == StepKind.Delete);
+
+    public bool HasOverwriteStep => _steps.Any(step => 
+        (step is CopyStep copy && copy.OverwriteMode != OverwriteMode.Skip) ||
+        (step is MoveStep move && move.OverwriteMode != OverwriteMode.Skip));
 
     public void Validate(PipelineValidationContext? context = null)
     {

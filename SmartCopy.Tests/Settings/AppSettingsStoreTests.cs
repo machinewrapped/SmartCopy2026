@@ -57,7 +57,8 @@ public sealed class AppSettingsStoreTests
             SettingsFilePath = filePath,
             RestoreLastWorkflow     = true,
             RestoreLastSourcePath   = false,
-            DisableDestructivePreview = true,
+            AllowDeleteWithoutPreview = true,
+            AllowOverwriteWithoutPreview = true,
             DefaultOverwriteMode    = OverwriteMode.Always,
             FullPreScan             = true,
             LazyExpandScan          = true,
@@ -68,7 +69,8 @@ public sealed class AppSettingsStoreTests
 
         Assert.True(loaded.RestoreLastWorkflow);
         Assert.False(loaded.RestoreLastSourcePath);
-        Assert.True(loaded.DisableDestructivePreview);
+        Assert.True(loaded.AllowDeleteWithoutPreview);
+        Assert.True(loaded.AllowOverwriteWithoutPreview);
         Assert.Equal(OverwriteMode.Always, loaded.DefaultOverwriteMode);
         Assert.True(loaded.FullPreScan);
         Assert.True(loaded.LazyExpandScan);
