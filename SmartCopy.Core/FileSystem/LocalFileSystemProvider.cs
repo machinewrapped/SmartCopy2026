@@ -4,23 +4,28 @@ namespace SmartCopy.Core.FileSystem;
 
 public sealed class LocalFileSystemProvider : IFileSystemProvider
 {
+    private readonly bool _isNetworkPath;
+    private readonly ProviderCapabilities _capabilities;
+
     public LocalFileSystemProvider(string rootPath)
     {
         RootPath = NormalizePath(rootPath);
+        _isNetworkPath = Uri.TryCreate(RootPath, UriKind.Absolute, out var uri) && uri.IsUnc;
+        _capabilities = new ProviderCapabilities(
+            CanSeek: true,
+            CanAtomicMove: !_isNetworkPath,
+            CanWatch: !_isNetworkPath,
+            MaxPathLength: int.MaxValue,
+            CanTrash: !_isNetworkPath);
     }
 
     public string RootPath { get; }
 
-    public string? VolumeId => (RootPath.StartsWith(@"\\") || RootPath.StartsWith("//"))
+    public string? VolumeId => _isNetworkPath
         ? null
         : Path.GetPathRoot(RootPath)?.ToUpperInvariant();
 
-    public ProviderCapabilities Capabilities => new(
-        CanSeek: true,
-        CanAtomicMove: true,
-        CanWatch: true,
-        MaxPathLength: int.MaxValue,
-        CanTrash: true);
+    public ProviderCapabilities Capabilities => _capabilities;
 
     public Task<IReadOnlyList<FileSystemNode>> GetChildrenAsync(string path, CancellationToken ct)
     {
