@@ -379,18 +379,4 @@ public partial class PipelineViewModel : ViewModelBase
         var value = config.Parameters[name]?.GetValue<string>()?.Trim();
         return string.IsNullOrWhiteSpace(value) ? null : value;
     }
-
-    private IPipelineStep CreateDefaultStep(StepKind kind)
-    {
-        return kind switch
-        {
-            StepKind.Flatten => new FlattenStep(),
-            StepKind.Rebase => new RebaseStep("", ""),
-            StepKind.Rename => new RenameStep("{name}"),
-            StepKind.Copy => new CopyStep(""),
-            StepKind.Move => new MoveStep(""),
-            StepKind.Delete => new DeleteStep(_appSettings.DefaultDeleteMode),
-            _ => new FlattenStep(),
-        };
-    }
 }
