@@ -1,7 +1,7 @@
 # Phase 5.2.7 — Capability Gates and Cross-Filesystem Hardening
 
 **Prepared:** 2026-03-07
-**Status:** In progress — A complete, B–E pending
+**Status:** In progress — A–B complete, C–E pending
 
 ## Execution rules
 - One sub-step per session. Do not start the next sub-step until the current one is manually validated.
@@ -64,30 +64,20 @@ Trash is OS-level (Recycle Bin, freedesktop, NSFileManager), not provider-level.
 
 ## Sub-step B — Atomic move volume rationalization
 
-**Status:** [ ] Pending
-**Manual validation gate:** move files from `C:\FolderA` to `C:\FolderB` using two separate providers — journal should show `move` (not copy+delete).
+**Status:** [x] Complete — 2026-03-07
+**Validation:** 367 tests passing; manual smoke confirmed same-volume atomic move (`C:\FolderA` → `C:\FolderB` shows `move` in journal, not copy+delete).
 
-**Goal:** Two `LocalFileSystemProvider` instances on the same OS volume can perform atomic moves between them (currently blocked by `ReferenceEquals` check in `MoveStep`).
+**Goal:** Two `LocalFileSystemProvider` instances on the same OS volume can perform atomic moves between them (previously blocked by `ReferenceEquals` check in `MoveStep`).
 
-### Root cause
-`MoveStep.ApplyAsync` uses `ReferenceEquals(targetProvider, context.SourceProvider)`.
-Two providers rooted at `C:\Source` and `C:\Destination` are different instances — always copy+delete even though `File.Move()` would succeed atomically.
-
-### Files to modify
-- `SmartCopy.Core/FileSystem/IFileSystemProvider.cs` — add `string? VolumeId { get; }` (drive root for local, null for memory/MTP)
-- `SmartCopy.Core/FileSystem/LocalFileSystemProvider.cs` — `VolumeId = Path.GetPathRoot(RootPath)?.ToUpperInvariant()` for local; `null` for UNC
-- `SmartCopy.Core/FileSystem/MemoryFileSystemProvider.cs` — `VolumeId = null`
-- `SmartCopy.Core/Pipeline/Steps/MoveStep.cs` — replace `ReferenceEquals` with VolumeId equality:
-  ```csharp
-  var sameVolume = context.SourceProvider.VolumeId is { } vid && targetProvider.VolumeId == vid;
-  var canAtomicMove = sameVolume && targetProvider.Capabilities.CanAtomicMove;
-  ```
-
-### Tests
-Extend `SmartCopy.Tests/Pipeline/MoveStepFallbackTests.cs`:
-- Two local providers, same drive root → atomic move
-- Two local providers, different drive roots → copy+delete fallback
-- Memory provider → always copy+delete (VolumeId = null)
+### Changes made
+- `SmartCopy.Core/FileSystem/IFileSystemProvider.cs` — added `string? VolumeId { get; }`
+- `SmartCopy.Core/FileSystem/LocalFileSystemProvider.cs` — `VolumeId = Path.GetPathRoot(RootPath)?.ToUpperInvariant()`; `null` for UNC
+- `SmartCopy.Core/FileSystem/MemoryFileSystemProvider.cs` — optional `volumeId` ctor param (default `null`)
+- `SmartCopy.Core/Pipeline/Steps/MoveStep.cs` — replaced `ReferenceEquals` with VolumeId equality; removed `sameProvider` param from `WalkAndMoveAsync`; fixed copy+delete fallback stream-before-delete `IOException` (stream was still open when `DeleteAsync` ran)
+- `SmartCopy.Tests/TestInfrastructure/CapabilityOverrideProvider.cs` — added `VolumeId` passthrough
+- `SmartCopy.Tests/TestInfrastructure/MemoryFileSystemFixtureBuilder.cs` — threaded `volumeId` through builder and factory
+- `SmartCopy.Tests/Pipeline/MoveStepFallbackTests.cs` — updated 4 existing tests; added `DifferentVolumeIds_UsesCopyDeleteFallback` and `NullVolumeId_AlwaysCopyDeleteFallback`
+- `SmartCopy.Tests/Pipeline/PipelineDirectoryTests.cs` — updated 5 atomic-move tests to set `volumeId: "MEM"`
 
 ---
 
