@@ -38,7 +38,15 @@ public sealed class DeleteStep : IPipelineStep
         // Include root node itself if selected, then all selected descendants.
         if (context.IsPreviewSelected(context.RootNode))
         {
-            yield return MakePreviewResult(context.RootNode, pathResult);
+            if (!context.AllowDeleteReadOnly && (context.RootNode.Attributes & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
+            {
+                context.MarkFailed(context.RootNode);
+                yield return MakePreviewResult(context.RootNode, SourceResult.None, isSuccess: false);
+            }
+            else
+            {
+                yield return MakePreviewResult(context.RootNode, pathResult);
+            }
         }
 
         // Yield all affected nodes for preview so the user sees exactly what will be deleted
@@ -46,6 +54,14 @@ public sealed class DeleteStep : IPipelineStep
         {
             ct.ThrowIfCancellationRequested();
             if (context.IsNodeFailed(node)) continue;
+
+            if (!context.AllowDeleteReadOnly && (node.Attributes & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
+            {
+                context.MarkFailed(node);
+                yield return MakePreviewResult(node, SourceResult.None, isSuccess: false);
+                continue;
+            }
+
             yield return MakePreviewResult(node, pathResult);
         }
     }
@@ -59,6 +75,19 @@ public sealed class DeleteStep : IPipelineStep
         // If the root node itself is fully selected, delete it atomically.
         if (context.RootNode.IsSelected)
         {
+            if (!context.AllowDeleteReadOnly && (context.RootNode.Attributes & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
+            {
+                context.MarkFailed(context.RootNode);
+                yield return new TransformResult(
+                    IsSuccess: false,
+                    SourceNode: context.RootNode,
+                    SourceNodeResult: SourceResult.None,
+                    NumberOfFilesAffected: 0,
+                    NumberOfFoldersAffected: 0,
+                    InputBytes: context.RootNode.Size);
+                yield break;
+            }
+
             await context.SourceProvider.DeleteAsync(context.RootNode.FullPath, ct);
             yield return new TransformResult(
                 IsSuccess: true,
@@ -77,6 +106,19 @@ public sealed class DeleteStep : IPipelineStep
             // Skip nodes whose parent is also selected — the parent delete covers them.
             if (node.Parent?.IsSelected == true) continue;
 
+            if (!context.AllowDeleteReadOnly && (node.Attributes & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
+            {
+                context.MarkFailed(node);
+                yield return new TransformResult(
+                    IsSuccess: false,
+                    SourceNode: node,
+                    SourceNodeResult: SourceResult.None,
+                    NumberOfFilesAffected: 0,
+                    NumberOfFoldersAffected: 0,
+                    InputBytes: node.Size);
+                continue;
+            }
+
             await context.SourceProvider.DeleteAsync(node.FullPath, ct);
             yield return new TransformResult(
                 IsSuccess: true,
@@ -89,9 +131,9 @@ public sealed class DeleteStep : IPipelineStep
     }
 
     private static TransformResult MakePreviewResult(
-        DirectoryTreeNode node, SourceResult pathResult)
+        DirectoryTreeNode node, SourceResult pathResult, bool isSuccess = true)
         => new(
-            IsSuccess: true,
+            IsSuccess: isSuccess,
             SourceNode: node,
             SourceNodeResult: pathResult,
             NumberOfFilesAffected: node.IsDirectory ? 0 : 1,

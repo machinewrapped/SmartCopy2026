@@ -65,6 +65,18 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private bool _addArtificialDelay = false;
 
+    [ObservableProperty]
+    private string _defaultOverwriteMode = "Skip";
+
+    [ObservableProperty]
+    private string _defaultDeleteMode = "Trash";
+
+    [ObservableProperty]
+    private bool _showHiddenFiles;
+
+    [ObservableProperty]
+    private bool _allowDeleteReadOnly;
+
     public string SourcePath
     {
         get => SourcePathPicker.Path;
@@ -234,6 +246,10 @@ public partial class MainViewModel : ViewModelBase
         FullPreScan = _settings.FullPreScan;
         LazyExpandScan = _settings.LazyExpandScan;
         FollowSymlinks = _settings.FollowSymlinks;
+        DefaultOverwriteMode = _settings.DefaultOverwriteMode;
+        DefaultDeleteMode = _settings.DefaultDeleteMode;
+        ShowHiddenFiles = _settings.ShowHiddenFiles;
+        AllowDeleteReadOnly = _settings.AllowDeleteReadOnly;
 
         SourcePathPicker.RefreshSettings();
 
@@ -358,7 +374,7 @@ public partial class MainViewModel : ViewModelBase
     private ScanOptions BuildScanOptions() => new()
     {
         LazyExpand = LazyExpandScan,
-        IncludeHidden = true,
+        IncludeHidden = ShowHiddenFiles,
         FollowSymlinks = FollowSymlinks,
     };
 
@@ -367,6 +383,36 @@ public partial class MainViewModel : ViewModelBase
     {
         _memoryProvider.AddArtificialDelay = value;
         _settings.AddArtificialDelay = value;
+        _ = SaveSettingsAsync();
+    }
+
+    partial void OnDefaultOverwriteModeChanged(string value)
+    {
+        _settings.DefaultOverwriteMode = value;
+        _ = SaveSettingsAsync();
+    }
+
+    partial void OnDefaultDeleteModeChanged(string value)
+    {
+        _settings.DefaultDeleteMode = value;
+        _ = SaveSettingsAsync();
+    }
+
+    partial void OnShowHiddenFilesChanged(bool value)
+    {
+        _settings.ShowHiddenFiles = value;
+        _ = SaveSettingsAsync();
+        // Since hidden files visibility impacts the tree, re-scan
+        var path = SourcePath.Trim();
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            _ = ApplySourcePathCoreAsync(path);
+        }
+    }
+
+    partial void OnAllowDeleteReadOnlyChanged(bool value)
+    {
+        _settings.AllowDeleteReadOnly = value;
         _ = SaveSettingsAsync();
     }
 

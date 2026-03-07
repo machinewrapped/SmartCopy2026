@@ -14,6 +14,9 @@ public interface IStepContext
     IFileSystemProvider SourceProvider { get; }
     FileSystemProviderRegistry ProviderRegistry { get; }
 
+    bool ShowHiddenFiles { get; }
+    bool AllowDeleteReadOnly { get; }
+
     /// <summary>Returns the cached (or newly created) <see cref="PipelineContext"/> for a node.
     /// PathSegments mutations persist across all steps in the run.</summary>
     PipelineContext GetNodeContext(DirectoryTreeNode node);

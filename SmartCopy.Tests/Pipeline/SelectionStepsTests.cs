@@ -24,6 +24,8 @@ public sealed class SelectionStepsTests
         public DirectoryTreeNode RootNode { get; }
         public IFileSystemProvider SourceProvider { get; }
         public FileSystemProviderRegistry ProviderRegistry { get; } = new();
+        public bool ShowHiddenFiles { get; }
+        public bool AllowDeleteReadOnly { get; }
 
         public TestStepContext(DirectoryTreeNode root, IFileSystemProvider provider)
         {

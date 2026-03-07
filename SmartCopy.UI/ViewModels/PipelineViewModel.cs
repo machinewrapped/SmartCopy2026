@@ -387,7 +387,7 @@ public partial class PipelineViewModel : ViewModelBase
         return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 
-    private static IPipelineStep CreateDefaultStep(StepKind kind)
+    private IPipelineStep CreateDefaultStep(StepKind kind)
     {
         return kind switch
         {
@@ -396,8 +396,15 @@ public partial class PipelineViewModel : ViewModelBase
             StepKind.Rename => new RenameStep("{name}"),
             StepKind.Copy => new CopyStep(""),
             StepKind.Move => new MoveStep(""),
-            StepKind.Delete => new DeleteStep(DeleteMode.Trash),
+            StepKind.Delete => new DeleteStep(GetDefaultDeleteMode()),
             _ => new FlattenStep(),
         };
+    }
+
+    private DeleteMode GetDefaultDeleteMode()
+    {
+        if (Enum.TryParse<DeleteMode>(_appSettings.DefaultDeleteMode, out var mode))
+            return mode;
+        return DeleteMode.Trash;
     }
 }

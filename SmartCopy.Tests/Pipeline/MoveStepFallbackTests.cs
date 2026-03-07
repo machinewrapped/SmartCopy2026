@@ -24,6 +24,8 @@ public sealed class MoveStepFallbackTests
         public DirectoryTreeNode RootNode { get; }
         public IFileSystemProvider SourceProvider { get; }
         public FileSystemProviderRegistry ProviderRegistry { get; }
+        public bool ShowHiddenFiles { get; }
+        public bool AllowDeleteReadOnly { get; }
 
 
         public MoveTestContext(DirectoryTreeNode root, IFileSystemProvider source, IFileSystemProvider? target = null)

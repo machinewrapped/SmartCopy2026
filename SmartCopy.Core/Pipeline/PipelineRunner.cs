@@ -147,12 +147,16 @@ public sealed class PipelineRunner
         public DirectoryTreeNode RootNode { get; }
         public IFileSystemProvider SourceProvider { get; }
         public FileSystemProviderRegistry ProviderRegistry { get; }
+        public bool ShowHiddenFiles { get; }
+        public bool AllowDeleteReadOnly { get; }
 
         public StepContext(PipelineJob job)
         {
             RootNode = job.RootNode;
             SourceProvider = job.SourceProvider;
             ProviderRegistry = job.ProviderRegistry;
+            ShowHiddenFiles = job.ShowHiddenFiles;
+            AllowDeleteReadOnly = job.AllowDeleteReadOnly;
         }
 
         public PipelineContext GetNodeContext(DirectoryTreeNode node)
