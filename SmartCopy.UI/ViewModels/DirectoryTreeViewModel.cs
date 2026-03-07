@@ -66,9 +66,9 @@ public class DirectoryTreeViewModel : ViewModelBase
     /// <summary>
     /// Set the root path for the directory tree (may be underneath the filesystem root)
     /// </summary>
-    public async Task ChangeRootAsync(string newRootPath, CancellationToken ct = default)
+    public async Task ChangeRootAsync(string newRootPath, ScanOptions scanOptions, CancellationToken ct = default)
     {
-        await InitializeAsync(newRootPath, ct: ct);
+        await InitializeAsync(newRootPath, scanOptions, ct);
     }
 
     /// <summary>
@@ -105,7 +105,7 @@ public class DirectoryTreeViewModel : ViewModelBase
         IsLoading = false;
     }
 
-    private async Task InitializeAsync(string rootPath, CancellationToken ct = default)
+    private async Task InitializeAsync(string rootPath, ScanOptions scanOptions, CancellationToken ct = default)
     {
         // Unsubscribe from old roots before clearing
         if (RootNode != null)
@@ -117,8 +117,6 @@ public class DirectoryTreeViewModel : ViewModelBase
         try
         {
             IsLoading = true;
-
-            var scanOptions = new ScanOptions { LazyExpand = false, IncludeHidden = true };
 
             var sourceProvider = _providerRegistry.ResolveProvider(rootPath)
                 ?? throw new ArgumentException("Source path cannot be mapped to a FileSystemProvider");
@@ -181,5 +179,24 @@ public class DirectoryTreeViewModel : ViewModelBase
             SelectionChanged?.Invoke(this, EventArgs.Empty);
         }
         catch (OperationCanceledException) { }
+    }
+
+    internal bool ApplyWatcherBatch(DirectoryWatcherBatch batch)
+    {
+        if (RootNode is null)
+        {
+            return false;
+        }
+
+        if (batch.RequiresFullRescan)
+        {
+            // Error handling and full-rescan fallback are implemented in a later milestone.
+            return false;
+        }
+
+        var result = DirectoryTreePatcher.Apply(RootNode, batch, SelectedNode);
+        SelectedNode = result.SelectedNode ?? SelectedNode;
+        RemoveNodesMarkedForRemoval();
+        return true;
     }
 }

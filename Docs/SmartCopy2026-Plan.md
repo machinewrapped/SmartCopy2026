@@ -474,20 +474,22 @@ Verification:
 
 #### 5.2.6 — Watcher and Incremental Rescan (selection-preserving)
 
+Authoritative design and progress tracking for this step lives in `Docs/Filesystem-Watcher-Plan.md`.
+
 Deliverables:
-- [ ] Gate watcher startup by provider capability and path suitability
-- [ ] Integrate `DirectoryWatcher` batching into directory tree update flow
-- [ ] Implement incremental subtree rescan for changed paths only
-- [ ] Preserve user selection/filter state across watcher-driven updates
+- [x] Gate watcher startup by provider capability and path suitability
+- [x] Integrate `DirectoryWatcher` batching into directory tree update flow
+- [x] Implement watcher-driven incremental patch updates for changed paths only
+- [x] Preserve user selection/filter state across watcher-driven updates
 
 Acceptance criteria:
-- [ ] Burst filesystem changes are coalesced (debounced) without UI thrash
-- [ ] External create/rename/delete events update only impacted subtrees
-- [ ] Selection/check-state is stable after incremental updates
+- [x] Burst filesystem changes are coalesced (debounced) without UI thrash
+- [x] External create/rename/delete events update only impacted branches
+- [x] Selection/check-state is stable after incremental updates
 
 Verification:
-- [ ] Automated tests for debounce/coalescing and subtree-only updates
-- [ ] Manual smoke with scripted file churn in nested directories
+- [x] Automated tests for debounce/coalescing and branch-local updates
+- [x] Manual smoke with scripted file churn in nested directories
 
 #### 5.2.7 — Capability-Gated Delete/Trash and Move Semantics
 

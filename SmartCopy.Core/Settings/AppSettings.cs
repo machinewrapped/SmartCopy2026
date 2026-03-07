@@ -21,6 +21,7 @@ public sealed class AppSettings
     public bool AllowDeleteReadOnly { get; set; }
     public bool LazyExpandScan { get; set; }
     public bool FullPreScan { get; set; }
+    public bool FollowSymlinks { get; set; }
     public bool EnableFilesystemWatcher { get; set; } = true;
     public int CopyChunkSizeKb { get; set; } = 256;
     public string DefaultOverwriteMode { get; set; } = "Skip";
@@ -84,6 +85,7 @@ public sealed class AppSettings
         AllowDeleteReadOnly = saved.AllowDeleteReadOnly;
         LazyExpandScan = saved.LazyExpandScan;
         FullPreScan = saved.FullPreScan;
+        FollowSymlinks = saved.FollowSymlinks;
         EnableFilesystemWatcher = saved.EnableFilesystemWatcher;
         CopyChunkSizeKb = saved.CopyChunkSizeKb;
         DefaultOverwriteMode = saved.DefaultOverwriteMode;

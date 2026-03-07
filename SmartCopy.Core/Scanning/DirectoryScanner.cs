@@ -21,6 +21,8 @@ public sealed class DirectoryScanner
 
         yield return rootNode;
 
+        if (!rootNode.IsDirectory) yield break;
+
         // visited guards against circular symbolic links re-enqueueing an already-processed path.
         var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { rootNode.FullPath };
         var queue = new Queue<(DirectoryTreeNode Node, int Depth)>();
@@ -58,7 +60,8 @@ public sealed class DirectoryScanner
                 if (node.IsDirectory)
                 {
                     currentDirectory.Children.Add(node);
-                    if (!options.LazyExpand && visited.Add(node.FullPath))
+
+                    if (!options.LazyExpand && ShouldTraverse(options, child) && visited.Add(node.FullPath))
                     {
                         queue.Enqueue((node, depth + 1));
                     }
@@ -75,6 +78,40 @@ public sealed class DirectoryScanner
         }
     }
 
+    private static bool ShouldTraverse(ScanOptions options, FileSystemNode child) 
+        => options.FollowSymlinks || !IsReparsePoint(child);
+    
+    public async Task<ScannedNode> BuildScannedSubtreeAsync(
+        string rootPath,
+        ScanOptions options,
+        CancellationToken ct = default)
+    {
+        var root = await _provider.GetNodeAsync(rootPath, ct);
+        return await BuildScannedNodeAsync(root, options, 0, ct);
+    }
+
+    private async Task<ScannedNode> BuildScannedNodeAsync(
+        FileSystemNode node,
+        ScanOptions options,
+        int depth,
+        CancellationToken ct)
+    {
+        if (!node.IsDirectory || !ShouldTraverse(options, node) || (options.MaxDepth.HasValue && depth >= options.MaxDepth.Value))
+            return new ScannedNode(node, []);
+
+        var rawChildren = await _provider.GetChildrenAsync(node.FullPath, ct);
+        var children = new List<ScannedNode>();
+        foreach (var child in rawChildren)
+        {
+            if (!ShouldIncludeNode(child, options)) continue;
+            if (child.IsDirectory)
+                children.Add(await BuildScannedNodeAsync(child, options, depth + 1, ct));
+            else
+                children.Add(new ScannedNode(child, []));
+        }
+        return new ScannedNode(node, [.. children]);
+    }
+
     private static bool ShouldIncludeNode(FileSystemNode node, ScanOptions options)
     {
         if (options.IncludeHidden)
@@ -84,4 +121,8 @@ public sealed class DirectoryScanner
 
         return (node.Attributes & FileAttributes.Hidden) == 0;
     }
+
+    private static bool IsReparsePoint(FileSystemNode node) =>
+        (node.Attributes & FileAttributes.ReparsePoint) != 0;
+
 }

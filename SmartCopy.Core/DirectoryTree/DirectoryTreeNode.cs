@@ -1,4 +1,3 @@
-using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -21,7 +20,7 @@ namespace SmartCopy.Core.DirectoryTree;
 /// </summary>
 public sealed class DirectoryTreeNode : INotifyPropertyChanged
 {
-    private readonly FileSystemNode _filesystemNode;
+    private FileSystemNode _filesystemNode;
     private CheckState _checkState;
 
     public DirectoryTreeNode(
@@ -170,6 +169,28 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
 
     public void ClearDirty() => IsDirty = false;
 
+    public void UpdateFrom(FileSystemNode filesystemNode)
+    {
+        if (IsDirectory != filesystemNode.IsDirectory)
+        {
+            throw new InvalidOperationException("Cannot update a node with a different node type.");
+        }
+
+        if (!string.Equals(FullPath, filesystemNode.FullPath, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Cannot update a node with a different full path.");
+        }
+
+        _filesystemNode = filesystemNode;
+        MarkDirty();
+        OnPropertyChanged(nameof(Name));
+        OnPropertyChanged(nameof(FullPath));
+        OnPropertyChanged(nameof(Size));
+        OnPropertyChanged(nameof(CreatedAt));
+        OnPropertyChanged(nameof(ModifiedAt));
+        OnPropertyChanged(nameof(Attributes));
+    }
+
     public void BuildStats()
     {
         int files = 0;
@@ -270,14 +291,14 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
         for (int i = 0; i < pathSegments.Length; i++)
         {
             var segment = pathSegments[i];
-            var nextNode = currentNode.Children.FirstOrDefault(c => string.Equals(c.Name, segment, StringComparison.OrdinalIgnoreCase));
+            var nextNode = currentNode.Children.FirstOrDefault(c => string.Equals(c.Name, segment, StringComparison.Ordinal));
 
             if (nextNode is null)
             {
                 // If we can't find a directory, check for a file, but only if it's the last segment.
                 if (i == pathSegments.Length - 1)
                 {
-                    return currentNode.Files.FirstOrDefault(f => string.Equals(f.Name, segment, StringComparison.OrdinalIgnoreCase));
+                    return currentNode.Files.FirstOrDefault(f => string.Equals(f.Name, segment, StringComparison.Ordinal));
                 }
                 // A directory segment in the middle of the path was not found.
                 return null;

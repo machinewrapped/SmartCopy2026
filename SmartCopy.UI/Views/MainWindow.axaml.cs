@@ -55,6 +55,7 @@ public partial class MainWindow : Window
     // Options menu — Scan
     private MenuItem? _fullPreScanMenuItem;
     private MenuItem? _lazyExpandScanMenuItem;
+    private MenuItem? _followSymlinksMenuItem;
 
     // Options menu — Debug
     private MenuItem? _artificialDelayMenuItem;
@@ -270,6 +271,12 @@ public partial class MainWindow : Window
             () => { if (_mainVm is not null) _mainVm.LazyExpandScan = !_mainVm.LazyExpandScan; });
         OptionsMenu.Items.Add(_lazyExpandScanMenuItem);
 
+        _followSymlinksMenuItem = Toggle(
+            "_Follow Symlinks",
+            _mainVm?.FollowSymlinks ?? false,
+            () => { if (_mainVm is not null) _mainVm.FollowSymlinks = !_mainVm.FollowSymlinks; });
+        OptionsMenu.Items.Add(_followSymlinksMenuItem);
+
         // ── Section: Debug  ───────────────────────────────────────────────────
         OptionsMenu.Items.Add(new Separator());
         OptionsMenu.Items.Add(SectionHeader("Debug"));
@@ -390,6 +397,11 @@ public partial class MainWindow : Window
             case nameof(MainViewModel.LazyExpandScan):
                 if (_lazyExpandScanMenuItem is not null)
                     _lazyExpandScanMenuItem.IsChecked = _mainVm?.LazyExpandScan ?? false;
+                break;
+
+            case nameof(MainViewModel.FollowSymlinks):
+                if (_followSymlinksMenuItem is not null)
+                    _followSymlinksMenuItem.IsChecked = _mainVm?.FollowSymlinks ?? false;
                 break;
         }
     }

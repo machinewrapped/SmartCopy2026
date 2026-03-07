@@ -11,6 +11,7 @@ using SmartCopy.Core.Filters;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Progress;
+using SmartCopy.Core.Scanning;
 using SmartCopy.Core.Selection;
 using SmartCopy.Core.Settings;
 using SmartCopy.Core.Workflows;
@@ -59,6 +60,9 @@ public partial class MainViewModel : ViewModelBase
     private bool _lazyExpandScan;
 
     [ObservableProperty]
+    private bool _followSymlinks;
+
+    [ObservableProperty]
     private string _defaultOverwriteMode = "Skip";
 
     [ObservableProperty]
@@ -79,6 +83,7 @@ public partial class MainViewModel : ViewModelBase
     private readonly SmartCopyAppContext _appContext;
     private readonly MemoryFileSystemProvider _memoryProvider;
     private readonly FileSystemProviderRegistry _providerRegistry = new();
+    private readonly IDirectoryWatcherFactory _watcherFactory = new LocalDirectoryWatcherFactory();
     private readonly AppSettings _settings;
     private readonly AppSettingsStore _settingsStore = new();
     private readonly SessionStore _sessionStore = new();
@@ -86,6 +91,8 @@ public partial class MainViewModel : ViewModelBase
     private readonly WorkflowPresetStore _workflowStore;
     private readonly SelectionManager _selectionManager = new();
     private readonly SelectionSerializer _selectionSerializer = new();
+    private readonly SemaphoreSlim _watcherApplyGate = new(1, 1);
+    private IDirectoryWatcher? _directoryWatcher;
     private CancellationTokenSource? _filterCts;
     private CancellationTokenSource? _scanCts;
     private string _lastCommittedSourcePath = string.Empty;
@@ -230,6 +237,7 @@ public partial class MainViewModel : ViewModelBase
         SaveSessionLocally = _settings.SaveSessionLocally;
         FullPreScan = _settings.FullPreScan;
         LazyExpandScan = _settings.LazyExpandScan;
+        FollowSymlinks = _settings.FollowSymlinks;
         DefaultOverwriteMode = _settings.DefaultOverwriteMode;
 
         SourcePathPicker.RefreshSettings();
@@ -352,6 +360,19 @@ public partial class MainViewModel : ViewModelBase
         _settings.LazyExpandScan = value;
         _ = SaveSettingsAsync();
     }
+
+    partial void OnFollowSymlinksChanged(bool value)
+    {
+        _settings.FollowSymlinks = value;
+        _ = SaveSettingsAsync();
+    }
+
+    private ScanOptions BuildScanOptions() => new()
+    {
+        LazyExpand = LazyExpandScan,
+        IncludeHidden = true,
+        FollowSymlinks = FollowSymlinks,
+    };
 
     partial void OnDefaultOverwriteModeChanged(string value)
     {
@@ -539,12 +560,14 @@ public partial class MainViewModel : ViewModelBase
 
         try
         {
+            DisposeDirectoryWatcher();
+
             SourcePath = normalizedPath;
             SourcePathValidationMessage = string.Empty;
 
             FileList.Clear();
 
-            await DirectoryTree.ChangeRootAsync(normalizedPath, ct);
+            await DirectoryTree.ChangeRootAsync(normalizedPath, BuildScanOptions(), ct);
 
             _lastCommittedSourcePath = normalizedPath;
 
@@ -552,6 +575,8 @@ public partial class MainViewModel : ViewModelBase
 
             // Apply filter chain
             await ApplyFiltersAsync();
+
+            StartDirectoryWatcherIfSupported();
 
             _settings.LastSourcePath = normalizedPath;
             await _settingsStore.SaveAsync(_settings);
@@ -714,7 +739,15 @@ public partial class MainViewModel : ViewModelBase
     {
         var chain = FilterChain.BuildLiveChain();
 
-        await FileList.ApplyChainToFilesAsync(chain, _appContext, ct);
+        if (DirectoryTree.SelectedNode is { IsDirectory: true } selectedDirectory)
+        {
+            await FileList.LoadFilesForNodeAsync(selectedDirectory, chain, _appContext);
+        }
+        else
+        {
+            await FileList.ApplyChainToFilesAsync(chain, _appContext, ct);
+        }
+
         await DirectoryTree.ApplyFiltersAsync(chain, _appContext, ct);
 
         RefreshIdleStats();
@@ -873,6 +906,7 @@ public partial class MainViewModel : ViewModelBase
             Pipeline.IsRunning = false;
             FileList.RemoveAllMarkedForRemoval();
             DirectoryTree.RemoveNodesMarkedForRemoval();
+            await ApplyPendingWatcherBatchesAsync();
         }
     }
 
@@ -944,6 +978,7 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     private void ApplyWorkflowConfig(WorkflowConfig config)
     {
+        DisposeDirectoryWatcher();
         DirectoryTree.Reset();
 
         // Restore source path
@@ -1045,5 +1080,108 @@ public partial class MainViewModel : ViewModelBase
     {
         var deleteStep = pipeline.Steps.OfType<DeleteStep>().FirstOrDefault();
         return deleteStep?.Mode ?? fallback;
+    }
+
+    private void StartDirectoryWatcherIfSupported()
+    {
+        DisposeDirectoryWatcher();
+
+        var provider = DirectoryTree.SourceProvider;
+        var rootNode = DirectoryTree.RootNode;
+        if (provider is null || rootNode is null || !provider.Capabilities.CanWatch)
+        {
+            return;
+        }
+
+        _directoryWatcher = _watcherFactory.Create(provider, rootNode.FullPath);
+        _directoryWatcher.PendingBatchesAvailable += OnDirectoryWatcherPendingBatchesAvailable;
+        _directoryWatcher.WatcherError += OnDirectoryWatcherError;
+        _directoryWatcher.NotifyNodeWillBeRemoved += OnDirectoryWatcherNodeWillBeRemoved;
+        _directoryWatcher.Start();
+    }
+
+    private void DisposeDirectoryWatcher()
+    {
+        if (_directoryWatcher is null)
+        {
+            return;
+        }
+
+        _directoryWatcher.PendingBatchesAvailable -= OnDirectoryWatcherPendingBatchesAvailable;
+        _directoryWatcher.WatcherError -= OnDirectoryWatcherError;
+        _directoryWatcher.NotifyNodeWillBeRemoved -= OnDirectoryWatcherNodeWillBeRemoved;
+        _directoryWatcher.Stop();
+        _directoryWatcher.Dispose();
+        _directoryWatcher = null;
+    }
+
+    private void OnDirectoryWatcherPendingBatchesAvailable(object? sender, EventArgs e)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = ApplyPendingWatcherBatchesAsync());
+    }
+
+    private void OnDirectoryWatcherError(object? sender, Exception error)
+    {
+        Debug.WriteLine($"[Watcher] {error}");
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            LogPanel.AddEntry(
+                $"Filesystem watcher warning: {error.Message}. Live updates may be incomplete; use Rescan to refresh.",
+                LogLevel.Warning));
+    }
+
+    private void OnDirectoryWatcherNodeWillBeRemoved(object? sender, string[] relativeSegments)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            DirectoryTree.RootNode?.FindNodeByPathSegments(relativeSegments)?.MarkForRemoval());
+    }
+
+    private async Task ApplyPendingWatcherBatchesAsync(CancellationToken ct = default)
+    {
+        if (Pipeline.IsRunning)
+        {
+            return;
+        }
+
+        if (!await _watcherApplyGate.WaitAsync(0, ct))
+        {
+            return;
+        }
+
+        try
+        {
+            var appliedAny = false;
+            var watcher = _directoryWatcher;
+            if (watcher is null)
+            {
+                return;
+            }
+
+            while (watcher.HasPendingBatches)
+            {
+                foreach (var batch in watcher.DrainPendingBatches())
+                {
+                    if (ct.IsCancellationRequested)
+                    {
+                        return;
+                    }
+
+                    Debug.Assert(!Pipeline.IsRunning);
+
+                    if (DirectoryTree.ApplyWatcherBatch(batch))
+                    {
+                        appliedAny = true;                        
+                    }
+                }                
+            }
+
+            if (appliedAny && !Pipeline.IsRunning && !ct.IsCancellationRequested)
+            {
+                await ApplyFiltersAsync(ct);
+            }
+        }
+        finally
+        {
+            _watcherApplyGate.Release();
+        }
     }
 }
