@@ -75,10 +75,10 @@ public sealed class PreviewViewModelTests
             MakeAction(SourceResult.Deleted, DestinationResult.None, destPath: null)));
 
         Assert.Equal(4, vm.Groups.Count);
-        Assert.Single(vm.Groups, g => g.Title.StartsWith("Will delete"));
-        Assert.Single(vm.Groups, g => g.Title.StartsWith("Will overwrite"));
-        Assert.Single(vm.Groups, g => g.Title.StartsWith("Will copy"));
-        Assert.Single(vm.Groups, g => g.Title.StartsWith("Will move"));
+        Assert.Single(vm.Groups, g => g.Title.StartsWith("Will delete") && g.Actions.Count == 1);
+        Assert.Single(vm.Groups, g => g.Title.StartsWith("Will overwrite") && g.Actions.Count == 1);
+        Assert.Single(vm.Groups, g => g.Title.StartsWith("Will copy") && g.Actions.Count == 2);
+        Assert.Single(vm.Groups, g => g.Title.StartsWith("Will move") && g.Actions.Count == 1);
     }
 
     [Fact]
