@@ -19,15 +19,15 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
     {
         AddArtificialDelay = addArtificialDelay;
         RootPath = customRootPath ?? DefaultRoot;
-        _volumeId = volumeId;
+        VolumeId = volumeId;
         Debug.Assert(RootPath.StartsWith("/"));
         _entries[RootPath] = MemoryEntry.CreateDirectory();
     }
 
+    public string? VolumeId { get; }
+
     public string RootPath { get; }
-    public bool SupportsProgress => true;
-    private readonly string? _volumeId;
-    public string? VolumeId => _volumeId;
+
     public ProviderCapabilities Capabilities => new(
         CanSeek: true,
         CanAtomicMove: true,

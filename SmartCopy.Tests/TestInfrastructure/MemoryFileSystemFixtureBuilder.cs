@@ -43,7 +43,7 @@ public sealed class MemoryFileSystemFixtureBuilder(string? customRootPath = null
 
 public static class MemoryFileSystemFixtures
 {
-    public static MemoryFileSystemProvider Create(Action<MemoryFileSystemFixtureBuilder> configure, string? customRootPath = null, string? volumeId = null)
+    public static MemoryFileSystemProvider Create(Action<MemoryFileSystemFixtureBuilder> configure, string? customRootPath = null, string? volumeId = "MEM")
     {
         var builder = new MemoryFileSystemFixtureBuilder(customRootPath, volumeId);
         configure(builder);

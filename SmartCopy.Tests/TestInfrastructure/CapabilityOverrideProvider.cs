@@ -8,10 +8,9 @@ namespace SmartCopy.Tests.TestInfrastructure;
 /// </summary>
 internal sealed class CapabilityOverrideProvider(IFileSystemProvider inner, ProviderCapabilities capabilities) : IFileSystemProvider
 {
-    public string RootPath => inner.RootPath;
-    public bool SupportsProgress => inner.SupportsProgress;
     public ProviderCapabilities Capabilities => capabilities;
     public string? VolumeId => inner.VolumeId;
+    public string RootPath => inner.RootPath;
 
     public Task<IReadOnlyList<FileSystemNode>> GetChildrenAsync(string path, CancellationToken ct) =>
         inner.GetChildrenAsync(path, ct);

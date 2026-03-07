@@ -76,8 +76,8 @@ public sealed class MoveStepFallbackTests
     [Fact]
     public async Task CrossProvider_File_UsesCopyDeleteFallback()
     {
-        var sourceProvider = MemoryFileSystemFixtures.Create(s => s.WithFile("/src/file.txt", "content"u8));
-        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target");
+        var sourceProvider = MemoryFileSystemFixtures.Create(s => s.WithFile("/src/file.txt", "content"u8), volumeId: "VOL1");
+        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target", volumeId: "VOL2");
 
         var root = await sourceProvider.BuildDirectoryTree("/src");
         root.Files[0].CheckState = CheckState.Checked;
@@ -103,7 +103,7 @@ public sealed class MoveStepFallbackTests
     [Fact]
     public async Task SameProvider_AtomicMove_FileMoved()
     {
-        var provider = MemoryFileSystemFixtures.Create(s => s.WithFile("/src/file.txt", "atomic"u8), volumeId: "MEM");
+        var provider = MemoryFileSystemFixtures.Create(s => s.WithFile("/src/file.txt", "atomic"u8));
 
         var root = await provider.BuildDirectoryTree("/src");
         root.Files[0].CheckState = CheckState.Checked;
@@ -130,7 +130,7 @@ public sealed class MoveStepFallbackTests
     [Fact]
     public async Task AtomicMoveDisabled_SameProvider_UsesCopyDeleteFallback()
     {
-        var memory = MemoryFileSystemFixtures.Create(s => s.WithFile("/src/file.txt", "fallback"u8), volumeId: "MEM");
+        var memory = MemoryFileSystemFixtures.Create(s => s.WithFile("/src/file.txt", "fallback"u8));
         var noAtomicMove = new CapabilityOverrideProvider(memory,
             new ProviderCapabilities(CanSeek: true, CanAtomicMove: false, CanWatch: false, MaxPathLength: int.MaxValue));
 
@@ -162,8 +162,9 @@ public sealed class MoveStepFallbackTests
     {
         var sourceProvider = MemoryFileSystemFixtures.Create(s => s
             .WithFile("/src/dir/a.txt", "aaa"u8)
-            .WithFile("/src/dir/b.txt", "bbb"u8));
-        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target");
+            .WithFile("/src/dir/b.txt", "bbb"u8)
+            , volumeId: "VOL1");
+        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target", volumeId: "VOL2");
 
         var root = await sourceProvider.BuildDirectoryTree("/src");
         var dir = root.Children.Single();
@@ -194,8 +195,9 @@ public sealed class MoveStepFallbackTests
     {
         var sourceProvider = MemoryFileSystemFixtures.Create(s => s
             .WithFile("/src/dir/keep.txt", "keep"u8)
-            .WithFile("/src/dir/move.txt", "move"u8));
-        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target");
+            .WithFile("/src/dir/move.txt", "move"u8)
+            , volumeId: "VOL1");
+        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target", volumeId: "VOL2");
 
         var root = await sourceProvider.BuildDirectoryTree("/src");
         var dir = root.Children.Single();
@@ -225,7 +227,7 @@ public sealed class MoveStepFallbackTests
     {
         var provider = MemoryFileSystemFixtures.Create(s => s
             .WithFile("/src/dir/a.txt", "aaa"u8)
-            .WithFile("/src/dir/b.txt", "bbb"u8), volumeId: "MEM");
+            .WithFile("/src/dir/b.txt", "bbb"u8));
 
         var root = await provider.BuildDirectoryTree("/src");
         var dir = root.Children.Single();
@@ -255,8 +257,9 @@ public sealed class MoveStepFallbackTests
     {
         var sourceProvider = MemoryFileSystemFixtures.Create(s => s
             .WithFile("/src/dir/top.txt", "top"u8)
-            .WithFile("/src/dir/sub/nested.txt", "nested"u8));
-        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target");
+            .WithFile("/src/dir/sub/nested.txt", "nested"u8)
+            , volumeId: "VOL1");
+        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target", volumeId: "VOL2");
 
         var root = await sourceProvider.BuildDirectoryTree("/src");
         var dir = root.Children.Single();
@@ -290,7 +293,7 @@ public sealed class MoveStepFallbackTests
     public async Task AtomicMoveDisabled_Directory_UsesCopyDeleteFallback()
     {
         var memory = MemoryFileSystemFixtures.Create(s => s
-            .WithFile("/src/dir/file.txt", "content"u8), volumeId: "MEM");
+            .WithFile("/src/dir/file.txt", "content"u8));
         var noAtomicMove = new CapabilityOverrideProvider(memory,
             new ProviderCapabilities(CanSeek: true, CanAtomicMove: false, CanWatch: false, MaxPathLength: int.MaxValue));
 
