@@ -22,6 +22,7 @@ public sealed class AppSettings
     public bool FollowSymlinks { get; set; }
     public bool EnableFilesystemWatcher { get; set; } = true;
     public int CopyChunkSizeKb { get; set; } = 256;
+    
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public OverwriteMode DefaultOverwriteMode { get; set; } = OverwriteMode.Skip;
 

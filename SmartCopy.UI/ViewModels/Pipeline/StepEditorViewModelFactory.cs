@@ -11,7 +11,7 @@ public static class StepEditorViewModelFactory
         {
             StepKind.Copy => new CopyStepEditorViewModel(settings),
             StepKind.Move => new MoveStepEditorViewModel(settings),
-            StepKind.Delete => new DeleteStepEditorViewModel(),
+            StepKind.Delete => new DeleteStepEditorViewModel(settings),
             StepKind.Flatten => new FlattenStepEditorViewModel(),
             StepKind.Rename => new RenameStepEditorViewModel(),
             StepKind.Rebase => new RebaseStepEditorViewModel(),
