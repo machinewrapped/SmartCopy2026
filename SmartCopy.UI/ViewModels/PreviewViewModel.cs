@@ -124,7 +124,7 @@ public partial class PreviewViewModel : ViewModelBase
             .GroupBy(ActionGrouping)
             .OrderBy(g => g.Key switch { GroupKey.Delete => 0, GroupKey.Overwrite => 1, _ => 2 });
 
-        IsDeletePipeline = grouped.Select(g => g.Key == GroupKey.Delete).Any();
+        IsDeletePipeline = grouped.Any(g => g.Key == GroupKey.Delete);
 
         foreach (var group in grouped)
         {
