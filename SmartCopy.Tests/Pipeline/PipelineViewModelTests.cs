@@ -11,8 +11,8 @@ public sealed class PipelineViewModelTests
     public void BuildLivePipeline_ReturnsStepSequence()
     {
         var vm = new PipelineViewModel(new TestAppContext());
-        vm.AddStepFromResult(StepKind.Flatten, new FlattenStep());
-        vm.AddStepFromResult(StepKind.Copy, new CopyStep("/mem/out"));
+        vm.AddStepFromResult(new FlattenStep());
+        vm.AddStepFromResult(new CopyStep("/mem/out"));
 
         var pipeline = vm.BuildLivePipeline();
 
@@ -28,7 +28,7 @@ public sealed class PipelineViewModelTests
         var count = 0;
         vm.PipelineChanged += (_, _) => count++;
 
-        vm.AddStepFromResult(StepKind.Copy, new CopyStep("/mem/out"));
+        vm.AddStepFromResult(new CopyStep("/mem/out"));
         vm.RemoveStepCommand.Execute(vm.Steps[0]);
 
         Assert.True(count >= 2);
@@ -38,7 +38,7 @@ public sealed class PipelineViewModelTests
     public void DestinationPathInlineEdit_RaisesPipelineChanged()
     {
         var vm = new PipelineViewModel(new TestAppContext());
-        vm.AddStepFromResult(StepKind.Copy, new CopyStep("/mem/out"));
+        vm.AddStepFromResult(new CopyStep("/mem/out"));
         var count = 0;
         vm.PipelineChanged += (_, _) => count++;
 
@@ -51,7 +51,7 @@ public sealed class PipelineViewModelTests
     public void ReplaceStep_UpdatesViewModelStep()
     {
         var vm = new PipelineViewModel(new TestAppContext());
-        vm.AddStepFromResult(StepKind.Copy, new CopyStep("/mem/out"));
+        vm.AddStepFromResult(new CopyStep("/mem/out"));
         var first = vm.Steps[0];
 
         vm.ReplaceStep(first, new MoveStep("/mem/archive"));
@@ -64,9 +64,9 @@ public sealed class PipelineViewModelTests
     public void FirstDestinationPath_TracksFirstCopyMove()
     {
         var vm = new PipelineViewModel(new TestAppContext());
-        vm.AddStepFromResult(StepKind.Flatten, new FlattenStep());
-        vm.AddStepFromResult(StepKind.Move, new MoveStep("/mem/archive"));
-        vm.AddStepFromResult(StepKind.Copy, new CopyStep("/mem/backup"));
+        vm.AddStepFromResult(new FlattenStep());
+        vm.AddStepFromResult(new MoveStep("/mem/archive"));
+        vm.AddStepFromResult(new CopyStep("/mem/backup"));
 
         Assert.Equal("/mem/archive", vm.FirstDestinationPath);
     }
@@ -75,7 +75,7 @@ public sealed class PipelineViewModelTests
     public void InvalidStep_ShowsValidationMessageAndBlocksRun()
     {
         var vm = new PipelineViewModel(new TestAppContext());
-        vm.AddStepFromResult(StepKind.Copy, new CopyStep(""));
+        vm.AddStepFromResult(new CopyStep(""));
 
         Assert.False(vm.CanRun);
         Assert.False(string.IsNullOrWhiteSpace(vm.BlockingValidationMessage));
@@ -87,7 +87,7 @@ public sealed class PipelineViewModelTests
     public void ExecutablePipeline_RequiresSelectedIncludedFiles()
     {
         var vm = new PipelineViewModel(new TestAppContext());
-        vm.AddStepFromResult(StepKind.Copy, new CopyStep("/mem/out"));
+        vm.AddStepFromResult(new CopyStep("/mem/out"));
 
         Assert.False(vm.CanRun);
         Assert.Equal("At least one file must be selected.", vm.BlockingValidationMessage);
@@ -103,7 +103,7 @@ public sealed class PipelineViewModelTests
     {
         var vm = new PipelineViewModel(new TestAppContext());
 
-        vm.AddStepFromResult(StepKind.Copy, new CopyStep("/mem/out"), "Music Mirror");
+        vm.AddStepFromResult(new CopyStep("/mem/out"), "Music Mirror");
 
         Assert.Equal("Music Mirror", vm.Steps[0].Label);
         Assert.Equal("Music Mirror", vm.Steps[0].CustomName);

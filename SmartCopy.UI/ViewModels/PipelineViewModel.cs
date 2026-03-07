@@ -123,7 +123,7 @@ public partial class PipelineViewModel : ViewModelBase
     private void OnStepPresetPicked(StepPreset preset)
     {
         var step = PipelineStepFactory.FromConfig(preset.Config);
-        AddStepFromResult(step.StepType, step, preset.Name);
+        AddStepFromResult(step, preset.Name);
     }
 
     public async Task DeletePipelinePresetAsync(string name)
@@ -148,13 +148,12 @@ public partial class PipelineViewModel : ViewModelBase
     {
         var step = StepEditorViewModelFactory.Create(kind, _appSettings).BuildStep();
         if (step.IsConfigurable) return false;
-        AddStepFromResult(kind, step);
+        AddStepFromResult(step);
         return true;
     }
 
-    public void AddStepFromResult(StepKind kind, IPipelineStep step, string? customName = null)
+    public void AddStepFromResult(IPipelineStep step, string? customName = null)
     {
-        _ = kind;
         Steps.Add(new PipelineStepViewModel(step, customName));
         Revalidate();
     }
@@ -175,12 +174,6 @@ public partial class PipelineViewModel : ViewModelBase
         }
 
         Revalidate();
-    }
-
-    [RelayCommand]
-    private void AddStepLegacy(StepKind kind)
-    {
-        AddStepFromResult(kind, CreateDefaultStep(kind));
     }
 
     [RelayCommand]
