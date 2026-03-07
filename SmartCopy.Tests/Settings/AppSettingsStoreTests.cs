@@ -1,3 +1,4 @@
+using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Settings;
 using SmartCopy.Tests.TestInfrastructure;
 
@@ -57,7 +58,7 @@ public sealed class AppSettingsStoreTests
             RestoreLastWorkflow     = true,
             RestoreLastSourcePath   = false,
             DisableDestructivePreview = true,
-            DefaultOverwriteMode    = "Always",
+            DefaultOverwriteMode    = OverwriteMode.Always,
             FullPreScan             = true,
             LazyExpandScan          = true,
         };
@@ -68,7 +69,7 @@ public sealed class AppSettingsStoreTests
         Assert.True(loaded.RestoreLastWorkflow);
         Assert.False(loaded.RestoreLastSourcePath);
         Assert.True(loaded.DisableDestructivePreview);
-        Assert.Equal("Always", loaded.DefaultOverwriteMode);
+        Assert.Equal(OverwriteMode.Always, loaded.DefaultOverwriteMode);
         Assert.True(loaded.FullPreScan);
         Assert.True(loaded.LazyExpandScan);
     }

@@ -396,15 +396,8 @@ public partial class PipelineViewModel : ViewModelBase
             StepKind.Rename => new RenameStep("{name}"),
             StepKind.Copy => new CopyStep(""),
             StepKind.Move => new MoveStep(""),
-            StepKind.Delete => new DeleteStep(GetDefaultDeleteMode()),
+            StepKind.Delete => new DeleteStep(_appSettings.DefaultDeleteMode),
             _ => new FlattenStep(),
         };
-    }
-
-    private DeleteMode GetDefaultDeleteMode()
-    {
-        if (Enum.TryParse<DeleteMode>(_appSettings.DefaultDeleteMode, out var mode))
-            return mode;
-        return DeleteMode.Trash;
     }
 }

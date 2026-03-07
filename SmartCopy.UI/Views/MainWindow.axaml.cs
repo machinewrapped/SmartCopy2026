@@ -246,13 +246,13 @@ public partial class MainWindow : Window
 
         _defaultOverwriteModeMenu = new MenuItem { Header = "Default _Overwrite Mode" };
         PopulateEnumRadioMenu<OverwriteMode>(_defaultOverwriteModeMenu,
-            _mainVm?.DefaultOverwriteMode ?? "Skip",
+            _mainVm?.DefaultOverwriteMode ?? OverwriteMode.Skip,
             mode => { if (_mainVm is not null) _mainVm.DefaultOverwriteMode = mode; });
         OptionsMenu.Items.Add(_defaultOverwriteModeMenu);
 
         _defaultDeleteModeMenu = new MenuItem { Header = "Default _Delete Mode" };
         PopulateEnumRadioMenu<DeleteMode>(_defaultDeleteModeMenu,
-            _mainVm?.DefaultDeleteMode ?? "Trash",
+            _mainVm?.DefaultDeleteMode ?? DeleteMode.Trash,
             mode => { if (_mainVm is not null) _mainVm.DefaultDeleteMode = mode; });
         OptionsMenu.Items.Add(_defaultDeleteModeMenu);
 
@@ -322,29 +322,28 @@ public partial class MainWindow : Window
             return item;
         }
 
-        static void PopulateEnumRadioMenu<TEnum>(MenuItem parent, string currentValue, Action<string> onSelect) where TEnum : struct, Enum
+        static void PopulateEnumRadioMenu<TEnum>(MenuItem parent, TEnum currentValue, Action<TEnum> onSelect) where TEnum : struct, Enum
         {
             parent.Items.Clear();
             foreach (var value in Enum.GetValues<TEnum>())
             {
-                var stringValue = value.ToString();
                 var displayName = value.GetDisplayName();
 
                 var item = new MenuItem
                 {
                     Header = displayName,
-                    Tag = stringValue,
+                    Tag = value,
                     ToggleType = MenuItemToggleType.Radio,
-                    IsChecked = stringValue == currentValue,
+                    IsChecked = value.Equals(currentValue),
                 };
                 item.Click += (_, _) =>
                 {
-                    onSelect(stringValue);
+                    onSelect(value);
                     // Update check state for all items
                     foreach (var child in parent.Items.OfType<MenuItem>())
                     {
-                        if (child.Tag is string t)
-                            child.IsChecked = t == stringValue;
+                        if (child.Tag is TEnum t)
+                            child.IsChecked = t.Equals(value);
                     }
                 };
                 parent.Items.Add(item);
@@ -427,7 +426,7 @@ public partial class MainWindow : Window
                 {
                     foreach (var child in _defaultOverwriteModeMenu.Items.OfType<MenuItem>())
                     {
-                        if (child.Tag is string t)
+                        if (child.Tag is OverwriteMode t)
                             child.IsChecked = t == _mainVm.DefaultOverwriteMode;
                     }
                 }
@@ -438,7 +437,7 @@ public partial class MainWindow : Window
                 {
                     foreach (var child in _defaultDeleteModeMenu.Items.OfType<MenuItem>())
                     {
-                        if (child.Tag is string t)
+                        if (child.Tag is DeleteMode t)
                             child.IsChecked = t == _mainVm.DefaultDeleteMode;
                     }
                 }

@@ -32,10 +32,7 @@ public partial class CopyStepEditorViewModel : StepEditorViewModelBase, IDestina
             }
         };
 
-        if (Enum.TryParse<OverwriteMode>(settings.DefaultOverwriteMode, out var mode))
-        {
-            SelectedOverwriteMode = mode;
-        }
+        SelectedOverwriteMode = settings.DefaultOverwriteMode;
     }
 
     public override bool IsValid => !string.IsNullOrWhiteSpace(DestinationPath);

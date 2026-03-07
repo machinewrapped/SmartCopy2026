@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using SmartCopy.Core.Pipeline;
 
 namespace SmartCopy.Core.Settings;
 
@@ -21,8 +22,11 @@ public sealed class AppSettings
     public bool FollowSymlinks { get; set; }
     public bool EnableFilesystemWatcher { get; set; } = true;
     public int CopyChunkSizeKb { get; set; } = 256;
-    public string DefaultOverwriteMode { get; set; } = "Skip";
-    public string DefaultDeleteMode { get; set; } = "Trash";
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public OverwriteMode DefaultOverwriteMode { get; set; } = OverwriteMode.Skip;
+
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public DeleteMode DefaultDeleteMode { get; set; } = DeleteMode.Trash;
 
     /// <summary>Reload the last saved workflow on startup.</summary>
     public bool RestoreLastWorkflow { get; set; } = false;

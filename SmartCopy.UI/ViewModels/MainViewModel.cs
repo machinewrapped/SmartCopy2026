@@ -66,10 +66,10 @@ public partial class MainViewModel : ViewModelBase
     private bool _addArtificialDelay = false;
 
     [ObservableProperty]
-    private string _defaultOverwriteMode = "Skip";
+    private OverwriteMode _defaultOverwriteMode = OverwriteMode.Skip;
 
     [ObservableProperty]
-    private string _defaultDeleteMode = "Trash";
+    private DeleteMode _defaultDeleteMode = DeleteMode.Trash;
 
     [ObservableProperty]
     private bool _showHiddenFiles;
@@ -386,13 +386,13 @@ public partial class MainViewModel : ViewModelBase
         _ = SaveSettingsAsync();
     }
 
-    partial void OnDefaultOverwriteModeChanged(string value)
+    partial void OnDefaultOverwriteModeChanged(OverwriteMode value)
     {
         _settings.DefaultOverwriteMode = value;
         _ = SaveSettingsAsync();
     }
 
-    partial void OnDefaultDeleteModeChanged(string value)
+    partial void OnDefaultDeleteModeChanged(DeleteMode value)
     {
         _settings.DefaultDeleteMode = value;
         _ = SaveSettingsAsync();
