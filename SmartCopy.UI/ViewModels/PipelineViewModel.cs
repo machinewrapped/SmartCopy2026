@@ -3,6 +3,7 @@ using System.Collections.Specialized;
 using System.Text.Json.Nodes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Pipeline.Validation;
@@ -42,6 +43,13 @@ public partial class PipelineViewModel : ViewModelBase
 
     internal AppSettings AppSettings => _appSettings;
 
+    // Default to full capabilities so editors show no false-positive warning before source is set.
+    internal ProviderCapabilities SourceCapabilities { get; private set; } =
+        new(CanSeek: true, CanAtomicMove: true, CanWatch: true, MaxPathLength: int.MaxValue, CanTrash: true);
+
+    internal void SetSourceCapabilities(ProviderCapabilities capabilities) =>
+        SourceCapabilities = capabilities;
+
     internal void RecordRecentTarget(string path)
     {
         if (string.IsNullOrWhiteSpace(path)) return;
@@ -60,6 +68,8 @@ public partial class PipelineViewModel : ViewModelBase
     [ObservableProperty]
     private string? _blockingValidationMessage;
 
+    private bool _capabilityBlocked;
+
     private bool _isRunning = false;
     public bool IsRunning 
     {
@@ -71,7 +81,7 @@ public partial class PipelineViewModel : ViewModelBase
         }
     }
 
-    public bool CanRun => ValidationResult.CanRun && !IsRunning;
+    public bool CanRun => ValidationResult.CanRun && !_capabilityBlocked && !IsRunning;
 
     public bool HasDeleteStep => Steps.Any(step => step.Step is DeleteStep);
 
@@ -315,11 +325,14 @@ public partial class PipelineViewModel : ViewModelBase
         {
             step.ValidationMessage = null;
             step.HasValidationError = false;
+            step.TrashUnavailable = false;
         }
+        _capabilityBlocked = false;
 
         var result = PipelineValidator.Validate(
             [.. Steps.Select(step => step.Step)],
             new PipelineValidationContext(_selectedIncludedFileCount > 0));
+
         ValidationResult = result;
         BlockingValidationMessage = result.FirstBlockingIssue?.Message;
 
@@ -338,6 +351,22 @@ public partial class PipelineViewModel : ViewModelBase
                 step.HasValidationError = issue.Severity == PipelineValidationSeverity.Blocking;
             }
         }
+
+        // Capability-derived blocking: Trash mode is unavailable for this source path.
+        if (!SourceCapabilities.CanTrash)
+        {
+            foreach (var step in Steps)
+            {
+                if (step.Step is DeleteStep ds && ds.Mode == DeleteMode.Trash)
+                {
+                    step.TrashUnavailable = true;
+                    _capabilityBlocked = true;
+                }
+            }
+        }
+
+        if (_capabilityBlocked && BlockingValidationMessage is null)
+            BlockingValidationMessage = "Trash is not available for this path";
 
         OnPropertyChanged(nameof(FirstDestinationPath));
         OnPropertyChanged(nameof(HasDeleteStep));

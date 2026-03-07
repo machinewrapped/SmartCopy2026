@@ -620,6 +620,9 @@ public partial class MainViewModel : ViewModelBase
 
             StartDirectoryWatcherIfSupported();
 
+            if (DirectoryTree.SourceProvider is { } sp)
+                Pipeline.SetSourceCapabilities(sp.Capabilities);
+
             _settings.LastSourcePath = normalizedPath;
             await _settingsStore.SaveAsync(_settings);
         }

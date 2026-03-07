@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Settings;
 using SmartCopy.UI.ViewModels;
@@ -69,15 +70,20 @@ public partial class EditStepDialogViewModel : ObservableObject
         OkCommand.NotifyCanExecuteChanged();
     }
 
-    public static EditStepDialogViewModel ForNew(StepKind kind, AppSettings settings)
+    public static EditStepDialogViewModel ForNew(StepKind kind, AppSettings settings, ProviderCapabilities? sourceCapabilities = null)
     {
-        return new EditStepDialogViewModel(kind, StepEditorViewModelFactory.Create(kind, settings));
+        var editor = StepEditorViewModelFactory.Create(kind, settings);
+        if (sourceCapabilities.HasValue && editor is DeleteStepEditorViewModel deleteEditor)
+            deleteEditor.SetSourceCapabilities(sourceCapabilities.Value);
+        return new EditStepDialogViewModel(kind, editor);
     }
 
-    public static EditStepDialogViewModel ForEdit(PipelineStepViewModel existing, AppSettings settings)
+    public static EditStepDialogViewModel ForEdit(PipelineStepViewModel existing, AppSettings settings, ProviderCapabilities? sourceCapabilities = null)
     {
         var editor = StepEditorViewModelFactory.Create(existing.Kind, settings);
         editor.LoadFrom(existing);
+        if (sourceCapabilities.HasValue && editor is DeleteStepEditorViewModel deleteEditor)
+            deleteEditor.SetSourceCapabilities(sourceCapabilities.Value);
         return new EditStepDialogViewModel(existing.Kind, editor, existing.CustomName);
     }
 

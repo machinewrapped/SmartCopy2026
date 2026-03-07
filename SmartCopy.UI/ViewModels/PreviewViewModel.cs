@@ -78,6 +78,12 @@ public partial class PreviewViewModel : ViewModelBase
     [ObservableProperty]
     private int _totalFoldersSkipped;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasWarnings))]
+    private IReadOnlyList<string> _warnings = [];
+
+    public bool HasWarnings => Warnings.Count > 0;
+
     public ObservableCollection<PreviewGroupViewModel> Groups { get; } = [];
 
     private enum GroupKey
@@ -122,6 +128,7 @@ public partial class PreviewViewModel : ViewModelBase
         TotalFoldersAffected = plan.TotalFoldersAffected;
         TotalEstimatedInputBytes = plan.TotalInputBytes;
         TotalEstimatedOutputBytes = plan.TotalEstimatedOutputBytes;
+        Warnings = plan.Warnings;
 
         Groups.Clear();
 

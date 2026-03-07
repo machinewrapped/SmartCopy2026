@@ -35,15 +35,27 @@
             <Separator Grid.Row="0" VerticalAlignment="Bottom" Height="1" Background="#3e3e42" Margin="4,0" IsHitTestVisible="False" />
 
             <Grid Grid.Row="1" RowDefinitions="Auto,*" Margin="16,16,16,0">
-                <Border Grid.Row="0"
-                        IsVisible="{Binding IsDeletePipeline}"
-                        Background="#3a2f1b"
-                        CornerRadius="4"
-                        Padding="8"
-                        Margin="0,0,0,10">
-                    <TextBlock Text="Delete confirmation is required before running."
-                               Foreground="#f0ad4e" />
-                </Border>
+                <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,10">
+                    <Border IsVisible="{Binding HasWarnings}"
+                            Background="#2d2d1b"
+                            CornerRadius="4"
+                            Padding="8">
+                        <ItemsControl ItemsSource="{Binding Warnings}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" Foreground="#f0d060" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
+                    <Border IsVisible="{Binding IsDeletePipeline}"
+                            Background="#3a2f1b"
+                            CornerRadius="4"
+                            Padding="8">
+                        <TextBlock Text="Delete confirmation is required before running."
+                                   Foreground="#f0ad4e" />
+                    </Border>
+                </StackPanel>
 
                 <ScrollViewer Grid.Row="1"
                               VerticalScrollBarVisibility="Auto">

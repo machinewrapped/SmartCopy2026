@@ -33,9 +33,16 @@ public partial class PipelineStepViewModel : ViewModelBase
 
     public string DestinationPath => (Step as IHasDestinationPath)?.DestinationPath ?? string.Empty;
 
-    public bool ShowDeleteBadge => Step is DeleteStep { Mode: DeleteMode.Permanent };
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowDeleteBadge))]
+    [NotifyPropertyChangedFor(nameof(DeleteBadge))]
+    private bool _trashUnavailable;
 
-    public string? DeleteBadge => ShowDeleteBadge ? "⚠ Permanent delete" : null;
+    public bool ShowDeleteBadge => Step is DeleteStep { Mode: DeleteMode.Permanent } || TrashUnavailable;
+
+    public string? DeleteBadge => TrashUnavailable
+        ? "⚠ Trash unavailable"
+        : ShowDeleteBadge ? "⚠ Permanent delete" : null;
 
     [ObservableProperty]
     public string? _validationMessage;
