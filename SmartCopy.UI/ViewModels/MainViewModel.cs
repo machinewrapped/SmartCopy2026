@@ -230,7 +230,6 @@ public partial class MainViewModel : ViewModelBase
         RestoreLastWorkflow = _settings.RestoreLastWorkflow;
         RestoreLastSourcePath = _settings.RestoreLastSourcePath;
         DisableDestructivePreview = _settings.DisableDestructivePreview;
-        DeleteToRecycleBin = _settings.DeleteToRecycleBin;
         SaveSessionLocally = _settings.SaveSessionLocally;
         FullPreScan = _settings.FullPreScan;
         LazyExpandScan = _settings.LazyExpandScan;
@@ -329,13 +328,6 @@ public partial class MainViewModel : ViewModelBase
     partial void OnDisableDestructivePreviewChanged(bool value)
     {
         _settings.DisableDestructivePreview = value;
-        _ = SaveSettingsAsync();
-    }
-
-    partial void OnDeleteToRecycleBinChanged(bool value)
-    {
-        _settings.DeleteToRecycleBin = value;
-        _settings.DefaultDeleteMode = value ? "Trash" : "Permanent";
         _ = SaveSettingsAsync();
     }
 

@@ -235,14 +235,6 @@ public partial class MainWindow : Window
             () => { if (_mainVm is not null) _mainVm.DisableDestructivePreview = !_mainVm.DisableDestructivePreview; });
         OptionsMenu.Items.Add(_disableDestructivePreviewMenuItem);
 
-        _deleteToRecycleBinMenuItem = Toggle(
-            "_Delete to Recycle Bin",
-            _mainVm?.DeleteToRecycleBin ?? true,
-            () => { if (_mainVm is not null) _mainVm.DeleteToRecycleBin = !_mainVm.DeleteToRecycleBin; });
-        OptionsMenu.Items.Add(_deleteToRecycleBinMenuItem);
-
-
-
         // ── Section: Scan ─────────────────────────────────────────────────────
         OptionsMenu.Items.Add(new Separator());
         OptionsMenu.Items.Add(SectionHeader("Scan"));
