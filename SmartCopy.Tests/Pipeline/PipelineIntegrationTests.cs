@@ -109,7 +109,7 @@ public sealed class PipelineIntegrationTests
                 ProviderRegistry = provider.CreateRegistry(),
             });
 
-        Assert.Contains(skipResults, result => result.SourceNodeResult == SourceResult.None);
+        Assert.Contains(skipResults, result => result.SourceNodeResult == SourceResult.Skipped);
     }
 
     [Fact]

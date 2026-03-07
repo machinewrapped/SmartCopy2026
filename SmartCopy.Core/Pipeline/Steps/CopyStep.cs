@@ -139,7 +139,7 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath
                     SourceNode: node,
                     SourceNodeResult: SourceResult.Skipped,
                     DestinationPath: destination,
-                    NumberOfFilesAffected: 1,
+                    NumberOfFilesSkipped: 1,
                     InputBytes: node.Size);
                 continue;
             }
