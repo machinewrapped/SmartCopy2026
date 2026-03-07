@@ -9,7 +9,6 @@ using CommunityToolkit.Mvvm.Input;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Pipeline;
-using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Progress;
 using SmartCopy.Core.Scanning;
 using SmartCopy.Core.Selection;
@@ -130,14 +129,7 @@ public partial class MainViewModel : ViewModelBase
         _settings = new AppSettings { SettingsFilePath = dataStore.GetFilePath("settings.json") };
         _appContext = new SmartCopyAppContext(_settings, dataStore);
 
-        if (OperatingSystem.IsWindows())
-            _trashService = new WindowsTrashService();
-        else if (OperatingSystem.IsLinux())
-            _trashService = new FreedesktopTrashService();
-        else if (OperatingSystem.IsMacOS())
-            _trashService = new MacOsTrashService();
-        else
-            _trashService = new NullTrashService();
+        _trashService = CreateTrashService();
 
         _operationJournal = new OperationJournal(dataStore.GetDirectoryPath("Logs"));
         _workflowStore = new WorkflowPresetStore(dataStore.GetDirectoryPath("Workflows"));
@@ -1216,5 +1208,13 @@ public partial class MainViewModel : ViewModelBase
         {
             _watcherApplyGate.Release();
         }
+    }
+
+    private static ITrashService CreateTrashService()
+    {
+        if (OperatingSystem.IsWindows()) return new WindowsTrashService();
+        if (OperatingSystem.IsLinux())   return new FreedesktopTrashService();
+        if (OperatingSystem.IsMacOS())   return new MacOsTrashService();
+        return new NullTrashService();
     }
 }

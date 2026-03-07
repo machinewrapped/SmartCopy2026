@@ -92,18 +92,7 @@ public sealed class DeleteStep : IPipelineStep
                 yield break;
             }
 
-            SourceResult actualResult;
-            if (useTrash)
-            {
-                await context.TrashService.TrashAsync(context.RootNode.FullPath, ct);
-                actualResult = SourceResult.Trashed;
-            }
-            else
-            {
-                await context.SourceProvider.DeleteAsync(context.RootNode.FullPath, ct);
-                actualResult = SourceResult.Deleted;
-            }
-
+            var actualResult = await DeleteNodeAsync(context.RootNode.FullPath, useTrash, context, ct);
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: context.RootNode,
@@ -134,18 +123,7 @@ public sealed class DeleteStep : IPipelineStep
                 continue;
             }
 
-            SourceResult actualResult;
-            if (useTrash)
-            {
-                await context.TrashService.TrashAsync(node.FullPath, ct);
-                actualResult = SourceResult.Trashed;
-            }
-            else
-            {
-                await context.SourceProvider.DeleteAsync(node.FullPath, ct);
-                actualResult = SourceResult.Deleted;
-            }
-
+            var actualResult = await DeleteNodeAsync(node.FullPath, useTrash, context, ct);
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: node,
@@ -154,6 +132,18 @@ public sealed class DeleteStep : IPipelineStep
                 NumberOfFoldersAffected: node.CountAllFolders(),
                 InputBytes: node.Size);
         }
+    }
+
+    private static async Task<SourceResult> DeleteNodeAsync(
+        string fullPath, bool useTrash, IStepContext context, CancellationToken ct)
+    {
+        if (useTrash)
+        {
+            await context.TrashService.TrashAsync(fullPath, ct);
+            return SourceResult.Trashed;
+        }
+        await context.SourceProvider.DeleteAsync(fullPath, ct);
+        return SourceResult.Deleted;
     }
 
     private static TransformResult MakePreviewResult(

@@ -22,14 +22,14 @@ public sealed record PipelineJob
     /// <summary>Provider registry for resolving paths during pipeline execution.</summary>
     public required FileSystemProviderRegistry ProviderRegistry { get; init; }
 
+    /// <summary>Service used to move files/directories to the OS-level trash.</summary>
+    public ITrashService TrashService { get; init; } = new NullTrashService();
+
     /// <summary>Whether hidden files should be visible to pipeline steps.</summary>
     public bool ShowHiddenFiles { get; init; }
 
     /// <summary>Whether read-only files can be deleted by pipeline steps.</summary>
     public bool AllowDeleteReadOnly { get; init; }
-
-    /// <summary>Service used to move files/directories to the OS-level trash.</summary>
-    public ITrashService TrashService { get; init; } = new NullTrashService();
 
     /// <summary>Progress reporter for overall pipeline execution.</summary>
     public IProgress<OperationProgress>? Progress { get; init; }
