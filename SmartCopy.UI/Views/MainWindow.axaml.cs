@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using SmartCopy.UI.ViewModels;
 using SmartCopy.UI.ViewModels.Workflows;
+using SmartCopy.Core.Pipeline;
 
 namespace SmartCopy.UI.Views;
 
@@ -46,16 +47,17 @@ public partial class MainWindow : Window
     private MenuItem? _saveSessionLocallyMenuItem;
 
     // Options menu — Pipeline
-    private MenuItem? _disableDestructivePreviewMenuItem;
-    private MenuItem? _deleteToRecycleBinMenuItem;
-    private MenuItem? _overwriteSkipMenuItem;
-    private MenuItem? _overwriteAlwaysMenuItem;
-    private MenuItem? _overwriteIfNewerMenuItem;
+    private MenuItem? _allowDeleteWithoutPreviewMenuItem;
+    private MenuItem? _allowOverwriteWithoutPreviewMenuItem;
+    private MenuItem? _allowDeleteReadOnlyMenuItem;
+    private MenuItem? _defaultOverwriteModeMenu;
+    private MenuItem? _defaultDeleteModeMenu;
 
     // Options menu — Scan
     private MenuItem? _fullPreScanMenuItem;
     private MenuItem? _lazyExpandScanMenuItem;
     private MenuItem? _followSymlinksMenuItem;
+    private MenuItem? _showHiddenFilesMenuItem;
 
     // Options menu — Debug
     private MenuItem? _artificialDelayMenuItem;
@@ -231,29 +233,35 @@ public partial class MainWindow : Window
         OptionsMenu.Items.Add(new Separator());
         OptionsMenu.Items.Add(SectionHeader("Pipeline"));
 
-        _disableDestructivePreviewMenuItem = Toggle(
-            "_Skip Destructive Preview",
-            _mainVm?.DisableDestructivePreview ?? false,
-            () => { if (_mainVm is not null) _mainVm.DisableDestructivePreview = !_mainVm.DisableDestructivePreview; });
-        OptionsMenu.Items.Add(_disableDestructivePreviewMenuItem);
+        _allowDeleteWithoutPreviewMenuItem = Toggle(
+            "Skip Preview for _Deletes",
+            _mainVm?.AllowDeleteWithoutPreview ?? false,
+            () => { if (_mainVm is not null) _mainVm.AllowDeleteWithoutPreview = !_mainVm.AllowDeleteWithoutPreview; });
+        OptionsMenu.Items.Add(_allowDeleteWithoutPreviewMenuItem);
 
-        _deleteToRecycleBinMenuItem = Toggle(
-            "_Delete to Recycle Bin",
-            _mainVm?.DeleteToRecycleBin ?? true,
-            () => { if (_mainVm is not null) _mainVm.DeleteToRecycleBin = !_mainVm.DeleteToRecycleBin; });
-        OptionsMenu.Items.Add(_deleteToRecycleBinMenuItem);
+        _allowOverwriteWithoutPreviewMenuItem = Toggle(
+            "Skip Preview for _Overwrites",
+            _mainVm?.AllowOverwriteWithoutPreview ?? false,
+            () => { if (_mainVm is not null) _mainVm.AllowOverwriteWithoutPreview = !_mainVm.AllowOverwriteWithoutPreview; });
+        OptionsMenu.Items.Add(_allowOverwriteWithoutPreviewMenuItem);
 
-        // Overwrite mode submenu
-        var currentMode = _mainVm?.DefaultOverwriteMode ?? "Skip";
-        _overwriteSkipMenuItem   = OverwriteRadio("_Skip (keep existing)",    "Skip",     currentMode);
-        _overwriteAlwaysMenuItem  = OverwriteRadio("_Always Overwrite",        "Always",   currentMode);
-        _overwriteIfNewerMenuItem = OverwriteRadio("Overwrite _if Newer",      "IfNewer",  currentMode);
+        _allowDeleteReadOnlyMenuItem = Toggle(
+            "Allow Deleting _Read-Only Files",
+            _mainVm?.AllowDeleteReadOnly ?? false,
+            () => { if (_mainVm is not null) _mainVm.AllowDeleteReadOnly = !_mainVm.AllowDeleteReadOnly; });
+        OptionsMenu.Items.Add(_allowDeleteReadOnlyMenuItem);
 
-        var overwriteSubMenu = new MenuItem { Header = "Default _Overwrite Mode" };
-        overwriteSubMenu.Items.Add(_overwriteSkipMenuItem);
-        overwriteSubMenu.Items.Add(_overwriteAlwaysMenuItem);
-        overwriteSubMenu.Items.Add(_overwriteIfNewerMenuItem);
-        OptionsMenu.Items.Add(overwriteSubMenu);
+        _defaultOverwriteModeMenu = new MenuItem { Header = "Default _Overwrite Mode" };
+        PopulateEnumRadioMenu<OverwriteMode>(_defaultOverwriteModeMenu,
+            _mainVm?.DefaultOverwriteMode ?? OverwriteMode.Skip,
+            mode => { if (_mainVm is not null) _mainVm.DefaultOverwriteMode = mode; });
+        OptionsMenu.Items.Add(_defaultOverwriteModeMenu);
+
+        _defaultDeleteModeMenu = new MenuItem { Header = "Default _Delete Mode" };
+        PopulateEnumRadioMenu<DeleteMode>(_defaultDeleteModeMenu,
+            _mainVm?.DefaultDeleteMode ?? DeleteMode.Trash,
+            mode => { if (_mainVm is not null) _mainVm.DefaultDeleteMode = mode; });
+        OptionsMenu.Items.Add(_defaultDeleteModeMenu);
 
         // ── Section: Scan ─────────────────────────────────────────────────────
         OptionsMenu.Items.Add(new Separator());
@@ -276,6 +284,12 @@ public partial class MainWindow : Window
             _mainVm?.FollowSymlinks ?? false,
             () => { if (_mainVm is not null) _mainVm.FollowSymlinks = !_mainVm.FollowSymlinks; });
         OptionsMenu.Items.Add(_followSymlinksMenuItem);
+
+        _showHiddenFilesMenuItem = Toggle(
+            "Show _Hidden Files",
+            _mainVm?.ShowHiddenFiles ?? false,
+            () => { if (_mainVm is not null) _mainVm.ShowHiddenFiles = !_mainVm.ShowHiddenFiles; });
+        OptionsMenu.Items.Add(_showHiddenFilesMenuItem);
 
         // ── Section: Debug  ───────────────────────────────────────────────────
         OptionsMenu.Items.Add(new Separator());
@@ -315,20 +329,32 @@ public partial class MainWindow : Window
             return item;
         }
 
-        MenuItem OverwriteRadio(string header, string mode, string currentMode)
+        static void PopulateEnumRadioMenu<TEnum>(MenuItem parent, TEnum currentValue, Action<TEnum> onSelect) where TEnum : struct, Enum
         {
-            var item = new MenuItem
+            parent.Items.Clear();
+            foreach (var value in Enum.GetValues<TEnum>())
             {
-                Header = header,
-                ToggleType = MenuItemToggleType.CheckBox,
-                IsChecked = string.Equals(currentMode, mode, StringComparison.OrdinalIgnoreCase),
-            };
-            item.Click += (_, _) =>
-            {
-                if (_mainVm is null) return;
-                _mainVm.DefaultOverwriteMode = mode;
-            };
-            return item;
+                var displayName = value.GetDisplayName();
+
+                var item = new MenuItem
+                {
+                    Header = displayName,
+                    Tag = value,
+                    ToggleType = MenuItemToggleType.Radio,
+                    IsChecked = value.Equals(currentValue),
+                };
+                item.Click += (_, _) =>
+                {
+                    onSelect(value);
+                    // Update check state for all items
+                    foreach (var child in parent.Items.OfType<MenuItem>())
+                    {
+                        if (child.Tag is TEnum t)
+                            child.IsChecked = t.Equals(value);
+                    }
+                };
+                parent.Items.Add(item);
+            }
         }
     }
 
@@ -372,21 +398,14 @@ public partial class MainWindow : Window
                     _saveSessionLocallyMenuItem.IsChecked = _mainVm?.SaveSessionLocally ?? false;
                 break;
 
-            case nameof(MainViewModel.DisableDestructivePreview):
-                if (_disableDestructivePreviewMenuItem is not null)
-                    _disableDestructivePreviewMenuItem.IsChecked = _mainVm?.DisableDestructivePreview ?? false;
+            case nameof(MainViewModel.AllowDeleteWithoutPreview):
+                if (_allowDeleteWithoutPreviewMenuItem is not null)
+                    _allowDeleteWithoutPreviewMenuItem.IsChecked = _mainVm?.AllowDeleteWithoutPreview ?? false;
                 break;
 
-            case nameof(MainViewModel.DeleteToRecycleBin):
-                if (_deleteToRecycleBinMenuItem is not null)
-                    _deleteToRecycleBinMenuItem.IsChecked = _mainVm?.DeleteToRecycleBin ?? true;
-                break;
-
-            case nameof(MainViewModel.DefaultOverwriteMode):
-                var mode = _mainVm?.DefaultOverwriteMode ?? "Skip";
-                if (_overwriteSkipMenuItem    is not null) _overwriteSkipMenuItem.IsChecked    = mode == "Skip";
-                if (_overwriteAlwaysMenuItem  is not null) _overwriteAlwaysMenuItem.IsChecked  = mode == "Always";
-                if (_overwriteIfNewerMenuItem is not null) _overwriteIfNewerMenuItem.IsChecked = mode == "IfNewer";
+            case nameof(MainViewModel.AllowOverwriteWithoutPreview):
+                if (_allowOverwriteWithoutPreviewMenuItem is not null)
+                    _allowOverwriteWithoutPreviewMenuItem.IsChecked = _mainVm?.AllowOverwriteWithoutPreview ?? false;
                 break;
 
             case nameof(MainViewModel.FullPreScan):
@@ -402,6 +421,38 @@ public partial class MainWindow : Window
             case nameof(MainViewModel.FollowSymlinks):
                 if (_followSymlinksMenuItem is not null)
                     _followSymlinksMenuItem.IsChecked = _mainVm?.FollowSymlinks ?? false;
+                break;
+
+            case nameof(MainViewModel.ShowHiddenFiles):
+                if (_showHiddenFilesMenuItem is not null)
+                    _showHiddenFilesMenuItem.IsChecked = _mainVm?.ShowHiddenFiles ?? false;
+                break;
+
+            case nameof(MainViewModel.AllowDeleteReadOnly):
+                if (_allowDeleteReadOnlyMenuItem is not null)
+                    _allowDeleteReadOnlyMenuItem.IsChecked = _mainVm?.AllowDeleteReadOnly ?? false;
+                break;
+
+            case nameof(MainViewModel.DefaultOverwriteMode):
+                if (_defaultOverwriteModeMenu is not null && _mainVm is not null)
+                {
+                    foreach (var child in _defaultOverwriteModeMenu.Items.OfType<MenuItem>())
+                    {
+                        if (child.Tag is OverwriteMode t)
+                            child.IsChecked = t == _mainVm.DefaultOverwriteMode;
+                    }
+                }
+                break;
+
+            case nameof(MainViewModel.DefaultDeleteMode):
+                if (_defaultDeleteModeMenu is not null && _mainVm is not null)
+                {
+                    foreach (var child in _defaultDeleteModeMenu.Items.OfType<MenuItem>())
+                    {
+                        if (child.Tag is DeleteMode t)
+                            child.IsChecked = t == _mainVm.DefaultDeleteMode;
+                    }
+                }
                 break;
         }
     }

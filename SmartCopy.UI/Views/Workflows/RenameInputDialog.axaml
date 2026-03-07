@@ -7,6 +7,8 @@
         Width="340"
         SizeToContent="Height"
         CanResize="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
         Background="#1e1e1e">
     <StackPanel Spacing="12" Margin="20">

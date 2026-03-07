@@ -9,6 +9,11 @@ public partial class MoveStepEditorViewModel : StepEditorViewModelBase, IDestina
 {
     public PathPickerViewModel DestinationPathPicker { get; }
 
+    [ObservableProperty]
+    private OverwriteMode _selectedOverwriteMode;
+
+    public static OverwriteMode[] OverwriteModes => Enum.GetValues<OverwriteMode>();
+
     public string DestinationPath 
     {
         get => DestinationPathPicker.Path;
@@ -26,17 +31,20 @@ public partial class MoveStepEditorViewModel : StepEditorViewModelBase, IDestina
                 OnPropertyChanged(nameof(IsValid));
             }
         };
+
+        SelectedOverwriteMode = settings.DefaultOverwriteMode;
     }
 
     public override bool IsValid => !string.IsNullOrWhiteSpace(DestinationPath);
 
-    public override IPipelineStep BuildStep() => new MoveStep(DestinationPath.Trim());
+    public override IPipelineStep BuildStep() => new MoveStep(DestinationPath.Trim(), SelectedOverwriteMode);
 
     public override void LoadFrom(PipelineStepViewModel stepViewModel)
     {
         if (stepViewModel.Step is MoveStep moveStep)
         {
             DestinationPath = moveStep.DestinationPath ?? string.Empty;
+            SelectedOverwriteMode = moveStep.OverwriteMode;
         }
     }
 }

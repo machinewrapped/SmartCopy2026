@@ -85,8 +85,6 @@ public sealed class PipelineDirectoryTests
                 RootNode       = root,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
-                OverwriteMode  = OverwriteMode.Always,
-                DeleteMode     = DeleteMode.Trash,
             });
 
         Assert.Single(results);
@@ -120,8 +118,6 @@ public sealed class PipelineDirectoryTests
             RootNode       = musicRoot,
             SourceProvider = provider,
             ProviderRegistry = provider.CreateRegistry(),
-            OverwriteMode  = OverwriteMode.Always,
-            DeleteMode     = DeleteMode.Permanent,
         };
 
         await runner.PreviewAsync(job);
@@ -161,8 +157,6 @@ public sealed class PipelineDirectoryTests
                 RootNode       = root,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
-                OverwriteMode  = OverwriteMode.Always,
-                DeleteMode     = DeleteMode.Trash,
             });
 
         Assert.Single(results);
@@ -206,8 +200,6 @@ public sealed class PipelineDirectoryTests
                 RootNode       = musicRoot,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
-                OverwriteMode  = OverwriteMode.Always,
-                DeleteMode     = DeleteMode.Trash,
             });
 
         // FlattenStep + MoveStep each produce results for the nodes traversed
@@ -244,8 +236,6 @@ public sealed class PipelineDirectoryTests
                 RootNode       = srcRoot,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
-                OverwriteMode  = OverwriteMode.Always,
-                DeleteMode     = DeleteMode.Trash,
             });
 
         var moveResult = results.Single(r => r.SourceNodeResult == SourceResult.Moved);
@@ -282,8 +272,6 @@ public sealed class PipelineDirectoryTests
                 RootNode       = root,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
-                OverwriteMode  = OverwriteMode.Always,
-                DeleteMode     = DeleteMode.Trash,
             });
 
         // One atomic result covering the entire subtree including nested dirs
@@ -317,8 +305,6 @@ public sealed class PipelineDirectoryTests
             RootNode       = musicRoot,
             SourceProvider = provider,
             ProviderRegistry = provider.CreateRegistry(),
-            OverwriteMode  = OverwriteMode.Always,
-            DeleteMode     = DeleteMode.Permanent,
         };
         await runner.PreviewAsync(job);
         var results = await runner.ExecuteAsync(job);
@@ -350,15 +336,13 @@ public sealed class PipelineDirectoryTests
         dirNode.CheckState = CheckState.Checked;
 
         var ct = CancellationToken.None;
-        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/mem/dest")]));
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/mem/dest", overwriteMode: OverwriteMode.Always)]));
         var plan = await runner.PreviewAsync(
             new PipelineJob
             {
                 RootNode       = root,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
-                OverwriteMode  = OverwriteMode.Always,
-                DeleteMode     = DeleteMode.Trash,
             }, ct);
 
         // One action per file, not one per directory
@@ -400,8 +384,6 @@ public sealed class PipelineDirectoryTests
                 RootNode       = root,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
-                OverwriteMode  = OverwriteMode.Always,
-                DeleteMode     = DeleteMode.Trash,
             });
 
         Assert.Single(results);

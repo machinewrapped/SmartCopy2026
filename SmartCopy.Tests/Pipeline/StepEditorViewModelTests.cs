@@ -31,10 +31,9 @@ public sealed class StepEditorViewModelTests
     [Fact]
     public void DeleteEditor_ModeToggle_BuildsMatchingDeleteStep()
     {
-        var editor = new DeleteStepEditorViewModel
-        {
-            DeleteMode = DeleteMode.Permanent,
-        };
+        var settings = new AppSettings() { DefaultDeleteMode = DeleteMode.Permanent };
+
+        var editor = new DeleteStepEditorViewModel(settings);
 
         var step = Assert.IsType<DeleteStep>(editor.BuildStep());
         Assert.Equal(DeleteMode.Permanent, step.Mode);

@@ -10,7 +10,9 @@ public readonly record struct PlannedAction(
     int NumberOfFilesAffected,
     int NumberOfFoldersAffected,
     long InputBytes,
-    long OutputBytes);
+    long OutputBytes,
+    int NumberOfFilesSkipped = 0,
+    int NumberOfFoldersSkipped = 0);
 
 public sealed class OperationPlan
 {
@@ -19,4 +21,6 @@ public sealed class OperationPlan
     public required long TotalEstimatedOutputBytes { get; init; }
     public int TotalFilesAffected   => Actions.Sum(a => a.NumberOfFilesAffected);
     public int TotalFoldersAffected => Actions.Sum(a => a.NumberOfFoldersAffected);
+    public int TotalFilesSkipped    => Actions.Sum(a => a.NumberOfFilesSkipped);
+    public int TotalFoldersSkipped  => Actions.Sum(a => a.NumberOfFoldersSkipped);
 }

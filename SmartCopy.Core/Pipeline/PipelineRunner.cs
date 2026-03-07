@@ -1,6 +1,4 @@
-using System;
 using System.Diagnostics;
-using System.Linq;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline.Validation;
@@ -46,7 +44,9 @@ public sealed class PipelineRunner
                         NumberOfFilesAffected: result.NumberOfFilesAffected,
                         NumberOfFoldersAffected: result.NumberOfFoldersAffected,
                         InputBytes: result.InputBytes,
-                        OutputBytes: result.OutputBytes));
+                        OutputBytes: result.OutputBytes,
+                        NumberOfFilesSkipped: result.NumberOfFilesSkipped,
+                        NumberOfFoldersSkipped: result.NumberOfFoldersSkipped));
                 }
             }
         }
@@ -148,17 +148,17 @@ public sealed class PipelineRunner
 
         public DirectoryTreeNode RootNode { get; }
         public IFileSystemProvider SourceProvider { get; }
-        public OverwriteMode OverwriteMode { get; }
-        public DeleteMode DeleteMode { get; }
         public FileSystemProviderRegistry ProviderRegistry { get; }
+        public bool ShowHiddenFiles { get; }
+        public bool AllowDeleteReadOnly { get; }
 
         public StepContext(PipelineJob job)
         {
             RootNode = job.RootNode;
             SourceProvider = job.SourceProvider;
-            OverwriteMode = job.OverwriteMode;
-            DeleteMode = job.DeleteMode;
             ProviderRegistry = job.ProviderRegistry;
+            ShowHiddenFiles = job.ShowHiddenFiles;
+            AllowDeleteReadOnly = job.AllowDeleteReadOnly;
         }
 
         public PipelineContext GetNodeContext(DirectoryTreeNode node)
@@ -178,8 +178,6 @@ public sealed class PipelineRunner
                 ProviderRegistry = ProviderRegistry,
                 PathSegments = segments,
                 CurrentExtension = extension,
-                OverwriteMode = OverwriteMode,
-                DeleteMode = DeleteMode,
                 VirtualCheckState = node.CheckState,
             };
             _contexts[node] = context;

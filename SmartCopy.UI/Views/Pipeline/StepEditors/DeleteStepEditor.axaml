@@ -9,6 +9,7 @@
                   SelectedItem="{Binding DeleteMode, Mode=TwoWay}" />
         <TextBlock Text="Permanent delete cannot be recovered."
                    Foreground="#f0ad4e"
-                   FontSize="11" />
+                   FontSize="11"
+                   IsVisible="{Binding IsPermanentDelete}" />
     </StackPanel>
 </UserControl>

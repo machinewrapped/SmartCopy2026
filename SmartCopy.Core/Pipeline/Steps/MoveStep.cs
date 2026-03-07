@@ -11,16 +11,23 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
     public StepKind StepType => StepKind.Move;
     public bool IsExecutable => true;
 
-    public MoveStep(string destinationPath)
+    public MoveStep(string destinationPath, OverwriteMode overwriteMode = OverwriteMode.Skip)
     {
         DestinationPath = destinationPath;
+        OverwriteMode = overwriteMode;
     }
 
-    public TransformStepConfig Config => new(StepType, new JsonObject { ["destinationPath"] = DestinationPath });
+    public OverwriteMode OverwriteMode { get; set; }
+
+    public TransformStepConfig Config => new(StepType, new JsonObject 
+    { 
+        ["destinationPath"] = DestinationPath,
+        ["overwriteMode"] = OverwriteMode.ToString()
+    });
 
     public string AutoSummary => HasDestinationPath ? $"Move to {PathHelper.GetFriendlyTarget(DestinationPath)}" : StepType.ForDisplay();
 
-    public string Description => HasDestinationPath ? $"Move to {DestinationPath}" : "Destination required";
+    public string Description => HasDestinationPath ? $"Move to {DestinationPath} ({OverwriteMode})" : "Destination required";
 
     private string? _destinationPath;
     public string? DestinationPath
@@ -50,19 +57,52 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
             yield break;
         }
 
+        // Directories whose destination already exists must be merged, not moved
+        // as a unit. Track them so their children are not suppressed by parent-collapsing.
+        HashSet<DirectoryTreeNode>? mergeNodes = null;
+
         foreach (var node in context.GetPreviewSelectedDescendants())
         {
             ct.ThrowIfCancellationRequested();
             if (context.IsNodeFailed(node)) continue;
-            // Only preview top-level selected nodes (parent not selected) to avoid duplicate entries.
-            if (node.Parent is { } p && context.IsPreviewSelected(p)) continue;
+
+            // Collapse children into parent unless the parent is being merged.
+            if (node.Parent is { } p 
+                && context.IsPreviewSelected(p)
+                && mergeNodes?.Contains(p) != true)
+            {
+                continue;
+            }
 
             var nodeCtx = context.GetNodeContext(node);
             var targetProvider = nodeCtx.ResolveProvider(DestinationPath)
                 ?? throw new InvalidOperationException("TargetProvider must be set for MoveStep.");
 
             var destination = targetProvider.JoinPath(DestinationPath, nodeCtx.PathSegments);
-            var destResult = await targetProvider.ExistsAsync(destination, ct)
+            var destinationExists = await targetProvider.ExistsAsync(destination, ct);
+
+            // When a directory already exists at the destination we need to merge:
+            // skip reporting it as a unit and let its children be previewed individually.
+            if (node.IsDirectory && destinationExists)
+            {
+                (mergeNodes ??= []).Add(node);
+                continue;
+            }
+
+            if (destinationExists && OverwriteMode == OverwriteMode.Skip)
+            {
+                yield return new TransformResult(
+                    IsSuccess: true,
+                    SourceNode: node,
+                    SourceNodeResult: SourceResult.Skipped,
+                    DestinationPath: destination,
+                    NumberOfFilesSkipped: node.CountSelectedFiles(),
+                    NumberOfFoldersSkipped: node.CountSelectedFolders(),
+                    InputBytes: node.Size);
+                continue;
+            }
+
+            var destResult = destinationExists
                 ? DestinationResult.Overwritten
                 : DestinationResult.Created;
 
@@ -93,7 +133,7 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
         var sameProvider = ReferenceEquals(targetProvider, context.SourceProvider);
         var canAtomicMove = targetProvider.Capabilities.CanAtomicMove;
 
-        await foreach (var result in WalkAndMoveAsync(context.RootNode, context, DestinationPath, targetProvider, sameProvider, canAtomicMove, ct))
+        await foreach (var result in WalkAndMoveAsync(context.RootNode, context, DestinationPath, targetProvider, sameProvider, canAtomicMove, OverwriteMode, ct))
             yield return result;
     }
 
@@ -103,6 +143,7 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
         DirectoryTreeNode node, IStepContext context,
         string destinationPath,
         IFileSystemProvider targetProvider, bool sameProvider, bool canAtomicMove,
+        OverwriteMode overwriteMode,
         [EnumeratorCancellation] CancellationToken ct)
     {
         foreach (var child in node.Children)
@@ -111,30 +152,21 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
             if (context.IsNodeFailed(child)) continue;
             if (child.CheckState == CheckState.Unchecked) continue;
 
-            if (sameProvider && canAtomicMove && CanMoveEntireSubtree(child))
+            var childCtx = context.GetNodeContext(child);
+            var dest = targetProvider.JoinPath(destinationPath, childCtx.PathSegments);
+            var destExists = await targetProvider.ExistsAsync(dest, ct);
+
+            // If the destination already exists we must recurse to merge contents,
+            // even when an atomic move would otherwise be possible.
+            if (!destExists && sameProvider && canAtomicMove && CanMoveEntireSubtree(child))
             {
-                var childCtx = context.GetNodeContext(child);
-                var dest = targetProvider.JoinPath(destinationPath, childCtx.PathSegments);
-                var destExists = await targetProvider.ExistsAsync(dest, ct);
-
-                if (destExists && context.OverwriteMode == OverwriteMode.Skip)
-                {
-                    yield return new TransformResult(
-                        IsSuccess: true,
-                        SourceNode: child,
-                        SourceNodeResult: SourceResult.None,
-                        DestinationPath: dest,
-                        InputBytes: child.Size);
-                    continue;
-                }
-
                 await context.SourceProvider.MoveAsync(child.FullPath, dest, ct);
                 yield return new TransformResult(
                     IsSuccess: true,
                     SourceNode: child,
                     SourceNodeResult: SourceResult.Moved,
                     DestinationPath: dest,
-                    DestinationResult: destExists ? DestinationResult.Overwritten : DestinationResult.Created,
+                    DestinationResult: DestinationResult.Created,
                     NumberOfFilesAffected: child.CountAllFiles(),
                     NumberOfFoldersAffected: child.CountAllFolders(),
                     InputBytes: child.Size,
@@ -142,8 +174,8 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
             }
             else
             {
-                // Atomic move not possible (cross-provider or partial selection): recurse piecewise.
-                await foreach (var result in WalkAndMoveAsync(child, context, destinationPath, targetProvider, sameProvider, canAtomicMove, ct))
+                // Destination exists (merge needed), cross-provider, or partial selection: recurse piecewise.
+                await foreach (var result in WalkAndMoveAsync(child, context, destinationPath, targetProvider, sameProvider, canAtomicMove, overwriteMode, ct))
                     yield return result;
             }
         }
@@ -157,13 +189,14 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
             var fileDest = targetProvider.JoinPath(destinationPath, fileCtx.PathSegments);
             var fileDestExists = await targetProvider.ExistsAsync(fileDest, ct);
 
-            if (fileDestExists && context.OverwriteMode == OverwriteMode.Skip)
+            if (fileDestExists && overwriteMode == OverwriteMode.Skip)
             {
                 yield return new TransformResult(
                     IsSuccess: true,
                     SourceNode: file,
-                    SourceNodeResult: SourceResult.None,
+                    SourceNodeResult: SourceResult.Skipped,
                     DestinationPath: fileDest,
+                    NumberOfFilesSkipped: 1,
                     InputBytes: file.Size);
                 continue;
             }

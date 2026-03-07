@@ -75,7 +75,11 @@ public partial class PipelineViewModel : ViewModelBase
 
     public bool HasDeleteStep => Steps.Any(step => step.Step is DeleteStep);
 
-    public string RunButtonLabel => HasDeleteStep ? "⚠ Run" : "▶ Run";
+    public bool HasOverwriteStep => Steps.Any(step => 
+        (step.Step is CopyStep copy && copy.OverwriteMode != OverwriteMode.Skip) ||
+        (step.Step is MoveStep move && move.OverwriteMode != OverwriteMode.Skip));
+
+    public string RunButtonLabel => HasDeleteStep || HasOverwriteStep ? "⚠ Run" : "▶ Run";
 
     public string FirstDestinationPath
     {
@@ -337,6 +341,7 @@ public partial class PipelineViewModel : ViewModelBase
 
         OnPropertyChanged(nameof(FirstDestinationPath));
         OnPropertyChanged(nameof(HasDeleteStep));
+        OnPropertyChanged(nameof(HasOverwriteStep));
         OnPropertyChanged(nameof(RunButtonLabel));
         OnPropertyChanged(nameof(HasSteps));
         UpdateButtonStates();
@@ -349,9 +354,7 @@ public partial class PipelineViewModel : ViewModelBase
         return new PipelineConfig(
             Name: name,
             Description: null,
-            Steps: [.. Steps.Select(BuildConfigWithUiMetadata)],
-            OverwriteMode: OverwriteMode.IfNewer.ToString(),
-            DeleteMode: DeleteMode.Trash.ToString());
+            Steps: [.. Steps.Select(BuildConfigWithUiMetadata)]);
     }
 
     private void UpdateButtonStates()

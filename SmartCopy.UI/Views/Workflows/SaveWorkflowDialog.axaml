@@ -7,8 +7,14 @@
         Width="400"
         SizeToContent="Height"
         CanResize="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
         Background="#1e1e1e">
+    <Window.KeyBindings>
+        <KeyBinding Gesture="Escape" Command="{Binding CancelCommand}" />
+    </Window.KeyBindings>
+
     <StackPanel Spacing="12" Margin="20">
 
         <StackPanel Spacing="4">

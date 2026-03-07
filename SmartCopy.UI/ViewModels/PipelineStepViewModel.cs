@@ -68,6 +68,7 @@ public partial class PipelineStepViewModel : ViewModelBase
         OnPropertyChanged(nameof(Kind));
         OnPropertyChanged(nameof(CustomName));
         OnPropertyChanged(nameof(Label));
+        OnPropertyChanged(nameof(Description));
         OnPropertyChanged(nameof(Icon));
         OnPropertyChanged(nameof(HasDestination));
         OnPropertyChanged(nameof(DestinationPath));

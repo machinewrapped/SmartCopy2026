@@ -45,7 +45,10 @@ public partial class MainViewModel : ViewModelBase
     private bool _restoreLastSourcePath = true;
 
     [ObservableProperty]
-    private bool _disableDestructivePreview;
+    private bool _allowDeleteWithoutPreview;
+
+    [ObservableProperty]
+    private bool _allowOverwriteWithoutPreview;
 
     [ObservableProperty]
     private bool _deleteToRecycleBin = true;
@@ -63,10 +66,19 @@ public partial class MainViewModel : ViewModelBase
     private bool _followSymlinks;
 
     [ObservableProperty]
-    private string _defaultOverwriteMode = "Skip";
+    private bool _addArtificialDelay = false;
 
     [ObservableProperty]
-    private bool _addArtificialDelay = false;
+    private OverwriteMode _defaultOverwriteMode = OverwriteMode.Skip;
+
+    [ObservableProperty]
+    private DeleteMode _defaultDeleteMode = DeleteMode.Trash;
+
+    [ObservableProperty]
+    private bool _showHiddenFiles;
+
+    [ObservableProperty]
+    private bool _allowDeleteReadOnly;
 
     public string SourcePath
     {
@@ -83,7 +95,7 @@ public partial class MainViewModel : ViewModelBase
     private readonly SmartCopyAppContext _appContext;
     private readonly MemoryFileSystemProvider _memoryProvider;
     private readonly FileSystemProviderRegistry _providerRegistry = new();
-    private readonly IDirectoryWatcherFactory _watcherFactory = new LocalDirectoryWatcherFactory();
+    private readonly LocalDirectoryWatcherFactory _watcherFactory = new();
     private readonly AppSettings _settings;
     private readonly AppSettingsStore _settingsStore = new();
     private readonly SessionStore _sessionStore = new();
@@ -232,13 +244,16 @@ public partial class MainViewModel : ViewModelBase
         ShowExcludedNodesByDefault = _settings.ShowFilteredNodesInTree;
         RestoreLastWorkflow = _settings.RestoreLastWorkflow;
         RestoreLastSourcePath = _settings.RestoreLastSourcePath;
-        DisableDestructivePreview = _settings.DisableDestructivePreview;
-        DeleteToRecycleBin = _settings.DeleteToRecycleBin;
+        AllowDeleteWithoutPreview = _settings.AllowDeleteWithoutPreview;
+        AllowOverwriteWithoutPreview = _settings.AllowOverwriteWithoutPreview;
         SaveSessionLocally = _settings.SaveSessionLocally;
         FullPreScan = _settings.FullPreScan;
         LazyExpandScan = _settings.LazyExpandScan;
         FollowSymlinks = _settings.FollowSymlinks;
         DefaultOverwriteMode = _settings.DefaultOverwriteMode;
+        DefaultDeleteMode = _settings.DefaultDeleteMode;
+        ShowHiddenFiles = _settings.ShowHiddenFiles;
+        AllowDeleteReadOnly = _settings.AllowDeleteReadOnly;
 
         SourcePathPicker.RefreshSettings();
 
@@ -330,16 +345,15 @@ public partial class MainViewModel : ViewModelBase
         _ = SaveSettingsAsync();
     }
 
-    partial void OnDisableDestructivePreviewChanged(bool value)
+    partial void OnAllowDeleteWithoutPreviewChanged(bool value)
     {
-        _settings.DisableDestructivePreview = value;
+        _settings.AllowDeleteWithoutPreview = value;
         _ = SaveSettingsAsync();
     }
 
-    partial void OnDeleteToRecycleBinChanged(bool value)
+    partial void OnAllowOverwriteWithoutPreviewChanged(bool value)
     {
-        _settings.DeleteToRecycleBin = value;
-        _settings.DefaultDeleteMode = value ? "Trash" : "Permanent";
+        _settings.AllowOverwriteWithoutPreview = value;
         _ = SaveSettingsAsync();
     }
 
@@ -370,20 +384,45 @@ public partial class MainViewModel : ViewModelBase
     private ScanOptions BuildScanOptions() => new()
     {
         LazyExpand = LazyExpandScan,
-        IncludeHidden = true,
+        IncludeHidden = ShowHiddenFiles,
         FollowSymlinks = FollowSymlinks,
     };
 
-    partial void OnDefaultOverwriteModeChanged(string value)
-    {
-        _settings.DefaultOverwriteMode = value;
-        _ = SaveSettingsAsync();
-    }
 
     partial void OnAddArtificialDelayChanged(bool value)
     {
         _memoryProvider.AddArtificialDelay = value;
         _settings.AddArtificialDelay = value;
+        _ = SaveSettingsAsync();
+    }
+
+    partial void OnDefaultOverwriteModeChanged(OverwriteMode value)
+    {
+        _settings.DefaultOverwriteMode = value;
+        _ = SaveSettingsAsync();
+    }
+
+    partial void OnDefaultDeleteModeChanged(DeleteMode value)
+    {
+        _settings.DefaultDeleteMode = value;
+        _ = SaveSettingsAsync();
+    }
+
+    partial void OnShowHiddenFilesChanged(bool value)
+    {
+        _settings.ShowHiddenFiles = value;
+        _ = SaveSettingsAsync();
+        // Since hidden files visibility impacts the tree, re-scan
+        var path = SourcePath.Trim();
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            _ = ApplySourcePathCoreAsync(path);
+        }
+    }
+
+    partial void OnAllowDeleteReadOnlyChanged(bool value)
+    {
+        _settings.AllowDeleteReadOnly = value;
         _ = SaveSettingsAsync();
     }
 
@@ -794,13 +833,11 @@ public partial class MainViewModel : ViewModelBase
             RootNode         = rootNode,
             SourceProvider   = sourceProvider,
             ProviderRegistry = _providerRegistry,
-            OverwriteMode    = ParseOverwriteMode(_settings.DefaultOverwriteMode),
-            DeleteMode       = ParseDeleteMode(_settings.DefaultDeleteMode),
         };
 
         var plan = await runner.PreviewAsync(job, CancellationToken.None);
 
-        Preview.LoadFrom(plan, pipeline.HasDeleteStep, GetDeleteModeFromPipeline(pipeline, job.DeleteMode));
+        Preview.LoadFrom(plan);
 
         if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
             && desktop.MainWindow is { } mainWindow)
@@ -819,7 +856,11 @@ public partial class MainViewModel : ViewModelBase
         var pipeline = Pipeline.BuildLivePipeline();
 
         // Mandatory preview for destructive pipelines, unless the user has opted out.
-        if (pipeline.HasDeleteStep && !_settings.DisableDestructivePreview)
+        bool needsPreview = false;
+        if (pipeline.HasDeleteStep && !_settings.AllowDeleteWithoutPreview) needsPreview = true;
+        if (pipeline.HasOverwriteStep && !_settings.AllowOverwriteWithoutPreview) needsPreview = true;
+
+        if (needsPreview)
         {
             await PreviewPipelineAsync();
             return;
@@ -845,9 +886,8 @@ public partial class MainViewModel : ViewModelBase
             RootNode         = rootNode,
             SourceProvider   = sourceProvider,
             ProviderRegistry = _providerRegistry,
-            OverwriteMode    = ParseOverwriteMode(_settings.DefaultOverwriteMode),
-            DeleteMode       = ParseDeleteMode(_settings.DefaultDeleteMode),
         };
+
         await ExecutePipelineAsync(runner, job);
     }
 
@@ -1060,26 +1100,6 @@ public partial class MainViewModel : ViewModelBase
         {
             await LoadWorkflowAsync(vm.LoadRequestedWorkflowName);
         }
-    }
-
-    private static OverwriteMode ParseOverwriteMode(string raw)
-    {
-        return Enum.TryParse<OverwriteMode>(raw, out var mode)
-            ? mode
-            : OverwriteMode.IfNewer;
-    }
-
-    private static DeleteMode ParseDeleteMode(string raw)
-    {
-        return Enum.TryParse<DeleteMode>(raw, out var mode)
-            ? mode
-            : DeleteMode.Trash;
-    }
-
-    private static DeleteMode GetDeleteModeFromPipeline(TransformPipeline pipeline, DeleteMode fallback)
-    {
-        var deleteStep = pipeline.Steps.OfType<DeleteStep>().FirstOrDefault();
-        return deleteStep?.Mode ?? fallback;
     }
 
     private void StartDirectoryWatcherIfSupported()

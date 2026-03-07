@@ -7,5 +7,16 @@
        <views:PathPickerControl DataContext="{Binding DestinationPathPicker}"
                                 BrowseDialogTitle="Select destination folder"
                                 BrowseButtonToolTip="Browse for destination folder" />
+
+       <TextBlock Text="Overwrite Mode" FontSize="12" Opacity="0.7" Margin="0,8,0,0" />
+       <ComboBox ItemsSource="{Binding OverwriteModes}"
+                 SelectedItem="{Binding SelectedOverwriteMode}"
+                 HorizontalAlignment="Stretch">
+           <ComboBox.ItemTemplate>
+               <DataTemplate>
+                   <TextBlock Text="{Binding Converter={StaticResource EnumToDisplayNameConverter}}" />
+               </DataTemplate>
+           </ComboBox.ItemTemplate>
+       </ComboBox>
    </StackPanel>
 </UserControl>

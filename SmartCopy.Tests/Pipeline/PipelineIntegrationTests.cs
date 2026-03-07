@@ -29,8 +29,6 @@ public sealed class PipelineIntegrationTests
                 RootNode       = root,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
-                OverwriteMode  = OverwriteMode.Always,
-                DeleteMode     = DeleteMode.Trash,
             });
 
         Assert.True(await provider.ExistsAsync("/dest/src/song.mp3", CancellationToken.None));
@@ -60,8 +58,6 @@ public sealed class PipelineIntegrationTests
                 RootNode       = root,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
-                OverwriteMode  = OverwriteMode.Always,
-                DeleteMode     = DeleteMode.Trash,
             });
 
         Assert.True(await provider.ExistsAsync("/dest/song.mp3", CancellationToken.None));
@@ -87,13 +83,11 @@ public sealed class PipelineIntegrationTests
                     RootNode       = root,
                     SourceProvider = provider,
                     ProviderRegistry = provider.CreateRegistry(),
-                    OverwriteMode  = OverwriteMode.Always,
-                    DeleteMode     = DeleteMode.Permanent,
                 }));
     }
 
     [Fact]
-    public async Task CopyPipeline_HonorsOverwriteSkipAndAlways()
+    public async Task CopyPipeline_HonorsOverwriteSkip()
     {
         var provider = MemoryFileSystemFixtures.Create(f => f
             .WithDirectory("/src")
@@ -105,28 +99,40 @@ public sealed class PipelineIntegrationTests
         var node = root.FindNodeByPathSegments(["src", "song.mp3"]);
         Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
-        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/mem/dest")]));
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/mem/dest", overwriteMode: OverwriteMode.Skip)]));
 
         var skipResults = await runner.ExecuteAsync(
             new PipelineJob
             {
-                RootNode       = root,
+                RootNode = root,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
-                OverwriteMode  = OverwriteMode.Skip,
-                DeleteMode     = DeleteMode.Trash,
             });
 
-        Assert.Contains(skipResults, result => result.SourceNodeResult == SourceResult.None);
+        Assert.Contains(skipResults, result => result.SourceNodeResult == SourceResult.Skipped);
+    }
+
+    [Fact]
+    public async Task CopyPipeline_HonorsOverwriteAlways()
+    {
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithDirectory("/src")
+            .WithDirectory("/dest/src")
+            .WithFile("/src/song.mp3", "new"u8)
+            .WithFile("/dest/src/song.mp3", "old"u8));
+
+        var root = await provider.BuildDirectoryTree();
+        var node = root.FindNodeByPathSegments(["src", "song.mp3"]);
+        Assert.NotNull(node);
+        node.CheckState = CheckState.Checked;
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/mem/dest", overwriteMode: OverwriteMode.Always)]));
 
         var alwaysResults = await runner.ExecuteAsync(
             new PipelineJob
             {
-                RootNode       = root,
+                RootNode = root,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
-                OverwriteMode  = OverwriteMode.Always,
-                DeleteMode     = DeleteMode.Trash,
             });
 
         Assert.Contains(alwaysResults, result => result.SourceNodeResult == SourceResult.Copied);
@@ -157,8 +163,6 @@ public sealed class PipelineIntegrationTests
                 RootNode       = root,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
-                OverwriteMode  = OverwriteMode.Always,
-                DeleteMode     = DeleteMode.Trash,
             });
 
         Assert.True(await provider.ExistsAsync("/backup/src/song.mp3", CancellationToken.None));
@@ -187,8 +191,6 @@ public sealed class PipelineIntegrationTests
                 RootNode       = root,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
-                OverwriteMode  = OverwriteMode.Always,
-                DeleteMode     = DeleteMode.Trash,
             });
 
         var logDir = Path.Combine(Path.GetTempPath(), "SmartCopy2026.Tests", Guid.NewGuid().ToString("N"), "logs");

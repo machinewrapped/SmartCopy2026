@@ -88,8 +88,6 @@ public sealed class PipelineRunnerSelectionTests
                 RootNode       = root,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
-                OverwriteMode  = OverwriteMode.Always,
-                DeleteMode     = DeleteMode.Trash,
             });
 
         // D and E should have been copied (they were unchecked → inverted to checked)
@@ -119,8 +117,6 @@ public sealed class PipelineRunnerSelectionTests
             RootNode       = root,
             SourceProvider = provider,
             ProviderRegistry = provider.CreateRegistry(),
-            OverwriteMode  = OverwriteMode.Always,
-            DeleteMode     = DeleteMode.Trash,
         };
 
         var runner = new PipelineRunner(new TransformPipeline(
@@ -163,15 +159,13 @@ public sealed class PipelineRunnerSelectionTests
             new CopyStep("/mem/dest"),
         ]));
 
-            await runner.ExecuteAsync(
-                new PipelineJob
-                {
-                    RootNode       = root,
-                    SourceProvider = provider,
-                    ProviderRegistry = provider.CreateRegistry(),
-                    OverwriteMode  = OverwriteMode.Always,
-                    DeleteMode     = DeleteMode.Trash,
-                });
+        await runner.ExecuteAsync(
+            new PipelineJob
+            {
+                RootNode       = root,
+                SourceProvider = provider,
+                ProviderRegistry = provider.CreateRegistry(),
+            });
 
         // All three files should be copied after SelectAll
         Assert.True(await provider.ExistsAsync("/dest/src/x.txt", CancellationToken.None));
@@ -205,8 +199,6 @@ public sealed class PipelineRunnerSelectionTests
                 RootNode       = root,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
-                OverwriteMode  = OverwriteMode.Always,
-                DeleteMode     = DeleteMode.Trash,
             });
 
         // Nothing should be copied — ClearSelection empties the working set
@@ -250,8 +242,6 @@ public sealed class PipelineRunnerSelectionTests
                 RootNode       = root,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
-                OverwriteMode  = OverwriteMode.Always,
-                DeleteMode     = DeleteMode.Trash,
             },
             ct: CancellationToken.None);
 

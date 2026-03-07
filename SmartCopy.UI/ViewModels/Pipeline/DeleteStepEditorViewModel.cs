@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
+using SmartCopy.Core.Settings;
 
 namespace SmartCopy.UI.ViewModels.Pipeline;
 
@@ -9,7 +10,15 @@ public partial class DeleteStepEditorViewModel : StepEditorViewModelBase
     public IReadOnlyList<DeleteMode> DeleteModes { get; } = Enum.GetValues<DeleteMode>();
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsPermanentDelete))]
     private DeleteMode _deleteMode = DeleteMode.Trash;
+
+    public DeleteStepEditorViewModel(AppSettings settings)
+    {
+        DeleteMode = settings.DefaultDeleteMode;
+    }
+
+    public bool IsPermanentDelete => DeleteMode == DeleteMode.Permanent;
 
     public override bool IsValid => true;
 

@@ -24,8 +24,9 @@ public sealed class MoveStepFallbackTests
         public DirectoryTreeNode RootNode { get; }
         public IFileSystemProvider SourceProvider { get; }
         public FileSystemProviderRegistry ProviderRegistry { get; }
-        public OverwriteMode OverwriteMode => OverwriteMode.Always;
-        public DeleteMode DeleteMode => DeleteMode.Permanent;
+        public bool ShowHiddenFiles { get; }
+        public bool AllowDeleteReadOnly { get; }
+
 
         public MoveTestContext(DirectoryTreeNode root, IFileSystemProvider source, IFileSystemProvider? target = null)
         {
@@ -52,8 +53,6 @@ public sealed class MoveStepFallbackTests
                         ? node.RelativePathSegments
                         : [node.Name],
                     CurrentExtension = Path.GetExtension(node.Name).TrimStart('.'),
-                    OverwriteMode = OverwriteMode,
-                    DeleteMode = DeleteMode,
                     VirtualCheckState = node.CheckState,
                 };
                 _contexts[node] = ctx;
@@ -230,7 +229,6 @@ public sealed class MoveStepFallbackTests
         var root = await provider.BuildDirectoryTree("/src");
         var dir = root.Children.Single();
         dir.CheckState = CheckState.Checked;
-        foreach (var f in dir.Files) f.CheckState = CheckState.Checked;
 
         var ctx = new MoveTestContext(root, provider, provider);
         var step = new MoveStep("/mem/dest");

@@ -34,6 +34,7 @@ public partial class PreviewItemViewModel : ViewModelBase
             (SourceResult.Moved,  _)                                => "Move",
             (SourceResult.Trashed, _)                               => "Trash",
             (SourceResult.Deleted, _)                               => "Delete",
+            (SourceResult.Skipped, _)                               => "Skip",
             _                                                       => string.Empty,
         };
 }
@@ -42,9 +43,6 @@ public partial class PreviewGroupViewModel : ViewModelBase
 {
     [ObservableProperty]
     private string _title = string.Empty;
-
-    [ObservableProperty]
-    private bool _isReadyGroup;
 
     [ObservableProperty]
     private bool _isExpanded;
@@ -56,8 +54,6 @@ public partial class PreviewGroupViewModel : ViewModelBase
 
 public partial class PreviewViewModel : ViewModelBase
 {
-    private DeleteMode _deleteMode = DeleteMode.Trash;
-
     [ObservableProperty]
     private bool _isDeletePipeline;
 
@@ -76,17 +72,21 @@ public partial class PreviewViewModel : ViewModelBase
     [ObservableProperty]
     private int _totalFoldersAffected;
 
-    public ObservableCollection<PreviewGroupViewModel> Groups { get; } = [];
+    [ObservableProperty]
+    private int _totalFilesSkipped;
 
-    public bool CanRun => true;
+    [ObservableProperty]
+    private int _totalFoldersSkipped;
+
+    public ObservableCollection<PreviewGroupViewModel> Groups { get; } = [];
 
     private enum GroupKey
     {
-        Ready,
         Copy,
         Move,
         Overwrite,
         Delete,
+        Skip,
     }
 
     public string ConfirmButtonText
@@ -114,11 +114,9 @@ public partial class PreviewViewModel : ViewModelBase
 
     private OperationPlan? _currentPlan;
 
-    public void LoadFrom(OperationPlan plan, bool isDeletePipeline, DeleteMode deleteMode)
+    public void LoadFrom(OperationPlan plan)
     {
         _currentPlan = plan;
-        _deleteMode = deleteMode;
-        IsDeletePipeline = isDeletePipeline;
         TotalActionCount = plan.Actions.Count;
         TotalFilesAffected = plan.TotalFilesAffected;
         TotalFoldersAffected = plan.TotalFoldersAffected;
@@ -126,33 +124,40 @@ public partial class PreviewViewModel : ViewModelBase
         TotalEstimatedOutputBytes = plan.TotalEstimatedOutputBytes;
 
         Groups.Clear();
-        var grouped = plan.Actions
-            .GroupBy(ActionGrouping)
-            .OrderBy(g => g.Key switch { GroupKey.Delete => 0, GroupKey.Overwrite => 1, _ => 2 });
 
-        foreach (var group in grouped)
+        var deleteActions = new List<PlannedAction>();
+        var overwriteActions = new List<PlannedAction>();
+        var moveActions = new List<PlannedAction>();
+        var copyActions = new List<PlannedAction>();
+        var skipActions = new List<PlannedAction>();
+
+        foreach (var a in plan.Actions)
         {
-            var files = group.Sum(a => a.NumberOfFilesAffected);
-            var folders = group.Sum(a => a.NumberOfFoldersAffected);
+            if (a.SourceResult is SourceResult.Trashed or SourceResult.Deleted) deleteActions.Add(a);
+            if (a.DestinationResult == DestinationResult.Overwritten) overwriteActions.Add(a);
+            if (a.SourceResult == SourceResult.Moved) moveActions.Add(a);
+            if (a.SourceResult == SourceResult.Copied) copyActions.Add(a);
+            if (a.SourceResult == SourceResult.Skipped) skipActions.Add(a);
+        }
 
-            var title = group.Key switch
-            {
-                GroupKey.Delete => FormatTitle("delete", files, folders),
-                GroupKey.Overwrite => FormatTitle("overwrite", files, folders),
-                GroupKey.Copy => FormatTitle("copy", files, folders),
-                GroupKey.Move => FormatTitle("move", files, folders),
-                _           => FormatTitle("ready", files, folders),
-            };
+        IsDeletePipeline = deleteActions.Count > 0;
 
-            var isReady = group.Key == GroupKey.Ready;
+        void AddGroup(GroupKey key, List<PlannedAction> actions)
+        {
+            if (actions.Count == 0) return;
+
+            var files = key == GroupKey.Skip ? actions.Sum(a => a.NumberOfFilesSkipped) : actions.Sum(a => a.NumberOfFilesAffected);
+            var folders = key == GroupKey.Skip ? actions.Sum(a => a.NumberOfFoldersSkipped) : actions.Sum(a => a.NumberOfFoldersAffected);
+
+            var title = FormatTitle(key.ToString().ToLowerInvariant(), files, folders);
+
             var vm = new PreviewGroupViewModel
             {
                 Title = title,
-                IsReadyGroup = isReady,
-                IsExpanded = group.Key is GroupKey.Delete or GroupKey.Overwrite,
+                IsExpanded = key is GroupKey.Delete or GroupKey.Overwrite,
             };
 
-            foreach (var action in group)
+            foreach (var action in actions)
             {
                 vm.Actions.Add(new PreviewItemViewModel
                 {
@@ -166,25 +171,14 @@ public partial class PreviewViewModel : ViewModelBase
             Groups.Add(vm);
         }
 
+        AddGroup(GroupKey.Delete, deleteActions);
+        AddGroup(GroupKey.Overwrite, overwriteActions);
+        AddGroup(GroupKey.Move, moveActions);
+        AddGroup(GroupKey.Copy, copyActions);
+        AddGroup(GroupKey.Skip, skipActions);
+
         RunCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(ConfirmButtonText));
-    }
-
-    private static GroupKey ActionGrouping(PlannedAction a)
-    {
-        if (a.SourceResult is SourceResult.Trashed or SourceResult.Deleted)
-            return GroupKey.Delete;
-
-        if (a.DestinationResult == DestinationResult.Overwritten)
-            return GroupKey.Overwrite;
-
-        if (a.SourceResult == SourceResult.Moved)
-            return GroupKey.Move;
-
-        if (a.SourceResult == SourceResult.Copied)
-            return GroupKey.Copy;
-        
-        return GroupKey.Ready;
     }
 
     private static string FormatTitle(string action, int files, int folders)
@@ -192,7 +186,7 @@ public partial class PreviewViewModel : ViewModelBase
         return (folders > 0) ? $"Will {action} {files} files and {folders} folders" : $"Will {action} {files} files";
     }
 
-    [RelayCommand(CanExecute = nameof(CanRun))]
+    [RelayCommand]
     private void Run()
     {
         RunRequested?.Invoke();
@@ -215,40 +209,54 @@ public partial class PreviewViewModel : ViewModelBase
         sb.AppendLine();
         sb.AppendLine($"**Total Actions:** {TotalActionCount}");
         sb.AppendLine($"**Files Affected:** {TotalFilesAffected}");
+        sb.AppendLine($"**Files Skipped:** {TotalFilesSkipped}");
         sb.AppendLine($"**Folders Affected:** {TotalFoldersAffected}");
+        sb.AppendLine($"**Folders Skipped:** {TotalFoldersSkipped}");
         sb.AppendLine($"**Total Input Size:** { FileSizeFormatter.FormatBytes(TotalEstimatedInputBytes)}");
         sb.AppendLine($"**Estimated Output Size:** {FileSizeFormatter.FormatBytes(TotalEstimatedOutputBytes)}");
         sb.AppendLine();
 
-        var grouped = _currentPlan.Actions
-            .GroupBy(ActionGrouping)
-            .OrderBy(g => g.Key switch { GroupKey.Delete => 0, GroupKey.Overwrite => 1, _ => 2 });
+        var deleteActions = new List<PlannedAction>();
+        var overwriteActions = new List<PlannedAction>();
+        var moveActions = new List<PlannedAction>();
+        var copyActions = new List<PlannedAction>();
+        var skipActions = new List<PlannedAction>();
 
-        foreach (var group in grouped)
+        foreach (var a in _currentPlan.Actions)
         {
-            var files = group.Sum(a => a.NumberOfFilesAffected);
-            var folders = group.Sum(a => a.NumberOfFoldersAffected);
-            var title = group.Key switch
-            {
-                GroupKey.Delete => FormatTitle("delete", files, folders),
-                GroupKey.Move   => FormatTitle("move", files, folders),
-                GroupKey.Copy   => FormatTitle("copy", files, folders),
-                GroupKey.Overwrite => FormatTitle("overwrite", files, folders),
-                _               => FormatTitle("ready", files, folders),
-            };
+            if (a.SourceResult is SourceResult.Trashed or SourceResult.Deleted) deleteActions.Add(a);
+            if (a.DestinationResult == DestinationResult.Overwritten) overwriteActions.Add(a);
+            if (a.SourceResult == SourceResult.Moved) moveActions.Add(a);
+            if (a.SourceResult == SourceResult.Copied) copyActions.Add(a);
+            if (a.SourceResult == SourceResult.Skipped) skipActions.Add(a);
+        }
+
+        void WriteGroup(GroupKey key, List<PlannedAction> actions)
+        {
+            if (actions.Count == 0) return;
+
+            var files = key == GroupKey.Skip ? actions.Sum(a => a.NumberOfFilesSkipped) : actions.Sum(a => a.NumberOfFilesAffected);
+            var folders = key == GroupKey.Skip ? actions.Sum(a => a.NumberOfFoldersSkipped) : actions.Sum(a => a.NumberOfFoldersAffected);
+            var title = FormatTitle(key.ToString().ToLowerInvariant(), files, folders);
 
             sb.AppendLine($"## {title}");
             sb.AppendLine();
             sb.AppendLine("| Source | Destination | Action |");
             sb.AppendLine("|---|---|---|");
 
-            foreach (var action in group)
+            foreach (var action in actions)
             {
                 var actionText = PreviewItemViewModel.GetActionText(action.SourceResult, action.DestinationResult);
                 sb.AppendLine($"| `{action.SourcePath}` | `{action.DestinationPath}` | {actionText} |");
             }
             sb.AppendLine();
         }
+
+        WriteGroup(GroupKey.Delete, deleteActions);
+        WriteGroup(GroupKey.Overwrite, overwriteActions);
+        WriteGroup(GroupKey.Move, moveActions);
+        WriteGroup(GroupKey.Copy, copyActions);
+        WriteGroup(GroupKey.Skip, skipActions);
 
         await SaveReportRequested.Invoke(sb.ToString());
     }
