@@ -83,48 +83,43 @@ Trash is OS-level (Recycle Bin, freedesktop, NSFileManager), not provider-level.
 
 ## Sub-step C — SMB / Network path capability detection
 
-**Status:** [ ] Pending
-**Manual validation gate:** point source at `\\server\share` — no watcher starts, Trash mode preview shows permanent delete warning.
+**Status:** [x] Complete — 2026-03-07
+**Validation:** 369 tests passing; manual smoke confirmed UNC source (`\\laptop\share`) — no watcher started, non-atomic move (copy+delete fallback observed).
 
 **Goal:** `LocalFileSystemProvider` detects UNC roots and adjusts capabilities accordingly.
 No separate SMB provider class needed — `System.IO` handles UNC paths natively.
 
-### Files to modify
-- `SmartCopy.Core/FileSystem/LocalFileSystemProvider.cs`
-  - Detect UNC in constructor: `_isNetworkPath = RootPath.StartsWith(@"\\") || RootPath.StartsWith("//")`
-  - `CanWatch = !_isNetworkPath` (FileSystemWatcher unreliable over SMB)
-  - `CanTrash = !_isNetworkPath` (can't send network files to local Recycle Bin)
-  - `CanAtomicMove = !_isNetworkPath`
-  - `VolumeId = null` if network, else drive root
+### Design decision
+Provider type boundaries track *implementation* divergence, not conceptual ownership. UNC paths differ only in capabilities (not in `System.IO` API surface), so they remain within `LocalFileSystemProvider`. Future rename to `SystemIOFileSystemProvider` is noted as a cleanup item.
 
-### Tests
-Extend `SmartCopy.Tests/FileSystem/PathHandlingTests.cs`:
-- UNC root → CanWatch/CanTrash/CanAtomicMove = false, VolumeId = null
-- Local root → all true, VolumeId = drive root string
+### Changes made
+- `SmartCopy.Core/FileSystem/LocalFileSystemProvider.cs` — detect UNC via `Uri.TryCreate + uri.IsUnc` (public BCL API); cache `_capabilities` as `readonly` field (single allocation); `VolumeId` reuses `_isNetworkPath`. CanWatch/CanTrash/CanAtomicMove = `!_isNetworkPath`.
+- `SmartCopy.Tests/FileSystem/PathHandlingTests.cs` — two new tests: local root has full capabilities; UNC root has degraded capabilities and null VolumeId.
+
+### Bug fix (same session)
+`MoveStep` copy+delete fallback left empty source directories behind. Fixed: after piecewise-moving a fully-selected subtree, the source directory is deleted bottom-up. Guard: `allMoved && !IsNodeFailed(child) && CanMoveEntireSubtree(child)`. Existing tests updated to assert source dirs are gone; partial-selection test asserts dir is preserved.
 
 ---
 
 ## Sub-step D — Capability-derived safety messaging in UI
 
-**Status:** [ ] Pending
-**Manual validation gate:** preview a Trash-mode delete with a UNC source — yellow warning banner appears in preview dialog.
+**Status:** [x] Complete — 2026-03-07
+**Validation:** 368 tests passing; manual smoke confirmed yellow banner in preview for UNC Trash-mode delete; "⚠ Trash unavailable" badge on step card; Run/Preview buttons disabled until mode changed to Permanent.
 
 **Goal:** Preview and step editors surface warnings when an operation will degrade due to provider capabilities (e.g., trash falls back to permanent delete, cross-volume copy+delete).
 
-### Messaging cases
-| Scenario | Location | Message |
-|---|---|---|
-| Trash mode, CanTrash=false | PreviewViewModel header | "Trash not available for this path — files will be permanently deleted" |
-| Cross-volume move | PreviewViewModel header | "Cross-volume move: files will be copied then deleted" |
-| DeleteStep editor, Trash + network source | DeleteStepEditor | "Network paths cannot be sent to Trash — permanent delete will be used" |
-
-### Files to modify
-- `SmartCopy.Core/Pipeline/OperationPlan.cs` — add `IReadOnlyList<string> Warnings { get; init; }`
-- `SmartCopy.Core/Pipeline/PipelineRunner.cs` — collect and populate `OperationPlan.Warnings` during PreviewAsync
-- `SmartCopy.UI/ViewModels/PreviewViewModel.cs` — expose Warnings; show yellow banner
-- `SmartCopy.UI/Views/PreviewView.axaml` — yellow warning banner, visible when Warnings.Count > 0
-- `SmartCopy.UI/ViewModels/Pipeline/StepEditors/DeleteStepEditorViewModel.cs` — `string? CapabilityWarning` from source provider capabilities
-- `SmartCopy.UI/Views/Pipeline/StepEditors/DeleteStepEditor.axaml` — warning TextBlock bound to CapabilityWarning
+### Changes made
+- `SmartCopy.Core/Pipeline/OperationPlan.cs` — added `IReadOnlyList<string> Warnings { get; init; }`
+- `SmartCopy.Core/Pipeline/PipelineRunner.cs` — collects warnings post-preview: Trash+!CanTrash → "Trash not available…"; cross-volume move → "Destination is on another drive…"
+- `SmartCopy.UI/ViewModels/PreviewViewModel.cs` — `Warnings`/`HasWarnings` populated from plan in `LoadFrom`
+- `SmartCopy.UI/Views/PreviewView.axaml` — yellow banner above delete confirmation banner; collapses when empty
+- `SmartCopy.UI/ViewModels/Pipeline/DeleteStepEditorViewModel.cs` — `CapabilityWarning` computed from mode × CanTrash; `SetSourceCapabilities()` method; defaults to full capabilities
+- `SmartCopy.UI/Views/Pipeline/StepEditors/DeleteStepEditor.axaml` — `CapabilityWarning` TextBlock with IsNotNullOrEmpty converter
+- `SmartCopy.UI/ViewModels/PipelineStepViewModel.cs` — `TrashUnavailable` observable drives `ShowDeleteBadge`/`DeleteBadge` ("⚠ Trash unavailable")
+- `SmartCopy.UI/ViewModels/PipelineViewModel.cs` — `_capabilityBlocked` field gates `CanRun`; `SourceCapabilities` property; `SetSourceCapabilities()`; capability check in `Revalidate()` sets `TrashUnavailable` + `BlockingValidationMessage`
+- `SmartCopy.UI/ViewModels/MainViewModel.cs` — pushes `SourceProvider.Capabilities` to `Pipeline` after each successful source path change
+- `SmartCopy.UI/ViewModels/Pipeline/EditStepDialogViewModel.cs` — `ForNew`/`ForEdit` accept optional `ProviderCapabilities?`; passed to `DeleteStepEditorViewModel` if applicable
+- `SmartCopy.UI/Views/PipelineView.axaml.cs` — passes `_currentViewModel.SourceCapabilities` to dialog factories
 
 ---
 
