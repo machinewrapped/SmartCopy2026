@@ -10,18 +10,14 @@
 
 ## Context
 
-Phase 1 and 2.1–2.6 established core UX, real filesystem integration, and incremental rescanning.
-Phase 5.2.7 adds adaptive behavior for heterogeneous filesystems: local (including network SMB paths),
-MTP devices, and platform trash (Recycle Bin / freedesktop / NSFileManager). The goal is that
-SmartCopy behaves correctly and safely regardless of where source/target files live, and surfaces
-meaningful capability-derived warnings to the user before destructive operations.
+Phase 1 and 2.1–2.6 established core UX, real filesystem integration, and incremental scanning.
+Phase 5.2.7 adds adaptive behavior for heterogeneous filesystems: local (including network SMB paths), MTP devices, and platform trash (Recycle Bin / freedesktop / NSFileManager). The goal is that SmartCopy behaves correctly and safely regardless of where source/target files live, and surfaces meaningful capability-derived warnings to the user before destructive operations.
 
 Current gaps at start of phase:
-- `DeleteStep.ApplyAsync` calls `provider.DeleteAsync()` for both Trash and Permanent modes (no routing)
-- `ProviderCapabilities` lacks `CanTrash`
-- No `TrashService` abstraction exists anywhere
-- `MoveStep` uses `ReferenceEquals` for same-provider check; two local providers on the same drive
-  are treated as cross-provider (no atomic move)
+- [Resolved] `DeleteStep.ApplyAsync` calls `provider.DeleteAsync()` for both Trash and Permanent modes (no routing)
+- [Resolved] `ProviderCapabilities` lacks `CanTrash`
+- [Resolved] No `TrashService` abstraction exists anywhere
+- `MoveStep` uses `ReferenceEquals` for same-provider check; two local providers on the same drive are treated as cross-provider (no atomic move)
 - `LocalFileSystemProvider` ignores whether root is a UNC path (no SMB capability adjustments)
 - No MTP provider
 - No capability-derived messaging in PreviewViewModel or DeleteStepEditor
@@ -33,13 +29,10 @@ Current gaps at start of phase:
 **Status:** [x] Complete — 2026-03-07
 **Validation:** 365 tests passing; manual smoke confirmed Trash → Recycle Bin and Permanent delete on local Windows SSD.
 
-**Goal:** DeleteStep routes to platform trash when mode=Trash and service is available; falls back to
-permanent delete when unavailable; journals actual outcome.
+**Goal:** DeleteStep routes to platform trash when mode=Trash and service is available; falls back to permanent delete when unavailable; journals actual outcome.
 
 ### Design decision
-Trash is OS-level (Recycle Bin, freedesktop, NSFileManager), not provider-level. An MTP device
-or memory provider cannot trash. Therefore `ITrashService` is a separate service, NOT a method
-on `IFileSystemProvider`.
+Trash is OS-level (Recycle Bin, freedesktop, NSFileManager), not provider-level. An MTP device or memory provider cannot trash. Therefore `ITrashService` is a separate service, NOT a method on `IFileSystemProvider`.
 
 ### Files to create
 - `SmartCopy.Core/Trash/ITrashService.cs`
@@ -74,13 +67,11 @@ on `IFileSystemProvider`.
 **Status:** [ ] Pending
 **Manual validation gate:** move files from `C:\FolderA` to `C:\FolderB` using two separate providers — journal should show `move` (not copy+delete).
 
-**Goal:** Two `LocalFileSystemProvider` instances on the same OS volume can perform atomic moves
-between them (currently blocked by `ReferenceEquals` check in `MoveStep`).
+**Goal:** Two `LocalFileSystemProvider` instances on the same OS volume can perform atomic moves between them (currently blocked by `ReferenceEquals` check in `MoveStep`).
 
 ### Root cause
 `MoveStep.ApplyAsync` uses `ReferenceEquals(targetProvider, context.SourceProvider)`.
-Two providers rooted at `C:\Source` and `C:\Destination` are different instances — always
-copy+delete even though `File.Move()` would succeed atomically.
+Two providers rooted at `C:\Source` and `C:\Destination` are different instances — always copy+delete even though `File.Move()` would succeed atomically.
 
 ### Files to modify
 - `SmartCopy.Core/FileSystem/IFileSystemProvider.cs` — add `string? VolumeId { get; }` (drive root for local, null for memory/MTP)
@@ -128,8 +119,7 @@ Extend `SmartCopy.Tests/FileSystem/PathHandlingTests.cs`:
 **Status:** [ ] Pending
 **Manual validation gate:** preview a Trash-mode delete with a UNC source — yellow warning banner appears in preview dialog.
 
-**Goal:** Preview and step editors surface warnings when an operation will degrade due to provider
-capabilities (e.g., trash falls back to permanent delete, cross-volume copy+delete).
+**Goal:** Preview and step editors surface warnings when an operation will degrade due to provider capabilities (e.g., trash falls back to permanent delete, cross-volume copy+delete).
 
 ### Messaging cases
 | Scenario | Location | Message |
