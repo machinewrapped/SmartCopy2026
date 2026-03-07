@@ -87,7 +87,7 @@ public partial class PipelineView : UserControl
                 _currentViewModel.RecordRecentTarget(destPath);
             }
 
-            _currentViewModel.AddStepFromResult(kind, vm.ResultStep, vm.ResultCustomName);
+            _currentViewModel.AddStepFromResult(vm.ResultStep, vm.ResultCustomName);
         }
     }
 
