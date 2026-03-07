@@ -9,7 +9,10 @@ public partial class DeleteStepEditorViewModel : StepEditorViewModelBase
     public IReadOnlyList<DeleteMode> DeleteModes { get; } = Enum.GetValues<DeleteMode>();
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsPermanentDelete))]
     private DeleteMode _deleteMode = DeleteMode.Trash;
+
+    public bool IsPermanentDelete => DeleteMode == DeleteMode.Permanent;
 
     public override bool IsValid => true;
 

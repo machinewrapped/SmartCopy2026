@@ -56,8 +56,6 @@ public partial class PreviewGroupViewModel : ViewModelBase
 
 public partial class PreviewViewModel : ViewModelBase
 {
-    private DeleteMode _deleteMode = DeleteMode.Trash;
-
     [ObservableProperty]
     private bool _isDeletePipeline;
 
@@ -77,8 +75,6 @@ public partial class PreviewViewModel : ViewModelBase
     private int _totalFoldersAffected;
 
     public ObservableCollection<PreviewGroupViewModel> Groups { get; } = [];
-
-    public bool CanRun => true;
 
     private enum GroupKey
     {
@@ -114,11 +110,9 @@ public partial class PreviewViewModel : ViewModelBase
 
     private OperationPlan? _currentPlan;
 
-    public void LoadFrom(OperationPlan plan, bool isDeletePipeline, DeleteMode deleteMode)
+    public void LoadFrom(OperationPlan plan)
     {
         _currentPlan = plan;
-        _deleteMode = deleteMode;
-        IsDeletePipeline = isDeletePipeline;
         TotalActionCount = plan.Actions.Count;
         TotalFilesAffected = plan.TotalFilesAffected;
         TotalFoldersAffected = plan.TotalFoldersAffected;
@@ -129,6 +123,8 @@ public partial class PreviewViewModel : ViewModelBase
         var grouped = plan.Actions
             .GroupBy(ActionGrouping)
             .OrderBy(g => g.Key switch { GroupKey.Delete => 0, GroupKey.Overwrite => 1, _ => 2 });
+
+        IsDeletePipeline = grouped.Select(g => g.Key == GroupKey.Delete).Any();
 
         foreach (var group in grouped)
         {
@@ -192,7 +188,7 @@ public partial class PreviewViewModel : ViewModelBase
         return (folders > 0) ? $"Will {action} {files} files and {folders} folders" : $"Will {action} {files} files";
     }
 
-    [RelayCommand(CanExecute = nameof(CanRun))]
+    [RelayCommand]
     private void Run()
     {
         RunRequested?.Invoke();

@@ -800,7 +800,7 @@ public partial class MainViewModel : ViewModelBase
 
         var plan = await runner.PreviewAsync(job, CancellationToken.None);
 
-        Preview.LoadFrom(plan, pipeline.HasDeleteStep, GetDeleteModeFromPipeline(pipeline, job.DeleteMode));
+        Preview.LoadFrom(plan);
 
         if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
             && desktop.MainWindow is { } mainWindow)
@@ -1074,12 +1074,6 @@ public partial class MainViewModel : ViewModelBase
         return Enum.TryParse<DeleteMode>(raw, out var mode)
             ? mode
             : DeleteMode.Trash;
-    }
-
-    private static DeleteMode GetDeleteModeFromPipeline(TransformPipeline pipeline, DeleteMode fallback)
-    {
-        var deleteStep = pipeline.Steps.OfType<DeleteStep>().FirstOrDefault();
-        return deleteStep?.Mode ?? fallback;
     }
 
     private void StartDirectoryWatcherIfSupported()

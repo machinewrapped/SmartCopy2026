@@ -58,7 +58,7 @@ public sealed class PreviewViewModelTests
     {
         var vm = new PreviewViewModel();
 
-        vm.LoadFrom(BuildPlan(), isDeletePipeline: false, deleteMode: DeleteMode.Trash);
+        vm.LoadFrom(BuildPlan());
 
         Assert.Equal(4, vm.Groups.Count);
         Assert.Contains(vm.Groups, g => g.Title.StartsWith("Will delete"));
@@ -72,18 +72,18 @@ public sealed class PreviewViewModelTests
     {
         var vm = new PreviewViewModel();
 
-        vm.LoadFrom(BuildPlan(), isDeletePipeline: false, deleteMode: DeleteMode.Trash);
+        vm.LoadFrom(BuildPlan());
 
         Assert.Equal(4, vm.TotalActionCount);
         Assert.Equal(30, vm.TotalEstimatedOutputBytes);
     }
 
     [Fact]
-    public void IsDeletePipeline_SetsDeleteMode()
+    public void IsDeletePipeline_SetsButtonText()
     {
         var vm = new PreviewViewModel();
 
-        vm.LoadFrom(BuildPlan(), isDeletePipeline: true, deleteMode: DeleteMode.Permanent);
+        vm.LoadFrom(BuildPlan());
 
         Assert.True(vm.IsDeletePipeline);
         Assert.Contains("⚠ Run", vm.ConfirmButtonText);
@@ -93,7 +93,7 @@ public sealed class PreviewViewModelTests
     public void CopyGroup_CountMatches()
     {
         var vm = new PreviewViewModel();
-        vm.LoadFrom(BuildPlan(), isDeletePipeline: false, deleteMode: DeleteMode.Trash);
+        vm.LoadFrom(BuildPlan());
 
         var copyGroup = Assert.Single(vm.Groups, g => g.Title.StartsWith("Will copy"));
         Assert.Equal(1, copyGroup.Count);
