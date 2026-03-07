@@ -18,8 +18,7 @@ public sealed class WorkflowMenuViewModelTests
             Name: name,
             Description: null,
             Steps: [new TransformStepConfig(StepKind.Copy, new System.Text.Json.Nodes.JsonObject { ["destinationPath"] = "/mem/Target" })],
-            OverwriteMode: OverwriteMode.IfNewer.ToString(),
-            DeleteMode: DeleteMode.Trash.ToString()));
+            OverwriteMode: OverwriteMode.IfNewer.ToString()));
 
     [Fact]
     public async Task RefreshAsync_PopulatesSavedWorkflows()

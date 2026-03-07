@@ -357,8 +357,7 @@ public partial class PipelineViewModel : ViewModelBase
             Name: name,
             Description: null,
             Steps: [.. Steps.Select(BuildConfigWithUiMetadata)],
-            OverwriteMode: OverwriteMode.IfNewer.ToString(),
-            DeleteMode: DeleteMode.Trash.ToString());
+            OverwriteMode: OverwriteMode.IfNewer.ToString());
     }
 
     private void UpdateButtonStates()

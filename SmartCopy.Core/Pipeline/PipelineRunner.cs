@@ -149,7 +149,6 @@ public sealed class PipelineRunner
         public DirectoryTreeNode RootNode { get; }
         public IFileSystemProvider SourceProvider { get; }
         public OverwriteMode OverwriteMode { get; }
-        public DeleteMode DeleteMode { get; }
         public FileSystemProviderRegistry ProviderRegistry { get; }
 
         public StepContext(PipelineJob job)
@@ -157,7 +156,6 @@ public sealed class PipelineRunner
             RootNode = job.RootNode;
             SourceProvider = job.SourceProvider;
             OverwriteMode = job.OverwriteMode;
-            DeleteMode = job.DeleteMode;
             ProviderRegistry = job.ProviderRegistry;
         }
 
@@ -179,7 +177,6 @@ public sealed class PipelineRunner
                 PathSegments = segments,
                 CurrentExtension = extension,
                 OverwriteMode = OverwriteMode,
-                DeleteMode = DeleteMode,
                 VirtualCheckState = node.CheckState,
             };
             _contexts[node] = context;

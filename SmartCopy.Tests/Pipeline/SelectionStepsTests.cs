@@ -24,7 +24,6 @@ public sealed class SelectionStepsTests
         public DirectoryTreeNode RootNode { get; }
         public IFileSystemProvider SourceProvider { get; }
         public OverwriteMode OverwriteMode => OverwriteMode.Always;
-        public DeleteMode DeleteMode => DeleteMode.Trash;
         public FileSystemProviderRegistry ProviderRegistry { get; } = new();
 
         public TestStepContext(DirectoryTreeNode root, IFileSystemProvider provider)
@@ -49,7 +48,6 @@ public sealed class SelectionStepsTests
                         : [node.Name],
                     CurrentExtension = Path.GetExtension(node.Name).TrimStart('.'),
                     OverwriteMode = OverwriteMode,
-                    DeleteMode = DeleteMode,
                     VirtualCheckState = node.CheckState,
                 };
                 _contexts[node] = context;

@@ -86,7 +86,6 @@ public sealed class PipelineDirectoryTests
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
-                DeleteMode     = DeleteMode.Trash,
             });
 
         Assert.Single(results);
@@ -121,7 +120,6 @@ public sealed class PipelineDirectoryTests
             SourceProvider = provider,
             ProviderRegistry = provider.CreateRegistry(),
             OverwriteMode  = OverwriteMode.Always,
-            DeleteMode     = DeleteMode.Permanent,
         };
 
         await runner.PreviewAsync(job);
@@ -162,7 +160,6 @@ public sealed class PipelineDirectoryTests
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
-                DeleteMode     = DeleteMode.Trash,
             });
 
         Assert.Single(results);
@@ -207,7 +204,6 @@ public sealed class PipelineDirectoryTests
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
-                DeleteMode     = DeleteMode.Trash,
             });
 
         // FlattenStep + MoveStep each produce results for the nodes traversed
@@ -245,7 +241,6 @@ public sealed class PipelineDirectoryTests
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
-                DeleteMode     = DeleteMode.Trash,
             });
 
         var moveResult = results.Single(r => r.SourceNodeResult == SourceResult.Moved);
@@ -283,7 +278,6 @@ public sealed class PipelineDirectoryTests
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
-                DeleteMode     = DeleteMode.Trash,
             });
 
         // One atomic result covering the entire subtree including nested dirs
@@ -318,7 +312,6 @@ public sealed class PipelineDirectoryTests
             SourceProvider = provider,
             ProviderRegistry = provider.CreateRegistry(),
             OverwriteMode  = OverwriteMode.Always,
-            DeleteMode     = DeleteMode.Permanent,
         };
         await runner.PreviewAsync(job);
         var results = await runner.ExecuteAsync(job);
@@ -358,7 +351,6 @@ public sealed class PipelineDirectoryTests
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
-                DeleteMode     = DeleteMode.Trash,
             }, ct);
 
         // One action per file, not one per directory
@@ -401,7 +393,6 @@ public sealed class PipelineDirectoryTests
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
                 OverwriteMode  = OverwriteMode.Always,
-                DeleteMode     = DeleteMode.Trash,
             });
 
         Assert.Single(results);

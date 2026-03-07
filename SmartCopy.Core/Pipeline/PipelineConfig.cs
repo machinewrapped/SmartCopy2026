@@ -4,6 +4,6 @@ public sealed record PipelineConfig(
     string Name,
     string? Description,
     List<TransformStepConfig> Steps,
-    string OverwriteMode,
-    string DeleteMode);
+    string OverwriteMode);
+
 

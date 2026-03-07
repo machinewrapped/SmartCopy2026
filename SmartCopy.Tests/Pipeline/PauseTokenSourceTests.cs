@@ -119,7 +119,6 @@ public sealed class PauseTokenSourceTests
             SourceProvider = provider,
             ProviderRegistry = provider.CreateRegistry(),
             OverwriteMode = OverwriteMode.Always,
-            DeleteMode = DeleteMode.Trash,
         };
 
         using var pts = new PauseTokenSource();
@@ -159,7 +158,6 @@ public sealed class PauseTokenSourceTests
             SourceProvider = provider,
             ProviderRegistry = provider.CreateRegistry(),
             OverwriteMode = OverwriteMode.Always,
-            DeleteMode = DeleteMode.Trash,
         };
 
         using var pts = new PauseTokenSource();

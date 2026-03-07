@@ -130,8 +130,7 @@ public sealed class PipelineViewModelTests
                             ["customName"] = "Audio Backup",
                         }),
                 ],
-                OverwriteMode: OverwriteMode.IfNewer.ToString(),
-                DeleteMode: DeleteMode.Trash.ToString()),
+                OverwriteMode: OverwriteMode.IfNewer.ToString()),
         };
 
         vm.LoadPreset(preset);

@@ -28,8 +28,7 @@ public sealed class PipelinePresetStoreTests
             [
                 new TransformStepConfig(StepKind.Copy, new JsonObject { ["destinationPath"] = "/mem/Mirror" }),
             ],
-            OverwriteMode: OverwriteMode.IfNewer.ToString(),
-            DeleteMode: DeleteMode.Trash.ToString());
+            OverwriteMode: OverwriteMode.IfNewer.ToString());
 
         await store.SaveUserPresetAsync("Music Copy", config);
         var loaded = await store.GetUserPresetsAsync();
@@ -55,8 +54,7 @@ public sealed class PipelinePresetStoreTests
             [
                 new TransformStepConfig(StepKind.Copy, new JsonObject { ["destinationPath"] = "/a" }),
             ],
-            OverwriteMode: OverwriteMode.IfNewer.ToString(),
-            DeleteMode: DeleteMode.Trash.ToString());
+            OverwriteMode: OverwriteMode.IfNewer.ToString());
 
         var moveConfig = copyConfig with
         {
@@ -81,7 +79,7 @@ public sealed class PipelinePresetStoreTests
         {
             new CopyStep("/mem/copy"),
             new MoveStep("/mem/move"),
-            new DeleteStep(DeleteMode.Permanent),
+            new DeleteStep(),
             new FlattenStep(FlattenConflictStrategy.Skip),
             new RenameStep("{name}_new"),
             new RebaseStep("source", "target"),

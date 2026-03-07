@@ -83,7 +83,7 @@ public partial class MainViewModel : ViewModelBase
     private readonly SmartCopyAppContext _appContext;
     private readonly MemoryFileSystemProvider _memoryProvider;
     private readonly FileSystemProviderRegistry _providerRegistry = new();
-    private readonly IDirectoryWatcherFactory _watcherFactory = new LocalDirectoryWatcherFactory();
+    private readonly LocalDirectoryWatcherFactory _watcherFactory = new();
     private readonly AppSettings _settings;
     private readonly AppSettingsStore _settingsStore = new();
     private readonly SessionStore _sessionStore = new();
@@ -795,7 +795,6 @@ public partial class MainViewModel : ViewModelBase
             SourceProvider   = sourceProvider,
             ProviderRegistry = _providerRegistry,
             OverwriteMode    = ParseOverwriteMode(_settings.DefaultOverwriteMode),
-            DeleteMode       = ParseDeleteMode(_settings.DefaultDeleteMode),
         };
 
         var plan = await runner.PreviewAsync(job, CancellationToken.None);
@@ -846,8 +845,8 @@ public partial class MainViewModel : ViewModelBase
             SourceProvider   = sourceProvider,
             ProviderRegistry = _providerRegistry,
             OverwriteMode    = ParseOverwriteMode(_settings.DefaultOverwriteMode),
-            DeleteMode       = ParseDeleteMode(_settings.DefaultDeleteMode),
         };
+
         await ExecutePipelineAsync(runner, job);
     }
 

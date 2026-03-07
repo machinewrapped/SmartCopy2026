@@ -24,9 +24,6 @@ public sealed record PipelineJob
     /// <summary>Controls how pre-existing destination files are handled.</summary>
     public OverwriteMode OverwriteMode { get; init; } = OverwriteMode.IfNewer;
 
-    /// <summary>Controls whether deleted files go to the recycle bin or are permanently removed.</summary>
-    public DeleteMode DeleteMode { get; init; } = DeleteMode.Trash;
-
     /// <summary>Progress reporter for overall pipeline execution.</summary>
     public IProgress<OperationProgress>? Progress { get; init; }
 
