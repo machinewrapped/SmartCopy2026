@@ -70,7 +70,7 @@ public sealed class PipelineDirectoryTests
         var provider = MemoryFileSystemFixtures.Create(f => f
             .WithSimulatedFile("/src/music/a.flac", 1000)
             .WithSimulatedFile("/src/music/b.flac", 2000)
-            .WithDirectory("/dest"));
+            .WithDirectory("/dest"), volumeId: "MEM");
 
         var root = await provider.BuildDirectoryTree();
 
@@ -178,7 +178,7 @@ public sealed class PipelineDirectoryTests
     {
         var provider = MemoryFileSystemFixtures.Create(f => f
             .WithSimulatedFile("/src/music/rock/a.flac", 1000)
-            .WithDirectory("/dest"));
+            .WithDirectory("/dest"), volumeId: "MEM");
 
         // Build from /src/music so "rock" is a direct child of the scan root.
         var musicRoot = await provider.BuildDirectoryTree("/src/music");
@@ -216,7 +216,7 @@ public sealed class PipelineDirectoryTests
     {
         var provider = MemoryFileSystemFixtures.Create(f => f
             .WithSimulatedFile("/src/music/a.flac", 1000)
-            .WithDirectory("/dest"));
+            .WithDirectory("/dest"), volumeId: "MEM");
 
         // Build from /src so "music" is a direct child of the scan root.
         var srcRoot = await provider.BuildDirectoryTree("/src");
@@ -256,7 +256,7 @@ public sealed class PipelineDirectoryTests
         var provider = MemoryFileSystemFixtures.Create(f => f
             .WithSimulatedFile("/src/music/rock/a.flac", 1000)
             .WithSimulatedFile("/src/music/rock/b.flac", 2000)
-            .WithDirectory("/dest"));
+            .WithDirectory("/dest"), volumeId: "MEM");
 
         var root = await provider.BuildDirectoryTree();
         var parentDir = root.FindNodeByPathSegments(["src", "music"]);
@@ -366,7 +366,7 @@ public sealed class PipelineDirectoryTests
         var provider = MemoryFileSystemFixtures.Create(f => f
             .WithSimulatedFile("/src/music/a.flac", 1000)
             .WithSimulatedFile("/src/music/b.flac", 2000)
-            .WithDirectory("/dest"));
+            .WithDirectory("/dest"), volumeId: "MEM");
 
         var root = await provider.BuildDirectoryTree();
         var dirNode = root.FindNodeByPathSegments(["src", "music"]);

@@ -103,7 +103,7 @@ public sealed class MoveStepFallbackTests
     [Fact]
     public async Task SameProvider_AtomicMove_FileMoved()
     {
-        var provider = MemoryFileSystemFixtures.Create(s => s.WithFile("/src/file.txt", "atomic"u8));
+        var provider = MemoryFileSystemFixtures.Create(s => s.WithFile("/src/file.txt", "atomic"u8), volumeId: "MEM");
 
         var root = await provider.BuildDirectoryTree("/src");
         root.Files[0].CheckState = CheckState.Checked;
@@ -130,14 +130,14 @@ public sealed class MoveStepFallbackTests
     [Fact]
     public async Task AtomicMoveDisabled_SameProvider_UsesCopyDeleteFallback()
     {
-        var memory = MemoryFileSystemFixtures.Create(s => s.WithFile("/src/file.txt", "fallback"u8));
+        var memory = MemoryFileSystemFixtures.Create(s => s.WithFile("/src/file.txt", "fallback"u8), volumeId: "MEM");
         var noAtomicMove = new CapabilityOverrideProvider(memory,
             new ProviderCapabilities(CanSeek: true, CanAtomicMove: false, CanWatch: false, MaxPathLength: int.MaxValue));
 
         var root = await memory.BuildDirectoryTree("/src");
         root.Files[0].CheckState = CheckState.Checked;
 
-        // Same wrapped instance → sameProvider = true, canAtomicMove = false → fallback.
+        // Same wrapped instance, VolumeId="MEM" → sameVolume=true, canAtomicMove=false → fallback.
         var ctx = new MoveTestContext(root, noAtomicMove);
         var step = new MoveStep("/mem/dest");
 
@@ -225,7 +225,7 @@ public sealed class MoveStepFallbackTests
     {
         var provider = MemoryFileSystemFixtures.Create(s => s
             .WithFile("/src/dir/a.txt", "aaa"u8)
-            .WithFile("/src/dir/b.txt", "bbb"u8));
+            .WithFile("/src/dir/b.txt", "bbb"u8), volumeId: "MEM");
 
         var root = await provider.BuildDirectoryTree("/src");
         var dir = root.Children.Single();
@@ -290,7 +290,7 @@ public sealed class MoveStepFallbackTests
     public async Task AtomicMoveDisabled_Directory_UsesCopyDeleteFallback()
     {
         var memory = MemoryFileSystemFixtures.Create(s => s
-            .WithFile("/src/dir/file.txt", "content"u8));
+            .WithFile("/src/dir/file.txt", "content"u8), volumeId: "MEM");
         var noAtomicMove = new CapabilityOverrideProvider(memory,
             new ProviderCapabilities(CanSeek: true, CanAtomicMove: false, CanWatch: false, MaxPathLength: int.MaxValue));
 
@@ -311,5 +311,59 @@ public sealed class MoveStepFallbackTests
         Assert.Equal(SourceResult.Moved, results[0].SourceNodeResult);
         Assert.False(await memory.ExistsAsync("/src/dir/file.txt", CancellationToken.None));
         Assert.True(await memory.ExistsAsync("/dest/dir/file.txt", CancellationToken.None));
+    }
+
+    /// <summary>
+    /// Two providers with different VolumeIds (e.g. C:\ and D:\) cannot do an atomic move
+    /// and fall back to copy+delete.
+    /// </summary>
+    [Fact]
+    public async Task DifferentVolumeIds_UsesCopyDeleteFallback()
+    {
+        var sourceProvider = MemoryFileSystemFixtures.Create(s => s.WithFile("/src/file.txt", "content"u8), volumeId: "C:\\");
+        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target", volumeId: "D:\\");
+
+        var root = await sourceProvider.BuildDirectoryTree("/src");
+        root.Files[0].CheckState = CheckState.Checked;
+
+        var ctx = new MoveTestContext(root, sourceProvider, targetProvider);
+        var step = new MoveStep("/target/dest");
+
+        var results = new List<TransformResult>();
+        await foreach (var r in step.ApplyAsync(ctx, CancellationToken.None))
+            results.Add(r);
+
+        Assert.Single(results);
+        Assert.Equal(SourceResult.Moved, results[0].SourceNodeResult);
+        Assert.False(await sourceProvider.ExistsAsync("/src/file.txt", CancellationToken.None));
+        Assert.True(await targetProvider.ExistsAsync("/dest/file.txt", CancellationToken.None));
+    }
+
+    /// <summary>
+    /// A MemoryFileSystemProvider with VolumeId=null (the default) never uses the atomic path,
+    /// even when the same instance is used as both source and target.
+    /// This documents the behavioral change from the old ReferenceEquals-based check.
+    /// </summary>
+    [Fact]
+    public async Task NullVolumeId_AlwaysCopyDeleteFallback()
+    {
+        // Default MemoryFileSystemProvider has VolumeId=null.
+        var provider = MemoryFileSystemFixtures.Create(s => s.WithFile("/src/file.txt", "content"u8));
+
+        var root = await provider.BuildDirectoryTree("/src");
+        root.Files[0].CheckState = CheckState.Checked;
+
+        // Same instance for source and target — copy+delete still moves the file correctly.
+        var ctx = new MoveTestContext(root, provider, provider);
+        var step = new MoveStep("/mem/dest");
+
+        var results = new List<TransformResult>();
+        await foreach (var r in step.ApplyAsync(ctx, CancellationToken.None))
+            results.Add(r);
+
+        Assert.Single(results);
+        Assert.Equal(SourceResult.Moved, results[0].SourceNodeResult);
+        Assert.False(await provider.ExistsAsync("/src/file.txt", CancellationToken.None));
+        Assert.True(await provider.ExistsAsync("/dest/file.txt", CancellationToken.None));
     }
 }

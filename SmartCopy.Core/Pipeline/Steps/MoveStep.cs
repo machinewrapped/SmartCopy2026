@@ -130,10 +130,10 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
         var nodeCtx = context.GetNodeContext(context.RootNode);
         var targetProvider = nodeCtx.ResolveProvider(DestinationPath)
             ?? throw new InvalidOperationException("TargetProvider must be set for MoveStep.");
-        var sameProvider = ReferenceEquals(targetProvider, context.SourceProvider);
-        var canAtomicMove = targetProvider.Capabilities.CanAtomicMove;
+        var sameVolume = context.SourceProvider.VolumeId is { } vid && targetProvider.VolumeId == vid;
+        var canAtomicMove = sameVolume && targetProvider.Capabilities.CanAtomicMove;
 
-        await foreach (var result in WalkAndMoveAsync(context.RootNode, context, DestinationPath, targetProvider, sameProvider, canAtomicMove, OverwriteMode, ct))
+        await foreach (var result in WalkAndMoveAsync(context.RootNode, context, DestinationPath, targetProvider, canAtomicMove, OverwriteMode, ct))
             yield return result;
     }
 
@@ -142,7 +142,7 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
     private static async IAsyncEnumerable<TransformResult> WalkAndMoveAsync(
         DirectoryTreeNode node, IStepContext context,
         string destinationPath,
-        IFileSystemProvider targetProvider, bool sameProvider, bool canAtomicMove,
+        IFileSystemProvider targetProvider, bool canAtomicMove,
         OverwriteMode overwriteMode,
         [EnumeratorCancellation] CancellationToken ct)
     {
@@ -158,7 +158,7 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
 
             // If the destination already exists we must recurse to merge contents,
             // even when an atomic move would otherwise be possible.
-            if (!destExists && sameProvider && canAtomicMove && CanMoveEntireSubtree(child))
+            if (!destExists && canAtomicMove && CanMoveEntireSubtree(child))
             {
                 await context.SourceProvider.MoveAsync(child.FullPath, dest, ct);
                 yield return new TransformResult(
@@ -175,7 +175,7 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
             else
             {
                 // Destination exists (merge needed), cross-provider, or partial selection: recurse piecewise.
-                await foreach (var result in WalkAndMoveAsync(child, context, destinationPath, targetProvider, sameProvider, canAtomicMove, overwriteMode, ct))
+                await foreach (var result in WalkAndMoveAsync(child, context, destinationPath, targetProvider, canAtomicMove, overwriteMode, ct))
                     yield return result;
             }
         }
@@ -201,14 +201,16 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
                 continue;
             }
 
-            if (sameProvider && canAtomicMove)
+            if (canAtomicMove)
             {
                 await context.SourceProvider.MoveAsync(file.FullPath, fileDest, ct);
             }
             else
             {
-                await using var stream = await context.SourceProvider.OpenReadAsync(file.FullPath, ct);
-                await targetProvider.WriteAsync(fileDest, stream, progress: null, ct);
+                await using (var stream = await context.SourceProvider.OpenReadAsync(file.FullPath, ct))
+                {
+                    await targetProvider.WriteAsync(fileDest, stream, progress: null, ct);
+                }
                 await context.SourceProvider.DeleteAsync(file.FullPath, ct);
             }
 

@@ -15,16 +15,19 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
     // Add artificial delay to simulate real I/O for testing progress reporting.
     public bool AddArtificialDelay { get; set; }
 
-    public MemoryFileSystemProvider(bool addArtificialDelay = false, string? customRootPath = null)
+    public MemoryFileSystemProvider(bool addArtificialDelay = false, string? customRootPath = null, string? volumeId = null)
     {
         AddArtificialDelay = addArtificialDelay;
         RootPath = customRootPath ?? DefaultRoot;
+        _volumeId = volumeId;
         Debug.Assert(RootPath.StartsWith("/"));
         _entries[RootPath] = MemoryEntry.CreateDirectory();
     }
 
     public string RootPath { get; }
     public bool SupportsProgress => true;
+    private readonly string? _volumeId;
+    public string? VolumeId => _volumeId;
     public ProviderCapabilities Capabilities => new(
         CanSeek: true,
         CanAtomicMove: true,

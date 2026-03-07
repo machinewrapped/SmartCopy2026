@@ -11,6 +11,9 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 
     public string RootPath { get; }
     public bool SupportsProgress => true;
+    public string? VolumeId => (RootPath.StartsWith(@"\\") || RootPath.StartsWith("//"))
+        ? null
+        : Path.GetPathRoot(RootPath)?.ToUpperInvariant();
     public ProviderCapabilities Capabilities => new(
         CanSeek: true,
         CanAtomicMove: true,

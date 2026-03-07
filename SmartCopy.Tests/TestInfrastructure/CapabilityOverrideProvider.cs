@@ -11,6 +11,7 @@ internal sealed class CapabilityOverrideProvider(IFileSystemProvider inner, Prov
     public string RootPath => inner.RootPath;
     public bool SupportsProgress => inner.SupportsProgress;
     public ProviderCapabilities Capabilities => capabilities;
+    public string? VolumeId => inner.VolumeId;
 
     public Task<IReadOnlyList<FileSystemNode>> GetChildrenAsync(string path, CancellationToken ct) =>
         inner.GetChildrenAsync(path, ct);

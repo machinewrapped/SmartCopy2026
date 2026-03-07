@@ -6,6 +6,13 @@ public interface IFileSystemProvider
     bool SupportsProgress { get; }
     ProviderCapabilities Capabilities { get; }
 
+    /// <summary>
+    /// Identifies the OS volume this provider operates on.
+    /// Equal non-null values on source and target mean an atomic OS-level move is safe.
+    /// Null for in-memory, MTP, and UNC/network providers.
+    /// </summary>
+    string? VolumeId { get; }
+
     Task<IReadOnlyList<FileSystemNode>> GetChildrenAsync(string path, CancellationToken ct);
     Task<FileSystemNode> GetNodeAsync(string path, CancellationToken ct);
     Task<Stream> OpenReadAsync(string path, CancellationToken ct);
