@@ -75,8 +75,10 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
                 yield return new TransformResult(
                     IsSuccess: true,
                     SourceNode: node,
-                    SourceNodeResult: SourceResult.None,
+                    SourceNodeResult: SourceResult.Skipped,
                     DestinationPath: destination,
+                    NumberOfFilesSkipped: node.CountSelectedFiles(),
+                    NumberOfFoldersSkipped: node.CountSelectedFolders(),
                     InputBytes: node.Size);
                 continue;
             }
@@ -142,8 +144,10 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
                     yield return new TransformResult(
                         IsSuccess: true,
                         SourceNode: child,
-                        SourceNodeResult: SourceResult.None,
+                        SourceNodeResult: SourceResult.Skipped,
                         DestinationPath: dest,
+                        NumberOfFilesAffected: child.CountAllFiles(),
+                        NumberOfFoldersAffected: child.CountAllFolders(),
                         InputBytes: child.Size);
                     continue;
                 }
@@ -182,8 +186,9 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
                 yield return new TransformResult(
                     IsSuccess: true,
                     SourceNode: file,
-                    SourceNodeResult: SourceResult.None,
+                    SourceNodeResult: SourceResult.Skipped,
                     DestinationPath: fileDest,
+                    NumberOfFilesSkipped: 1,
                     InputBytes: file.Size);
                 continue;
             }

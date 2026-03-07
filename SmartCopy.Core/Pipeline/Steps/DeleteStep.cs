@@ -41,7 +41,7 @@ public sealed class DeleteStep : IPipelineStep
             if (!context.AllowDeleteReadOnly && (context.RootNode.Attributes & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
             {
                 context.MarkFailed(context.RootNode);
-                yield return MakePreviewResult(context.RootNode, SourceResult.None, isSuccess: false);
+                yield return MakePreviewResult(context.RootNode, SourceResult.Skipped, isSuccess: false);
             }
             else
             {
@@ -58,7 +58,7 @@ public sealed class DeleteStep : IPipelineStep
             if (!context.AllowDeleteReadOnly && (node.Attributes & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
             {
                 context.MarkFailed(node);
-                yield return MakePreviewResult(node, SourceResult.None, isSuccess: false);
+                yield return MakePreviewResult(node, SourceResult.Skipped, isSuccess: false);
                 continue;
             }
 
@@ -81,9 +81,9 @@ public sealed class DeleteStep : IPipelineStep
                 yield return new TransformResult(
                     IsSuccess: false,
                     SourceNode: context.RootNode,
-                    SourceNodeResult: SourceResult.None,
-                    NumberOfFilesAffected: 0,
-                    NumberOfFoldersAffected: 0,
+                    SourceNodeResult: SourceResult.Skipped,
+                    NumberOfFilesSkipped: context.RootNode.CountAllFiles(),
+                    NumberOfFoldersSkipped: context.RootNode.CountAllFolders(),
                     InputBytes: context.RootNode.Size);
                 yield break;
             }
@@ -112,9 +112,9 @@ public sealed class DeleteStep : IPipelineStep
                 yield return new TransformResult(
                     IsSuccess: false,
                     SourceNode: node,
-                    SourceNodeResult: SourceResult.None,
-                    NumberOfFilesAffected: 0,
-                    NumberOfFoldersAffected: 0,
+                    SourceNodeResult: SourceResult.Skipped,
+                    NumberOfFilesSkipped: node.CountAllFiles(),
+                    NumberOfFoldersSkipped: node.CountAllFolders(),
                     InputBytes: node.Size);
                 continue;
             }
@@ -132,11 +132,16 @@ public sealed class DeleteStep : IPipelineStep
 
     private static TransformResult MakePreviewResult(
         DirectoryTreeNode node, SourceResult pathResult, bool isSuccess = true)
-        => new(
+    {
+        var isSkipped = pathResult == SourceResult.Skipped;
+        return new TransformResult(
             IsSuccess: isSuccess,
             SourceNode: node,
             SourceNodeResult: pathResult,
-            NumberOfFilesAffected: node.IsDirectory ? 0 : 1,
-            NumberOfFoldersAffected: node.IsDirectory ? 1 : 0,
-            InputBytes: node.Size);
+            NumberOfFilesAffected: (node.IsDirectory || isSkipped) ? 0 : 1,
+            NumberOfFoldersAffected: (!node.IsDirectory || isSkipped) ? 0 : 1,
+            InputBytes: node.Size,
+            NumberOfFilesSkipped: (node.IsDirectory || !isSkipped) ? 0 : 1,
+            NumberOfFoldersSkipped: (!node.IsDirectory || !isSkipped) ? 0 : 1);
+    }
 }

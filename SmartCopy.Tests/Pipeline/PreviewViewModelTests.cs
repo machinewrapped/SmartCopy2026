@@ -72,13 +72,15 @@ public sealed class PreviewViewModelTests
             MakeAction(SourceResult.Copied,  DestinationResult.Created),
             MakeAction(SourceResult.Copied,  DestinationResult.Overwritten),
             MakeAction(SourceResult.Moved,   DestinationResult.Created),
-            MakeAction(SourceResult.Deleted, DestinationResult.None, destPath: null)));
+            MakeAction(SourceResult.Deleted, DestinationResult.None, destPath: null),
+            MakeAction(SourceResult.Skipped, DestinationResult.None, destPath: null)));
 
-        Assert.Equal(4, vm.Groups.Count);
+        Assert.Equal(5, vm.Groups.Count);
         Assert.Single(vm.Groups, g => g.Title.StartsWith("Will delete") && g.Actions.Count == 1);
         Assert.Single(vm.Groups, g => g.Title.StartsWith("Will overwrite") && g.Actions.Count == 1);
         Assert.Single(vm.Groups, g => g.Title.StartsWith("Will copy") && g.Actions.Count == 2);
         Assert.Single(vm.Groups, g => g.Title.StartsWith("Will move") && g.Actions.Count == 1);
+        Assert.Single(vm.Groups, g => g.Title.StartsWith("Will skip") && g.Actions.Count == 1);
     }
 
     [Fact]
@@ -105,6 +107,18 @@ public sealed class PreviewViewModelTests
 
         Assert.Single(vm.Groups);
         Assert.StartsWith("Will delete", vm.Groups[0].Title);
+    }
+
+    [Fact]
+    public void LoadFrom_SkippedAction_PlacedInSkipGroup()
+    {
+        var vm = new PreviewViewModel();
+        vm.LoadFrom(MakePlan(
+            MakeAction(SourceResult.Skipped, DestinationResult.None, destPath: null)));
+
+        Assert.Single(vm.Groups);
+        Assert.StartsWith("Will skip", vm.Groups[0].Title);
+        Assert.Equal("Skip", vm.Groups[0].Actions[0].ActionText);
     }
 
     [Fact]
@@ -300,6 +314,7 @@ public sealed class PreviewViewModelTests
     [InlineData(SourceResult.Moved,   DestinationResult.Overwritten, "Move (overwrite)")]
     [InlineData(SourceResult.Trashed, DestinationResult.None,        "Trash")]
     [InlineData(SourceResult.Deleted, DestinationResult.None,        "Delete")]
+    [InlineData(SourceResult.Skipped, DestinationResult.None,        "Skip")]
     [InlineData(SourceResult.None,    DestinationResult.None,        "")]
     public void GetActionText_ReturnsExpectedString(
         SourceResult src, DestinationResult dest, string expected)

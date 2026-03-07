@@ -80,8 +80,9 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath
                 yield return new TransformResult(
                     IsSuccess: true,
                     SourceNode: node,
-                    SourceNodeResult: SourceResult.None,
+                    SourceNodeResult: SourceResult.Skipped,
                     DestinationPath: destination,
+                    NumberOfFilesSkipped: 1,
                     InputBytes: node.Size);
                 continue;
             }
@@ -136,8 +137,9 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath
                 yield return new TransformResult(
                     IsSuccess: true,
                     SourceNode: node,
-                    SourceNodeResult: SourceResult.None,
+                    SourceNodeResult: SourceResult.Skipped,
                     DestinationPath: destination,
+                    NumberOfFilesAffected: 1,
                     InputBytes: node.Size);
                 continue;
             }

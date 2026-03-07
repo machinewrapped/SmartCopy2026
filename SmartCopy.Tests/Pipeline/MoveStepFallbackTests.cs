@@ -229,7 +229,6 @@ public sealed class MoveStepFallbackTests
         var root = await provider.BuildDirectoryTree("/src");
         var dir = root.Children.Single();
         dir.CheckState = CheckState.Checked;
-        foreach (var f in dir.Files) f.CheckState = CheckState.Checked;
 
         var ctx = new MoveTestContext(root, provider, provider);
         var step = new MoveStep("/mem/dest");

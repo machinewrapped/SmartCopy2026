@@ -34,6 +34,7 @@ public partial class PreviewItemViewModel : ViewModelBase
             (SourceResult.Moved,  _)                                => "Move",
             (SourceResult.Trashed, _)                               => "Trash",
             (SourceResult.Deleted, _)                               => "Delete",
+            (SourceResult.Skipped, _)                               => "Skip",
             _                                                       => string.Empty,
         };
 }
@@ -79,6 +80,7 @@ public partial class PreviewViewModel : ViewModelBase
         Move,
         Overwrite,
         Delete,
+        Skip,
     }
 
     public string ConfirmButtonText
@@ -121,6 +123,7 @@ public partial class PreviewViewModel : ViewModelBase
         var overwriteActions = new List<PlannedAction>();
         var moveActions = new List<PlannedAction>();
         var copyActions = new List<PlannedAction>();
+        var skipActions = new List<PlannedAction>();
 
         foreach (var a in plan.Actions)
         {
@@ -128,6 +131,7 @@ public partial class PreviewViewModel : ViewModelBase
             if (a.DestinationResult == DestinationResult.Overwritten) overwriteActions.Add(a);
             if (a.SourceResult == SourceResult.Moved) moveActions.Add(a);
             if (a.SourceResult == SourceResult.Copied) copyActions.Add(a);
+            if (a.SourceResult == SourceResult.Skipped) skipActions.Add(a);
         }
 
         IsDeletePipeline = deleteActions.Count > 0;
@@ -136,8 +140,8 @@ public partial class PreviewViewModel : ViewModelBase
         {
             if (actions.Count == 0) return;
 
-            var files = actions.Sum(a => a.NumberOfFilesAffected);
-            var folders = actions.Sum(a => a.NumberOfFoldersAffected);
+            var files = actions.Sum(a => a.NumberOfFilesAffected + a.NumberOfFilesSkipped);
+            var folders = actions.Sum(a => a.NumberOfFoldersAffected + a.NumberOfFoldersSkipped);
 
             var title = FormatTitle(key.ToString().ToLowerInvariant(), files, folders);
 
@@ -165,6 +169,7 @@ public partial class PreviewViewModel : ViewModelBase
         AddGroup(GroupKey.Overwrite, overwriteActions);
         AddGroup(GroupKey.Move, moveActions);
         AddGroup(GroupKey.Copy, copyActions);
+        AddGroup(GroupKey.Skip, skipActions);
 
         RunCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(ConfirmButtonText));
@@ -207,6 +212,7 @@ public partial class PreviewViewModel : ViewModelBase
         var overwriteActions = new List<PlannedAction>();
         var moveActions = new List<PlannedAction>();
         var copyActions = new List<PlannedAction>();
+        var skipActions = new List<PlannedAction>();
 
         foreach (var a in _currentPlan.Actions)
         {
@@ -214,13 +220,15 @@ public partial class PreviewViewModel : ViewModelBase
             if (a.DestinationResult == DestinationResult.Overwritten) overwriteActions.Add(a);
             if (a.SourceResult == SourceResult.Moved) moveActions.Add(a);
             if (a.SourceResult == SourceResult.Copied) copyActions.Add(a);
+            if (a.SourceResult == SourceResult.Skipped) skipActions.Add(a);
         }
 
         void WriteGroup(GroupKey key, List<PlannedAction> actions)
         {
             if (actions.Count == 0) return;
-            var files = actions.Sum(a => a.NumberOfFilesAffected);
-            var folders = actions.Sum(a => a.NumberOfFoldersAffected);
+
+            var files = key == GroupKey.Skip ? actions.Sum(a => a.NumberOfFilesSkipped) : actions.Sum(a => a.NumberOfFilesAffected);
+            var folders = key == GroupKey.Skip ? actions.Sum(a => a.NumberOfFoldersSkipped) : actions.Sum(a => a.NumberOfFoldersAffected);
             var title = FormatTitle(key.ToString().ToLowerInvariant(), files, folders);
 
             sb.AppendLine($"## {title}");
@@ -240,6 +248,7 @@ public partial class PreviewViewModel : ViewModelBase
         WriteGroup(GroupKey.Overwrite, overwriteActions);
         WriteGroup(GroupKey.Move, moveActions);
         WriteGroup(GroupKey.Copy, copyActions);
+        WriteGroup(GroupKey.Skip, skipActions);
 
         await SaveReportRequested.Invoke(sb.ToString());
     }

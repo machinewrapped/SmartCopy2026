@@ -44,7 +44,9 @@ public sealed class PipelineRunner
                         NumberOfFilesAffected: result.NumberOfFilesAffected,
                         NumberOfFoldersAffected: result.NumberOfFoldersAffected,
                         InputBytes: result.InputBytes,
-                        OutputBytes: result.OutputBytes));
+                        OutputBytes: result.OutputBytes,
+                        NumberOfFilesSkipped: result.NumberOfFilesSkipped,
+                        NumberOfFoldersSkipped: result.NumberOfFoldersSkipped));
                 }
             }
         }

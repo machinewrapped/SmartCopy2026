@@ -218,7 +218,7 @@ public sealed class PipelineRunnerTests
 
             });
 
-        Assert.Contains(results, r => r.SourceNodeResult == SourceResult.None);
+        Assert.Contains(results, r => r.SourceNodeResult == SourceResult.Skipped);
         // Source must not have been deleted.
         Assert.True(await provider.ExistsAsync("/source/song.mp3", CancellationToken.None));
         // Destination must remain unchanged.
