@@ -603,8 +603,8 @@ public partial class MainViewModel : ViewModelBase
         var confirmVm = new ConfirmDialogViewModel
         {
             Title = "Pipeline Running",
-            Message = "Cancel the current operation and change the source path?",
-            ConfirmText = "Cancel & Change",
+            Message = "Abort the current operation and change the source path?",
+            ConfirmText = "Abort & Change",
             CancelText = "Keep Running",
         };
         var dialog = new ConfirmDialog { DataContext = confirmVm };

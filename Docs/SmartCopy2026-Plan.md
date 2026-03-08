@@ -521,7 +521,7 @@ Scope:
 - [X] Disable Pipeline Run & Preview whilst scan is in progress
 - [X] Lock Pipeline view whilst execution is in progress (no run, preview, remove or edit steps)
 - [X] Lock Filter view whilst execution is in progress (no add, remove, edit or re-arrange filters)
-- [X] Disable changing source path whilst pipeline execution is in progress (or confirm + cancel)
+- [X] Confirmation required to change source path whilst pipeline execution is in progress
 - [X] Confirm quit whilst pipeline execution is in progress
 
 Exit criteria:
