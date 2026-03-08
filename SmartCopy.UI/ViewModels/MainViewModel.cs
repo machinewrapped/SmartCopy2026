@@ -864,6 +864,12 @@ public partial class MainViewModel : ViewModelBase
         var sourceProvider = DirectoryTree.SourceProvider
             ?? throw new ApplicationException("Directory tree is loaded but source provider is unknown");
 
+        if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop
+            || desktop.MainWindow is not { } mainWindow)
+        {
+            return;
+        }
+
         var runner = new PipelineRunner(pipeline);
         var job = new PipelineJob
         {
@@ -873,19 +879,41 @@ public partial class MainViewModel : ViewModelBase
             TrashService     = _trashService,
         };
 
-        var plan = await runner.PreviewAsync(job, CancellationToken.None);
+        // Put the view into "preparing" state and open the dialog immediately
+        // so the user sees a progress indicator rather than the app freezing.
+        Preview.BeginPreparation();
+        var dialog = new PreviewView { DataContext = Preview };
+        var dialogTask = dialog.ShowDialog<bool?>(mainWindow);
 
-        Preview.LoadFrom(plan);
+        // Generate the plan concurrently, tied to dialog lifetime.
+        // If the user closes the dialog before the plan is ready, we cancel generation.
+        using var previewCts = new CancellationTokenSource();
 
-        if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
-            && desktop.MainWindow is { } mainWindow)
+        // Cancel plan generation the moment the dialog closes.
+        var _ = dialogTask.ContinueWith(
+            _ => previewCts.Cancel(),
+            TaskScheduler.Default);
+
+        OperationPlan? plan = null;
+        try
         {
-            var dialog = new PreviewView { DataContext = Preview };
-            var confirmRun = await dialog.ShowDialog<bool?>(mainWindow);
-            if (confirmRun == true)
-            {
-                await ExecutePipelineAsync(runner, job);
-            }
+            plan = await runner.PreviewAsync(job, previewCts.Token);
+
+            // Plan is ready — populate the view on the UI thread.
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => Preview.LoadFrom(plan));
+        }
+        catch (OperationCanceledException)
+        {
+            // User closed the dialog before plan generation finished — nothing to do.
+            await dialogTask;
+            return;
+        }
+
+        // Wait for user's decision (Run or Close).
+        var confirmRun = await dialogTask;
+        if (confirmRun == true)
+        {
+            await ExecutePipelineAsync(runner, job);
         }
     }
 

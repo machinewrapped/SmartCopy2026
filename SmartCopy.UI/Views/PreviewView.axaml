@@ -3,7 +3,6 @@
         xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
         x:Class="SmartCopy.UI.Views.PreviewView"
         x:DataType="vm:PreviewViewModel"
-        Title="{Binding TotalActionCount, StringFormat=Preview (\{0\} actions)}"
         Width="1400"
         Height="600"
         WindowStartupLocation="CenterOwner"
@@ -19,9 +18,27 @@
 
     <Border Background="#1e1e1e" BorderBrush="#555" BorderThickness="1" CornerRadius="6">
         <Grid RowDefinitions="Auto, *, Auto">
-            
+
+            <!-- Title bar -->
             <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="8,4,4,2" Background="Transparent" PointerPressed="OnTitleBarPointerPressed">
-                <TextBlock Grid.Column="0" Text="{Binding TotalActionCount, StringFormat=Preview (\{0\} actions)}" FontWeight="SemiBold" Foreground="#4facfe" VerticalAlignment="Center" Margin="4,2,0,2" IsHitTestVisible="False" />
+                <!-- "Preparing preview…" shown while plan is being generated -->
+                <TextBlock Grid.Column="0"
+                           Text="Preparing preview…"
+                           FontWeight="SemiBold"
+                           Foreground="#4facfe"
+                           VerticalAlignment="Center"
+                           Margin="4,2,0,2"
+                           IsHitTestVisible="False"
+                           IsVisible="{Binding IsPreparingPlan}" />
+                <!-- Normal title once plan is ready -->
+                <TextBlock Grid.Column="0"
+                           Text="{Binding TotalActionCount, StringFormat=Preview (\{0\} actions)}"
+                           FontWeight="SemiBold"
+                           Foreground="#4facfe"
+                           VerticalAlignment="Center"
+                           Margin="4,2,0,2"
+                           IsHitTestVisible="False"
+                           IsVisible="{Binding !IsPreparingPlan}" />
                 <Button Grid.Column="1"
                         Content="✕"
                         Command="{Binding CancelCommand}"
@@ -34,62 +51,85 @@
 
             <Separator Grid.Row="0" VerticalAlignment="Bottom" Height="1" Background="#3e3e42" Margin="4,0" IsHitTestVisible="False" />
 
-            <Grid Grid.Row="1" RowDefinitions="Auto,*" Margin="16,16,16,0">
-                <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,10">
-                    <Border IsVisible="{Binding HasWarnings}"
-                            Background="#2d2d1b"
-                            CornerRadius="4"
-                            Padding="8">
-                        <ItemsControl ItemsSource="{Binding Warnings}">
+            <!-- Main content area -->
+            <Grid Grid.Row="1">
+
+                <!-- Loading / preparing panel (shown while IsPreparingPlan) -->
+                <StackPanel IsVisible="{Binding IsPreparingPlan}"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Center"
+                            Spacing="16"
+                            Margin="32">
+                    <ProgressBar IsIndeterminate="True"
+                                 Width="320"
+                                 Height="4" />
+                    <TextBlock Text="{Binding PreparationMessage}"
+                               Foreground="#a0a0a0"
+                               FontSize="13"
+                               HorizontalAlignment="Center" />
+                </StackPanel>
+
+                <!-- Content: warnings + group list (shown once plan is ready) -->
+                <Grid RowDefinitions="Auto,*"
+                      Margin="16,16,16,0"
+                      IsVisible="{Binding !IsPreparingPlan}">
+                    <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,10">
+                        <Border IsVisible="{Binding HasWarnings}"
+                                Background="#2d2d1b"
+                                CornerRadius="4"
+                                Padding="8">
+                            <ItemsControl ItemsSource="{Binding Warnings}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" Foreground="#f0d060" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+                        <Border IsVisible="{Binding IsDeletePipeline}"
+                                Background="#3a2f1b"
+                                CornerRadius="4"
+                                Padding="8">
+                            <TextBlock Text="Delete confirmation is required before running."
+                                       Foreground="#f0ad4e" />
+                        </Border>
+                    </StackPanel>
+
+                    <ScrollViewer Grid.Row="1"
+                                  VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding Groups}">
                             <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding}" Foreground="#f0d060" />
+                                <DataTemplate x:DataType="vm:PreviewGroupViewModel">
+                                    <Expander Header="{Binding Title}"
+                                              IsExpanded="{Binding IsExpanded}"
+                                              HorizontalAlignment="Stretch"
+                                              HorizontalContentAlignment="Stretch"
+                                              Margin="0,0,0,8">
+                                        <ItemsControl ItemsSource="{Binding Actions}"
+                                                      HorizontalAlignment="Stretch">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:PreviewItemViewModel">
+                                                    <Panel Margin="0,2,0,2">
+                                                        <Grid ColumnDefinitions="2*,2*" IsVisible="{Binding HasDestination}">
+                                                            <TextBlock Grid.Column="0" Text="{Binding SourcePath}" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                                                            <TextBlock Grid.Column="1" Text="{Binding DestinationPath}" Opacity="0.85" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                                                        </Grid>
+                                                        <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding !HasDestination}">
+                                                            <TextBlock Grid.Column="0" Text="{Binding SourcePath}" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                                                        </Grid>
+                                                    </Panel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Expander>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                    </Border>
-                    <Border IsVisible="{Binding IsDeletePipeline}"
-                            Background="#3a2f1b"
-                            CornerRadius="4"
-                            Padding="8">
-                        <TextBlock Text="Delete confirmation is required before running."
-                                   Foreground="#f0ad4e" />
-                    </Border>
-                </StackPanel>
-
-                <ScrollViewer Grid.Row="1"
-                              VerticalScrollBarVisibility="Auto">
-                    <ItemsControl ItemsSource="{Binding Groups}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:PreviewGroupViewModel">
-                                <Expander Header="{Binding Title}"
-                                          IsExpanded="{Binding IsExpanded}"
-                                          HorizontalAlignment="Stretch"
-                                          HorizontalContentAlignment="Stretch"
-                                          Margin="0,0,0,8">
-                                    <ItemsControl ItemsSource="{Binding Actions}"
-                                                  HorizontalAlignment="Stretch">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="vm:PreviewItemViewModel">
-                                                <Panel Margin="0,2,0,2">
-                                                    <Grid ColumnDefinitions="2*,2*" IsVisible="{Binding HasDestination}">
-                                                        <TextBlock Grid.Column="0" Text="{Binding SourcePath}" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
-                                                        <TextBlock Grid.Column="1" Text="{Binding DestinationPath}" Opacity="0.85" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
-                                                    </Grid>
-                                                    <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding !HasDestination}">
-                                                        <TextBlock Grid.Column="0" Text="{Binding SourcePath}" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
-                                                    </Grid>
-                                                </Panel>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </Expander>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
+                    </ScrollViewer>
+                </Grid>
             </Grid>
 
+            <!-- Footer buttons -->
             <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,Auto" Margin="16,10,16,16" HorizontalAlignment="Right">
                 <Button Grid.Column="0"
                         Content="Close"
@@ -103,11 +143,13 @@
                         MinWidth="110"
                         HorizontalContentAlignment="Center"
                         Margin="0,0,8,0"
+                        IsEnabled="{Binding !IsPreparingPlan}"
                         Command="{Binding SaveReportCommand}" />
                 <Button Grid.Column="2"
                         Content="{Binding ConfirmButtonText}"
                         MinWidth="200"
                         HorizontalContentAlignment="Center"
+                        IsEnabled="{Binding !IsPreparingPlan}"
                         Command="{Binding RunCommand}" />
             </Grid>
         </Grid>
