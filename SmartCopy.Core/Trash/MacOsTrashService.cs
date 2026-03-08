@@ -11,14 +11,18 @@ public sealed class MacOsTrashService : ITrashService
         if (!File.Exists(fullPath) && !Directory.Exists(fullPath))
             throw new FileNotFoundException($"Path does not exist: {fullPath}", fullPath);
 
-        var escaped = fullPath.Replace("'", "\\'");
+        // Embed path into AppleScript string, escaping backslashes and double-quotes.
+        var escapedPath = fullPath.Replace("\\", "\\\\").Replace("\"", "\\\"");
+        var script = $"tell application \"Finder\" to delete POSIX file \"{escapedPath}\"";
+
         var startInfo = new System.Diagnostics.ProcessStartInfo
         {
             FileName = "osascript",
-            Arguments = $"-e 'tell application \"Finder\" to delete POSIX file \"{escaped}\"'",
             RedirectStandardError = true,
             UseShellExecute = false,
         };
+        startInfo.ArgumentList.Add("-e");
+        startInfo.ArgumentList.Add(script);
 
         using var process = System.Diagnostics.Process.Start(startInfo)
             ?? throw new InvalidOperationException("Failed to start osascript process.");
