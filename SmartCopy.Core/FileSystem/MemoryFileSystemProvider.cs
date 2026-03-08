@@ -19,7 +19,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
     {
         AddArtificialDelay = addArtificialDelay;
         RootPath = customRootPath ?? DefaultRoot;
-        VolumeId = volumeId;
+        VolumeId = volumeId ?? "MEM";
         Debug.Assert(RootPath.StartsWith("/"));
         _entries[RootPath] = MemoryEntry.CreateDirectory();
     }
