@@ -95,7 +95,6 @@ public partial class MainViewModel : ViewModelBase
 
     private readonly SmartCopyAppContext _appContext;
     private readonly ITrashService _trashService;
-    private readonly MemoryFileSystemProvider _memoryProvider;
     private readonly FileSystemProviderRegistry _providerRegistry = new();
     private readonly LocalDirectoryWatcherFactory _watcherFactory = new();
     private readonly AppSettings _settings;
@@ -106,6 +105,7 @@ public partial class MainViewModel : ViewModelBase
     private readonly SelectionManager _selectionManager = new();
     private readonly SelectionSerializer _selectionSerializer = new();
     private readonly SemaphoreSlim _watcherApplyGate = new(1, 1);
+    private MemoryFileSystemProvider? _memoryProvider;
     private IDirectoryWatcher? _directoryWatcher;
     private CancellationTokenSource? _filterCts;
     private CancellationTokenSource? _scanCts;
@@ -134,11 +134,6 @@ public partial class MainViewModel : ViewModelBase
 
         _operationJournal = new OperationJournal(dataStore.GetDirectoryPath("Logs"));
         _workflowStore = new WorkflowPresetStore(dataStore.GetDirectoryPath("Workflows"));
-
-        // Create an in-memory virtual file system for testing.
-        // TODO: this should be a debug option, not exposed in release builds
-        _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: _settings.AddArtificialDelay);
-        _providerRegistry.Register(_memoryProvider);
 
         // Create the ViewModel for the filter chain
         FilterChain = new FilterChainViewModel(_appContext);
@@ -269,6 +264,11 @@ public partial class MainViewModel : ViewModelBase
         ShowHiddenFiles = _settings.ShowHiddenFiles;
         AllowDeleteReadOnly = _settings.AllowDeleteReadOnly;
         AddArtificialDelay = _settings.AddArtificialDelay;
+
+        // Create an in-memory virtual file system for testing.
+        // TODO: this should be a debug option, not exposed in release builds
+        _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: AddArtificialDelay);
+        _providerRegistry.Register(_memoryProvider);
 
         SourcePathPicker.RefreshSettings();
 
