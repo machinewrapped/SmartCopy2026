@@ -125,6 +125,8 @@ public class DirectoryTreeViewModel : ViewModelBase
             
             await foreach (var node in scanner.ScanAsync(rootPath, scanOptions, ct: ct))
             {
+                ct.ThrowIfCancellationRequested();
+                
                 // First node yielded is our root node
                 if (!ItemsSource.Any())
                 {

@@ -643,6 +643,7 @@ public partial class MainViewModel : ViewModelBase
             await DirectoryTree.ChangeRootAsync(normalizedPath, BuildScanOptions(), ct);
 
             _lastCommittedSourcePath = normalizedPath;
+            SourcePathValidationMessage = string.Empty;
 
             RecordRecentSource(normalizedPath);
 
@@ -669,9 +670,6 @@ public partial class MainViewModel : ViewModelBase
 
             SourcePathValidationMessage = BuildSourcePathValidationMessage(normalizedPath, ex);
             LogPanel.AddEntry(SourcePathValidationMessage, LogLevel.Error);
-
-            // Revert path display on failure; do not attempt to re-scan the previous path.
-            SourcePath = previousSourcePath ?? string.Empty;
         }
     }
 
