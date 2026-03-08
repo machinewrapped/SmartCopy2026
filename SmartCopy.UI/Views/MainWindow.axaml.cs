@@ -268,17 +268,11 @@ public partial class MainWindow : Window
         OptionsMenu.Items.Add(new Separator());
         OptionsMenu.Items.Add(SectionHeader("Scan"));
 
-        _fullPreScanMenuItem = Toggle(
-            "_Full Pre-Scan",
-            _mainVm?.FullPreScan ?? false,
-            () => { if (_mainVm is not null) _mainVm.FullPreScan = !_mainVm.FullPreScan; });
-        OptionsMenu.Items.Add(_fullPreScanMenuItem);
-
-        _lazyExpandScanMenuItem = Toggle(
-            "_Lazy Scan (scan on demand)",
-            _mainVm?.LazyExpandScan ?? false,
-            () => { if (_mainVm is not null) _mainVm.LazyExpandScan = !_mainVm.LazyExpandScan; });
-        OptionsMenu.Items.Add(_lazyExpandScanMenuItem);
+        _showHiddenFilesMenuItem = Toggle(
+            "Show _Hidden Files",
+            _mainVm?.ShowHiddenFiles ?? false,
+            () => { if (_mainVm is not null) _mainVm.ShowHiddenFiles = !_mainVm.ShowHiddenFiles; });
+        OptionsMenu.Items.Add(_showHiddenFilesMenuItem);
 
         _followSymlinksMenuItem = Toggle(
             "_Follow Symlinks",
@@ -286,11 +280,17 @@ public partial class MainWindow : Window
             () => { if (_mainVm is not null) _mainVm.FollowSymlinks = !_mainVm.FollowSymlinks; });
         OptionsMenu.Items.Add(_followSymlinksMenuItem);
 
-        _showHiddenFilesMenuItem = Toggle(
-            "Show _Hidden Files",
-            _mainVm?.ShowHiddenFiles ?? false,
-            () => { if (_mainVm is not null) _mainVm.ShowHiddenFiles = !_mainVm.ShowHiddenFiles; });
-        OptionsMenu.Items.Add(_showHiddenFilesMenuItem);
+        _lazyExpandScanMenuItem = Toggle(
+            "_Lazy Scan (scan on demand)",
+            _mainVm?.LazyExpandScan ?? false,
+            () => { if (_mainVm is not null) _mainVm.LazyExpandScan = !_mainVm.LazyExpandScan; });
+        OptionsMenu.Items.Add(_lazyExpandScanMenuItem);
+
+        _fullPreScanMenuItem = Toggle(
+            "_Immediate Full Scan",
+            _mainVm?.FullPreScan ?? false,
+            () => { if (_mainVm is not null) _mainVm.FullPreScan = !_mainVm.FullPreScan; });
+        OptionsMenu.Items.Add(_fullPreScanMenuItem);
 
         // ── Section: Debug  ───────────────────────────────────────────────────
         OptionsMenu.Items.Add(new Separator());

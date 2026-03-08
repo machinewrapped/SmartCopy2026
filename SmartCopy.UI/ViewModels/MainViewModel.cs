@@ -127,7 +127,7 @@ public partial class MainViewModel : ViewModelBase
     {
         var dataStore = LocalAppDataStore.ForCurrentUser();
         _settings = new AppSettings { SettingsFilePath = dataStore.GetFilePath("settings.json") };
-        _appContext = new SmartCopyAppContext(_settings, dataStore);
+        _appContext = new SmartCopyAppContext(_settings, dataStore, _providerRegistry);
 
         _trashService = CreateTrashService();
 
@@ -402,17 +402,6 @@ public partial class MainViewModel : ViewModelBase
         FollowSymlinks = FollowSymlinks,
     };
 
-
-    partial void OnAddArtificialDelayChanged(bool value)
-    {
-        if (_memoryProvider != null)
-        {
-            _memoryProvider.AddArtificialDelay = value;            
-        }
-        _settings.AddArtificialDelay = value;
-        _ = SaveSettingsAsync();
-    }
-
     partial void OnDefaultOverwriteModeChanged(OverwriteMode value)
     {
         _settings.DefaultOverwriteMode = value;
@@ -440,6 +429,16 @@ public partial class MainViewModel : ViewModelBase
     partial void OnAllowDeleteReadOnlyChanged(bool value)
     {
         _settings.AllowDeleteReadOnly = value;
+        _ = SaveSettingsAsync();
+    }
+
+    partial void OnAddArtificialDelayChanged(bool value)
+    {
+        if (_memoryProvider != null)
+        {
+            _memoryProvider.AddArtificialDelay = value;            
+        }
+        _settings.AddArtificialDelay = value;
         _ = SaveSettingsAsync();
     }
 
@@ -722,6 +721,9 @@ public partial class MainViewModel : ViewModelBase
         {
             return;
         }
+
+        RemoveEquivalentPath(_settings.FavouritePaths, normalizedPath);
+        _settings.FavouritePaths.Insert(0, normalizedPath);
 
         RemoveEquivalentPath(_settings.RecentSources, normalizedPath);
         _settings.RecentSources.Insert(0, normalizedPath);
