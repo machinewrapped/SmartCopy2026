@@ -37,6 +37,9 @@ public sealed record PipelineJob
     /// <summary>Progress reporter for individual node transformations.</summary>
     public IProgress<TransformResult>? NodeProgress { get; init; }
 
+    /// <summary>Callback invoked at the start of each pipeline step with the zero-based index of the step.</summary>
+    public Action<int>? StepStarted { get; init; }
+
     /// <summary>Token for pausing/resuming the pipeline.</summary>
     public PauseTokenSource? PauseToken { get; init; }
 

@@ -50,6 +50,9 @@ public partial class PipelineStepViewModel : ViewModelBase
     [ObservableProperty]
     public bool _hasValidationError;
 
+    [ObservableProperty]
+    public bool _isActiveStep;
+
     public event EventHandler? StepChanged;
 
     public void ReplaceStep(IPipelineStep newStep, string? customName = null)

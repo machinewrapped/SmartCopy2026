@@ -933,7 +933,12 @@ public partial class MainViewModel : ViewModelBase
     private async Task ExecutePipelineAsync(PipelineRunner runner, PipelineJob job)
     {
         var nodeProgress = new Progress<TransformResult>(OnNodeCompleted);
-        var executionJob = StatusBar.Progress.Begin(job with { NodeProgress = nodeProgress });
+        var executionJob = StatusBar.Progress.Begin(job with
+        {
+            NodeProgress = nodeProgress,
+            StepStarted = index =>
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => Pipeline.SetActiveStep(index)),
+        });
 
         Pipeline.IsRunning = true;
         FilterChain.IsLocked = true;
@@ -983,6 +988,7 @@ public partial class MainViewModel : ViewModelBase
         }
         finally
         {
+            Pipeline.ClearActiveStep();
             Pipeline.IsRunning = false;
             FilterChain.IsLocked = false;
             FileList.RemoveAllMarkedForRemoval();

@@ -533,13 +533,14 @@ Exit criteria:
 *Goal: surface meaningful visual feedback during plan preparation and pipeline execution. No state locking — purely observability.*
 
 Scope:
-- [ ] Open PreviewView and show a progress bar whilst OperationPlan is being prepared
 - [ ] Active step highlighted during pipeline execution
+- [ ] Open PreviewView and show a progress bar whilst OperationPlan is being prepared
+- [ ] Cancellation/abort of preview preparation
 
 Exit criteria:
-- [ ] PreviewView progress indicator visible during plan generation and dismissed on completion
 - [ ] Active step card is visually distinct during run; advances correctly through multi-step pipelines
-- [ ] Manual smoke: multi-step pipeline run confirms step highlight advances in real time
+- [ ] PreviewView progress indicator visible during plan generation and dismissed on completion
+- [ ] Abort preview preparation and confirm the progress indicator is dismissed
 
 ### Phase 5.2.10 — Pre-flight Safety Validation
 
@@ -567,6 +568,16 @@ Validation:
 
 Exit criteria:
 - [ ] Manual smoke: swap source and destination paths and confirm the directory tree and file list update correctly, and the pipeline step target is set to the previous source
+
+### Phase 5.2.12 Bug fixes
+
+- [ ] Incorrect progress bar status after Select All step (X/0 files)
+- [ ] Incorrect progress bar for multi-step pipelines (e.g. Copy + Move shows 500/400 files during Move)
+- [ ] Suppress redundant preview for Copy/Move with Overwrite != Skip if destination path does not exist
+
+Exit criteria:
+- [ ] All bug fixes are implemented and tests are added
+- [ ] Manual smoke tests confirm the bug fixes
 
 #### 5.3 Validation and initial release
 
