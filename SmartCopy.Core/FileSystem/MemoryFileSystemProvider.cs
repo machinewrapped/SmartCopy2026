@@ -276,7 +276,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
 
         if (totalBytesRemaining.Value < 0)
         {
-            totalBytesRemaining = 0;    // maybe null?
+            totalBytesRemaining = 0;
         }
 
         return Task.FromResult(totalBytesRemaining);
