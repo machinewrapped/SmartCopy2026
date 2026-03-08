@@ -11,57 +11,25 @@ public sealed class FreedesktopTrashService : ITrashService
         if (!File.Exists(fullPath) && !Directory.Exists(fullPath))
             throw new FileNotFoundException($"Path does not exist: {fullPath}", fullPath);
 
-        var trashDir = GetTrashDirectory();
-        var filesDir = Path.Combine(trashDir, "files");
-        var infoDir = Path.Combine(trashDir, "info");
-
-        Directory.CreateDirectory(filesDir);
-        Directory.CreateDirectory(infoDir);
-
-        var baseName = Path.GetFileName(fullPath);
-        var destName = ResolveUniqueName(filesDir, baseName);
-        var destPath = Path.Combine(filesDir, destName);
-        var infoPath = Path.Combine(infoDir, destName + ".trashinfo");
-
-        var trashInfo =
-            $"[Trash Info]\nPath={fullPath}\nDeletionDate={DateTime.Now:yyyy-MM-ddTHH:mm:ss}\n";
-
-        await File.WriteAllTextAsync(infoPath, trashInfo, ct);
-
-        if (Directory.Exists(fullPath))
-            Directory.Move(fullPath, destPath);
-        else
-            File.Move(fullPath, destPath);
-    }
-
-    private static string GetTrashDirectory()
-    {
-        var xdgDataHome = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
-        if (!string.IsNullOrWhiteSpace(xdgDataHome))
-            return Path.Combine(xdgDataHome, "Trash");
-
-        return Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".local", "share", "Trash");
-    }
-
-    private static string ResolveUniqueName(string filesDir, string baseName)
-    {
-        if (!File.Exists(Path.Combine(filesDir, baseName)) &&
-            !Directory.Exists(Path.Combine(filesDir, baseName)))
-            return baseName;
-
-        var nameWithoutExt = Path.GetFileNameWithoutExtension(baseName);
-        var ext = Path.GetExtension(baseName);
-
-        for (int i = 2; i < int.MaxValue; i++)
+        var startInfo = new System.Diagnostics.ProcessStartInfo
         {
-            var candidate = $"{nameWithoutExt}_{i}{ext}";
-            if (!File.Exists(Path.Combine(filesDir, candidate)) &&
-                !Directory.Exists(Path.Combine(filesDir, candidate)))
-                return candidate;
-        }
+            FileName = "gio",
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        startInfo.ArgumentList.Add("trash");
+        startInfo.ArgumentList.Add("--");
+        startInfo.ArgumentList.Add(fullPath);
 
-        return $"{baseName}_{Guid.NewGuid():N}";
+        using var process = System.Diagnostics.Process.Start(startInfo)
+            ?? throw new InvalidOperationException("Failed to start gio process.");
+
+        await process.WaitForExitAsync(ct);
+
+        if (process.ExitCode != 0)
+        {
+            var error = await process.StandardError.ReadToEndAsync(ct);
+            throw new IOException($"gio trash failed (exit {process.ExitCode}): {error}");
+        }
     }
 }
