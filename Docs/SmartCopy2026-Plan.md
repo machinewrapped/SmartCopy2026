@@ -513,20 +513,47 @@ Exit criteria:
 - [X] Operations across file systems (local, network) validated
 - [X] Delete operations are deterministic and journaled as `Trashed` vs `Deleted`
 
-### Phase 5.2.8 - UI/UXPolish
+### Phase 5.2.8 — UI State Locking (scan + execution)
+
+*Goal: prevent the user from mutating state while the app is busy. All items share the same underlying mechanism (`IsScanning` / `IsExecuting` flags propagated through ViewModels).*
 
 Scope:
 - [ ] Disable Pipeline Run & Preview whilst scan is in progress
-- [ ] Active step highlighted during pipeline execution
-- [ ] Open PreviewView and show a progress bar whilst OperationPlan is being prepared
 - [ ] Lock Pipeline view whilst execution is in progress (no run, preview, remove or edit steps)
 - [ ] Lock Filter view whilst execution is in progress (no add, remove, edit or re-arrange filters)
-- [ ] Confirm quit whilst pipeline execution is in progress
 - [ ] Disable changing source path whilst pipeline execution is in progress (or confirm + cancel)
-- [ ] Free space validation for Copy and Move-To-Different-Volume steps
+- [ ] Confirm quit whilst pipeline execution is in progress
 
 Exit criteria:
-- [ ] User acceptance tests
+- [ ] All locking/unlocking transitions are deterministic and covered by automated tests
+- [ ] Manual smoke: start a run, attempt each locked action, confirm correct blocking behavior
+
+### Phase 5.2.9 — Execution Progress UX
+
+*Goal: surface meaningful visual feedback during plan preparation and pipeline execution. No state locking — purely observability.*
+
+Scope:
+- [ ] Open PreviewView and show a progress bar whilst OperationPlan is being prepared
+- [ ] Active step highlighted during pipeline execution
+
+Exit criteria:
+- [ ] PreviewView progress indicator visible during plan generation and dismissed on completion
+- [ ] Active step card is visually distinct during run; advances correctly through multi-step pipelines
+- [ ] Manual smoke: multi-step pipeline run confirms step highlight advances in real time
+
+### Phase 5.2.10 — Pre-flight Safety Validation
+
+*Goal: detect and surface insufficient disk space before committing to a copy or cross-volume move.*
+
+Scope:
+- [ ] Free space check against target volume for Copy steps
+- [ ] Free space check against target volume for Move steps that cross volumes (copy+delete fallback path)
+- [ ] Surface warning/blocking message in PreviewView when space is insufficient
+
+Exit criteria:
+- [ ] Insufficient-space condition surfaces as a blocking warning in the preview before any file I/O begins
+- [ ] Automated tests for free-space gate logic using a mock/capped provider
+- [ ] Manual smoke: attempt copy to a near-full volume and confirm warning appears
 
 #### 5.3 Validation and initial release
 
