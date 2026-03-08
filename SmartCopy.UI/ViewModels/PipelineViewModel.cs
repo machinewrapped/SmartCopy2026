@@ -73,18 +73,7 @@ public partial class PipelineViewModel : ViewModelBase
     private async Task RefreshFreeSpaceCacheAsync()
     {
         if (_sourceProvider is null) return;
-        var cache = new Dictionary<string, long?>();
-        foreach (var stepVm in Steps)
-        {
-            if (stepVm.Step is not IHasFreeSpaceCheck fsCheck) continue;
-            var target = fsCheck.ResolveFreeSpaceTarget(_sourceProvider, _appContext);
-            if (target?.Capabilities.CanQueryFreeSpace == true && !cache.ContainsKey(target.RootPath))
-            {
-                try   { cache[target.RootPath] = await target.GetAvailableFreeSpaceAsync(CancellationToken.None); }
-                catch { cache[target.RootPath] = null; }
-            }
-        }
-        _cachedFreeSpace = cache;
+        _cachedFreeSpace = new Dictionary<string, long?>();
         Avalonia.Threading.Dispatcher.UIThread.Post(Revalidate);
     }
 
@@ -397,7 +386,7 @@ public partial class PipelineViewModel : ViewModelBase
             step.IsActiveStep = false;
     }
 
-    private void Revalidate()
+    private async void Revalidate()
     {
         foreach (var step in Steps)
         {
@@ -408,7 +397,7 @@ public partial class PipelineViewModel : ViewModelBase
         }
         _capabilityBlocked = false;
 
-        var result = PipelineValidator.Validate(
+        var result = await PipelineValidator.ValidateAsync(
             [.. Steps.Select(step => step.Step)],
             new PipelineValidationContext(
                 HasSelectedIncludedInputs: _selectedIncludedFileCount > 0,

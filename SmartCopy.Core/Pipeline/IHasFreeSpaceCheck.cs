@@ -8,7 +8,7 @@ namespace SmartCopy.Core.Pipeline;
 /// Also carries <see cref="TargetRootPath"/> so callers can update a running
 /// free-space cache to account for cumulative consumption across multiple steps.
 /// </summary>
-public sealed record FreeSpaceValidationResult(long NeededBytes, long FreeBytes, string TargetRootPath)
+public sealed record FreeSpaceValidationResult(long NeededBytes, long FreeBytes, string TargetPath)
 {
     /// <summary>True when <see cref="NeededBytes"/> exceeds <see cref="FreeBytes"/>.</summary>
     public bool IsViolation => NeededBytes > FreeBytes;
@@ -21,7 +21,7 @@ public sealed record FreeSpaceValidationResult(long NeededBytes, long FreeBytes,
 
     /// <summary>Full message for the preview warnings pane.</summary>
     public string LongMessage =>
-        $"Not enough space on {TargetRootPath} — {FileSizeFormatter.FormatBytes(NeededBytes)} needed, " +
+        $"Not enough space in {TargetPath} — {FileSizeFormatter.FormatBytes(NeededBytes)} needed, " +
         $"{FileSizeFormatter.FormatBytes(FreeBytes)} free " +
         $"({FileSizeFormatter.FormatBytes(OverBytes)} over)";
 }
@@ -33,23 +33,15 @@ public sealed record FreeSpaceValidationResult(long NeededBytes, long FreeBytes,
 public interface IHasFreeSpaceCheck
 {
     /// <summary>
-    /// Returns the provider that will receive output from this step,
-    /// or <see langword="null"/> if no free-space check is needed
-    /// (e.g., same-volume moves that require no additional space).
+    /// Checks free space using a cache keyed by provider RootPath.
+    /// Returns null when inapplicable or no check is possible (same-volume move, no destination, unknown free space).
+    /// Otherwise, returns a <see cref="FreeSpaceValidationResult"/> with IsViolation set if free space is insufficient.
+    /// The free space cache is updated to subtract the space consumed by this operation.
     /// </summary>
-    IFileSystemProvider? ResolveFreeSpaceTarget(IFileSystemProvider sourceProvider, IPathResolver registry);
-
-    /// <summary>
-    /// Checks free space using a pre-cached map (keyed by provider RootPath).
-    /// Returns null when no check is applicable (same-volume move, no destination, unknown free space).
-    /// Returns a result in all other cases — examine <see cref="FreeSpaceValidationResult.IsViolation"/>
-    /// to determine whether space is insufficient. The result always carries
-    /// <see cref="FreeSpaceValidationResult.NeededBytes"/> so callers can deduct consumption
-    /// from the cache to correctly account for cumulative multi-step usage.
-    /// </summary>
-    FreeSpaceValidationResult? ValidateFreeSpace(
+    Task<FreeSpaceValidationResult?> ValidateFreeSpace(
         long bytesNeeded,
         IFileSystemProvider source,
         IPathResolver registry,
-        IReadOnlyDictionary<string, long?> freeSpaceCache);
+        Dictionary<string, long?> freeSpaceCache,
+        CancellationToken ct);
 }

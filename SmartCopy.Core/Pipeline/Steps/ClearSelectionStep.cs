@@ -16,7 +16,7 @@ public sealed class ClearSelectionStep : IPipelineStep
 
     public TransformStepConfig Config => new(StepType, new JsonObject());
 
-    public void Validate(StepValidationContext context)
+    public async Task Validate(StepValidationContext context)
     {
         // No preconditions or postconditions.
     }

@@ -2,7 +2,7 @@ namespace SmartCopy.Core.Pipeline.Validation;
 
 public sealed class PipelineValidator
 {
-    public static PipelineValidationResult Validate(
+    public static async Task<PipelineValidationResult> ValidateAsync(
         IReadOnlyList<IPipelineStep> steps,
         PipelineValidationContext? context = null)
     {
@@ -29,7 +29,7 @@ public sealed class PipelineValidator
         for (var i = 0; i < steps.Count; i++)
         {
             validationContext.StepIndex = i;
-            steps[i].Validate(validationContext);
+            await steps[i].Validate(validationContext);
 
             if (validationContext.HasBlockingIssue)
             {

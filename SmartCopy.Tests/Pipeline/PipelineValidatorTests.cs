@@ -6,18 +6,18 @@ namespace SmartCopy.Tests.Pipeline;
 public sealed class PipelineValidatorTests
 {
     [Fact]
-    public void PathOnlyPipeline_ReturnsNoExecutableBlockingIssue()
+    public async Task PathOnlyPipeline_ReturnsNoExecutableBlockingIssue()
     {
-        var result = PipelineValidator.Validate([new FlattenStep()]);
+        var result = await PipelineValidator.ValidateAsync([new FlattenStep()]);
 
         Assert.False(result.CanRun);
         Assert.Contains(result.Issues, issue => issue.Code == "Pipeline.NoExecutableStep");
     }
 
     [Fact]
-    public void MissingDestination_ReturnsStepScopedBlockingIssue()
+    public async Task MissingDestination_ReturnsStepScopedBlockingIssue()
     {
-        var result = PipelineValidator.Validate([new CopyStep("")]);
+        var result = await PipelineValidator.ValidateAsync([new CopyStep("")]);
 
         Assert.False(result.CanRun);
         var issue = Assert.Single(result.Issues, i => i.Code == "Step.MissingDestination");
@@ -25,9 +25,9 @@ public sealed class PipelineValidatorTests
     }
 
     [Fact]
-    public void ExecutablePipelineWithoutSelectedInputs_ReturnsBlockingIssue()
+    public async Task ExecutablePipelineWithoutSelectedInputs_ReturnsBlockingIssue()
     {
-        var result = PipelineValidator.Validate(
+        var result = await PipelineValidator.ValidateAsync(
             [new CopyStep("/mem/out")],
             new PipelineValidationContext(HasSelectedIncludedInputs: false));
 
@@ -36,9 +36,9 @@ public sealed class PipelineValidatorTests
     }
 
     [Fact]
-    public void CopyThenMove_IsValid()
+    public async Task CopyThenMove_IsValid()
     {
-        var result = PipelineValidator.Validate(
+        var result = await PipelineValidator.ValidateAsync(
         [
             new CopyStep("/mem/backup"),
             new MoveStep("/mem/archive"),
@@ -49,9 +49,9 @@ public sealed class PipelineValidatorTests
     }
 
     [Fact]
-    public void PathOnlyPipeline_DoesNotRequireSelectedInputs()
+    public async Task PathOnlyPipeline_DoesNotRequireSelectedInputs()
     {
-        var result = PipelineValidator.Validate(
+        var result = await PipelineValidator.ValidateAsync(
             [new FlattenStep()],
             new PipelineValidationContext(HasSelectedIncludedInputs: false));
 
@@ -59,9 +59,9 @@ public sealed class PipelineValidatorTests
     }
 
     [Fact]
-    public void DeleteThenCopy_InvalidAtCopyStep_BecauseSourceNoLongerExists()
+    public async Task DeleteThenCopy_InvalidAtCopyStep_BecauseSourceNoLongerExists()
     {
-        var result = PipelineValidator.Validate(
+        var result = await PipelineValidator.ValidateAsync(
         [
             new DeleteStep(),
             new CopyStep("/mem/out"),
@@ -72,9 +72,9 @@ public sealed class PipelineValidatorTests
     }
 
     [Fact]
-    public void MoveThenDelete_InvalidAtDeleteStep_BecauseSourceNoLongerExists()
+    public async Task MoveThenDelete_InvalidAtDeleteStep_BecauseSourceNoLongerExists()
     {
-        var result = PipelineValidator.Validate(
+        var result = await PipelineValidator.ValidateAsync(
         [
             new MoveStep("/mem/out"),
             new DeleteStep(),
@@ -85,10 +85,10 @@ public sealed class PipelineValidatorTests
     }
 
     [Fact]
-    public void InvertSelection_AfterDelete_ResetsSourceExists()
+    public async Task InvertSelection_AfterDelete_ResetsSourceExists()
     {
         // InvertSelection re-sets SourceExists=true, so Copy after it should be valid.
-        var result = PipelineValidator.Validate(
+        var result = await PipelineValidator.ValidateAsync(
         [
             new DeleteStep(),
             new InvertSelectionStep(),

@@ -22,7 +22,7 @@ public sealed class RenameStep : IPipelineStep
 
     public TransformStepConfig Config => new(StepType, new JsonObject { ["pattern"] = Pattern });
 
-    public void Validate(StepValidationContext context)
+    public async Task Validate(StepValidationContext context)
     {
         context.ValidateSourceExists("Rename");
         if (string.IsNullOrWhiteSpace(Pattern))

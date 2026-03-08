@@ -22,7 +22,7 @@ public sealed class DeleteStep : IPipelineStep
 
     public TransformStepConfig Config => new(StepType, new JsonObject { ["deleteMode"] = Mode.ToString() });
 
-    public void Validate(StepValidationContext context)
+    public async Task Validate(StepValidationContext context)
     {
         context.ValidateHasSelectedInputs();
         context.ValidateSourceExists("Delete");

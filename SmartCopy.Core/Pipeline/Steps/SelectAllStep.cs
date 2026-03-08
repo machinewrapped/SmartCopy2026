@@ -14,7 +14,7 @@ public sealed class SelectAllStep : IPipelineStep
     public string AutoSummary => StepType.ForDisplay();
     public string Description => "Mark all files as selected";
 
-    public void Validate(StepValidationContext context)
+    public async Task Validate(StepValidationContext context)
     {
         // No preconditions. Post-condition: reset SourceExists so downstream steps
         // are not blocked by a prior destructive step.

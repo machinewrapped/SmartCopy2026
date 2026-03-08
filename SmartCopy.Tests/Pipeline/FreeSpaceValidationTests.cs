@@ -6,8 +6,8 @@ using SmartCopy.Tests.TestInfrastructure;
 namespace SmartCopy.Tests.Pipeline;
 
 /// <summary>
-/// Tests for real-time free-space warnings emitted by PipelineValidator.Validate()
-/// using the pre-cached free-space map path (distinct from the async PipelineRunner path).
+/// Tests for real-time free-space warnings emitted by PipelineValidator.ValidateAsync()
+/// using the lazy-populated free-space cache path (distinct from the async PipelineRunner path).
 /// </summary>
 public sealed class FreeSpaceValidationTests
 {
@@ -32,26 +32,24 @@ public sealed class FreeSpaceValidationTests
     private static PipelineValidationContext MakeContext(
         IFileSystemProvider source,
         IPathResolver registry,
-        long selectedBytes,
-        IReadOnlyDictionary<string, long?> cache)
+        long selectedBytes)
         => new(
             HasSelectedIncludedInputs: true,
             SelectedBytes: selectedBytes,
             SourceProvider: source,
             ProviderRegistry: registry,
-            CachedFreeSpace: cache);
+            CachedFreeSpace: new Dictionary<string, long?>());
 
     [Fact]
-    public void CopyStep_InsufficientSpace_EmitsStepScopedWarning()
+    public async Task CopyStep_InsufficientSpace_EmitsStepScopedWarning()
     {
         var (source, registry) = MakeSource();
         var target = MakeTarget(capacity: 100, rootPath: "/target");
         registry.Register(target);
 
-        var cache = new Dictionary<string, long?> { [target.RootPath] = 100L };
-        var context = MakeContext(source, registry, selectedBytes: 500, cache);
-
-        var result = PipelineValidator.Validate([new CopyStep("/target/dst")], context);
+        var result = await PipelineValidator.ValidateAsync(
+            [new CopyStep("/target/dst")],
+            MakeContext(source, registry, selectedBytes: 500));
 
         // Warning — not a blocking issue, so CanRun stays true
         Assert.True(result.CanRun);
@@ -62,81 +60,79 @@ public sealed class FreeSpaceValidationTests
     }
 
     [Fact]
-    public void CopyStep_SufficientSpace_NoWarning()
+    public async Task CopyStep_SufficientSpace_NoWarning()
     {
         var (source, registry) = MakeSource();
         var target = MakeTarget(capacity: 1_000_000, rootPath: "/target");
         registry.Register(target);
 
-        var cache = new Dictionary<string, long?> { [target.RootPath] = 1_000_000L };
-        var context = MakeContext(source, registry, selectedBytes: 500, cache);
-
-        var result = PipelineValidator.Validate([new CopyStep("/target/dst")], context);
+        var result = await PipelineValidator.ValidateAsync(
+            [new CopyStep("/target/dst")],
+            MakeContext(source, registry, selectedBytes: 500));
 
         Assert.True(result.CanRun);
         Assert.DoesNotContain(result.Issues, i => i.Code == "Step.InsufficientSpace");
     }
 
     [Fact]
-    public void CopyStep_NullCacheEntry_NoWarning()
+    public async Task CopyStep_NoCapability_NoWarning()
     {
         var (source, registry) = MakeSource();
+        // No SimulatedCapacity → CanQueryFreeSpace = false → check skipped
         var target = MakeTarget(capacity: null, rootPath: "/target");
         registry.Register(target);
 
-        // Cache has null entry for target — means unknown/unsupported
-        var cache = new Dictionary<string, long?> { [target.RootPath] = null };
-        var context = MakeContext(source, registry, selectedBytes: 500, cache);
-
-        var result = PipelineValidator.Validate([new CopyStep("/target/dst")], context);
+        var result = await PipelineValidator.ValidateAsync(
+            [new CopyStep("/target/dst")],
+            MakeContext(source, registry, selectedBytes: 500));
 
         Assert.True(result.CanRun);
         Assert.DoesNotContain(result.Issues, i => i.Code == "Step.InsufficientSpace");
     }
 
     [Fact]
-    public void CopyStep_EmptyCache_NoWarning()
+    public async Task CopyStep_NoRegisteredProvider_NoWarning()
     {
         var (source, registry) = MakeSource();
-        var context = MakeContext(source, registry, selectedBytes: 500, cache: new Dictionary<string, long?>());
+        // No target registered at all
 
-        var result = PipelineValidator.Validate([new CopyStep("/target/dst")], context);
+        var result = await PipelineValidator.ValidateAsync(
+            [new CopyStep("/target/dst")],
+            MakeContext(source, registry, selectedBytes: 500));
 
         Assert.True(result.CanRun);
         Assert.DoesNotContain(result.Issues, i => i.Code == "Step.InsufficientSpace");
     }
 
     [Fact]
-    public void MoveStep_SameVolume_NoWarning()
+    public async Task MoveStep_SameVolume_NoWarning()
     {
-        // Same VolumeId → ResolveFreeSpaceTarget returns null → no warning
+        // Same VolumeId → same-volume check short-circuits → no warning
         var source = MemoryFileSystemFixtures.Create(b => b
             .WithFile("/src/file.txt", new byte[500])
             .WithDirectory("/dst"),
             volumeId: "VOL");
+        source.SimulatedCapacity = 1; // only 1 byte free, but same-volume should not trigger
         var registry = source.CreateRegistry();
 
-        // Cache has very little space, but same-volume should short-circuit
-        var cache = new Dictionary<string, long?> { [source.RootPath] = 1L };
-        var context = MakeContext(source, registry, selectedBytes: 500, cache);
-
-        var result = PipelineValidator.Validate([new MoveStep("/mem/dst")], context);
+        var result = await PipelineValidator.ValidateAsync(
+            [new MoveStep("/mem/dst")],
+            MakeContext(source, registry, selectedBytes: 500));
 
         Assert.True(result.CanRun);
         Assert.DoesNotContain(result.Issues, i => i.Code == "Step.InsufficientSpace");
     }
 
     [Fact]
-    public void MoveStep_CrossVolume_InsufficientSpace_EmitsWarning()
+    public async Task MoveStep_CrossVolume_InsufficientSpace_EmitsWarning()
     {
         var (source, registry) = MakeSource(volumeId: "SRC");
         var target = MakeTarget(capacity: 10, rootPath: "/target", volumeId: "DST");
         registry.Register(target);
 
-        var cache = new Dictionary<string, long?> { [target.RootPath] = 10L };
-        var context = MakeContext(source, registry, selectedBytes: 500, cache);
-
-        var result = PipelineValidator.Validate([new MoveStep("/target/dst")], context);
+        var result = await PipelineValidator.ValidateAsync(
+            [new MoveStep("/target/dst")],
+            MakeContext(source, registry, selectedBytes: 500));
 
         Assert.True(result.CanRun);
         var issue = Assert.Single(result.Issues, i => i.Code == "Step.InsufficientSpace");
@@ -145,81 +141,69 @@ public sealed class FreeSpaceValidationTests
     }
 
     [Fact]
-    public void InvertSelection_ResetsBytes_DownstreamCopySkipsCheck()
+    public async Task InvertSelection_ResetsBytes_DownstreamCopySkipsCheck()
     {
         var (source, registry) = MakeSource();
-        var target = MakeTarget(capacity: 1, rootPath: "/target"); // very low
+        var target = MakeTarget(capacity: 1, rootPath: "/target");
         registry.Register(target);
 
-        var cache = new Dictionary<string, long?> { [target.RootPath] = 1L };
-        var context = MakeContext(source, registry, selectedBytes: 500, cache);
-
         // InvertSelectionStep resets SelectedBytes → CopyStep should not warn
-        var result = PipelineValidator.Validate(
+        var result = await PipelineValidator.ValidateAsync(
             [new InvertSelectionStep(), new CopyStep("/target/dst")],
-            context);
+            MakeContext(source, registry, selectedBytes: 500));
 
         Assert.True(result.CanRun);
         Assert.DoesNotContain(result.Issues, i => i.Code == "Step.InsufficientSpace");
     }
 
     [Fact]
-    public void TwoCopySteps_SameVolume_CumulativeSpaceChecked()
+    public async Task TwoCopySteps_SameVolume_CumulativeSpaceChecked()
     {
         // 600 bytes free, two Copy steps each needing 400 bytes → second step should warn
         var (source, registry) = MakeSource();
         var target = MakeTarget(capacity: 600, rootPath: "/target");
         registry.Register(target);
 
-        var cache = new Dictionary<string, long?> { [target.RootPath] = 600L };
-        var context = MakeContext(source, registry, selectedBytes: 400, cache);
-
-        var result = PipelineValidator.Validate(
+        var result = await PipelineValidator.ValidateAsync(
             [new CopyStep("/target/dst1"), new CopyStep("/target/dst2")],
-            context);
+            MakeContext(source, registry, selectedBytes: 400));
 
         Assert.True(result.CanRun);
-        // First step: 400 <= 600 → no warning; cache updated to 200
+        // First step: 400 <= 600 free → no warning; cache updated to 200
         // Second step: 400 > 200 → warning
         var issue = Assert.Single(result.Issues, i => i.Code == "Step.InsufficientSpace");
         Assert.Equal(1, issue.StepIndex);
     }
 
     [Fact]
-    public void TwoCopySteps_SameVolume_BothFit_NoWarning()
+    public async Task TwoCopySteps_SameVolume_BothFit_NoWarning()
     {
         var (source, registry) = MakeSource();
         var target = MakeTarget(capacity: 1_000_000, rootPath: "/target");
         registry.Register(target);
 
-        var cache = new Dictionary<string, long?> { [target.RootPath] = 1_000_000L };
-        var context = MakeContext(source, registry, selectedBytes: 400, cache);
-
-        var result = PipelineValidator.Validate(
+        var result = await PipelineValidator.ValidateAsync(
             [new CopyStep("/target/dst1"), new CopyStep("/target/dst2")],
-            context);
+            MakeContext(source, registry, selectedBytes: 400));
 
         Assert.True(result.CanRun);
         Assert.DoesNotContain(result.Issues, i => i.Code == "Step.InsufficientSpace");
     }
 
     [Fact]
-    public void BlockingIssueFirst_NoSpaceWarning()
+    public async Task BlockingIssueFirst_NoSpaceWarning()
     {
-        // CopyStep with no destination → blocking issue only; space warning is a no-op
+        // CopyStep with no destination → blocking issue; destination is null so no space check
         var (source, registry) = MakeSource();
         var target = MakeTarget(capacity: 1, rootPath: "/target");
         registry.Register(target);
 
-        var cache = new Dictionary<string, long?> { [target.RootPath] = 1L };
-        var context = MakeContext(source, registry, selectedBytes: 500, cache);
-
-        var result = PipelineValidator.Validate([new CopyStep("")], context);
+        var result = await PipelineValidator.ValidateAsync(
+            [new CopyStep("")],
+            MakeContext(source, registry, selectedBytes: 500));
 
         Assert.False(result.CanRun);
         Assert.Contains(result.Issues, i => i.Code == "Step.MissingDestination");
-        // Space warning is still emitted (AddFreeSpaceWarning is not guarded by HasBlockingIssue)
-        // But destination is null so ResolveFreeSpaceTarget returns null → no warning
         Assert.DoesNotContain(result.Issues, i => i.Code == "Step.InsufficientSpace");
     }
 }

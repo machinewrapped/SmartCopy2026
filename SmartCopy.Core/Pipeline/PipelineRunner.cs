@@ -17,14 +17,13 @@ public sealed class PipelineRunner
     public PipelineRunner(TransformPipeline pipeline)
     {
         _pipeline = pipeline;
-        _pipeline.Validate();
     }
 
     public async Task<OperationPlan> PreviewAsync(
         PipelineJob job,
         CancellationToken ct = default)
     {
-        _pipeline.Validate(new PipelineValidationContext(
+        await _pipeline.ValidateAsync(new PipelineValidationContext(
             job.RootNode.GetSelectedDescendants().Any()));
 
         var context = new StepContext(job);
@@ -59,18 +58,11 @@ public sealed class PipelineRunner
 
             if (step is IHasFreeSpaceCheck fsCheck)
             {
-                var target = fsCheck.ResolveFreeSpaceTarget(job.SourceProvider, job.ProviderRegistry);
-                if (target?.Capabilities.CanQueryFreeSpace == true)
+                long needed = stepActions.Sum(a => a.OutputBytes);
+                var fsResult = await fsCheck.ValidateFreeSpace(needed, job.SourceProvider, job.ProviderRegistry, freeSpaceCache, ct);
+                if (fsResult?.IsViolation == true)
                 {
-                    if (!freeSpaceCache.ContainsKey(target.RootPath))
-                        freeSpaceCache[target.RootPath] = await target.GetAvailableFreeSpaceAsync(ct);
-                    long needed = stepActions.Sum(a => a.OutputBytes);
-                    var fsResult = fsCheck.ValidateFreeSpace(needed, job.SourceProvider, job.ProviderRegistry, freeSpaceCache);
-                    if (fsResult is not null)
-                    {
-                        if (fsResult.IsViolation) warnings.Add(fsResult.LongMessage);
-                        freeSpaceCache[fsResult.TargetRootPath] = Math.Max(0, fsResult.FreeBytes - fsResult.NeededBytes);
-                    }
+                    warnings.Add(fsResult.LongMessage);
                 }
             }
 
@@ -109,7 +101,7 @@ public sealed class PipelineRunner
 
     public async Task<IReadOnlyList<TransformResult>> ExecuteAsync(PipelineJob job)
     {
-        _pipeline.Validate(new PipelineValidationContext(
+        await _pipeline.ValidateAsync(new PipelineValidationContext(
             job.RootNode.GetSelectedDescendants().Any()));
 
         if (_pipeline.HasDeleteStep && !_previewCompleted)

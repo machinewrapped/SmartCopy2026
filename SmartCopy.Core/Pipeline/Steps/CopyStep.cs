@@ -36,23 +36,31 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
 
     public bool HasDestinationPath => !string.IsNullOrWhiteSpace(DestinationPath);
 
-    public IFileSystemProvider? ResolveFreeSpaceTarget(IFileSystemProvider sourceProvider, IPathResolver registry)
-        => HasDestinationPath ? registry.ResolveProvider(DestinationPath!) : null;
-
-    public FreeSpaceValidationResult? ValidateFreeSpace(
+    public async Task<FreeSpaceValidationResult?> ValidateFreeSpace(
         long bytesNeeded,
         IFileSystemProvider source,
         IPathResolver registry,
-        IReadOnlyDictionary<string, long?> freeSpaceCache)
+        Dictionary<string, long?> freeSpaceCache,
+        CancellationToken ct)
     {
         if (bytesNeeded <= 0) return null;
-        var target = ResolveFreeSpaceTarget(source, registry);
+        if (DestinationPath is null) return null;
+
+        var target = registry.ResolveProvider(DestinationPath);
         if (target is null) return null;
+        if (target.Capabilities.CanQueryFreeSpace == false) return null;
+
+        if (!freeSpaceCache.ContainsKey(target.RootPath))
+            freeSpaceCache[target.RootPath] = await target.GetAvailableFreeSpaceAsync(ct);
+
         if (!freeSpaceCache.TryGetValue(target.RootPath, out var free) || free is null) return null;
-        return new FreeSpaceValidationResult(bytesNeeded, free.Value, target.RootPath);
+
+        freeSpaceCache[target.RootPath] = Math.Max(0, free.Value - bytesNeeded);
+
+        return new FreeSpaceValidationResult(bytesNeeded, free.Value, DestinationPath);
     }
 
-    public void Validate(StepValidationContext context)
+    public async Task Validate(StepValidationContext context)
     {
         context.ValidateHasSelectedInputs();
         context.ValidateSourceExists("Copy");
@@ -60,7 +68,7 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
         {
             context.AddBlockingIssue("Step.MissingDestination", "Copy requires a destination path.");
         }
-        context.AddFreeSpaceWarning(this);
+        await context.AddFreeSpaceWarning(this);
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(

@@ -16,7 +16,7 @@ public sealed class InvertSelectionStep : IPipelineStep
 
     public TransformStepConfig Config => new(StepType, new JsonObject());
 
-    public void Validate(StepValidationContext context)
+    public async Task Validate(StepValidationContext context)
     {
         // No preconditions. Post-condition: reset SourceExists so downstream steps
         // are not blocked by a prior destructive step.
