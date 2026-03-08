@@ -961,7 +961,7 @@ public partial class MainViewModel : ViewModelBase
         {
             Pipeline.IsRunning = false;
             FilterChain.IsLocked = false;
-            SourcePathPicker.IsEnabled = DirectoryTree.IsLoaded;
+            SourcePathPicker.IsEnabled = !DirectoryTree.IsLoading;
             FileList.RemoveAllMarkedForRemoval();
             DirectoryTree.RemoveNodesMarkedForRemoval();
             await ApplyPendingWatcherBatchesAsync();
