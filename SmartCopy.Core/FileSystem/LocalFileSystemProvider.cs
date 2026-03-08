@@ -251,7 +251,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         }
 
         var full = Path.GetFullPath(path);
-        return full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return PathHelper.RemoveTrailingSeparator(full);
     }
 
     private string Resolve(string path)

@@ -168,4 +168,16 @@ public sealed class PathHandlingTests : IDisposable
         Assert.True(caps.CanAtomicMove);
         Assert.NotNull(provider.VolumeId);
     }
+
+    [Fact]
+    public void Local_PosixRootPath_IsPreserved_OnLinux()
+    {
+        if (!OperatingSystem.IsLinux())
+            return;
+
+        var provider = new LocalFileSystemProvider("/");
+
+        Assert.Equal("/", provider.RootPath);
+        Assert.True(provider.Capabilities.CanSeek);
+    }
 }

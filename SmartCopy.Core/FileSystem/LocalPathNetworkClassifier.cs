@@ -29,6 +29,11 @@ internal static class LocalPathNetworkClassifier
 
     public static bool IsNetworkPath(string normalizedPath, Func<string>? readLinuxMountInfo = null)
     {
+        if (string.IsNullOrWhiteSpace(normalizedPath))
+        {
+            return false;
+        }
+
         if (IsWindowsUncPath(normalizedPath))
         {
             return true;
