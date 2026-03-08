@@ -57,7 +57,7 @@ public sealed class FreeSpaceCheckTests
     }
 
     [Fact]
-    public async Task Copy_InsufficientSpace_Error()
+    public async Task Copy_InsufficientSpace_Warning()
     {
         var (source, root, registry) = MakeSource();
         var target = MakeTarget(capacity: 10, customRootPath: "/target"); // only 10 bytes free
@@ -71,8 +71,8 @@ public sealed class FreeSpaceCheckTests
             ProviderRegistry = registry,
         });
 
-        Assert.Single(plan.Errors);
-        Assert.Contains("Not enough space", plan.Errors[0]);
+        Assert.Single(plan.Warnings);
+        Assert.Contains("Not enough space", plan.Warnings[0]);
     }
 
     [Fact]
@@ -137,7 +137,7 @@ public sealed class FreeSpaceCheckTests
     }
 
     [Fact]
-    public async Task Move_CrossVolume_InsufficientSpace_Error()
+    public async Task Move_CrossVolume_InsufficientSpace_Warning()
     {
         var (source, root, registry) = MakeSource(volumeId: "SRC");
         var target = MakeTarget(capacity: 10, customRootPath: "/target", volumeId: "DST"); // only 10 bytes
@@ -151,7 +151,7 @@ public sealed class FreeSpaceCheckTests
             ProviderRegistry = registry,
         });
 
-        Assert.Single(plan.Errors);
-        Assert.Contains("Not enough space", plan.Errors[0]);
+        Assert.NotEmpty(plan.Warnings);
+        Assert.Contains("Not enough space", plan.Warnings[0]);
     }
 }

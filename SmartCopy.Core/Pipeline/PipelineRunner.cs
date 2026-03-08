@@ -29,6 +29,7 @@ public sealed class PipelineRunner
 
         var context = new StepContext(job);
         var actions = new List<PlannedAction>();
+        var warnings = new List<string>();
         var errors = new List<string>();
 
         foreach (var step in _pipeline.Steps)
@@ -66,7 +67,7 @@ public sealed class PipelineRunner
                         string txtNeeded = FileSizeFormatter.FormatBytes(needed);
                         string txtFree = FileSizeFormatter.FormatBytes(free.Value);
                         string txtOver = FileSizeFormatter.FormatBytes(needed - free.Value);
-                        errors.Add($"Not enough space on target drive — {txtNeeded} needed, {txtFree} available ({txtOver} over)");
+                        warnings.Add($"Not enough space on target drive — {txtNeeded} needed, {txtFree} available ({txtOver} over)");
                     }
                 }
             }
@@ -76,7 +77,6 @@ public sealed class PipelineRunner
 
         _previewCompleted = true;
 
-        var warnings = new List<string>();
         foreach (var step in _pipeline.Steps)
         {
             if (step is DeleteStep ds && ds.Mode == DeleteMode.Trash && !job.SourceProvider.Capabilities.CanTrash)
