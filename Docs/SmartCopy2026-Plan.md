@@ -143,9 +143,9 @@ UI/UX checklist:
 - [x] FileListView with column resizing
 - [x] Filter chain area: filter cards with human-readable summary + technical subtitle,
       enable/disable checkbox, edit button, remove button, "+ Add filter" card
-- [X] Filter chain save/load (`.sc2filter`) + preset library
+- [x] Filter chain save/load (`.sc2filter`) + preset library
 - [x] Pipeline area: horizontal scrollable step chain with + Add step flyout + Run and Preview buttons
-- [X] Pipeline save/load (`.sc2pipe`) + preset library
+- [x] Pipeline save/load (`.sc2pipe`) + preset library
 - [x] Status bar: file count, size, filtered count, progress bar, time remaining, current file
 - [x] Operation progress overlay: progress bars, pause/cancel buttons, status labels
 - [x] Log panel: collapsible, scrollable, log entries
@@ -253,8 +253,8 @@ Acceptance criteria status:
 
 Validation performed:
 - [x] Added new pipeline test suites
-- [X] `dotnet test` execution
-- [X] Manual UI scenario checks for preview/delete/progress/journal flows
+- [x] `dotnet test` execution
+- [x] Manual UI scenario checks for preview/delete/progress/journal flows
 
 #### 5.1.6 — Workflow Presets and Menu
 
@@ -275,7 +275,7 @@ Acceptance criteria — all met:
 Verification:
 - [x] `dotnet build SmartCopy.App/SmartCopy.App.csproj`
 - [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj`
-- [X] Manual UI scenario checks for workflow menu integration
+- [x] Manual UI scenario checks for workflow menu integration
 
 #### 5.1.7 — Selection management
 
@@ -301,7 +301,7 @@ Verification:
 - [x] Non-ASCII path round-trip tests across `.txt`, `.m3u8`, `.sc2sel`
 - [x] `dotnet build SmartCopy.App/SmartCopy.App.csproj`
 - [x] `dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj`
-- [X] Manual UI smoke scenarios for save/restore/bulk-selection flows
+- [x] Manual UI smoke scenarios for save/restore/bulk-selection flows
 
 #### 5.1.8 — Settings Persistence
 
@@ -411,36 +411,36 @@ Real filesystem test strategy (three tiers):
 #### 5.2.2 — Source Acquisition UX (native browse + path commit)
 
 Deliverables:
-- [X] Replace disabled Browse buttons with native folder picker wiring (source + destination contexts)
-- [X] Keep editable `SourcePath` commit semantics (Enter/dropdown close) while allowing picker-driven path updates
-- [X] Ensure bookmarks/MRU normalization works across multiple drives, UNC paths, and trailing-separator variations
-- [X] Add validation/error messaging for inaccessible or missing paths without freezing UI
+- [x] Replace disabled Browse buttons with native folder picker wiring (source + destination contexts)
+- [x] Keep editable `SourcePath` commit semantics (Enter/dropdown close) while allowing picker-driven path updates
+- [x] Ensure bookmarks/MRU normalization works across multiple drives, UNC paths, and trailing-separator variations
+- [x] Add validation/error messaging for inaccessible or missing paths without freezing UI
 
 Acceptance criteria:
-- [X] User can pick a local folder and immediately scan it
-- [X] MRU/bookmarks de-duplicate equivalent paths reliably
-- [X] Invalid/unreachable path entry fails safely and preserves last good state
+- [x] User can pick a local folder and immediately scan it
+- [x] MRU/bookmarks de-duplicate equivalent paths reliably
+- [x] Invalid/unreachable path entry fails safely and preserves last good state
 
 Verification:
-- [X] Automated tests for bookmark/MRU normalization edge cases
+- [x] Automated tests for bookmark/MRU normalization edge cases
 - [ ] Manual smoke: local drive path, UNC/network path, disconnected path recovery
 
 #### 5.2.3 — Real Provider Runtime Integration (scanner + pipeline path)
 
 Deliverables:
-- [X] Introduce runtime provider selection (memory for debug flows, local for real filesystem flows) - DONE: path based resolution
-- [X] Wire `DirectoryTreeViewModel` and `FileListViewModel` to the active provider at root-change time
-- [X] Ensure pipeline preview/run uses active source provider and correct target providers
-- [X] Preserve existing progress, cancellation, and log semantics when using local files
+- [x] Introduce runtime provider selection (memory for debug flows, local for real filesystem flows) - DONE: path based resolution
+- [x] Wire `DirectoryTreeViewModel` and `FileListViewModel` to the active provider at root-change time
+- [x] Ensure pipeline preview/run uses active source provider and correct target providers
+- [x] Preserve existing progress, cancellation, and log semantics when using local files
 
 Acceptance criteria:
-- [X] No hard dependency on memory-only paths (`/mem`) remains in execution paths
-- [X] Phase 1 workflows behave the same from a user perspective when pointed at real folders
-- [X] UI remains responsive during large local scans
-- [X] Functional pause button
+- [x] No hard dependency on memory-only paths (`/mem`) remains in execution paths
+- [x] Phase 1 workflows behave the same from a user perspective when pointed at real folders
+- [x] UI remains responsive during large local scans
+- [x] Functional pause button
 
 Verification:
-- [X] Manual smoke: scan/filter/preview/run on a real directory tree with at least 10k files
+- [x] Manual smoke: scan/filter/preview/run on a real directory tree with at least 10k files
 - [x] Automated tests around provider switching and pipeline execution provider routing
 
 ### 5.2.4 - Directory browser integration for filter and pipeline editors
@@ -470,7 +470,7 @@ Acceptance criteria:
 - [x] Accessibility and keyboard workflows remain unchanged
 
 Verification:
-- [X] UI-level smoke checks for DnD + keyboard navigation regression
+- [x] UI-level smoke checks for DnD + keyboard navigation regression
 
 #### 5.2.6 — Watcher and Incremental Rescan (selection-preserving)
 
@@ -509,40 +509,40 @@ Verification:
 - [x] Manual smoke: delete-to-trash and permanent delete on local files
 
 Exit criteria:
-- [X] SMB/Network share provider-aware operations validated
-- [X] Operations across file systems (local, network) validated
-- [X] Delete operations are deterministic and journaled as `Trashed` vs `Deleted`
+- [x] SMB/Network share provider-aware operations validated
+- [x] Operations across file systems (local, network) validated
+- [x] Delete operations are deterministic and journaled as `Trashed` vs `Deleted`
 
 ### Phase 5.2.8 — UI State Locking (scan + execution)
 
 *Goal: prevent the user from mutating state while the app is busy. All items share the same underlying mechanism (`IsScanning` / `IsExecuting` flags propagated through ViewModels).*
 
 Scope:
-- [X] Disable Pipeline Run & Preview whilst scan is in progress
-- [X] Lock Pipeline view whilst execution is in progress (no run, preview, remove or edit steps)
-- [X] Lock Filter view whilst execution is in progress (no add, remove, edit or re-arrange filters)
-- [X] Confirmation required to change source path whilst pipeline execution is in progress
-- [X] Confirm quit whilst pipeline execution is in progress
+- [x] Disable Pipeline Run & Preview whilst scan is in progress
+- [x] Lock Pipeline view whilst execution is in progress (no run, preview, remove or edit steps)
+- [x] Lock Filter view whilst execution is in progress (no add, remove, edit or re-arrange filters)
+- [x] Confirmation required to change source path whilst pipeline execution is in progress
+- [x] Confirm quit whilst pipeline execution is in progress
 
 Exit criteria:
-- [X] All locking/unlocking transitions are deterministic and covered by automated tests
-- [X] Manual smoke: start a run, attempt each locked action, confirm correct blocking behavior
+- [x] All locking/unlocking transitions are deterministic and covered by automated tests
+- [x] Manual smoke: start a run, attempt each locked action, confirm correct blocking behavior
 
 ### Phase 5.2.9 — Execution Progress UX
 
 *Goal: surface meaningful visual feedback during plan preparation and pipeline execution. No state locking — purely observability.*
 
 Scope:
-- [X] Active step highlighted during pipeline execution
-- [X] Open PreviewView and show a progress bar whilst OperationPlan is being prepared
-- [X] Cancellation/abort of preview preparation
-- [X] Suppress redundant preview for Copy/Move with Overwrite != Skip if destination path does not exist
+- [x] Active step highlighted during pipeline execution
+- [x] Open PreviewView and show a progress bar whilst OperationPlan is being prepared
+- [x] Cancellation/abort of preview preparation
+- [x] Suppress redundant preview for Copy/Move with Overwrite != Skip if destination path does not exist
 
 Exit criteria:
-- [X] Active step card is visually distinct during run; advances correctly through multi-step pipelines
-- [X] PreviewView progress indicator visible during plan generation and dismissed on completion
-- [X] Abort preview preparation and confirm the progress indicator is dismissed
-- [X] Automatically proceed if no actual overwrites are found in a preview triggered by a potential overwrite
+- [x] Active step card is visually distinct during run; advances correctly through multi-step pipelines
+- [x] PreviewView progress indicator visible during plan generation and dismissed on completion
+- [x] Abort preview preparation and confirm the progress indicator is dismissed
+- [x] Automatically proceed if no actual overwrites are found in a preview triggered by a potential overwrite
 
 ### Phase 5.2.10 — Pre-flight Safety Validation
 
