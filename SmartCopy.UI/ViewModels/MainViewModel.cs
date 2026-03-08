@@ -191,6 +191,10 @@ public partial class MainViewModel : ViewModelBase
                 StatusBar.IsScanning = DirectoryTree.IsLoading;
                 StatusBar.ScanStatusText = DirectoryTree.IsLoading ? "Scanning..." : string.Empty;
                 Pipeline.IsScanning = DirectoryTree.IsLoading;
+                // Lock the source path picker during scanning (prevents cancellation warnings from mid-scan path changes)
+                // Use && so that a scan completing after execution doesn't re-enable prematurely.
+                if (!Pipeline.IsRunning)
+                    SourcePathPicker.IsEnabled = !DirectoryTree.IsLoading;
             }
             else if (e.PropertyName == nameof(DirectoryTreeViewModel.SelectedNode))
             {

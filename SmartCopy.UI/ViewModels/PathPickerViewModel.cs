@@ -14,6 +14,9 @@ public partial class PathPickerViewModel : ViewModelBase
     private readonly PathPickerMode _mode;
 
     [ObservableProperty]
+    private bool _isEnabled = true;
+
+    [ObservableProperty]
     private string _path = string.Empty;
 
     [ObservableProperty]
@@ -23,8 +26,6 @@ public partial class PathPickerViewModel : ViewModelBase
     private SourceBookmarkItem? _selectedBookmark;
 
     public ObservableCollection<SourceBookmarkItem> Bookmarks { get; } = [];
-
-    public bool IsEnabled { get; set; } = true;
 
     // Fired when the user explicitly commits a path (Enter key or combo selection)
     public event EventHandler<string>? PathCommitted;
