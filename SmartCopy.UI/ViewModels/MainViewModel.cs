@@ -271,7 +271,7 @@ public partial class MainViewModel : ViewModelBase
 
         // Create an in-memory virtual file system for testing.
         // TODO: this should be a debug option, not exposed in release builds
-        long? capacity = LimitMemoryFilesystemCapacity ? 100_000_000 : null;
+        long? capacity = LimitMemoryFilesystemCapacity ? 100_000_000_000 : null;
         _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: AddArtificialDelay, capacity: capacity);
         _providerRegistry.Register(_memoryProvider);
 
@@ -452,7 +452,7 @@ public partial class MainViewModel : ViewModelBase
     {
         if (_memoryProvider != null)
         {
-            _memoryProvider.SimulatedCapacity = value ? 100_000_000 : null;
+            _memoryProvider.SimulatedCapacity = value ? 100_000_000_000 : null;
         }
         _settings.LimitMemoryFilesystemCapacity = value;
         _ = SaveSettingsAsync();

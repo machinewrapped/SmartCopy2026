@@ -3,9 +3,9 @@ using System.ComponentModel;
 using System.Text.Json;
 using Avalonia.Controls;
 using Avalonia.Input;
+using SmartCopy.Core.Pipeline;
 using SmartCopy.UI.ViewModels;
 using SmartCopy.UI.ViewModels.Workflows;
-using SmartCopy.Core.Pipeline;
 
 namespace SmartCopy.UI.Views;
 
@@ -92,7 +92,9 @@ public partial class MainWindow : Window
         }
 
         if (_mainVm is not null)
+        {
             _mainVm.PropertyChanged += OnMainViewModelPropertyChanged;
+        }
 
         RebuildWorkflowsMenu();
         BuildSelectionMenu();
@@ -460,6 +462,19 @@ public partial class MainWindow : Window
                     }
                 }
                 break;
+
+            case nameof(MainViewModel.AddArtificialDelay):
+                if (_artificialDelayMenuItem is not null)
+                    _artificialDelayMenuItem.IsChecked = _mainVm?.AddArtificialDelay ?? false;
+
+                break;
+
+            case nameof(MainViewModel.LimitMemoryFilesystemCapacity):
+                if (_limitMemoryFilesystemCapacityMenuItem is not null)
+                    _limitMemoryFilesystemCapacityMenuItem.IsChecked = _mainVm?.LimitMemoryFilesystemCapacity ?? false;
+
+                break;
+
         }
     }
 

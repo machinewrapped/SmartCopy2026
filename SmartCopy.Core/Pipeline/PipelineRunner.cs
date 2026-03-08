@@ -59,8 +59,8 @@ public sealed class PipelineRunner
                 var target = fsCheck.ResolveFreeSpaceTarget(job.SourceProvider, job.ProviderRegistry);
                 if (target?.Capabilities.CanQueryFreeSpace == true)
                 {
-                    var needed = stepActions.Sum(a => a.OutputBytes);
-                    var free = await target.GetAvailableFreeSpaceAsync(ct);
+                    long needed = stepActions.Sum(a => a.OutputBytes);
+                    long? free = await target.GetAvailableFreeSpaceAsync(ct);
                     if (free.HasValue && needed > free.Value)
                     {
                         string txtNeeded = FileSizeFormatter.FormatBytes(needed);

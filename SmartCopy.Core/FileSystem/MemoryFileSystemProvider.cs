@@ -274,6 +274,11 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         long totalBytesUsed = _entries.Values.Sum(x => x.Size);
         long? totalBytesRemaining = SimulatedCapacity.Value - totalBytesUsed;
 
+        if (totalBytesRemaining.Value < 0)
+        {
+            totalBytesRemaining = 0;    // maybe null?
+        }
+
         return Task.FromResult(totalBytesRemaining);
     }
 
