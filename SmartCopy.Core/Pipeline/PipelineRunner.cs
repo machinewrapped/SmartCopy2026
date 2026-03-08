@@ -98,8 +98,8 @@ public sealed class PipelineRunner
         var results = new List<TransformResult>();
 
         var stopwatch = Stopwatch.StartNew();
-        long totalBytes = GetAllSelectedBytes(job.RootNode);
-        int totalFiles = job.RootNode.CountSelectedFiles();
+        long totalBytes = 0;
+        int totalFiles = 0;
         long completedBytes = 0;
         int filesCompleted = 0;
         int stepIndex = 0;
@@ -108,6 +108,15 @@ public sealed class PipelineRunner
         {
             job.CancellationToken.ThrowIfCancellationRequested();
             job.StepStarted?.Invoke(stepIndex);
+
+            if (step.IsExecutable)
+            {
+                totalBytes = GetAllSelectedBytes(job.RootNode);
+                totalFiles = job.RootNode.CountSelectedFiles();
+                completedBytes = 0;
+                filesCompleted = 0;
+                stopwatch.Restart();
+            }
 
             await foreach (var result in step.ApplyAsync(context, job.CancellationToken))
             {

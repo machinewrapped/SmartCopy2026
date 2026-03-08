@@ -134,7 +134,7 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
         }
     }
 
-    public bool IsSelected => CheckState == CheckState.Checked && FilterResult == FilterResult.Included;
+    public bool IsSelected => CheckState == CheckState.Checked && FilterResult == FilterResult.Included && !IsMarkedForRemoval;
     public bool IsFilterIncluded => FilterResult != FilterResult.Excluded;
     public bool IsAtomicIncluded => FilterResult == FilterResult.Included;
 
