@@ -47,6 +47,7 @@ public partial class PipelineView : UserControl
 
     private void OnAddStepButtonClick(object? sender, RoutedEventArgs e)
     {
+        if (_currentViewModel?.IsRunning == true) return;
         _currentViewModel?.AddStep.GoBackCommand.Execute(null);
         AddStepPopup.IsOpen = true;
         Dispatcher.UIThread.Post(() => AddStepFlyoutControl.Focus(), DispatcherPriority.Loaded);

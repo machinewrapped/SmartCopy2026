@@ -190,6 +190,12 @@ public partial class MainViewModel : ViewModelBase
             {
                 StatusBar.IsScanning = DirectoryTree.IsLoading;
                 StatusBar.ScanStatusText = DirectoryTree.IsLoading ? "Scanning..." : string.Empty;
+                Pipeline.IsScanning = DirectoryTree.IsLoading;
+                // Lock the source path picker during scanning (confirm + cancel would be better)
+                if (!Pipeline.IsRunning)
+                {
+                    SourcePathPicker.IsEnabled = !DirectoryTree.IsLoading;
+                }
             }
             else if (e.PropertyName == nameof(DirectoryTreeViewModel.SelectedNode))
             {
@@ -905,6 +911,8 @@ public partial class MainViewModel : ViewModelBase
         var executionJob = StatusBar.Progress.Begin(job with { NodeProgress = nodeProgress });
 
         Pipeline.IsRunning = true;
+        FilterChain.IsLocked = true;
+        SourcePathPicker.IsEnabled = false;
 
         if (AutoOpenLogOnRun)
             LogPanel.IsExpanded = true;
@@ -952,6 +960,8 @@ public partial class MainViewModel : ViewModelBase
         finally
         {
             Pipeline.IsRunning = false;
+            FilterChain.IsLocked = false;
+            SourcePathPicker.IsEnabled = DirectoryTree.IsLoaded;
             FileList.RemoveAllMarkedForRemoval();
             DirectoryTree.RemoveNodesMarkedForRemoval();
             await ApplyPendingWatcherBatchesAsync();

@@ -33,6 +33,7 @@ public partial class MainWindow : Window
 
     private MainViewModel? _mainVm;
     private WorkflowMenuViewModel? _workflowMenu;
+    private bool _confirmingClose = false;
 
     // Selection menu
     private MenuItem? _absolutePathsMenuItem;
@@ -541,6 +542,14 @@ public partial class MainWindow : Window
     protected override void OnClosing(WindowClosingEventArgs e)
     {
         base.OnClosing(e);
+
+        if (_mainVm?.Pipeline.IsRunning == true && !_confirmingClose)
+        {
+            e.Cancel = true;
+            _ = ConfirmQuitAsync();
+            return;
+        }
+
         // Best-effort session snapshot — allows RestoreLastWorkflow to capture
         // the exact state at exit, even if the user never explicitly saved.
         if (_mainVm?.RestoreLastWorkflow == true)
@@ -548,6 +557,24 @@ public partial class MainWindow : Window
             _ = _mainVm.SaveSessionSnapshotAsync();
         }
         TrySaveWindowState();
+    }
+
+    private async Task ConfirmQuitAsync()
+    {
+        var confirmVm = new ConfirmDialogViewModel
+        {
+            Title = "Pipeline Running",
+            Message = "A pipeline operation is currently executing. Quit anyway?",
+            ConfirmText = "Quit",
+            CancelText = "Stay",
+        };
+        var dialog = new SmartCopy.UI.Views.Workflows.ConfirmDialog { DataContext = confirmVm };
+        var confirmed = await dialog.ShowDialog<bool?>(this);
+        if (confirmed == true)
+        {
+            _confirmingClose = true;
+            Close();
+        }
     }
 
     private void TrySaveWindowState()

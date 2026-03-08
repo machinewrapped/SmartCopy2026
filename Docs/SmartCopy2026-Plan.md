@@ -518,15 +518,15 @@ Exit criteria:
 *Goal: prevent the user from mutating state while the app is busy. All items share the same underlying mechanism (`IsScanning` / `IsExecuting` flags propagated through ViewModels).*
 
 Scope:
-- [ ] Disable Pipeline Run & Preview whilst scan is in progress
-- [ ] Lock Pipeline view whilst execution is in progress (no run, preview, remove or edit steps)
-- [ ] Lock Filter view whilst execution is in progress (no add, remove, edit or re-arrange filters)
-- [ ] Disable changing source path whilst pipeline execution is in progress (or confirm + cancel)
-- [ ] Confirm quit whilst pipeline execution is in progress
+- [X] Disable Pipeline Run & Preview whilst scan is in progress
+- [X] Lock Pipeline view whilst execution is in progress (no run, preview, remove or edit steps)
+- [X] Lock Filter view whilst execution is in progress (no add, remove, edit or re-arrange filters)
+- [X] Disable changing source path whilst pipeline execution is in progress (or confirm + cancel)
+- [X] Confirm quit whilst pipeline execution is in progress
 
 Exit criteria:
-- [ ] All locking/unlocking transitions are deterministic and covered by automated tests
-- [ ] Manual smoke: start a run, attempt each locked action, confirm correct blocking behavior
+- [X] All locking/unlocking transitions are deterministic and covered by automated tests
+- [X] Manual smoke: start a run, attempt each locked action, confirm correct blocking behavior
 
 ### Phase 5.2.9 — Execution Progress UX
 

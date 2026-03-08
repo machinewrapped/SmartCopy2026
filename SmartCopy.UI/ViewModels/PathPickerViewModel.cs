@@ -14,6 +14,9 @@ public partial class PathPickerViewModel : ViewModelBase
     private readonly PathPickerMode _mode;
 
     [ObservableProperty]
+    private bool _isEnabled = true;
+
+    [ObservableProperty]
     private string _path = string.Empty;
 
     [ObservableProperty]
@@ -63,6 +66,7 @@ public partial class PathPickerViewModel : ViewModelBase
     [RelayCommand]
     private void ApplyPath()
     {
+        if (!IsEnabled) return;
         var normalized = PathHelper.NormalizeUserPath(Path);
         if (string.IsNullOrWhiteSpace(normalized))
         {

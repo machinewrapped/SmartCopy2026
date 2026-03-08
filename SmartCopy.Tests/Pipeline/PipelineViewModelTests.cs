@@ -125,4 +125,60 @@ public sealed class PipelineViewModelTests
         Assert.Equal("Audio Backup", vm.Steps[0].Label);
         Assert.Equal("Audio Backup", vm.Steps[0].CustomName);
     }
+
+    // ── Locking ───────────────────────────────────────────────────────────────
+
+    private static PipelineViewModel MakeRunnableVm()
+    {
+        var vm = new PipelineViewModel(new TestAppContext());
+        vm.AddStepFromResult(new CopyStep("/mem/out"));
+        vm.SetSelectedIncludedFileCount(1);
+        return vm;
+    }
+
+    [Fact]
+    public void IsScanning_BlocksCanRun()
+    {
+        var vm = MakeRunnableVm();
+        Assert.True(vm.CanRun);
+
+        vm.IsScanning = true;
+
+        Assert.False(vm.CanRun);
+    }
+
+    [Fact]
+    public void IsRunning_BlocksRemoveStepCommand()
+    {
+        var vm = new PipelineViewModel(new TestAppContext());
+        vm.AddStepFromResult(new CopyStep("/mem/out"));
+
+        vm.IsRunning = true;
+
+        Assert.False(vm.RemoveStepCommand.CanExecute(vm.Steps[0]));
+    }
+
+    [Fact]
+    public void IsRunning_BlocksRequestEditStepCommand()
+    {
+        var vm = new PipelineViewModel(new TestAppContext());
+        vm.AddStepFromResult(new CopyStep("/mem/out"));
+
+        vm.IsRunning = true;
+
+        Assert.False(vm.RequestEditStepCommand.CanExecute(vm.Steps[0]));
+    }
+
+    [Fact]
+    public void IsNotRunning_UnblocksStepCommands()
+    {
+        var vm = new PipelineViewModel(new TestAppContext());
+        vm.AddStepFromResult(new CopyStep("/mem/out"));
+        vm.IsRunning = true;
+
+        vm.IsRunning = false;
+
+        Assert.True(vm.RemoveStepCommand.CanExecute(vm.Steps[0]));
+        Assert.True(vm.RequestEditStepCommand.CanExecute(vm.Steps[0]));
+    }
 }

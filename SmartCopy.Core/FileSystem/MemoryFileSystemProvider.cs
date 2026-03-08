@@ -109,11 +109,6 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
 
             await output.WriteAsync(buffer.AsMemory(0, read), ct);
 
-            if (AddArtificialDelay)
-            {
-                await Task.Delay(2, ct); // Simulate delay for testing progress reporting
-            }
-
             progress?.Report(read);
         }
 
@@ -126,6 +121,11 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
             EnsureParentDirectoryExists(normalizedPath);
             _entries[normalizedPath] = entry;
             TouchParentModifiedTime(normalizedPath, now);
+
+            if (AddArtificialDelay)
+            {
+                await Task.Delay(10, ct); // Simulate delay for testing progress reporting
+            }
         }
         finally
         {

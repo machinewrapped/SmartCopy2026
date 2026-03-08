@@ -39,8 +39,9 @@
         <Border Grid.Row="1" Background="#252526" BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="6" Margin="10,10,10,5" Padding="10">
             <Grid ColumnDefinitions="Auto, *" ColumnSpacing="4">
                 <TextBlock Grid.Column="0" Text="Source" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold"/>
-                <views:PathPickerControl Grid.Column="1" 
+                <views:PathPickerControl Grid.Column="1"
                                         DataContext="{Binding SourcePathPicker}"
+                                        IsEnabled="{Binding IsEnabled}"
                                         BrowseDialogTitle="Select Source Path"
                                         BrowseButtonToolTip="Set the source path for the workflow" />
             </Grid>

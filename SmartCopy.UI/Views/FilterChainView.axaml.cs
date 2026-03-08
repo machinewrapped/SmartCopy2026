@@ -66,6 +66,7 @@ public partial class FilterChainView : UserControl
 
     private void OnAddFilterButtonClick(object? sender, RoutedEventArgs e)
     {
+        if (_currentViewModel?.IsLocked == true) return;
         // Reset to Level 1 each time the popup opens.
         _currentViewModel?.AddFilter.GoBackCommand.Execute(null);
         AddFilterPopup.IsOpen = true;
@@ -267,6 +268,7 @@ public partial class FilterChainView : UserControl
     private void OnFiltersDrop(object? sender, DragEventArgs e)
     {
         if (_currentViewModel is null) return;
+        if (_currentViewModel.IsLocked) return;
         if (!e.DataTransfer.Contains(DragDataFormat)) return;
 
         var toIndex = GetDropTargetIndex(e.GetPosition(FiltersItemsControl));
