@@ -535,12 +535,13 @@ Exit criteria:
 Scope:
 - [X] Active step highlighted during pipeline execution
 - [X] Open PreviewView and show a progress bar whilst OperationPlan is being prepared
-- [ ] Cancellation/abort of preview preparation
+- [X] Cancellation/abort of preview preparation
+- [X] Suppress redundant preview for Copy/Move with Overwrite != Skip if destination path does not exist
 
 Exit criteria:
 - [X] Active step card is visually distinct during run; advances correctly through multi-step pipelines
 - [X] PreviewView progress indicator visible during plan generation and dismissed on completion
-- [ ] Abort preview preparation and confirm the progress indicator is dismissed
+- [X] Abort preview preparation and confirm the progress indicator is dismissed
 
 ### Phase 5.2.10 — Pre-flight Safety Validation
 
@@ -574,7 +575,6 @@ Exit criteria:
 - [ ] Memory to Memory moves report that atomic move is not possible (null volumeId?)
 - [ ] Incorrect progress bar status after Select All step (X/0 files)
 - [ ] Incorrect progress bar for multi-step pipelines (e.g. Copy + Move shows 500/400 files during Move)
-- [ ] Suppress redundant preview for Copy/Move with Overwrite != Skip if destination path does not exist
 
 Exit criteria:
 - [ ] All bug fixes are implemented and tests are added

@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.Input;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Pipeline;
+using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Progress;
 using SmartCopy.Core.Scanning;
 using SmartCopy.Core.Selection;
@@ -924,7 +925,8 @@ public partial class MainViewModel : ViewModelBase
         // Mandatory preview for destructive pipelines, unless the user has opted out.
         bool needsPreview = false;
         if (pipeline.HasDeleteStep && !_settings.AllowDeleteWithoutPreview) needsPreview = true;
-        if (pipeline.HasOverwriteStep && !_settings.AllowOverwriteWithoutPreview) needsPreview = true;
+        if (!needsPreview && !_settings.AllowOverwriteWithoutPreview)
+            needsPreview = await HasPotentialOverwriteAsync(pipeline);
 
         if (needsPreview)
         {
@@ -956,6 +958,37 @@ public partial class MainViewModel : ViewModelBase
         };
 
         await ExecutePipelineAsync(runner, job);
+    }
+
+    /// <summary>
+    /// Returns true when the pipeline has at least one Copy or Move step with
+    /// <c>OverwriteMode != Skip</c> whose destination directory already exists.
+    /// If the destination doesn't exist yet, no files can be overwritten, so the
+    /// mandatory-preview guard is unnecessary.
+    /// </summary>
+    private async Task<bool> HasPotentialOverwriteAsync(TransformPipeline pipeline)
+    {
+        foreach (var step in pipeline.Steps)
+        {
+            string? destPath = step switch
+            {
+                CopyStep copy when copy.OverwriteMode != OverwriteMode.Skip => copy.DestinationPath,
+                MoveStep move when move.OverwriteMode != OverwriteMode.Skip => move.DestinationPath,
+                _ => null,
+            };
+
+            if (string.IsNullOrWhiteSpace(destPath))
+                continue;
+
+            var provider = _providerRegistry.ResolveProvider(destPath);
+            if (provider is null)
+                continue;
+
+            if (await provider.ExistsAsync(destPath, CancellationToken.None))
+                return true;
+        }
+
+        return false;
     }
 
     private async Task ExecutePipelineAsync(PipelineRunner runner, PipelineJob job)
