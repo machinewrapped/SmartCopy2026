@@ -38,12 +38,26 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
 
     public bool HasDestinationPath => !string.IsNullOrWhiteSpace(DestinationPath);
 
-    public IFileSystemProvider? ResolveFreeSpaceTarget(IFileSystemProvider sourceProvider, FileSystemProviderRegistry registry)
+    public IFileSystemProvider? ResolveFreeSpaceTarget(IFileSystemProvider sourceProvider, IPathResolver registry)
     {
         if (!HasDestinationPath) return null;
         var target = registry.ResolveProvider(DestinationPath!);
         var sameVolume = sourceProvider.VolumeId is { } vid && target?.VolumeId == vid;
         return sameVolume ? null : target;
+    }
+
+    public FreeSpaceValidationResult? ValidateFreeSpace(
+        long bytesNeeded,
+        IFileSystemProvider source,
+        IPathResolver registry,
+        IReadOnlyDictionary<string, long?> freeSpaceCache)
+    {
+        if (bytesNeeded <= 0) return null;
+        var target = ResolveFreeSpaceTarget(source, registry);
+        if (target is null) return null;
+        if (!freeSpaceCache.TryGetValue(target.RootPath, out var free) || free is null) return null;
+        if (bytesNeeded <= free.Value) return null;
+        return new FreeSpaceValidationResult(bytesNeeded, free.Value);
     }
 
     public void Validate(StepValidationContext context)
@@ -54,6 +68,7 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
         {
             context.AddBlockingIssue("Step.MissingDestination", "Move requires a destination path.");
         }
+        context.AddFreeSpaceWarning(this);
         context.SourceExists = false;
     }
 

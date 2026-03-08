@@ -1,4 +1,4 @@
-using System.Linq;
+using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Core.Pipeline.Validation;
 
@@ -10,11 +10,22 @@ namespace SmartCopy.Core.Pipeline.Validation;
 public sealed class StepValidationContext
 {
     private readonly List<PipelineValidationIssue> _issues = new();
+    private readonly IReadOnlyDictionary<string, long?>? _cachedFreeSpace;
 
-    public StepValidationContext(bool hasSelectedIncludedInputs, bool sourceExists = true)
+    public StepValidationContext(
+        bool hasSelectedIncludedInputs,
+        bool sourceExists = true,
+        long selectedBytes = 0,
+        IFileSystemProvider? sourceProvider = null,
+        IPathResolver? providerRegistry = null,
+        IReadOnlyDictionary<string, long?>? cachedFreeSpace = null)
     {
         HasSelectedIncludedInputs = hasSelectedIncludedInputs;
         SourceExists = sourceExists;
+        SelectedBytes = selectedBytes;
+        SourceProvider = sourceProvider;
+        ProviderRegistry = providerRegistry;
+        _cachedFreeSpace = cachedFreeSpace;
     }
 
     /// <summary>Index of the step currently being validated. Set by <see cref="PipelineValidator"/> before each call.</summary>
@@ -25,6 +36,18 @@ public sealed class StepValidationContext
 
     /// <summary>Whether at least one selected/included file is present (supplied externally).</summary>
     public bool HasSelectedIncludedInputs { get; set; }
+
+    /// <summary>Approximate total bytes of selected files. Steps may reset this (e.g. InvertSelectionStep).</summary>
+    public long SelectedBytes { get; set; }
+
+    /// <summary>True after a step that inverts selection, so downstream steps skip the byte-based space check.</summary>
+    public bool ByteEstimateUnknown { get; set; }
+
+    /// <summary>Source provider for space-check resolution.</summary>
+    public IFileSystemProvider? SourceProvider { get; }
+
+    /// <summary>Provider registry for space-check resolution.</summary>
+    public IPathResolver? ProviderRegistry { get; }
 
     /// <summary>True if any blocking issue has been recorded — subsequent steps should not validate.</summary>
     public bool HasBlockingIssue { get; private set; }
@@ -53,6 +76,27 @@ public sealed class StepValidationContext
             Code: code,
             Message: message,
             Severity: severity));
+    }
+
+    /// <summary>Adds a non-blocking warning scoped to the current step.</summary>
+    public void AddStepWarning(string code, string message)
+    {
+        _issues.Add(new PipelineValidationIssue(StepIndex, code, message, PipelineValidationSeverity.Warning));
+    }
+
+    /// <summary>
+    /// Checks free space using the cached map and adds a step-scoped warning if insufficient.
+    /// No-op when estimate is unknown, bytes ≤ 0, or context lacks providers/cache.
+    /// </summary>
+    public void AddFreeSpaceWarning(IHasFreeSpaceCheck step)
+    {
+        if (ByteEstimateUnknown || SelectedBytes <= 0
+            || _cachedFreeSpace is null
+            || SourceProvider is null
+            || ProviderRegistry is null) return;
+        var result = step.ValidateFreeSpace(SelectedBytes, SourceProvider, ProviderRegistry, _cachedFreeSpace);
+        if (result is not null)
+            AddStepWarning("Step.InsufficientSpace", result.ShortMessage);
     }
 
     /// <summary>

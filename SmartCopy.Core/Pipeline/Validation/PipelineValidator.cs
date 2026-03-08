@@ -7,7 +7,12 @@ public sealed class PipelineValidator
         PipelineValidationContext? context = null)
     {
         context ??= new PipelineValidationContext();
-        var validationContext = new StepValidationContext(context.HasSelectedIncludedInputs);
+        var validationContext = new StepValidationContext(
+            context.HasSelectedIncludedInputs,
+            selectedBytes:    context.SelectedBytes,
+            sourceProvider:   context.SourceProvider,
+            providerRegistry: context.ProviderRegistry,
+            cachedFreeSpace:  context.CachedFreeSpace);
 
         if (steps.Count == 0)
         {

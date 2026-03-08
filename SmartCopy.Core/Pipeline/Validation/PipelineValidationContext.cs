@@ -1,4 +1,10 @@
+using SmartCopy.Core.FileSystem;
+
 namespace SmartCopy.Core.Pipeline.Validation;
 
 public sealed record PipelineValidationContext(
-    bool HasSelectedIncludedInputs = true);
+    bool HasSelectedIncludedInputs = true,
+    long SelectedBytes = 0,
+    IFileSystemProvider? SourceProvider = null,
+    IPathResolver? ProviderRegistry = null,
+    IReadOnlyDictionary<string, long?>? CachedFreeSpace = null);

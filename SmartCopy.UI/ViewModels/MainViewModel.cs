@@ -668,7 +668,7 @@ public partial class MainViewModel : ViewModelBase
             StartDirectoryWatcherIfSupported();
 
             if (DirectoryTree.SourceProvider is { } sp)
-                Pipeline.SetSourceCapabilities(sp.Capabilities);
+                Pipeline.SetSourceContext(sp);
 
             _settings.LastSourcePath = normalizedPath;
             await _settingsStore.SaveAsync(_settings);
@@ -862,6 +862,7 @@ public partial class MainViewModel : ViewModelBase
         long totalBytes = root.TotalSelectedBytes;
 
         Pipeline.SetSelectedIncludedFileCount(selected);
+        Pipeline.SetSelectedBytes(totalBytes);
         StatusBar.Selection.UpdateStats(selected, totalBytes, filteredOut);
     }
 

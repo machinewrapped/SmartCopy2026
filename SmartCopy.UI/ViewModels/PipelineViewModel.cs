@@ -29,6 +29,9 @@ public partial class PipelineViewModel : ViewModelBase
     private readonly StepPresetStore _stepPresetStore;
     private readonly AppSettings _appSettings;
     private int _selectedIncludedFileCount;
+    private long _selectedBytes;
+    private IFileSystemProvider? _sourceProvider;
+    private Dictionary<string, long?> _cachedFreeSpace = new();
 
     public ObservableCollection<PipelineStepViewModel> Steps { get; } = [];
 
@@ -50,6 +53,39 @@ public partial class PipelineViewModel : ViewModelBase
     {
         SourceCapabilities = capabilities;
         Revalidate();
+    }
+
+    internal void SetSourceContext(IFileSystemProvider provider)
+    {
+        _sourceProvider = provider;
+        SourceCapabilities = provider.Capabilities;
+        _ = RefreshFreeSpaceCacheAsync();
+    }
+
+    internal void SetSelectedBytes(long bytes)
+    {
+        var normalized = Math.Max(0, bytes);
+        if (_selectedBytes == normalized) return;
+        _selectedBytes = normalized;
+        Revalidate();
+    }
+
+    private async Task RefreshFreeSpaceCacheAsync()
+    {
+        if (_sourceProvider is null) return;
+        var cache = new Dictionary<string, long?>();
+        foreach (var stepVm in Steps)
+        {
+            if (stepVm.Step is not IHasFreeSpaceCheck fsCheck) continue;
+            var target = fsCheck.ResolveFreeSpaceTarget(_sourceProvider, _appContext);
+            if (target?.Capabilities.CanQueryFreeSpace == true && !cache.ContainsKey(target.RootPath))
+            {
+                try   { cache[target.RootPath] = await target.GetAvailableFreeSpaceAsync(CancellationToken.None); }
+                catch { cache[target.RootPath] = null; }
+            }
+        }
+        _cachedFreeSpace = cache;
+        Avalonia.Threading.Dispatcher.UIThread.Post(Revalidate);
     }
 
     internal void RecordRecentTarget(string path)
@@ -305,6 +341,7 @@ public partial class PipelineViewModel : ViewModelBase
             }
         }
 
+        _ = RefreshFreeSpaceCacheAsync();
         Revalidate();
     }
 
@@ -312,6 +349,7 @@ public partial class PipelineViewModel : ViewModelBase
     {
         _ = sender;
         _ = e;
+        _ = RefreshFreeSpaceCacheAsync();
         Revalidate();
     }
 
@@ -365,13 +403,19 @@ public partial class PipelineViewModel : ViewModelBase
         {
             step.ValidationMessage = null;
             step.HasValidationError = false;
+            step.HasValidationWarning = false;
             step.TrashUnavailable = false;
         }
         _capabilityBlocked = false;
 
         var result = PipelineValidator.Validate(
             [.. Steps.Select(step => step.Step)],
-            new PipelineValidationContext(_selectedIncludedFileCount > 0));
+            new PipelineValidationContext(
+                HasSelectedIncludedInputs: _selectedIncludedFileCount > 0,
+                SelectedBytes:    _selectedBytes,
+                SourceProvider:   _sourceProvider,
+                ProviderRegistry: _appContext,
+                CachedFreeSpace:  _cachedFreeSpace));
 
         ValidationResult = result;
         BlockingValidationMessage = result.FirstBlockingIssue?.Message;
@@ -389,6 +433,7 @@ public partial class PipelineViewModel : ViewModelBase
             {
                 step.ValidationMessage = issue.Message;
                 step.HasValidationError = issue.Severity == PipelineValidationSeverity.Blocking;
+                step.HasValidationWarning = issue.Severity == PipelineValidationSeverity.Warning;
             }
         }
 

@@ -36,8 +36,22 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
 
     public bool HasDestinationPath => !string.IsNullOrWhiteSpace(DestinationPath);
 
-    public IFileSystemProvider? ResolveFreeSpaceTarget(IFileSystemProvider sourceProvider, FileSystemProviderRegistry registry)
+    public IFileSystemProvider? ResolveFreeSpaceTarget(IFileSystemProvider sourceProvider, IPathResolver registry)
         => HasDestinationPath ? registry.ResolveProvider(DestinationPath!) : null;
+
+    public FreeSpaceValidationResult? ValidateFreeSpace(
+        long bytesNeeded,
+        IFileSystemProvider source,
+        IPathResolver registry,
+        IReadOnlyDictionary<string, long?> freeSpaceCache)
+    {
+        if (bytesNeeded <= 0) return null;
+        var target = ResolveFreeSpaceTarget(source, registry);
+        if (target is null) return null;
+        if (!freeSpaceCache.TryGetValue(target.RootPath, out var free) || free is null) return null;
+        if (bytesNeeded <= free.Value) return null;
+        return new FreeSpaceValidationResult(bytesNeeded, free.Value);
+    }
 
     public void Validate(StepValidationContext context)
     {
@@ -47,6 +61,7 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
         {
             context.AddBlockingIssue("Step.MissingDestination", "Copy requires a destination path.");
         }
+        context.AddFreeSpaceWarning(this);
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(

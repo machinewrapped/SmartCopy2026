@@ -62,13 +62,9 @@ public sealed class PipelineRunner
                 {
                     long needed = stepActions.Sum(a => a.OutputBytes);
                     long? free = await target.GetAvailableFreeSpaceAsync(ct);
-                    if (free.HasValue && needed > free.Value)
-                    {
-                        string txtNeeded = FileSizeFormatter.FormatBytes(needed);
-                        string txtFree = FileSizeFormatter.FormatBytes(free.Value);
-                        string txtOver = FileSizeFormatter.FormatBytes(needed - free.Value);
-                        warnings.Add($"Not enough space on target drive — {txtNeeded} needed, {txtFree} available ({txtOver} over)");
-                    }
+                    var singleEntryCache = new Dictionary<string, long?> { [target.RootPath] = free };
+                    var fsResult = fsCheck.ValidateFreeSpace(needed, job.SourceProvider, job.ProviderRegistry, singleEntryCache);
+                    if (fsResult is not null) warnings.Add(fsResult.LongMessage);
                 }
             }
 
@@ -133,8 +129,8 @@ public sealed class PipelineRunner
 
             if (step.IsExecutable)
             {
-                totalBytes = GetAllSelectedBytes(job.RootNode);
-                totalFiles = job.RootNode.CountSelectedFiles();
+                totalBytes = job.RootNode.TotalSelectedBytes;
+                totalFiles = job.RootNode.NumSelectedFiles;
                 completedBytes = 0;
                 filesCompleted = 0;
                 stopwatch.Restart();
@@ -175,16 +171,6 @@ public sealed class PipelineRunner
         }
 
         return results;
-    }
-
-    private static long GetAllSelectedBytes(DirectoryTreeNode node)
-    {
-        long total = 0;
-        foreach (var file in node.Files)
-            if (file.IsSelected) total += file.Size;
-        foreach (var child in node.Children)
-            total += GetAllSelectedBytes(child);
-        return total;
     }
 
     private static TimeSpan EstimateRemaining(TimeSpan elapsed, long completed, long total)

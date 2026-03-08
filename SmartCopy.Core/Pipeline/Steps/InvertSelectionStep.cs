@@ -22,6 +22,8 @@ public sealed class InvertSelectionStep : IPipelineStep
         // are not blocked by a prior destructive step.
         context.SourceExists = true;
         context.HasSelectedIncludedInputs = true;
+        context.SelectedBytes = 0;
+        context.ByteEstimateUnknown = true;
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(
