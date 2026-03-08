@@ -191,11 +191,6 @@ public partial class MainViewModel : ViewModelBase
                 StatusBar.IsScanning = DirectoryTree.IsLoading;
                 StatusBar.ScanStatusText = DirectoryTree.IsLoading ? "Scanning..." : string.Empty;
                 Pipeline.IsScanning = DirectoryTree.IsLoading;
-                // Lock the source path picker during scanning (confirm + cancel would be better)
-                if (!Pipeline.IsRunning)
-                {
-                    SourcePathPicker.IsEnabled = !DirectoryTree.IsLoading;
-                }
             }
             else if (e.PropertyName == nameof(DirectoryTreeViewModel.SelectedNode))
             {
@@ -223,7 +218,16 @@ public partial class MainViewModel : ViewModelBase
             }
         };
 
-        SourcePathPicker.PathCommitted += async (s,p) => await ApplySourcePathCoreAsync(p);
+        SourcePathPicker.PathCommitted += async (s, p) =>
+        {
+            if (Pipeline.IsRunning)
+            {
+                var confirmed = await ConfirmCancelPipelineForSourceChangeAsync();
+                if (!confirmed) return;
+                StatusBar.Progress.CancelCommand.Execute(null);
+            }
+            await ApplySourcePathCoreAsync(p);
+        };
 
         StatusBar.CancelScanRequested += (_, _) => _scanCts?.Cancel();
 
@@ -263,6 +267,7 @@ public partial class MainViewModel : ViewModelBase
         DefaultDeleteMode = _settings.DefaultDeleteMode;
         ShowHiddenFiles = _settings.ShowHiddenFiles;
         AllowDeleteReadOnly = _settings.AllowDeleteReadOnly;
+        AddArtificialDelay = _settings.AddArtificialDelay;
 
         SourcePathPicker.RefreshSettings();
 
@@ -400,7 +405,10 @@ public partial class MainViewModel : ViewModelBase
 
     partial void OnAddArtificialDelayChanged(bool value)
     {
-        _memoryProvider.AddArtificialDelay = value;
+        if (_memoryProvider != null)
+        {
+            _memoryProvider.AddArtificialDelay = value;            
+        }
         _settings.AddArtificialDelay = value;
         _ = SaveSettingsAsync();
     }
@@ -586,6 +594,23 @@ public partial class MainViewModel : ViewModelBase
     private void RevertSourcePath()
     {
         SourcePath = _lastCommittedSourcePath;
+    }
+
+    private async Task<bool> ConfirmCancelPipelineForSourceChangeAsync()
+    {
+        var mainWindow = GetMainWindow();
+        if (mainWindow is null) return false;
+
+        var confirmVm = new ConfirmDialogViewModel
+        {
+            Title = "Pipeline Running",
+            Message = "Cancel the current operation and change the source path?",
+            ConfirmText = "Cancel & Change",
+            CancelText = "Keep Running",
+        };
+        var dialog = new ConfirmDialog { DataContext = confirmVm };
+        var result = await dialog.ShowDialog<bool?>(mainWindow);
+        return result == true;
     }
 
     private async Task ApplySourcePathCoreAsync(string path)
@@ -912,7 +937,6 @@ public partial class MainViewModel : ViewModelBase
 
         Pipeline.IsRunning = true;
         FilterChain.IsLocked = true;
-        SourcePathPicker.IsEnabled = false;
 
         if (AutoOpenLogOnRun)
             LogPanel.IsExpanded = true;
@@ -961,7 +985,6 @@ public partial class MainViewModel : ViewModelBase
         {
             Pipeline.IsRunning = false;
             FilterChain.IsLocked = false;
-            SourcePathPicker.IsEnabled = !DirectoryTree.IsLoading;
             FileList.RemoveAllMarkedForRemoval();
             DirectoryTree.RemoveNodesMarkedForRemoval();
             await ApplyPendingWatcherBatchesAsync();

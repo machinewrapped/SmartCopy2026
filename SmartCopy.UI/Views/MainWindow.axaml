@@ -41,7 +41,6 @@
                 <TextBlock Grid.Column="0" Text="Source" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold"/>
                 <views:PathPickerControl Grid.Column="1"
                                         DataContext="{Binding SourcePathPicker}"
-                                        IsEnabled="{Binding IsEnabled}"
                                         BrowseDialogTitle="Select Source Path"
                                         BrowseButtonToolTip="Set the source path for the workflow" />
             </Grid>

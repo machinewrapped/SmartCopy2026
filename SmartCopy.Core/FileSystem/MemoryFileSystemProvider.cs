@@ -37,21 +37,30 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
 
     public Task<IReadOnlyList<FileSystemNode>> GetChildrenAsync(string path, CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        var normalizedPath = Normalize(path);
-        EnsureDirectoryExists(normalizedPath);
+        return Task.Run(async () =>
+        {
+            ct.ThrowIfCancellationRequested();
+            var normalizedPath = Normalize(path);
+            EnsureDirectoryExists(normalizedPath);
 
-        // GetParentPath(kv.Key) == normalizedPath selects direct children.
-        // The extra inequality guard is only needed for root, where GetParentPath(RootPath) == RootPath.
-        var children = _entries
-            .Where(kv => GetParentPath(kv.Key).Equals(normalizedPath, StringComparison.OrdinalIgnoreCase)
-                         && !kv.Key.Equals(normalizedPath, StringComparison.OrdinalIgnoreCase))
-            .Select(kv => ToNode(kv.Key, kv.Value))
-            .OrderBy(node => node.IsDirectory ? 0 : 1)
-            .ThenBy(node => node.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+            // GetParentPath(kv.Key) == normalizedPath selects direct children.
+            // The extra inequality guard is only needed for root, where GetParentPath(RootPath) == RootPath.
+            IReadOnlyList<FileSystemNode> children = _entries
+                .Where(kv => GetParentPath(kv.Key).Equals(normalizedPath, StringComparison.OrdinalIgnoreCase)
+                            && !kv.Key.Equals(normalizedPath, StringComparison.OrdinalIgnoreCase))
+                .Select(kv => ToNode(kv.Key, kv.Value))
+                .OrderBy(node => node.IsDirectory ? 0 : 1)
+                .ThenBy(node => node.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
-        return Task.FromResult<IReadOnlyList<FileSystemNode>>(children);
+            if (AddArtificialDelay)
+            {
+                await Task.Delay(10);
+            }
+
+            return children;
+
+        }, ct);
     }
 
     public Task<FileSystemNode> GetNodeAsync(string path, CancellationToken ct)

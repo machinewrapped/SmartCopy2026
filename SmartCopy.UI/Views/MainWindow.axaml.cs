@@ -296,12 +296,10 @@ public partial class MainWindow : Window
         OptionsMenu.Items.Add(new Separator());
         OptionsMenu.Items.Add(SectionHeader("Debug"));
 
-        _artificialDelayMenuItem = new MenuItem
-        {
-            Header = "Add Artificial Delays to Mock Provider",
-            ToggleType = MenuItemToggleType.CheckBox,
-            IsChecked = _mainVm?.AddArtificialDelay ?? false,
-        };
+        _artificialDelayMenuItem = Toggle(
+            "Add Artificial Delays to Mock Provider",
+            _mainVm?.AddArtificialDelay ?? false,
+            () => { if (_mainVm is not null) _mainVm.AddArtificialDelay = !_mainVm.AddArtificialDelay; });
         OptionsMenu.Items.Add(_artificialDelayMenuItem);
 
         return;
