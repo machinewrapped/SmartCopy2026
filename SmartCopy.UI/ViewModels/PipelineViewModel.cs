@@ -46,8 +46,11 @@ public partial class PipelineViewModel : ViewModelBase
     // Default to full capabilities so editors show no false-positive warning before source is set.
     internal ProviderCapabilities SourceCapabilities { get; private set; } = ProviderCapabilities.Full;
 
-    internal void SetSourceCapabilities(ProviderCapabilities capabilities) =>
+    internal void SetSourceCapabilities(ProviderCapabilities capabilities)
+    {
         SourceCapabilities = capabilities;
+        Revalidate();
+    }
 
     internal void RecordRecentTarget(string path)
     {

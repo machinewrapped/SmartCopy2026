@@ -2,7 +2,34 @@ namespace SmartCopy.Core.Trash;
 
 public sealed class FreedesktopTrashService : ITrashService
 {
-    public bool IsAvailable => OperatingSystem.IsLinux();
+    // Lazily probe for gio once; null = not yet checked.
+    private static bool? _gioAvailable;
+
+    public bool IsAvailable => OperatingSystem.IsLinux() && GioAvailable;
+
+    private static bool GioAvailable =>
+        _gioAvailable ??= ProbeGio();
+
+    private static bool ProbeGio()
+    {
+        try
+        {
+            using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "gio",
+                ArgumentList = { "version" },
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            });
+            process?.WaitForExit();
+            return process?.ExitCode == 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     public async Task TrashAsync(string fullPath, CancellationToken ct)
     {
