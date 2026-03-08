@@ -33,7 +33,9 @@ public sealed class DeleteStep : IPipelineStep
         IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
         await Task.Yield();
-        var pathResult = Mode == DeleteMode.Trash ? SourceResult.Trashed : SourceResult.Deleted;
+        var pathResult = Mode == DeleteMode.Trash && context.SourceProvider.Capabilities.CanTrash
+            ? SourceResult.Trashed
+            : SourceResult.Deleted;
 
         // Include root node itself if selected, then all selected descendants.
         if (context.IsPreviewSelected(context.RootNode))
@@ -70,7 +72,9 @@ public sealed class DeleteStep : IPipelineStep
         IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var pathResult = Mode == DeleteMode.Trash ? SourceResult.Trashed : SourceResult.Deleted;
+        bool useTrash = Mode == DeleteMode.Trash
+            && context.SourceProvider.Capabilities.CanTrash
+            && context.TrashService.IsAvailable;
 
         // If the root node itself is fully selected, delete it atomically.
         if (context.RootNode.IsSelected)
@@ -88,11 +92,11 @@ public sealed class DeleteStep : IPipelineStep
                 yield break;
             }
 
-            await context.SourceProvider.DeleteAsync(context.RootNode.FullPath, ct);
+            var actualResult = await DeleteNodeAsync(context.RootNode.FullPath, useTrash, context, ct);
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: context.RootNode,
-                SourceNodeResult: pathResult,
+                SourceNodeResult: actualResult,
                 NumberOfFilesAffected: context.RootNode.CountAllFiles(),
                 NumberOfFoldersAffected: context.RootNode.CountAllFolders(),
                 InputBytes: context.RootNode.Size);
@@ -119,15 +123,27 @@ public sealed class DeleteStep : IPipelineStep
                 continue;
             }
 
-            await context.SourceProvider.DeleteAsync(node.FullPath, ct);
+            var actualResult = await DeleteNodeAsync(node.FullPath, useTrash, context, ct);
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: node,
-                SourceNodeResult: pathResult,
+                SourceNodeResult: actualResult,
                 NumberOfFilesAffected: node.CountAllFiles(),
                 NumberOfFoldersAffected: node.CountAllFolders(),
                 InputBytes: node.Size);
         }
+    }
+
+    private static async Task<SourceResult> DeleteNodeAsync(
+        string fullPath, bool useTrash, IStepContext context, CancellationToken ct)
+    {
+        if (useTrash)
+        {
+            await context.TrashService.TrashAsync(fullPath, ct);
+            return SourceResult.Trashed;
+        }
+        await context.SourceProvider.DeleteAsync(fullPath, ct);
+        return SourceResult.Deleted;
     }
 
     private static TransformResult MakePreviewResult(

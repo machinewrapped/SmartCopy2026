@@ -2,6 +2,7 @@ using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
+using SmartCopy.Core.Trash;
 using SmartCopy.Tests.TestInfrastructure;
 
 namespace SmartCopy.Tests.Pipeline;
@@ -26,7 +27,7 @@ public sealed class MoveStepFallbackTests
         public FileSystemProviderRegistry ProviderRegistry { get; }
         public bool ShowHiddenFiles { get; }
         public bool AllowDeleteReadOnly { get; }
-
+        public ITrashService TrashService { get; } = new NullTrashService();
 
         public MoveTestContext(DirectoryTreeNode root, IFileSystemProvider source, IFileSystemProvider? target = null)
         {
@@ -75,8 +76,8 @@ public sealed class MoveStepFallbackTests
     [Fact]
     public async Task CrossProvider_File_UsesCopyDeleteFallback()
     {
-        var sourceProvider = MemoryFileSystemFixtures.Create(s => s.WithFile("/src/file.txt", "content"u8));
-        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target");
+        var sourceProvider = MemoryFileSystemFixtures.Create(s => s.WithFile("/src/file.txt", "content"u8), volumeId: "VOL1");
+        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target", volumeId: "VOL2");
 
         var root = await sourceProvider.BuildDirectoryTree("/src");
         root.Files[0].CheckState = CheckState.Checked;
@@ -136,7 +137,7 @@ public sealed class MoveStepFallbackTests
         var root = await memory.BuildDirectoryTree("/src");
         root.Files[0].CheckState = CheckState.Checked;
 
-        // Same wrapped instance → sameProvider = true, canAtomicMove = false → fallback.
+        // Same wrapped instance, VolumeId="MEM" → sameVolume=true, canAtomicMove=false → fallback.
         var ctx = new MoveTestContext(root, noAtomicMove);
         var step = new MoveStep("/mem/dest");
 
@@ -161,8 +162,9 @@ public sealed class MoveStepFallbackTests
     {
         var sourceProvider = MemoryFileSystemFixtures.Create(s => s
             .WithFile("/src/dir/a.txt", "aaa"u8)
-            .WithFile("/src/dir/b.txt", "bbb"u8));
-        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target");
+            .WithFile("/src/dir/b.txt", "bbb"u8)
+            , volumeId: "VOL1");
+        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target", volumeId: "VOL2");
 
         var root = await sourceProvider.BuildDirectoryTree("/src");
         var dir = root.Children.Single();
@@ -181,6 +183,7 @@ public sealed class MoveStepFallbackTests
         Assert.All(results, r => Assert.Equal(SourceResult.Moved, r.SourceNodeResult));
         Assert.False(await sourceProvider.ExistsAsync("/src/dir/a.txt", CancellationToken.None));
         Assert.False(await sourceProvider.ExistsAsync("/src/dir/b.txt", CancellationToken.None));
+        Assert.False(await sourceProvider.ExistsAsync("/src/dir", CancellationToken.None));
         Assert.True(await targetProvider.ExistsAsync("/dest/dir/a.txt", CancellationToken.None));
         Assert.True(await targetProvider.ExistsAsync("/dest/dir/b.txt", CancellationToken.None));
     }
@@ -193,8 +196,9 @@ public sealed class MoveStepFallbackTests
     {
         var sourceProvider = MemoryFileSystemFixtures.Create(s => s
             .WithFile("/src/dir/keep.txt", "keep"u8)
-            .WithFile("/src/dir/move.txt", "move"u8));
-        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target");
+            .WithFile("/src/dir/move.txt", "move"u8)
+            , volumeId: "VOL1");
+        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target", volumeId: "VOL2");
 
         var root = await sourceProvider.BuildDirectoryTree("/src");
         var dir = root.Children.Single();
@@ -211,6 +215,7 @@ public sealed class MoveStepFallbackTests
         Assert.Single(results);
         Assert.Equal(SourceResult.Moved, results[0].SourceNodeResult);
         Assert.True(await sourceProvider.ExistsAsync("/src/dir/keep.txt", CancellationToken.None));
+        Assert.True(await sourceProvider.ExistsAsync("/src/dir", CancellationToken.None)); // partial selection: dir must remain
         Assert.False(await sourceProvider.ExistsAsync("/src/dir/move.txt", CancellationToken.None));
         Assert.True(await targetProvider.ExistsAsync("/dest/dir/move.txt", CancellationToken.None));
     }
@@ -254,8 +259,9 @@ public sealed class MoveStepFallbackTests
     {
         var sourceProvider = MemoryFileSystemFixtures.Create(s => s
             .WithFile("/src/dir/top.txt", "top"u8)
-            .WithFile("/src/dir/sub/nested.txt", "nested"u8));
-        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target");
+            .WithFile("/src/dir/sub/nested.txt", "nested"u8)
+            , volumeId: "VOL1");
+        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target", volumeId: "VOL2");
 
         var root = await sourceProvider.BuildDirectoryTree("/src");
         var dir = root.Children.Single();
@@ -277,6 +283,8 @@ public sealed class MoveStepFallbackTests
         Assert.All(results, r => Assert.Equal(SourceResult.Moved, r.SourceNodeResult));
         Assert.False(await sourceProvider.ExistsAsync("/src/dir/top.txt", CancellationToken.None));
         Assert.False(await sourceProvider.ExistsAsync("/src/dir/sub/nested.txt", CancellationToken.None));
+        Assert.False(await sourceProvider.ExistsAsync("/src/dir/sub", CancellationToken.None));
+        Assert.False(await sourceProvider.ExistsAsync("/src/dir", CancellationToken.None));
         Assert.True(await targetProvider.ExistsAsync("/dest/dir/top.txt", CancellationToken.None));
         Assert.True(await targetProvider.ExistsAsync("/dest/dir/sub/nested.txt", CancellationToken.None));
     }
@@ -309,6 +317,61 @@ public sealed class MoveStepFallbackTests
         Assert.True(results[0].IsSuccess);
         Assert.Equal(SourceResult.Moved, results[0].SourceNodeResult);
         Assert.False(await memory.ExistsAsync("/src/dir/file.txt", CancellationToken.None));
+        Assert.False(await memory.ExistsAsync("/src/dir", CancellationToken.None));
         Assert.True(await memory.ExistsAsync("/dest/dir/file.txt", CancellationToken.None));
+    }
+
+    /// <summary>
+    /// Two providers with different VolumeIds (e.g. C:\ and D:\) cannot do an atomic move
+    /// and fall back to copy+delete.
+    /// </summary>
+    [Fact]
+    public async Task DifferentVolumeIds_UsesCopyDeleteFallback()
+    {
+        var sourceProvider = MemoryFileSystemFixtures.Create(s => s.WithFile("/src/file.txt", "content"u8), volumeId: "C:\\");
+        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target", volumeId: "D:\\");
+
+        var root = await sourceProvider.BuildDirectoryTree("/src");
+        root.Files[0].CheckState = CheckState.Checked;
+
+        var ctx = new MoveTestContext(root, sourceProvider, targetProvider);
+        var step = new MoveStep("/target/dest");
+
+        var results = new List<TransformResult>();
+        await foreach (var r in step.ApplyAsync(ctx, CancellationToken.None))
+            results.Add(r);
+
+        Assert.Single(results);
+        Assert.Equal(SourceResult.Moved, results[0].SourceNodeResult);
+        Assert.False(await sourceProvider.ExistsAsync("/src/file.txt", CancellationToken.None));
+        Assert.True(await targetProvider.ExistsAsync("/dest/file.txt", CancellationToken.None));
+    }
+
+    /// <summary>
+    /// A MemoryFileSystemProvider with VolumeId=null (the default) never uses the atomic path,
+    /// even when the same instance is used as both source and target.
+    /// This documents the behavioral change from the old ReferenceEquals-based check.
+    /// </summary>
+    [Fact]
+    public async Task NullVolumeId_AlwaysCopyDeleteFallback()
+    {
+        // Default MemoryFileSystemProvider has VolumeId=null.
+        var provider = MemoryFileSystemFixtures.Create(s => s.WithFile("/src/file.txt", "content"u8));
+
+        var root = await provider.BuildDirectoryTree("/src");
+        root.Files[0].CheckState = CheckState.Checked;
+
+        // Same instance for source and target — copy+delete still moves the file correctly.
+        var ctx = new MoveTestContext(root, provider, provider);
+        var step = new MoveStep("/mem/dest");
+
+        var results = new List<TransformResult>();
+        await foreach (var r in step.ApplyAsync(ctx, CancellationToken.None))
+            results.Add(r);
+
+        Assert.Single(results);
+        Assert.Equal(SourceResult.Moved, results[0].SourceNodeResult);
+        Assert.False(await provider.ExistsAsync("/src/file.txt", CancellationToken.None));
+        Assert.True(await provider.ExistsAsync("/dest/file.txt", CancellationToken.None));
     }
 }

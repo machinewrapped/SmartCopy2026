@@ -1,5 +1,6 @@
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.Trash;
 
 namespace SmartCopy.Core.Pipeline;
 
@@ -13,6 +14,7 @@ public interface IStepContext
     DirectoryTreeNode RootNode { get; }
     IFileSystemProvider SourceProvider { get; }
     FileSystemProviderRegistry ProviderRegistry { get; }
+    ITrashService TrashService { get; }
 
     bool ShowHiddenFiles { get; }
     bool AllowDeleteReadOnly { get; }

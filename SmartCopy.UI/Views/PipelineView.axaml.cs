@@ -70,7 +70,7 @@ public partial class PipelineView : UserControl
         if (this.VisualRoot is not Window parentWindow)
             return;
 
-        var vm = EditStepDialogViewModel.ForNew(kind, _currentViewModel.AppSettings);
+        var vm = EditStepDialogViewModel.ForNew(kind, _currentViewModel.AppSettings, _currentViewModel.SourceCapabilities);
         var dialog = new EditStepDialog { DataContext = vm };
         var result = await dialog.ShowDialog<bool?>(parentWindow);
         if (result == true && vm.ResultStep is not null)
@@ -99,7 +99,7 @@ public partial class PipelineView : UserControl
         if (!step.Step.IsConfigurable)
             return;
 
-        var vm = EditStepDialogViewModel.ForEdit(step, _currentViewModel.AppSettings);
+        var vm = EditStepDialogViewModel.ForEdit(step, _currentViewModel.AppSettings, _currentViewModel.SourceCapabilities);
         var dialog = new EditStepDialog { DataContext = vm };
         var result = await dialog.ShowDialog<bool?>(parentWindow);
         if (result == true && vm.ResultStep is not null)

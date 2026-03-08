@@ -3,9 +3,9 @@ using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Tests.TestInfrastructure;
 
-public sealed class MemoryFileSystemFixtureBuilder(string? customRootPath = null)
+public sealed class MemoryFileSystemFixtureBuilder(string? customRootPath = null, string? volumeId = null)
 {
-    private readonly MemoryFileSystemProvider _provider = new(customRootPath: customRootPath);
+    private readonly MemoryFileSystemProvider _provider = new(customRootPath: customRootPath, volumeId: volumeId);
 
     public MemoryFileSystemFixtureBuilder WithDirectory(string path,
         FileAttributes attributes = FileAttributes.Directory)
@@ -43,9 +43,9 @@ public sealed class MemoryFileSystemFixtureBuilder(string? customRootPath = null
 
 public static class MemoryFileSystemFixtures
 {
-    public static MemoryFileSystemProvider Create(Action<MemoryFileSystemFixtureBuilder> configure, string? customRootPath = null)
+    public static MemoryFileSystemProvider Create(Action<MemoryFileSystemFixtureBuilder> configure, string? customRootPath = null, string? volumeId = "MEM")
     {
-        var builder = new MemoryFileSystemFixtureBuilder(customRootPath);
+        var builder = new MemoryFileSystemFixtureBuilder(customRootPath, volumeId);
         configure(builder);
         return builder.Build();
     }

@@ -496,23 +496,22 @@ Verification:
 Add filesystem-aware features that adapt to the capabilities of the source and target systems.
 
 Scope:
-- [ ] SMB/Network share provider-aware operations
-- [ ] Windows MTP provider (`MtpFileSystemProvider`) + device picker integration
-- [ ] Atomic move enabled within the same volume, even when roots are different (rationalise IFileSystemProvider.RootPath vs DirectoryTreeNode.RootPath)
-- [ ] Introduce `TrashService` abstraction/adapters with timeout and fallback behavior
-- [ ] Route delete behavior through capability/availability checks (trash when available, permanent fallback)
-- [ ] Surface capability-derived safety messaging in preview/run UX
+- [x] SMB/Network share provider-aware operations
+- [x] Atomic move enabled within the same volume, even when roots are different (rationalise IFileSystemProvider.RootPath vs DirectoryTreeNode.RootPath)
+- [x] Introduce `TrashService` abstraction/adapters with timeout and fallback behavior
+- [x] Route delete behavior through capability/availability checks (trash when available, permanent fallback)
+- [x] Surface capability-derived safety messaging in preview/run UX
+- [x] Linux remote-mount capability gating via mount type detection (`/proc/self/mountinfo`) for watcher/trash/atomic-move safety
 
 Verification:
-- [ ] Manual validation of operations over MTP and SMB
-- [ ] Unit tests for trash fallback, timeout, and move fallback paths
-- [ ] Manual smoke: delete-to-trash and permanent delete on local files
+- [x] Manual validation of operations over SMB
+- [x] Unit tests for trash fallback, timeout, and move fallback paths
+- [x] Manual smoke: delete-to-trash and permanent delete on local files
 
 Exit criteria:
-- [ ] MTP copy round-trip validated
-- [ ] SMB/Network share provider-aware operations validated
-- [ ] Operations across file systems (local, network, MTP) validated
-- [ ] Delete operations are deterministic and journaled as `Trashed` vs `Deleted`
+- [X] SMB/Network share provider-aware operations validated
+- [X] Operations across file systems (local, network) validated
+- [X] Delete operations are deterministic and journaled as `Trashed` vs `Deleted`
 
 ### Phase 5.2.8 - UI/UXPolish
 
@@ -548,7 +547,20 @@ Exit criteria:
 - [ ] Release candidate passes cross-platform smoke checklist
 - [ ] Initial release published
 
-### 5.4 — Plug-Ins and Extensibility
+### 5.4 MTP and media devices support
+
+Scope:
+- [ ] MTP provider (`MtpFileSystemProvider`) + device picker integration
+- [ ] Operation gating based on device capabilities (e.g. CanDelete)
+- [ ] Concerns such as device disconnection addressed, with error handling and user feedback
+
+Exit criteria:
+- [ ] MTP devices can be enumerated and selected
+- [ ] Source root directory can be selected from an MTP device
+- [ ] MTP copy round-trip validated
+- [ ] Move/Delete operations validated
+
+### 5.5 — Plug-Ins and Extensibility
 
 Scope:
 - [ ] `ConvertStep` + plugin loader + per-plugin settings UI

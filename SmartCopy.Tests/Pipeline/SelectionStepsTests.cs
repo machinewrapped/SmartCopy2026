@@ -3,6 +3,7 @@ using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Pipeline.Validation;
+using SmartCopy.Core.Trash;
 using SmartCopy.Tests.TestInfrastructure;
 
 namespace SmartCopy.Tests.Pipeline;
@@ -26,6 +27,7 @@ public sealed class SelectionStepsTests
         public FileSystemProviderRegistry ProviderRegistry { get; } = new();
         public bool ShowHiddenFiles { get; }
         public bool AllowDeleteReadOnly { get; }
+        public ITrashService TrashService { get; } = new NullTrashService();
 
         public TestStepContext(DirectoryTreeNode root, IFileSystemProvider provider)
         {

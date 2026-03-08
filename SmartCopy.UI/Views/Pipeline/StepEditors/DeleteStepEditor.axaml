@@ -11,5 +11,9 @@
                    Foreground="#f0ad4e"
                    FontSize="11"
                    IsVisible="{Binding IsPermanentDelete}" />
+        <TextBlock Text="{Binding CapabilityWarning}"
+                   Foreground="#f0d060"
+                   FontSize="11"
+                   IsVisible="{Binding CapabilityWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
     </StackPanel>
 </UserControl>

@@ -2,8 +2,16 @@ namespace SmartCopy.Core.FileSystem;
 
 public interface IFileSystemProvider
 {
+    /// <summary>
+    /// Identifies the OS volume this provider operates on.
+    /// </summary>
+    string? VolumeId { get; }
+
+    /// <summary>
+    /// Container root for this filesystem provider
+    /// </summary>
     string RootPath { get; }
-    bool SupportsProgress { get; }
+
     ProviderCapabilities Capabilities { get; }
 
     Task<IReadOnlyList<FileSystemNode>> GetChildrenAsync(string path, CancellationToken ct);

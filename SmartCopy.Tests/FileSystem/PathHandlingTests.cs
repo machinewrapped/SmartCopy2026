@@ -121,4 +121,63 @@ public sealed class PathHandlingTests : IDisposable
     {
         Assert.Equal(string.Empty, _local.GetRelativePath(_local.RootPath, _local.RootPath));
     }
+
+    // -------------------------------------------------------------------------
+    // LocalFileSystemProvider — Capability detection
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void Local_LocalRoot_HasFullCapabilities()
+    {
+        var provider = new LocalFileSystemProvider(_temp.Path);
+        var caps = provider.Capabilities;
+
+        Assert.True(caps.CanWatch);
+        Assert.True(caps.CanTrash);
+        Assert.True(caps.CanAtomicMove);
+        Assert.NotNull(provider.VolumeId);
+    }
+
+    [Fact]
+    public void Local_UncRoot_HasDegradedCapabilities_OnWindows()
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        // Constructor only — no I/O, no real network access.
+        var provider = new LocalFileSystemProvider(@"\\server\share");
+        var caps = provider.Capabilities;
+
+        Assert.False(caps.CanWatch);
+        Assert.False(caps.CanTrash);
+        Assert.False(caps.CanAtomicMove);
+        Assert.Null(provider.VolumeId);
+    }
+
+    [Fact]
+    public void Local_WindowsUncLikeInput_IsLocalPath_OnNonWindows()
+    {
+        if (OperatingSystem.IsWindows())
+            return;
+
+        var provider = new LocalFileSystemProvider(@"\\server\share");
+        var caps = provider.Capabilities;
+
+        Assert.True(caps.CanWatch);
+        Assert.True(caps.CanTrash);
+        Assert.True(caps.CanAtomicMove);
+        Assert.NotNull(provider.VolumeId);
+    }
+
+    [Fact]
+    public void Local_PosixRootPath_IsPreserved_OnLinux()
+    {
+        if (!OperatingSystem.IsLinux())
+            return;
+
+        var provider = new LocalFileSystemProvider("/");
+
+        Assert.Equal("/", provider.RootPath);
+        Assert.True(provider.Capabilities.CanSeek);
+    }
 }

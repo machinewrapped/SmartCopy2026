@@ -1,21 +1,29 @@
-using System;
-
 namespace SmartCopy.Core.FileSystem;
 
 public sealed class LocalFileSystemProvider : IFileSystemProvider
 {
-    public LocalFileSystemProvider(string rootPath)
+    private readonly bool _isNetworkPath;
+    private readonly ProviderCapabilities _capabilities;
+
+    public LocalFileSystemProvider(string rootPath, Func<string>? readLinuxMountInfo = null)
     {
         RootPath = NormalizePath(rootPath);
+        _isNetworkPath = LocalPathNetworkClassifier.IsNetworkPath(RootPath, readLinuxMountInfo);
+        _capabilities = new ProviderCapabilities(
+            CanSeek: true,
+            CanAtomicMove: !_isNetworkPath,
+            CanWatch: !_isNetworkPath,
+            MaxPathLength: int.MaxValue,
+            CanTrash: !_isNetworkPath);
     }
 
     public string RootPath { get; }
-    public bool SupportsProgress => true;
-    public ProviderCapabilities Capabilities => new(
-        CanSeek: true,
-        CanAtomicMove: true,
-        CanWatch: true,
-        MaxPathLength: int.MaxValue);
+
+    public string? VolumeId => _isNetworkPath
+        ? null
+        : Path.GetPathRoot(RootPath)?.ToUpperInvariant();
+
+    public ProviderCapabilities Capabilities => _capabilities;
 
     public Task<IReadOnlyList<FileSystemNode>> GetChildrenAsync(string path, CancellationToken ct)
     {
@@ -243,7 +251,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         }
 
         var full = Path.GetFullPath(path);
-        return full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return PathHelper.RemoveTrailingSeparator(full);
     }
 
     private string Resolve(string path)

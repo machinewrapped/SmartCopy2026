@@ -1,8 +1,10 @@
 using System.Diagnostics;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Pipeline.Validation;
 using SmartCopy.Core.Progress;
+using SmartCopy.Core.Trash;
 
 namespace SmartCopy.Core.Pipeline;
 
@@ -52,11 +54,32 @@ public sealed class PipelineRunner
         }
 
         _previewCompleted = true;
+
+        var warnings = new List<string>();
+        foreach (var step in _pipeline.Steps)
+        {
+            if (step is DeleteStep ds && ds.Mode == DeleteMode.Trash && !job.SourceProvider.Capabilities.CanTrash)
+            {
+                warnings.Add("Trash not available for this path — files will be permanently deleted");
+            }
+
+            if (step is MoveStep ms && ms.HasDestinationPath)
+            {
+                var targetProvider = job.ProviderRegistry.ResolveProvider(ms.DestinationPath!);
+                var sameVolume = job.SourceProvider.VolumeId is { } vid && targetProvider?.VolumeId == vid;
+                if (!sameVolume)
+                {
+                    warnings.Add("Destination is on another drive, atomic move is not possible");
+                }
+            }
+        }
+
         return new OperationPlan
         {
             Actions = actions,
             TotalInputBytes = actions.Sum(a => a.InputBytes),
             TotalEstimatedOutputBytes = actions.Sum(a => a.OutputBytes),
+            Warnings = warnings,
         };
     }
 
@@ -151,6 +174,7 @@ public sealed class PipelineRunner
         public FileSystemProviderRegistry ProviderRegistry { get; }
         public bool ShowHiddenFiles { get; }
         public bool AllowDeleteReadOnly { get; }
+        public ITrashService TrashService { get; }
 
         public StepContext(PipelineJob job)
         {
@@ -159,6 +183,7 @@ public sealed class PipelineRunner
             ProviderRegistry = job.ProviderRegistry;
             ShowHiddenFiles = job.ShowHiddenFiles;
             AllowDeleteReadOnly = job.AllowDeleteReadOnly;
+            TrashService = job.TrashService;
         }
 
         public PipelineContext GetNodeContext(DirectoryTreeNode node)

@@ -33,24 +33,16 @@ public partial class PipelineStepViewModel : ViewModelBase
 
     public string DestinationPath => (Step as IHasDestinationPath)?.DestinationPath ?? string.Empty;
 
-    public void SetDestinationPath(string? destinationPath)
-    {
-        if (Step is IHasDestinationPath pathProvider)
-        {
-            pathProvider.DestinationPath = destinationPath ?? string.Empty;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowDeleteBadge))]
+    [NotifyPropertyChangedFor(nameof(DeleteBadge))]
+    private bool _trashUnavailable;
 
-            OnPropertyChanged(nameof(Label));
-            OnPropertyChanged(nameof(HasDestination));
-            OnPropertyChanged(nameof(DestinationPath));
-            OnPropertyChanged(nameof(Description));
+    public bool ShowDeleteBadge => Step is DeleteStep { Mode: DeleteMode.Permanent } || TrashUnavailable;
 
-            StepChanged?.Invoke(this, EventArgs.Empty);
-        }
-    }
-
-    public bool ShowDeleteBadge => Step is DeleteStep { Mode: DeleteMode.Permanent };
-
-    public string? DeleteBadge => ShowDeleteBadge ? "⚠ Permanent delete" : null;
+    public string? DeleteBadge => TrashUnavailable
+        ? "⚠ Trash unavailable"
+        : ShowDeleteBadge ? "⚠ Permanent delete" : null;
 
     [ObservableProperty]
     public string? _validationMessage;
