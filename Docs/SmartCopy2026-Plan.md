@@ -573,9 +573,9 @@ Exit criteria:
 
 ### Phase 5.2 Bug fixes
 
-- [ ] Memory to Memory moves report that atomic move is not possible (null volumeId?)
-- [ ] Incorrect progress bar status after Select All step (X/0 files)
-- [ ] Incorrect progress bar for multi-step pipelines (e.g. Copy + Move shows 500/400 files during Move)
+- [x] Memory to Memory moves report that atomic move is not possible (null volumeId?)
+- [x] Incorrect progress bar status after Select All step (X/0 files)
+- [x] Incorrect progress bar for multi-step pipelines (e.g. Copy + Move shows 500/400 files during Move)
 
 Exit criteria:
 - [ ] All bug fixes are implemented and tests are added
