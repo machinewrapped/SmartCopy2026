@@ -533,13 +533,16 @@ Exit criteria:
 *Goal: surface meaningful visual feedback during plan preparation and pipeline execution. No state locking — purely observability.*
 
 Scope:
-- [ ] Open PreviewView and show a progress bar whilst OperationPlan is being prepared
-- [ ] Active step highlighted during pipeline execution
+- [X] Active step highlighted during pipeline execution
+- [X] Open PreviewView and show a progress bar whilst OperationPlan is being prepared
+- [X] Cancellation/abort of preview preparation
+- [X] Suppress redundant preview for Copy/Move with Overwrite != Skip if destination path does not exist
 
 Exit criteria:
-- [ ] PreviewView progress indicator visible during plan generation and dismissed on completion
-- [ ] Active step card is visually distinct during run; advances correctly through multi-step pipelines
-- [ ] Manual smoke: multi-step pipeline run confirms step highlight advances in real time
+- [X] Active step card is visually distinct during run; advances correctly through multi-step pipelines
+- [X] PreviewView progress indicator visible during plan generation and dismissed on completion
+- [X] Abort preview preparation and confirm the progress indicator is dismissed
+- [X] Automatically proceed if no actual overwrites are found in a preview triggered by a potential overwrite
 
 ### Phase 5.2.10 — Pre-flight Safety Validation
 
@@ -567,6 +570,16 @@ Validation:
 
 Exit criteria:
 - [ ] Manual smoke: swap source and destination paths and confirm the directory tree and file list update correctly, and the pipeline step target is set to the previous source
+
+### Phase 5.2 Bug fixes
+
+- [ ] Memory to Memory moves report that atomic move is not possible (null volumeId?)
+- [ ] Incorrect progress bar status after Select All step (X/0 files)
+- [ ] Incorrect progress bar for multi-step pipelines (e.g. Copy + Move shows 500/400 files during Move)
+
+Exit criteria:
+- [ ] All bug fixes are implemented and tests are added
+- [ ] Manual smoke tests confirm the bug fixes
 
 #### 5.3 Validation and initial release
 

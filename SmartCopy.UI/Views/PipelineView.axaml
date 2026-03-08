@@ -115,6 +115,13 @@
                             <Style Selector="ListBoxItem:focus-visible > StackPanel > Border">
                                 <Setter Property="BorderBrush" Value="#4facfe" />
                             </Style>
+                            <!-- Active step highlight: shown while this step is executing -->
+                            <Style Selector="Border.activeStep">
+                                <Setter Property="BorderBrush" Value="#4facfe" />
+                                <Setter Property="BorderThickness" Value="2" />
+                                <Setter Property="Background" Value="#1a2a3a" />
+                                <Setter Property="BoxShadow" Value="0 0 10 2 #4facfe" />
+                            </Style>
                         </ListBox.Styles>
                         <ListBox.ItemsPanel>
                             <ItemsPanelTemplate>
@@ -127,7 +134,8 @@
                                     <Border BorderBrush="#3e3e42" BorderThickness="1"
                                             CornerRadius="4" Padding="10,6"
                                             Background="#333333"
-                                            MinWidth="140">
+                                            MinWidth="140"
+                                            Classes.activeStep="{Binding IsActiveStep}">
                                         <Grid RowDefinitions="Auto, Auto, Auto">
                                             <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto, Auto">
                                                 <TextBlock Grid.Column="0"

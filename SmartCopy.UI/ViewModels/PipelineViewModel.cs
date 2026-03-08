@@ -337,6 +337,28 @@ public partial class PipelineViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Marks the step at <paramref name="index"/> as the currently-executing step
+    /// and clears the flag on any previously active step. Safe to call from any thread.
+    /// </summary>
+    public void SetActiveStep(int index)
+    {
+        for (int i = 0; i < Steps.Count; i++)
+        {
+            Steps[i].IsActiveStep = (i == index);
+        }
+    }
+
+    /// <summary>
+    /// Clears the active-step highlight from all steps.
+    /// Called after execution completes or is cancelled.
+    /// </summary>
+    public void ClearActiveStep()
+    {
+        foreach (var step in Steps)
+            step.IsActiveStep = false;
+    }
+
     private void Revalidate()
     {
         foreach (var step in Steps)

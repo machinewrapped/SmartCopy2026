@@ -84,6 +84,12 @@ public partial class PreviewViewModel : ViewModelBase
 
     public bool HasWarnings => Warnings.Count > 0;
 
+    [ObservableProperty]
+    private bool _isPreparingPlan;
+
+    [ObservableProperty]
+    private string _preparationMessage = "Preparing preview\u2026";
+
     public ObservableCollection<PreviewGroupViewModel> Groups { get; } = [];
 
     private enum GroupKey
@@ -120,8 +126,30 @@ public partial class PreviewViewModel : ViewModelBase
 
     private OperationPlan? _currentPlan;
 
+    /// <summary>
+    /// Puts the view into "preparing" state: shows the progress indicator
+    /// and clears any previously-loaded plan content.
+    /// </summary>
+    public void BeginPreparation(string message = "Preparing preview\u2026")
+    {
+        IsPreparingPlan = true;
+        PreparationMessage = message;
+        _currentPlan = null;
+        TotalActionCount = 0;
+        TotalFilesAffected = 0;
+        TotalFoldersAffected = 0;
+        TotalFilesSkipped = 0;
+        TotalFoldersSkipped = 0;
+        TotalEstimatedInputBytes = 0;
+        TotalEstimatedOutputBytes = 0;
+        Warnings = [];
+        Groups.Clear();
+        OnPropertyChanged(nameof(ConfirmButtonText));
+    }
+
     public void LoadFrom(OperationPlan plan)
     {
+        IsPreparingPlan = false;
         _currentPlan = plan;
         TotalActionCount = plan.Actions.Count;
         TotalFilesAffected = plan.TotalFilesAffected;

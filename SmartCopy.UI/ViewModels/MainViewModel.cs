@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.Input;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Pipeline;
+using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Progress;
 using SmartCopy.Core.Scanning;
 using SmartCopy.Core.Selection;
@@ -849,7 +850,14 @@ public partial class MainViewModel : ViewModelBase
         StatusBar.Selection.UpdateStats(selected, totalBytes, filteredOut);
     }
 
-    private async Task PreviewPipelineAsync()
+    private static string GetPreparationMessage(PreviewReason reason) => reason switch
+    {
+        PreviewReason.DeleteConfirm  => "Checking for files to delete\u2026",
+        PreviewReason.OverwriteCheck => "Checking for overwrites\u2026",
+        _                            => "Preparing preview\u2026",
+    };
+
+    private async Task PreviewPipelineAsync(PreviewReason reason = PreviewReason.Manual)
     {
         var pipeline = Pipeline.BuildLivePipeline();
         if (DirectoryTree.IsLoaded == false)
@@ -864,6 +872,12 @@ public partial class MainViewModel : ViewModelBase
         var sourceProvider = DirectoryTree.SourceProvider
             ?? throw new ApplicationException("Directory tree is loaded but source provider is unknown");
 
+        if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop
+            || desktop.MainWindow is not { } mainWindow)
+        {
+            return;
+        }
+
         var runner = new PipelineRunner(pipeline);
         var job = new PipelineJob
         {
@@ -873,19 +887,52 @@ public partial class MainViewModel : ViewModelBase
             TrashService     = _trashService,
         };
 
-        var plan = await runner.PreviewAsync(job, CancellationToken.None);
+        // Put the view into "preparing" state and open the dialog immediately
+        // so the user sees a progress indicator rather than the app freezing.
+        Preview.BeginPreparation(GetPreparationMessage(reason));
+        var dialog = new PreviewView { DataContext = Preview };
+        var dialogTask = dialog.ShowDialog<bool?>(mainWindow);
 
-        Preview.LoadFrom(plan);
+        // Generate the plan concurrently, tied to dialog lifetime.
+        // If the user closes the dialog before the plan is ready, we cancel generation.
+        using var previewCts = new CancellationTokenSource();
 
-        if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
-            && desktop.MainWindow is { } mainWindow)
+        // Cancel plan generation the moment the dialog closes.
+        var _ = dialogTask.ContinueWith(
+            _ => previewCts.Cancel(),
+            TaskScheduler.Default);
+
+        OperationPlan? plan = null;
+        try
         {
-            var dialog = new PreviewView { DataContext = Preview };
-            var confirmRun = await dialog.ShowDialog<bool?>(mainWindow);
-            if (confirmRun == true)
+            plan = await runner.PreviewAsync(job, previewCts.Token);
+
+            // OverwriteCheck: if the plan shows no actual overwrites, skip confirmation
+            // and run directly — no need to bother the user with a benign preview.
+            if (reason == PreviewReason.OverwriteCheck &&
+                !plan.Actions.Any(a => a.DestinationResult == DestinationResult.Overwritten))
             {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => dialog.Close(false));
+                await dialogTask;
                 await ExecutePipelineAsync(runner, job);
+                return;
             }
+
+            // Plan is ready — populate the view on the UI thread.
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => Preview.LoadFrom(plan));
+        }
+        catch (OperationCanceledException)
+        {
+            // User closed the dialog before plan generation finished — nothing to do.
+            await dialogTask;
+            return;
+        }
+
+        // Wait for user's decision (Run or Close).
+        var confirmRun = await dialogTask;
+        if (confirmRun == true)
+        {
+            await ExecutePipelineAsync(runner, job);
         }
     }
 
@@ -896,11 +943,15 @@ public partial class MainViewModel : ViewModelBase
         // Mandatory preview for destructive pipelines, unless the user has opted out.
         bool needsPreview = false;
         if (pipeline.HasDeleteStep && !_settings.AllowDeleteWithoutPreview) needsPreview = true;
-        if (pipeline.HasOverwriteStep && !_settings.AllowOverwriteWithoutPreview) needsPreview = true;
+        if (!needsPreview && !_settings.AllowOverwriteWithoutPreview)
+            needsPreview = await HasPotentialOverwriteAsync(pipeline);
 
         if (needsPreview)
         {
-            await PreviewPipelineAsync();
+            var reason = pipeline.HasDeleteStep
+                ? PreviewReason.DeleteConfirm
+                : PreviewReason.OverwriteCheck;
+            await PreviewPipelineAsync(reason);
             return;
         }
 
@@ -930,10 +981,46 @@ public partial class MainViewModel : ViewModelBase
         await ExecutePipelineAsync(runner, job);
     }
 
+    /// <summary>
+    /// Returns true when the pipeline has at least one Copy or Move step with
+    /// <c>OverwriteMode != Skip</c> whose destination directory already exists.
+    /// If the destination doesn't exist yet, no files can be overwritten, so the
+    /// mandatory-preview guard is unnecessary.
+    /// </summary>
+    private async Task<bool> HasPotentialOverwriteAsync(TransformPipeline pipeline)
+    {
+        foreach (var step in pipeline.Steps)
+        {
+            string? destPath = step switch
+            {
+                CopyStep copy when copy.OverwriteMode != OverwriteMode.Skip => copy.DestinationPath,
+                MoveStep move when move.OverwriteMode != OverwriteMode.Skip => move.DestinationPath,
+                _ => null,
+            };
+
+            if (string.IsNullOrWhiteSpace(destPath))
+                continue;
+
+            var provider = _providerRegistry.ResolveProvider(destPath);
+            if (provider is null)
+                continue;
+
+            if (await provider.ExistsAsync(destPath, CancellationToken.None))
+                return true;
+        }
+
+        return false;
+    }
+
     private async Task ExecutePipelineAsync(PipelineRunner runner, PipelineJob job)
     {
         var nodeProgress = new Progress<TransformResult>(OnNodeCompleted);
-        var executionJob = StatusBar.Progress.Begin(job with { NodeProgress = nodeProgress });
+        var executionJob = StatusBar.Progress.Begin(job with
+        {
+            NodeProgress = nodeProgress,
+            StepStarted = index =>
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => Pipeline.SetActiveStep(index)),
+        });
 
         Pipeline.IsRunning = true;
         FilterChain.IsLocked = true;
@@ -983,6 +1070,7 @@ public partial class MainViewModel : ViewModelBase
         }
         finally
         {
+            Pipeline.ClearActiveStep();
             Pipeline.IsRunning = false;
             FilterChain.IsLocked = false;
             FileList.RemoveAllMarkedForRemoval();

@@ -102,10 +102,12 @@ public sealed class PipelineRunner
         int totalFiles = job.RootNode.CountSelectedFiles();
         long completedBytes = 0;
         int filesCompleted = 0;
+        int stepIndex = 0;
 
         foreach (var step in _pipeline.Steps)
         {
             job.CancellationToken.ThrowIfCancellationRequested();
+            job.StepStarted?.Invoke(stepIndex);
 
             await foreach (var result in step.ApplyAsync(context, job.CancellationToken))
             {
@@ -137,6 +139,8 @@ public sealed class PipelineRunner
                         EstimatedRemaining: remaining));
                 }
             }
+
+            stepIndex++;
         }
 
         return results;
