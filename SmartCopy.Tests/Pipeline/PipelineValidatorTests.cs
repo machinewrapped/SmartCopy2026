@@ -8,7 +8,7 @@ public sealed class PipelineValidatorTests
     [Fact]
     public async Task PathOnlyPipeline_ReturnsNoExecutableBlockingIssue()
     {
-        var result = await PipelineValidator.ValidateAsync([new FlattenStep()]);
+        var result = await PipelineValidator.ValidateAsync([new FlattenStep()], new PipelineValidationContext());
 
         Assert.False(result.CanRun);
         Assert.Contains(result.Issues, issue => issue.Code == "Pipeline.NoExecutableStep");
@@ -17,7 +17,7 @@ public sealed class PipelineValidatorTests
     [Fact]
     public async Task MissingDestination_ReturnsStepScopedBlockingIssue()
     {
-        var result = await PipelineValidator.ValidateAsync([new CopyStep("")]);
+        var result = await PipelineValidator.ValidateAsync([new CopyStep("")], new PipelineValidationContext());
 
         Assert.False(result.CanRun);
         var issue = Assert.Single(result.Issues, i => i.Code == "Step.MissingDestination");
@@ -42,7 +42,8 @@ public sealed class PipelineValidatorTests
         [
             new CopyStep("/mem/backup"),
             new MoveStep("/mem/archive"),
-        ]);
+        ],
+        new PipelineValidationContext());
 
         Assert.True(result.CanRun);
         Assert.Empty(result.Issues);
@@ -65,7 +66,8 @@ public sealed class PipelineValidatorTests
         [
             new DeleteStep(),
             new CopyStep("/mem/out"),
-        ]);
+        ],
+        new PipelineValidationContext());
 
         Assert.False(result.CanRun);
         Assert.Contains(result.Issues, issue => issue.Code == "Step.SourceMissing" && issue.StepIndex == 1);
@@ -78,7 +80,8 @@ public sealed class PipelineValidatorTests
         [
             new MoveStep("/mem/out"),
             new DeleteStep(),
-        ]);
+        ],
+        new PipelineValidationContext());
 
         Assert.False(result.CanRun);
         Assert.Contains(result.Issues, issue => issue.Code == "Step.SourceMissing" && issue.StepIndex == 1);
@@ -93,7 +96,8 @@ public sealed class PipelineValidatorTests
             new DeleteStep(),
             new InvertSelectionStep(),
             new CopyStep("/mem/out"),
-        ]);
+        ],
+        new PipelineValidationContext());
 
         Assert.True(result.CanRun);
         Assert.Empty(result.Issues);

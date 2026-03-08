@@ -99,7 +99,15 @@ public sealed class StepValidationContext
         var result = await step.ValidateFreeSpace(SelectedBytes, SourceProvider, ProviderRegistry, _cachedFreeSpace, CancellationToken.None);
         if (result is null) return;
         if (result.IsViolation)
+        {
             AddStepWarning("Step.InsufficientSpace", result.ShortMessage);
+        }
+
+        // Update free space cache
+        var currentFreeSpace = _cachedFreeSpace[result.TargetRootPath];
+        if (currentFreeSpace == null) return;
+
+        _cachedFreeSpace[result.TargetRootPath] = Math.Max(0, currentFreeSpace.Value - result.NeededBytes);
     }
 
     /// <summary>

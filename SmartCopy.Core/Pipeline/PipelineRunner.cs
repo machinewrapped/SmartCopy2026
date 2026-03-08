@@ -24,7 +24,10 @@ public sealed class PipelineRunner
         CancellationToken ct = default)
     {
         await _pipeline.ValidateAsync(new PipelineValidationContext(
-            job.RootNode.GetSelectedDescendants().Any()));
+            job.RootNode.GetSelectedDescendants().Any(),
+            job.RootNode.TotalSelectedBytes,
+            job.SourceProvider,
+            job.ProviderRegistry));
 
         var context = new StepContext(job);
         var actions = new List<PlannedAction>();
@@ -56,13 +59,29 @@ public sealed class PipelineRunner
                 }
             }
 
+            if (step is IHasDestinationPath destination)
+            {
+                PipelineHelper.CacheFreeSpaceForDestination(freeSpaceCache,
+                    destination, 
+                    job.ProviderRegistry, 
+                    ct);
+            }
+
             if (step is IHasFreeSpaceCheck fsCheck)
             {
                 long needed = stepActions.Sum(a => a.OutputBytes);
                 var fsResult = await fsCheck.ValidateFreeSpace(needed, job.SourceProvider, job.ProviderRegistry, freeSpaceCache, ct);
-                if (fsResult?.IsViolation == true)
+                if (fsResult != null)
                 {
-                    warnings.Add(fsResult.LongMessage);
+                    if (fsResult.IsViolation == true)
+                        warnings.Add(fsResult.LongMessage);
+
+                    // Update free space cache
+                    var currentFreeSpace = freeSpaceCache[fsResult.TargetRootPath];
+                    if (currentFreeSpace != null)
+                    {
+                        freeSpaceCache[fsResult.TargetRootPath] = Math.Max(0, currentFreeSpace.Value - fsResult.NeededBytes);                    
+                    }                    
                 }
             }
 

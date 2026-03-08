@@ -87,6 +87,8 @@ public sealed class FreeSpaceCheckTests
             volumeId: "SRC");
         var root = await provider.BuildDirectoryTree();
         root.FindNodeByPathSegments(["src"])!.CheckState = CheckState.Checked;
+        root.BuildStats();
+
         var registry = provider.CreateRegistry();
 
         var target = MakeTarget(capacity: 600, customRootPath: "/target");

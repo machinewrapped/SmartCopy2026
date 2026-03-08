@@ -6,5 +6,4 @@ public sealed record PipelineValidationContext(
     bool HasSelectedIncludedInputs = true,
     long SelectedBytes = 0,
     IFileSystemProvider? SourceProvider = null,
-    IPathResolver? ProviderRegistry = null,
-    IReadOnlyDictionary<string, long?>? CachedFreeSpace = null);
+    IPathResolver? ProviderRegistry = null);

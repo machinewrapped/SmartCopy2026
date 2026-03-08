@@ -31,7 +31,6 @@ public partial class PipelineViewModel : ViewModelBase
     private int _selectedIncludedFileCount;
     private long _selectedBytes;
     private IFileSystemProvider? _sourceProvider;
-    private Dictionary<string, long?> _cachedFreeSpace = new();
 
     public ObservableCollection<PipelineStepViewModel> Steps { get; } = [];
 
@@ -59,7 +58,7 @@ public partial class PipelineViewModel : ViewModelBase
     {
         _sourceProvider = provider;
         SourceCapabilities = provider.Capabilities;
-        _ = RefreshFreeSpaceCacheAsync();
+        Revalidate();
     }
 
     internal void SetSelectedBytes(long bytes)
@@ -68,13 +67,6 @@ public partial class PipelineViewModel : ViewModelBase
         if (_selectedBytes == normalized) return;
         _selectedBytes = normalized;
         Revalidate();
-    }
-
-    private async Task RefreshFreeSpaceCacheAsync()
-    {
-        if (_sourceProvider is null) return;
-        _cachedFreeSpace = new Dictionary<string, long?>();
-        Avalonia.Threading.Dispatcher.UIThread.Post(Revalidate);
     }
 
     internal void RecordRecentTarget(string path)
@@ -330,7 +322,6 @@ public partial class PipelineViewModel : ViewModelBase
             }
         }
 
-        _ = RefreshFreeSpaceCacheAsync();
         Revalidate();
     }
 
@@ -338,7 +329,6 @@ public partial class PipelineViewModel : ViewModelBase
     {
         _ = sender;
         _ = e;
-        _ = RefreshFreeSpaceCacheAsync();
         Revalidate();
     }
 
@@ -403,8 +393,7 @@ public partial class PipelineViewModel : ViewModelBase
                 HasSelectedIncludedInputs: _selectedIncludedFileCount > 0,
                 SelectedBytes:    _selectedBytes,
                 SourceProvider:   _sourceProvider,
-                ProviderRegistry: _appContext,
-                CachedFreeSpace:  _cachedFreeSpace));
+                ProviderRegistry: _appContext));
 
         ValidationResult = result;
         BlockingValidationMessage = result.FirstBlockingIssue?.Message;

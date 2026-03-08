@@ -42,7 +42,7 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
         long bytesNeeded,
         IFileSystemProvider source,
         IPathResolver registry,
-        Dictionary<string, long?> freeSpaceCache,
+        IReadOnlyDictionary<string, long?> freeSpaceCache,
         CancellationToken ct)
     {
         if (bytesNeeded <= 0) return null;
@@ -51,18 +51,12 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
         var target = registry.ResolveProvider(DestinationPath);
         if (target is null) return null;
         if (target.Capabilities.CanQueryFreeSpace == false) return null;
+        if (!freeSpaceCache.TryGetValue(target.RootPath, out var free) || free is null) return null;
 
         // No space consumed by move on the same volume
         if (source.VolumeId is { } vid && target.VolumeId == vid) return null;
 
-        if (!freeSpaceCache.ContainsKey(target.RootPath))
-            freeSpaceCache[target.RootPath] = await target.GetAvailableFreeSpaceAsync(ct);
-
-        if (!freeSpaceCache.TryGetValue(target.RootPath, out var free) || free is null) return null;
-
-        freeSpaceCache[target.RootPath] = Math.Max(0, free.Value - bytesNeeded);
-
-        return new FreeSpaceValidationResult(bytesNeeded, free.Value, DestinationPath);
+        return new FreeSpaceValidationResult(bytesNeeded, free.Value, target.RootPath);
     }
 
     public async Task Validate(StepValidationContext context)

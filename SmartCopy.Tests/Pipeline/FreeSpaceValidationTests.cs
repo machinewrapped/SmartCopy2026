@@ -37,8 +37,7 @@ public sealed class FreeSpaceValidationTests
             HasSelectedIncludedInputs: true,
             SelectedBytes: selectedBytes,
             SourceProvider: source,
-            ProviderRegistry: registry,
-            CachedFreeSpace: new Dictionary<string, long?>());
+            ProviderRegistry: registry);
 
     [Fact]
     public async Task CopyStep_InsufficientSpace_EmitsStepScopedWarning()

@@ -4,15 +4,32 @@ public sealed class PipelineValidator
 {
     public static async Task<PipelineValidationResult> ValidateAsync(
         IReadOnlyList<IPipelineStep> steps,
-        PipelineValidationContext? context = null)
+        PipelineValidationContext context,
+        CancellationToken ct = default)
     {
-        context ??= new PipelineValidationContext();
+        var freeSpaceCache = new Dictionary<string,long?>();
+
+        if (context.ProviderRegistry is not null)
+        {
+            // Cache free space on devices used as destination
+            foreach (var step in steps)
+            {
+                if (step is IHasDestinationPath destination)
+                {
+                    PipelineHelper.CacheFreeSpaceForDestination(freeSpaceCache, 
+                        destination, 
+                        context.ProviderRegistry, 
+                        ct );
+                }            
+            }            
+        }
+
         var validationContext = new StepValidationContext(
             context.HasSelectedIncludedInputs,
             selectedBytes:    context.SelectedBytes,
             sourceProvider:   context.SourceProvider,
             providerRegistry: context.ProviderRegistry,
-            cachedFreeSpace:  context.CachedFreeSpace);
+            cachedFreeSpace:  freeSpaceCache);
 
         if (steps.Count == 0)
         {
@@ -29,6 +46,7 @@ public sealed class PipelineValidator
         for (var i = 0; i < steps.Count; i++)
         {
             validationContext.StepIndex = i;
+
             await steps[i].Validate(validationContext);
 
             if (validationContext.HasBlockingIssue)

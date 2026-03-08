@@ -8,7 +8,7 @@ namespace SmartCopy.Core.Pipeline;
 /// Also carries <see cref="TargetRootPath"/> so callers can update a running
 /// free-space cache to account for cumulative consumption across multiple steps.
 /// </summary>
-public sealed record FreeSpaceValidationResult(long NeededBytes, long FreeBytes, string TargetPath)
+public sealed record FreeSpaceValidationResult(long NeededBytes, long FreeBytes, string TargetRootPath)
 {
     /// <summary>True when <see cref="NeededBytes"/> exceeds <see cref="FreeBytes"/>.</summary>
     public bool IsViolation => NeededBytes > FreeBytes;
@@ -21,7 +21,7 @@ public sealed record FreeSpaceValidationResult(long NeededBytes, long FreeBytes,
 
     /// <summary>Full message for the preview warnings pane.</summary>
     public string LongMessage =>
-        $"Not enough space in {TargetPath} — {FileSizeFormatter.FormatBytes(NeededBytes)} needed, " +
+        $"Not enough space in {TargetRootPath} — {FileSizeFormatter.FormatBytes(NeededBytes)} needed, " +
         $"{FileSizeFormatter.FormatBytes(FreeBytes)} free " +
         $"({FileSizeFormatter.FormatBytes(OverBytes)} over)";
 }
@@ -42,6 +42,6 @@ public interface IHasFreeSpaceCheck
         long bytesNeeded,
         IFileSystemProvider source,
         IPathResolver registry,
-        Dictionary<string, long?> freeSpaceCache,
+        IReadOnlyDictionary<string, long?> freeSpaceCache,
         CancellationToken ct);
 }
