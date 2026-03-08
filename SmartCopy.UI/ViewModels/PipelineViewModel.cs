@@ -83,7 +83,16 @@ public partial class PipelineViewModel : ViewModelBase
         }
     }
 
-    public bool CanRun => ValidationResult.CanRun && !_capabilityBlocked && !IsRunning;
+    private bool _isScanning;
+    public bool IsScanning
+    {
+        get => _isScanning;
+        set { SetProperty(ref _isScanning, value); UpdateButtonStates(); }
+    }
+
+    public bool IsNotRunning => !IsRunning;
+
+    public bool CanRun => ValidationResult.CanRun && !_capabilityBlocked && !IsRunning && !IsScanning;
 
     public bool HasDeleteStep => Steps.Any(step => step.Step is DeleteStep);
 
@@ -192,7 +201,7 @@ public partial class PipelineViewModel : ViewModelBase
         Revalidate();
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(IsNotRunning))]
     private void RemoveStep(PipelineStepViewModel step)
     {
         if (step is null)
@@ -260,7 +269,7 @@ public partial class PipelineViewModel : ViewModelBase
         PreviewRequested?.Invoke(this, EventArgs.Empty);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(IsNotRunning))]
     private void RequestEditStep(PipelineStepViewModel step)
     {
         if (step is null)
@@ -392,6 +401,8 @@ public partial class PipelineViewModel : ViewModelBase
     {
         RunPipelineCommand.NotifyCanExecuteChanged();
         PreviewPipelineCommand.NotifyCanExecuteChanged();
+        RemoveStepCommand.NotifyCanExecuteChanged();
+        RequestEditStepCommand.NotifyCanExecuteChanged();
     }
 
     private static TransformStepConfig BuildConfigWithUiMetadata(PipelineStepViewModel stepViewModel)

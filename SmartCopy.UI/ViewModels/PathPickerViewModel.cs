@@ -24,6 +24,8 @@ public partial class PathPickerViewModel : ViewModelBase
 
     public ObservableCollection<SourceBookmarkItem> Bookmarks { get; } = [];
 
+    public bool IsEnabled { get; set; } = true;
+
     // Fired when the user explicitly commits a path (Enter key or combo selection)
     public event EventHandler<string>? PathCommitted;
 
@@ -63,6 +65,7 @@ public partial class PathPickerViewModel : ViewModelBase
     [RelayCommand]
     private void ApplyPath()
     {
+        if (!IsEnabled) return;
         var normalized = PathHelper.NormalizeUserPath(Path);
         if (string.IsNullOrWhiteSpace(normalized))
         {

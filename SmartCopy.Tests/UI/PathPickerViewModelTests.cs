@@ -195,4 +195,20 @@ public sealed class PathPickerViewModelTests
 
         Assert.Empty(vm.Bookmarks);
     }
+
+    // ── Locking ───────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void IsEnabled_False_SuppressesPathCommit()
+    {
+        var vm = CreateVm();
+        vm.Path = P("music");
+        vm.IsEnabled = false;
+        var committed = false;
+        vm.PathCommitted += (_, _) => committed = true;
+
+        vm.ApplyPathCommand.Execute(null);
+
+        Assert.False(committed);
+    }
 }

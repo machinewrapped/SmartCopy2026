@@ -101,6 +101,22 @@ public partial class FilterChainViewModel : ViewModelBase
     public AppSettings AppSettings { get; }
 
     /// <summary>Fired whenever the chain changes: add, remove, reorder, toggle, or edit.</summary>
+    private bool _isLocked;
+    public bool IsLocked
+    {
+        get => _isLocked;
+        set { if (SetProperty(ref _isLocked, value)) NotifyFilterCommandsChanged(); }
+    }
+
+    public bool IsNotLocked => !IsLocked;
+
+    private void NotifyFilterCommandsChanged()
+    {
+        RemoveFilterCommand.NotifyCanExecuteChanged();
+        RequestEditFilterCommand.NotifyCanExecuteChanged();
+        LoadChainPresetCommand.NotifyCanExecuteChanged();
+    }
+
     public event EventHandler? ChainChanged;
 
     /// <summary>
@@ -194,6 +210,7 @@ public partial class FilterChainViewModel : ViewModelBase
     /// <summary>Reorders filter cards after a drag-drop operation.</summary>
     public void MoveFilter(int fromIndex, int toIndex)
     {
+        if (IsLocked) return;
         if (fromIndex < 0 || fromIndex >= Filters.Count) return;
         if (toIndex < 0 || toIndex >= Filters.Count) return;
         if (fromIndex == toIndex) return;
@@ -207,13 +224,13 @@ public partial class FilterChainViewModel : ViewModelBase
         AddFilterFromResult(filter);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(IsNotLocked))]
     private void RequestEditFilter(FilterViewModel filter)
     {
         EditFilterRequested?.Invoke(this, filter);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(IsNotLocked))]
     private void RemoveFilter(FilterViewModel filter)
     {
         if (filter is null) return;
@@ -244,7 +261,7 @@ public partial class FilterChainViewModel : ViewModelBase
         await RefreshPresetsAsync();
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(IsNotLocked))]
     private void LoadChainPreset(string name)
     {
         var preset = UserPresets.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
