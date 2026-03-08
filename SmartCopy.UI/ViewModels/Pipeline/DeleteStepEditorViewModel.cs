@@ -9,7 +9,7 @@ namespace SmartCopy.UI.ViewModels.Pipeline;
 public partial class DeleteStepEditorViewModel : StepEditorViewModelBase
 {
     // Default to full capabilities so no false-positive warning when no source is configured yet.
-    private ProviderCapabilities _sourceCapabilities = new(CanSeek: true, CanAtomicMove: true, CanWatch: true, MaxPathLength: int.MaxValue, CanTrash: true);
+    private ProviderCapabilities _sourceCapabilities = ProviderCapabilities.Full;
 
     public IReadOnlyList<DeleteMode> DeleteModes { get; } = Enum.GetValues<DeleteMode>();
 

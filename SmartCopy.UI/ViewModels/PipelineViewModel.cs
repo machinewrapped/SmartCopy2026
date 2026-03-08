@@ -44,8 +44,7 @@ public partial class PipelineViewModel : ViewModelBase
     internal AppSettings AppSettings => _appSettings;
 
     // Default to full capabilities so editors show no false-positive warning before source is set.
-    internal ProviderCapabilities SourceCapabilities { get; private set; } =
-        new(CanSeek: true, CanAtomicMove: true, CanWatch: true, MaxPathLength: int.MaxValue, CanTrash: true);
+    internal ProviderCapabilities SourceCapabilities { get; private set; } = ProviderCapabilities.Full;
 
     internal void SetSourceCapabilities(ProviderCapabilities capabilities) =>
         SourceCapabilities = capabilities;
