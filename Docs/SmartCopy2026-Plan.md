@@ -542,6 +542,7 @@ Exit criteria:
 - [X] Active step card is visually distinct during run; advances correctly through multi-step pipelines
 - [X] PreviewView progress indicator visible during plan generation and dismissed on completion
 - [X] Abort preview preparation and confirm the progress indicator is dismissed
+- [X] Automatically proceed if no actual overwrites are found in a preview triggered by a potential overwrite
 
 ### Phase 5.2.10 — Pre-flight Safety Validation
 
