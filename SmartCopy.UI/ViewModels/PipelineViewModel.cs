@@ -282,6 +282,7 @@ public partial class PipelineViewModel : ViewModelBase
     {
         SourceCapabilities = capabilities;
         await RefreshFreeSpaceCacheAsync();
+        Revalidate();
     }
 
     internal async Task SetSourceContext(IFileSystemProvider provider)
@@ -455,7 +456,7 @@ public partial class PipelineViewModel : ViewModelBase
         {
             if (stepVm.Step is IHasDestinationPath destination)
             {
-                PipelineHelper.CacheFreeSpaceForDestination(_cachedFreeSpace, destination, _appContext, ct);
+                PipelineHelper.CacheFreeSpaceForDestination(cache, destination, _appContext, ct);
             }
         }
         _cachedFreeSpace = cache;
