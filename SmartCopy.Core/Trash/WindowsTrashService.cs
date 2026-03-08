@@ -8,25 +8,26 @@ public sealed class WindowsTrashService : ITrashService
     {
         ct.ThrowIfCancellationRequested();
 
-        if (File.Exists(fullPath))
+        return Task.Run(() =>
         {
-            Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(
-                fullPath,
-                Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
-                Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
-        }
-        else if (Directory.Exists(fullPath))
-        {
-            Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(
-                fullPath,
-                Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
-                Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
-        }
-        else
-        {
-            throw new FileNotFoundException($"Path does not exist: {fullPath}", fullPath);
-        }
-
-        return Task.CompletedTask;
+            if (File.Exists(fullPath))
+            {
+                Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(
+                    fullPath,
+                    Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
+                    Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+            }
+            else if (Directory.Exists(fullPath))
+            {
+                Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(
+                    fullPath,
+                    Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
+                    Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+            }
+            else
+            {
+                throw new FileNotFoundException($"Path does not exist: {fullPath}", fullPath);
+            }
+        }, ct);
     }
 }
