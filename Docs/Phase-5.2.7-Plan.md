@@ -1,7 +1,7 @@
 # Phase 5.2.7 — Capability Gates and Cross-Filesystem Hardening
 
 **Prepared:** 2026-03-07
-**Status:** In progress — A–B complete, C–E pending
+**Status:** A–D complete
 
 ## Execution rules
 - One sub-step per session. Do not start the next sub-step until the current one is manually validated.
@@ -11,16 +11,15 @@
 ## Context
 
 Phase 1 and 2.1–2.6 established core UX, real filesystem integration, and incremental scanning.
-Phase 5.2.7 adds adaptive behavior for heterogeneous filesystems: local (including network SMB paths), MTP devices, and platform trash (Recycle Bin / freedesktop / NSFileManager). The goal is that SmartCopy behaves correctly and safely regardless of where source/target files live, and surfaces meaningful capability-derived warnings to the user before destructive operations.
+Phase 5.2.7 adds adaptive behavior for heterogeneous filesystems: local (including network SMB paths), and platform trash (Recycle Bin / freedesktop / NSFileManager). The goal is that SmartCopy behaves correctly and safely regardless of where source/target files live, and surfaces meaningful capability-derived warnings to the user before destructive operations.
 
-Current gaps at start of phase:
+Gaps at start of phase:
 - [Resolved] `DeleteStep.ApplyAsync` calls `provider.DeleteAsync()` for both Trash and Permanent modes (no routing)
 - [Resolved] `ProviderCapabilities` lacks `CanTrash`
 - [Resolved] No `TrashService` abstraction exists anywhere
-- `MoveStep` uses `ReferenceEquals` for same-provider check; two local providers on the same drive are treated as cross-provider (no atomic move)
-- `LocalFileSystemProvider` ignores whether root is a UNC path (no SMB capability adjustments)
-- No MTP provider
-- No capability-derived messaging in PreviewViewModel or DeleteStepEditor
+- [Resolved] `MoveStep` uses `ReferenceEquals` for same-provider check; two local providers on the same drive are treated as cross-provider (no atomic move)
+- [Resolved] `LocalFileSystemProvider` ignores whether root is a UNC path (no SMB capability adjustments)
+- [Resolved] No capability-derived messaging in PreviewViewModel or DeleteStepEditor
 
 ---
 
@@ -123,36 +122,6 @@ Provider type boundaries track *implementation* divergence, not conceptual owner
 
 ---
 
-## Sub-step E — MTP provider + device picker (Windows-only)
-
-**Status:** [ ] Pending
-**Manual validation gate:** connect Android device, select via MTP picker, copy files to local destination — round-trip completes without error.
-
-**Goal:** Users can select a connected MTP device as source; SmartCopy scans and copies from it via
-the existing pipeline.
-
-### NuGet dependency
-Add `MediaDevices` to `SmartCopy.Core.csproj` (Windows WPD API wrapper).
-
-### Files to create
-- `SmartCopy.Core/FileSystem/MtpFileSystemProvider.cs`
-  - `RootPath = "mtp://{device.FriendlyName}/"`
-  - `VolumeId = null`
-  - `Capabilities`: all false (CanSeek, CanAtomicMove, CanWatch, CanTrash = false)
-  - `MoveAsync` throws `NotSupportedException` (MoveStep will copy+delete via fallback)
-- `SmartCopy.UI/ViewModels/Dialogs/MtpDevicePickerViewModel.cs` — lists `MediaDevice.GetDevices()`
-- `SmartCopy.UI/Views/Dialogs/MtpDevicePickerDialog.axaml` + `.axaml.cs` — ListBox of device names
-
-### Files to modify
-- `SmartCopy.Core/FileSystem/FileSystemProviderRegistry.cs` — add `RegisterMtpDevice(MediaDevice)`
-- `SmartCopy.UI/ViewModels/MainViewModel.cs` — add `OpenMtpDevicePicker` command
-- `SmartCopy.UI/Views/MainWindow.axaml` — "MTP Device..." source option, Windows-only
-
-### Tests
-- `SmartCopy.Tests/FileSystem/MtpProviderTests.cs` — mock `MediaDevice` via NSubstitute; test capabilities, MoveAsync throws, path operations
-
----
-
 ## Verification
 
 ### Automated
@@ -164,9 +133,8 @@ dotnet test SmartCopy.Tests/SmartCopy.Tests.csproj
 - **Trash (local):** delete pipeline with Trash mode → files in Recycle Bin
 - **Trash fallback (network):** UNC source, Trash mode → preview warning + permanent delete
 - **Same-volume atomic move:** `C:\Source` → `C:\Dest` → journal shows move (not copy+delete)
-- **MTP copy:** Android/camera as source → copy to local destination
 - **SMB scan + copy:** `\\server\share` → no watcher, trash warning for delete steps
 
 ### Plan document update
 Update `Docs/SmartCopy2026-Plan.md` section 5.2.7 checkboxes after each sub-step is validated.
-Update `Docs/Architecture.md` for `ITrashService`, `VolumeId`, MTP provider, and SMB capability detection.
+Update `Docs/Architecture.md` for `ITrashService`, `VolumeId`, and SMB capability detection.
