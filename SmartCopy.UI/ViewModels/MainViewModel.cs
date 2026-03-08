@@ -850,7 +850,14 @@ public partial class MainViewModel : ViewModelBase
         StatusBar.Selection.UpdateStats(selected, totalBytes, filteredOut);
     }
 
-    private async Task PreviewPipelineAsync()
+    private static string GetPreparationMessage(PreviewReason reason) => reason switch
+    {
+        PreviewReason.DeleteConfirm  => "Checking for files to delete\u2026",
+        PreviewReason.OverwriteCheck => "Checking for overwrites\u2026",
+        _                            => "Preparing preview\u2026",
+    };
+
+    private async Task PreviewPipelineAsync(PreviewReason reason = PreviewReason.Manual)
     {
         var pipeline = Pipeline.BuildLivePipeline();
         if (DirectoryTree.IsLoaded == false)
@@ -882,7 +889,7 @@ public partial class MainViewModel : ViewModelBase
 
         // Put the view into "preparing" state and open the dialog immediately
         // so the user sees a progress indicator rather than the app freezing.
-        Preview.BeginPreparation();
+        Preview.BeginPreparation(GetPreparationMessage(reason));
         var dialog = new PreviewView { DataContext = Preview };
         var dialogTask = dialog.ShowDialog<bool?>(mainWindow);
 
@@ -899,6 +906,17 @@ public partial class MainViewModel : ViewModelBase
         try
         {
             plan = await runner.PreviewAsync(job, previewCts.Token);
+
+            // OverwriteCheck: if the plan shows no actual overwrites, skip confirmation
+            // and run directly — no need to bother the user with a benign preview.
+            if (reason == PreviewReason.OverwriteCheck &&
+                !plan.Actions.Any(a => a.DestinationResult == DestinationResult.Overwritten))
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => dialog.Close(false));
+                await dialogTask;
+                await ExecutePipelineAsync(runner, job);
+                return;
+            }
 
             // Plan is ready — populate the view on the UI thread.
             Avalonia.Threading.Dispatcher.UIThread.Post(() => Preview.LoadFrom(plan));
@@ -930,7 +948,10 @@ public partial class MainViewModel : ViewModelBase
 
         if (needsPreview)
         {
-            await PreviewPipelineAsync();
+            var reason = pipeline.HasDeleteStep
+                ? PreviewReason.DeleteConfirm
+                : PreviewReason.OverwriteCheck;
+            await PreviewPipelineAsync(reason);
             return;
         }
 

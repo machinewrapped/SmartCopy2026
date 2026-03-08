@@ -130,10 +130,10 @@ public partial class PreviewViewModel : ViewModelBase
     /// Puts the view into "preparing" state: shows the progress indicator
     /// and clears any previously-loaded plan content.
     /// </summary>
-    public void BeginPreparation()
+    public void BeginPreparation(string message = "Preparing preview\u2026")
     {
         IsPreparingPlan = true;
-        PreparationMessage = "Preparing preview\u2026";
+        PreparationMessage = message;
         _currentPlan = null;
         TotalActionCount = 0;
         TotalFilesAffected = 0;
