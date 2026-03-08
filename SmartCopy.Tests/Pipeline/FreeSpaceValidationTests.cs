@@ -1,4 +1,5 @@
 using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Pipeline.Validation;
 using SmartCopy.Tests.TestInfrastructure;
@@ -29,15 +30,18 @@ public sealed class FreeSpaceValidationTests
         return target;
     }
 
-    private static PipelineValidationContext MakeContext(
+    private static async Task<PipelineValidationContext> MakeContext(
         IFileSystemProvider source,
         IPathResolver registry,
+        IReadOnlyList<IPipelineStep> steps,
         long selectedBytes)
         => new(
-            HasSelectedIncludedInputs: true,
-            SelectedBytes: selectedBytes,
             SourceProvider: source,
-            ProviderRegistry: registry);
+            ProviderRegistry: registry,
+            CachedFreeSpace: await PipelineHelper.BuildFreeSpaceCacheForPipeline(steps, registry, CancellationToken.None),
+            HasSelectedIncludedInputs: true,
+            SelectedBytes: selectedBytes
+            );
 
     [Fact]
     public async Task CopyStep_InsufficientSpace_EmitsStepScopedWarning()
@@ -46,9 +50,9 @@ public sealed class FreeSpaceValidationTests
         var target = MakeTarget(capacity: 100, rootPath: "/target");
         registry.Register(target);
 
-        var result = await PipelineValidator.ValidateAsync(
-            [new CopyStep("/target/dst")],
-            MakeContext(source, registry, selectedBytes: 500));
+        IReadOnlyList<IPipelineStep> steps = [new CopyStep("/target/dst")];
+        var result = await PipelineValidator.ValidateAsync(steps,
+            await MakeContext(source, registry, steps, selectedBytes: 500));
 
         // Warning — not a blocking issue, so CanRun stays true
         Assert.True(result.CanRun);
@@ -65,9 +69,9 @@ public sealed class FreeSpaceValidationTests
         var target = MakeTarget(capacity: 1_000_000, rootPath: "/target");
         registry.Register(target);
 
-        var result = await PipelineValidator.ValidateAsync(
-            [new CopyStep("/target/dst")],
-            MakeContext(source, registry, selectedBytes: 500));
+        IReadOnlyList<IPipelineStep> steps = [new CopyStep("/target/dst")];
+        var result = await PipelineValidator.ValidateAsync(steps,
+            await MakeContext(source, registry, steps, selectedBytes: 500));
 
         Assert.True(result.CanRun);
         Assert.DoesNotContain(result.Issues, i => i.Code == "Step.InsufficientSpace");
@@ -81,9 +85,10 @@ public sealed class FreeSpaceValidationTests
         var target = MakeTarget(capacity: null, rootPath: "/target");
         registry.Register(target);
 
+        IReadOnlyList<IPipelineStep> steps = [new CopyStep("/target/dst")];
         var result = await PipelineValidator.ValidateAsync(
-            [new CopyStep("/target/dst")],
-            MakeContext(source, registry, selectedBytes: 500));
+            steps,
+            await MakeContext(source, registry, steps, selectedBytes: 500));
 
         Assert.True(result.CanRun);
         Assert.DoesNotContain(result.Issues, i => i.Code == "Step.InsufficientSpace");
@@ -95,9 +100,10 @@ public sealed class FreeSpaceValidationTests
         var (source, registry) = MakeSource();
         // No target registered at all
 
+        IReadOnlyList<IPipelineStep> steps = [new CopyStep("/target/dst")];
         var result = await PipelineValidator.ValidateAsync(
-            [new CopyStep("/target/dst")],
-            MakeContext(source, registry, selectedBytes: 500));
+            steps,
+            await MakeContext(source, registry, steps, selectedBytes: 500));
 
         Assert.True(result.CanRun);
         Assert.DoesNotContain(result.Issues, i => i.Code == "Step.InsufficientSpace");
@@ -114,9 +120,10 @@ public sealed class FreeSpaceValidationTests
         source.SimulatedCapacity = 1; // only 1 byte free, but same-volume should not trigger
         var registry = source.CreateRegistry();
 
+        IReadOnlyList<IPipelineStep> steps = [new MoveStep("/mem/dst")];
         var result = await PipelineValidator.ValidateAsync(
-            [new MoveStep("/mem/dst")],
-            MakeContext(source, registry, selectedBytes: 500));
+            steps,
+            await MakeContext(source, registry, steps, selectedBytes: 500));
 
         Assert.True(result.CanRun);
         Assert.DoesNotContain(result.Issues, i => i.Code == "Step.InsufficientSpace");
@@ -129,9 +136,10 @@ public sealed class FreeSpaceValidationTests
         var target = MakeTarget(capacity: 10, rootPath: "/target", volumeId: "DST");
         registry.Register(target);
 
+        IReadOnlyList<IPipelineStep> steps = [new MoveStep("/target/dst")];
         var result = await PipelineValidator.ValidateAsync(
-            [new MoveStep("/target/dst")],
-            MakeContext(source, registry, selectedBytes: 500));
+            steps,
+            await MakeContext(source, registry, steps, selectedBytes: 500));
 
         Assert.True(result.CanRun);
         var issue = Assert.Single(result.Issues, i => i.Code == "Step.InsufficientSpace");
@@ -147,9 +155,10 @@ public sealed class FreeSpaceValidationTests
         registry.Register(target);
 
         // InvertSelectionStep resets SelectedBytes → CopyStep should not warn
+        IReadOnlyList<IPipelineStep> steps = [new InvertSelectionStep(), new CopyStep("/target/dst")];
         var result = await PipelineValidator.ValidateAsync(
-            [new InvertSelectionStep(), new CopyStep("/target/dst")],
-            MakeContext(source, registry, selectedBytes: 500));
+            steps,
+            await MakeContext(source, registry, steps, selectedBytes: 500));
 
         Assert.True(result.CanRun);
         Assert.DoesNotContain(result.Issues, i => i.Code == "Step.InsufficientSpace");
@@ -163,9 +172,10 @@ public sealed class FreeSpaceValidationTests
         var target = MakeTarget(capacity: 600, rootPath: "/target");
         registry.Register(target);
 
+        IReadOnlyList<IPipelineStep> steps = [new CopyStep("/target/dst1"), new CopyStep("/target/dst2")];
         var result = await PipelineValidator.ValidateAsync(
-            [new CopyStep("/target/dst1"), new CopyStep("/target/dst2")],
-            MakeContext(source, registry, selectedBytes: 400));
+            steps,
+            await MakeContext(source, registry, steps, selectedBytes: 400));
 
         Assert.True(result.CanRun);
         // First step: 400 <= 600 free → no warning; cache updated to 200
@@ -181,9 +191,10 @@ public sealed class FreeSpaceValidationTests
         var target = MakeTarget(capacity: 1_000_000, rootPath: "/target");
         registry.Register(target);
 
+        IReadOnlyList<IPipelineStep> steps = [new CopyStep("/target/dst1"), new CopyStep("/target/dst2")];
         var result = await PipelineValidator.ValidateAsync(
-            [new CopyStep("/target/dst1"), new CopyStep("/target/dst2")],
-            MakeContext(source, registry, selectedBytes: 400));
+            steps,
+            await MakeContext(source, registry, steps, selectedBytes: 400));
 
         Assert.True(result.CanRun);
         Assert.DoesNotContain(result.Issues, i => i.Code == "Step.InsufficientSpace");
@@ -197,9 +208,10 @@ public sealed class FreeSpaceValidationTests
         var target = MakeTarget(capacity: 1, rootPath: "/target");
         registry.Register(target);
 
+        IReadOnlyList<IPipelineStep> steps = [new CopyStep("")];
         var result = await PipelineValidator.ValidateAsync(
-            [new CopyStep("")],
-            MakeContext(source, registry, selectedBytes: 500));
+            steps,
+            await MakeContext(source, registry, steps, selectedBytes: 500));
 
         Assert.False(result.CanRun);
         Assert.Contains(result.Issues, i => i.Code == "Step.MissingDestination");

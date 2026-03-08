@@ -11,8 +11,11 @@ namespace SmartCopy.Core.Pipeline;
 public sealed class PipelineRunner
 {
     private readonly TransformPipeline _pipeline;
+
     // Tracks that PreviewAsync was called before ExecuteAsync on delete pipelines.
     private bool _previewCompleted;
+
+    private Dictionary<string,long?> _freeSpaceCache = new();
 
     public PipelineRunner(TransformPipeline pipeline)
     {
@@ -23,11 +26,16 @@ public sealed class PipelineRunner
         PipelineJob job,
         CancellationToken ct = default)
     {
+        job.RootNode.BuildStats();
+
+        _freeSpaceCache = await PipelineHelper.BuildFreeSpaceCacheForPipeline(_pipeline.Steps, job.ProviderRegistry, ct);
+
         await _pipeline.ValidateAsync(new PipelineValidationContext(
-            job.RootNode.GetSelectedDescendants().Any(),
-            job.RootNode.TotalSelectedBytes,
             job.SourceProvider,
-            job.ProviderRegistry));
+            job.ProviderRegistry,
+            _freeSpaceCache,
+            job.RootNode.GetSelectedDescendants().Any(),
+            job.RootNode.TotalSelectedBytes));
 
         var context = new StepContext(job);
         var actions = new List<PlannedAction>();
@@ -121,7 +129,11 @@ public sealed class PipelineRunner
     public async Task<IReadOnlyList<TransformResult>> ExecuteAsync(PipelineJob job)
     {
         await _pipeline.ValidateAsync(new PipelineValidationContext(
-            job.RootNode.GetSelectedDescendants().Any()));
+            job.SourceProvider,
+            job.ProviderRegistry,
+            _freeSpaceCache,
+            job.RootNode.GetSelectedDescendants().Any(),
+            job.RootNode.TotalSelectedBytes));
 
         if (_pipeline.HasDeleteStep && !_previewCompleted)
         {

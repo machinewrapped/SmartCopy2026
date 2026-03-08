@@ -7,29 +7,12 @@ public sealed class PipelineValidator
         PipelineValidationContext context,
         CancellationToken ct = default)
     {
-        var freeSpaceCache = new Dictionary<string,long?>();
-
-        if (context.ProviderRegistry is not null)
-        {
-            // Cache free space on devices used as destination
-            foreach (var step in steps)
-            {
-                if (step is IHasDestinationPath destination)
-                {
-                    PipelineHelper.CacheFreeSpaceForDestination(freeSpaceCache, 
-                        destination, 
-                        context.ProviderRegistry, 
-                        ct );
-                }            
-            }            
-        }
-
         var validationContext = new StepValidationContext(
             context.HasSelectedIncludedInputs,
             selectedBytes:    context.SelectedBytes,
             sourceProvider:   context.SourceProvider,
             providerRegistry: context.ProviderRegistry,
-            cachedFreeSpace:  freeSpaceCache);
+            cachedFreeSpace:  context.CachedFreeSpace);
 
         if (steps.Count == 0)
         {

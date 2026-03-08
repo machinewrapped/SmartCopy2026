@@ -65,7 +65,7 @@ public partial class PipelineView : UserControl
 
         Dispatcher.UIThread.Post(() => AddStepPopup.IsOpen = false);
 
-        if (_currentViewModel.TryAddStepWithoutConfiguration(kind))
+        if (await _currentViewModel.TryAddStepWithoutConfiguration(kind))
             return;
 
         if (this.VisualRoot is not Window parentWindow)
@@ -88,7 +88,7 @@ public partial class PipelineView : UserControl
                 _currentViewModel.RecordRecentTarget(destPath);
             }
 
-            _currentViewModel.AddStepFromResult(vm.ResultStep, vm.ResultCustomName);
+            await _currentViewModel.AddStepFromResult(vm.ResultStep, vm.ResultCustomName);
         }
     }
 
@@ -116,7 +116,7 @@ public partial class PipelineView : UserControl
                 _currentViewModel.RecordRecentTarget(destPath);
             }
 
-            _currentViewModel.ReplaceStep(step, vm.ResultStep, vm.ResultCustomName);
+            await _currentViewModel.ReplaceStep(step, vm.ResultStep, vm.ResultCustomName);
         }
     }
 

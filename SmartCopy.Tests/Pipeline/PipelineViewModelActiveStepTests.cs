@@ -5,26 +5,29 @@ namespace SmartCopy.Tests.Pipeline;
 
 public sealed class PipelineViewModelActiveStepTests
 {
-    private static PipelineViewModel MakeVm(int stepCount = 3)
+    private static async Task<PipelineViewModel> MakeVm(int stepCount = 3)
     {
         var vm = new PipelineViewModel(new TestAppContext());
         for (int i = 0; i < stepCount; i++)
-            vm.AddStepFromResult(new FlattenStep());
+        {
+            await vm.AddStepFromResult(new FlattenStep());
+        }
+
         return vm;
     }
 
     [Fact]
-    public void IsActiveStep_IsFalseByDefault()
+    public async Task IsActiveStep_IsFalseByDefault()
     {
-        var vm = MakeVm(2);
+        var vm = await MakeVm(2);
 
         Assert.All(vm.Steps, s => Assert.False(s.IsActiveStep));
     }
 
     [Fact]
-    public void SetActiveStep_HighlightsOnlyTargetStep()
+    public async Task SetActiveStep_HighlightsOnlyTargetStep()
     {
-        var vm = MakeVm(3);
+        var vm = await MakeVm(3);
 
         vm.SetActiveStep(1);
 
@@ -34,9 +37,9 @@ public sealed class PipelineViewModelActiveStepTests
     }
 
     [Fact]
-    public void SetActiveStep_ClearsPreviouslyActiveStep()
+    public async Task SetActiveStep_ClearsPreviouslyActiveStep()
     {
-        var vm = MakeVm(3);
+        var vm = await MakeVm(3);
 
         vm.SetActiveStep(0);
         vm.SetActiveStep(2);
@@ -47,9 +50,9 @@ public sealed class PipelineViewModelActiveStepTests
     }
 
     [Fact]
-    public void ClearActiveStep_ResetsAllSteps()
+    public async Task ClearActiveStep_ResetsAllSteps()
     {
-        var vm = MakeVm(3);
+        var vm = await MakeVm(3);
         vm.SetActiveStep(1);
 
         vm.ClearActiveStep();
@@ -58,9 +61,9 @@ public sealed class PipelineViewModelActiveStepTests
     }
 
     [Fact]
-    public void SetActiveStep_FirstIndex_Works()
+    public async Task SetActiveStep_FirstIndex_Works()
     {
-        var vm = MakeVm(2);
+        var vm = await MakeVm(2);
 
         vm.SetActiveStep(0);
 
@@ -69,9 +72,9 @@ public sealed class PipelineViewModelActiveStepTests
     }
 
     [Fact]
-    public void SetActiveStep_LastIndex_Works()
+    public async Task SetActiveStep_LastIndex_Works()
     {
-        var vm = MakeVm(3);
+        var vm = await MakeVm(3);
 
         vm.SetActiveStep(2);
 
@@ -81,9 +84,9 @@ public sealed class PipelineViewModelActiveStepTests
     }
 
     [Fact]
-    public void ClearActiveStep_WhenNoActiveStep_DoesNotThrow()
+    public async Task ClearActiveStep_WhenNoActiveStep_DoesNotThrow()
     {
-        var vm = MakeVm(2);
+        var vm = await MakeVm(2);
 
         // Should not throw even with no step previously highlighted.
         vm.ClearActiveStep();

@@ -288,7 +288,7 @@ public partial class MainViewModel : ViewModelBase
                 var session = await _sessionStore.LoadAsync(GetSessionPath());
                 if (session is not null)
                 {
-                    ApplyWorkflowConfig(session);
+                    await ApplyWorkflowConfig(session);
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
@@ -668,7 +668,7 @@ public partial class MainViewModel : ViewModelBase
             StartDirectoryWatcherIfSupported();
 
             if (DirectoryTree.SourceProvider is { } sp)
-                Pipeline.SetSourceContext(sp);
+                await Pipeline.SetSourceContext(sp);
 
             _settings.LastSourcePath = normalizedPath;
             await _settingsStore.SaveAsync(_settings);
@@ -1152,7 +1152,7 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
-        ApplyWorkflowConfig(preset.Config);
+        await ApplyWorkflowConfig(preset.Config);
 
         await ApplySourcePathCoreAsync(SourcePath);
     }
@@ -1161,7 +1161,7 @@ public partial class MainViewModel : ViewModelBase
     /// Applies a <see cref="WorkflowConfig"/> to the current session without
     /// triggering a directory scan — just restores source, filters, and pipeline.
     /// </summary>
-    private void ApplyWorkflowConfig(WorkflowConfig config)
+    private async Task ApplyWorkflowConfig(WorkflowConfig config)
     {
         DisposeDirectoryWatcher();
         DirectoryTree.Reset();
@@ -1185,7 +1185,8 @@ public partial class MainViewModel : ViewModelBase
             IsBuiltIn = false,
             Config = config.Pipeline,
         };
-        Pipeline.LoadPreset(pipelinePreset);
+
+        await Pipeline.LoadPreset(pipelinePreset);
     }
 
     /// <summary>

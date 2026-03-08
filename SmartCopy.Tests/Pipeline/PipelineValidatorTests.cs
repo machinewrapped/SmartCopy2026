@@ -1,3 +1,5 @@
+using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Pipeline.Validation;
 
@@ -5,10 +7,27 @@ namespace SmartCopy.Tests.Pipeline;
 
 public sealed class PipelineValidatorTests
 {
+    private static PipelineValidationContext MakeContext(
+        IFileSystemProvider? sourceProvider = null,
+        FileSystemProviderRegistry? registry = null,
+        Dictionary<string,long?>? freeSpaceCache = null,
+        bool hasSelectedInputs = true, 
+        long totalSelectedBytes = 1)
+    {
+        return new PipelineValidationContext(
+            sourceProvider ?? new MemoryFileSystemProvider(),
+            registry ?? new FileSystemProviderRegistry(),
+            freeSpaceCache ?? new Dictionary<string, long?>(),
+            hasSelectedInputs,
+            totalSelectedBytes
+        );
+    }
+
     [Fact]
     public async Task PathOnlyPipeline_ReturnsNoExecutableBlockingIssue()
     {
-        var result = await PipelineValidator.ValidateAsync([new FlattenStep()], new PipelineValidationContext());
+        var result = await PipelineValidator.ValidateAsync([new FlattenStep()], 
+            MakeContext());
 
         Assert.False(result.CanRun);
         Assert.Contains(result.Issues, issue => issue.Code == "Pipeline.NoExecutableStep");
@@ -17,7 +36,9 @@ public sealed class PipelineValidatorTests
     [Fact]
     public async Task MissingDestination_ReturnsStepScopedBlockingIssue()
     {
-        var result = await PipelineValidator.ValidateAsync([new CopyStep("")], new PipelineValidationContext());
+        IReadOnlyList<IPipelineStep> steps = [new CopyStep("")];
+        PipelineValidationContext context = MakeContext();
+        var result = await PipelineValidator.ValidateAsync(steps, context);
 
         Assert.False(result.CanRun);
         var issue = Assert.Single(result.Issues, i => i.Code == "Step.MissingDestination");
@@ -29,7 +50,7 @@ public sealed class PipelineValidatorTests
     {
         var result = await PipelineValidator.ValidateAsync(
             [new CopyStep("/mem/out")],
-            new PipelineValidationContext(HasSelectedIncludedInputs: false));
+            MakeContext(hasSelectedInputs: false));
 
         Assert.False(result.CanRun);
         Assert.Contains(result.Issues, issue => issue.Code == "Pipeline.NoSelectedInputs" && issue.StepIndex is null);
@@ -43,7 +64,7 @@ public sealed class PipelineValidatorTests
             new CopyStep("/mem/backup"),
             new MoveStep("/mem/archive"),
         ],
-        new PipelineValidationContext());
+        MakeContext());
 
         Assert.True(result.CanRun);
         Assert.Empty(result.Issues);
@@ -54,7 +75,7 @@ public sealed class PipelineValidatorTests
     {
         var result = await PipelineValidator.ValidateAsync(
             [new FlattenStep()],
-            new PipelineValidationContext(HasSelectedIncludedInputs: false));
+            MakeContext(hasSelectedInputs: false));
 
         Assert.DoesNotContain(result.Issues, issue => issue.Code == "Pipeline.NoSelectedInputs");
     }
@@ -67,7 +88,7 @@ public sealed class PipelineValidatorTests
             new DeleteStep(),
             new CopyStep("/mem/out"),
         ],
-        new PipelineValidationContext());
+        MakeContext());
 
         Assert.False(result.CanRun);
         Assert.Contains(result.Issues, issue => issue.Code == "Step.SourceMissing" && issue.StepIndex == 1);
@@ -81,7 +102,7 @@ public sealed class PipelineValidatorTests
             new MoveStep("/mem/out"),
             new DeleteStep(),
         ],
-        new PipelineValidationContext());
+        MakeContext());
 
         Assert.False(result.CanRun);
         Assert.Contains(result.Issues, issue => issue.Code == "Step.SourceMissing" && issue.StepIndex == 1);
@@ -97,7 +118,7 @@ public sealed class PipelineValidatorTests
             new InvertSelectionStep(),
             new CopyStep("/mem/out"),
         ],
-        new PipelineValidationContext());
+        MakeContext());
 
         Assert.True(result.CanRun);
         Assert.Empty(result.Issues);

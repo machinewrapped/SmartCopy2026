@@ -5,9 +5,9 @@ namespace SmartCopy.Core.Pipeline;
 /// <summary>
 /// Helper class for common operations on the transform pipeline.
 /// </summary>
-internal static class PipelineHelper
+public static class PipelineHelper
 {
-    internal async static void CacheFreeSpaceForDestination(
+    public async static void CacheFreeSpaceForDestination(
         Dictionary<string, long?> freeSpaceCache,
         IHasDestinationPath destination,
         IPathResolver pathResolver,
@@ -24,6 +24,23 @@ internal static class PipelineHelper
             long? freeSpace = await target.GetAvailableFreeSpaceAsync(ct);
             freeSpaceCache[target.RootPath] = freeSpace;
         }                        
+    }
+
+    public static async Task<Dictionary<string, long?>> BuildFreeSpaceCacheForPipeline(
+        IReadOnlyList<IPipelineStep> steps,
+        IPathResolver pathResolver,
+        CancellationToken ct = default)
+    {
+        Dictionary<string, long?> cache = new();
+        foreach (var step in steps)
+        {
+            if (step is IHasDestinationPath destination)
+            {
+                CacheFreeSpaceForDestination(cache, destination, pathResolver, ct);
+            }
+        }
+
+        return cache;
     }
 
 }
