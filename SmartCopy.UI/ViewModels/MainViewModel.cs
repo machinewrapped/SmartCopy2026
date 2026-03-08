@@ -70,6 +70,9 @@ public partial class MainViewModel : ViewModelBase
     private bool _addArtificialDelay = false;
 
     [ObservableProperty]
+    private bool _limitMemoryFilesystemCapacity = false;
+
+    [ObservableProperty]
     private OverwriteMode _defaultOverwriteMode = OverwriteMode.Skip;
 
     [ObservableProperty]
@@ -264,10 +267,12 @@ public partial class MainViewModel : ViewModelBase
         ShowHiddenFiles = _settings.ShowHiddenFiles;
         AllowDeleteReadOnly = _settings.AllowDeleteReadOnly;
         AddArtificialDelay = _settings.AddArtificialDelay;
+        LimitMemoryFilesystemCapacity = _settings.LimitMemoryFilesystemCapacity;
 
         // Create an in-memory virtual file system for testing.
         // TODO: this should be a debug option, not exposed in release builds
-        _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: AddArtificialDelay);
+        long? capacity = LimitMemoryFilesystemCapacity ? 100_000_000 : null;
+        _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: AddArtificialDelay, capacity: capacity);
         _providerRegistry.Register(_memoryProvider);
 
         SourcePathPicker.RefreshSettings();
@@ -440,6 +445,16 @@ public partial class MainViewModel : ViewModelBase
             _memoryProvider.AddArtificialDelay = value;            
         }
         _settings.AddArtificialDelay = value;
+        _ = SaveSettingsAsync();
+    }
+
+    partial void OnLimitMemoryFilesystemCapacityChanged(bool value)
+    {
+        if (_memoryProvider != null)
+        {
+            _memoryProvider.SimulatedCapacity = value ? 100_000_000 : null;
+        }
+        _settings.LimitMemoryFilesystemCapacity = value;
         _ = SaveSettingsAsync();
     }
 

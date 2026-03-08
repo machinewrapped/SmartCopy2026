@@ -5,7 +5,7 @@ using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
-public sealed class CopyStep : IPipelineStep, IHasDestinationPath
+public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpaceCheck
 {
     public StepKind StepType => StepKind.Copy;
     public bool IsExecutable => true;
@@ -35,6 +35,9 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath
     }
 
     public bool HasDestinationPath => !string.IsNullOrWhiteSpace(DestinationPath);
+
+    public IFileSystemProvider? ResolveFreeSpaceTarget(IFileSystemProvider sourceProvider, FileSystemProviderRegistry registry)
+        => HasDestinationPath ? registry.ResolveProvider(DestinationPath!) : null;
 
     public void Validate(StepValidationContext context)
     {

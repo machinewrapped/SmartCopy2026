@@ -1,5 +1,3 @@
-using System;
-using System.Text;
 using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.UI.Services;
@@ -9,9 +7,17 @@ internal static class MockMemoryFileSystemFactory
     public const string SourcePath = "/mem/Music";
     public const string TargetPath = "/mem/Mirror";
 
-    public static MemoryFileSystemProvider CreateSeeded(bool artificialDelay = false, string? rootPathOverride = null)
+    public static MemoryFileSystemProvider CreateSeeded(
+        bool artificialDelay = false,
+        string? customRootPath = null,
+        string? volumeId = null,
+        long? capacity = null)
     {
-        var provider = new MemoryFileSystemProvider(artificialDelay, rootPathOverride);
+        var provider = new MemoryFileSystemProvider(
+            addArtificialDelay: artificialDelay,
+            customRootPath: customRootPath,
+            volumeId: volumeId,
+            capacity: capacity);
 
         provider.SeedDirectory(provider.RootPath);
 

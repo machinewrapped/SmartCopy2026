@@ -29,16 +29,18 @@ public sealed class PipelineRunner
 
         var context = new StepContext(job);
         var actions = new List<PlannedAction>();
+        var errors = new List<string>();
 
         foreach (var step in _pipeline.Steps)
         {
             ct.ThrowIfCancellationRequested();
+            var stepActions = new List<PlannedAction>();
 
             await foreach (var result in step.PreviewAsync(context, ct))
             {
                 if (result.IsSuccess && result.SourceNodeResult != SourceResult.None)
                 {
-                    actions.Add(new PlannedAction(
+                    stepActions.Add(new PlannedAction(
                         SourcePath: result.SourceNode.CanonicalRelativePath,
                         SourceResult: result.SourceNodeResult,
                         DestinationPath: result.DestinationPath,
@@ -51,6 +53,25 @@ public sealed class PipelineRunner
                         NumberOfFoldersSkipped: result.NumberOfFoldersSkipped));
                 }
             }
+
+            if (step is IHasFreeSpaceCheck fsCheck)
+            {
+                var target = fsCheck.ResolveFreeSpaceTarget(job.SourceProvider, job.ProviderRegistry);
+                if (target?.Capabilities.CanQueryFreeSpace == true)
+                {
+                    var needed = stepActions.Sum(a => a.OutputBytes);
+                    var free = await target.GetAvailableFreeSpaceAsync(ct);
+                    if (free.HasValue && needed > free.Value)
+                    {
+                        string txtNeeded = FileSizeFormatter.FormatBytes(needed);
+                        string txtFree = FileSizeFormatter.FormatBytes(free.Value);
+                        string txtOver = FileSizeFormatter.FormatBytes(needed - free.Value);
+                        errors.Add($"Not enough space on target drive — {txtNeeded} needed, {txtFree} available ({txtOver} over)");
+                    }
+                }
+            }
+
+            actions.AddRange(stepActions);
         }
 
         _previewCompleted = true;
@@ -80,6 +101,7 @@ public sealed class PipelineRunner
             TotalInputBytes = actions.Sum(a => a.InputBytes),
             TotalEstimatedOutputBytes = actions.Sum(a => a.OutputBytes),
             Warnings = warnings,
+            Errors = errors,
         };
     }
 

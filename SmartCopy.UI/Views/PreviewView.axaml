@@ -74,6 +74,18 @@
                       Margin="16,16,16,0"
                       IsVisible="{Binding !IsPreparingPlan}">
                     <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,10">
+                        <Border IsVisible="{Binding HasErrors}"
+                                Background="#3b1a1a"
+                                CornerRadius="4"
+                                Padding="8">
+                            <ItemsControl ItemsSource="{Binding Errors}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" Foreground="#f06060" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
                         <Border IsVisible="{Binding HasWarnings}"
                                 Background="#2d2d1b"
                                 CornerRadius="4"

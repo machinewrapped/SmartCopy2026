@@ -85,6 +85,14 @@ public partial class PreviewViewModel : ViewModelBase
     public bool HasWarnings => Warnings.Count > 0;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasErrors))]
+    [NotifyPropertyChangedFor(nameof(HasNoErrors))]
+    private IReadOnlyList<string> _errors = [];
+
+    public bool HasErrors => Errors.Count > 0;
+    public bool HasNoErrors => !HasErrors;
+
+    [ObservableProperty]
     private bool _isPreparingPlan;
 
     [ObservableProperty]
@@ -143,6 +151,7 @@ public partial class PreviewViewModel : ViewModelBase
         TotalEstimatedInputBytes = 0;
         TotalEstimatedOutputBytes = 0;
         Warnings = [];
+        Errors = [];
         Groups.Clear();
         OnPropertyChanged(nameof(ConfirmButtonText));
     }
@@ -157,6 +166,7 @@ public partial class PreviewViewModel : ViewModelBase
         TotalEstimatedInputBytes = plan.TotalInputBytes;
         TotalEstimatedOutputBytes = plan.TotalEstimatedOutputBytes;
         Warnings = plan.Warnings;
+        Errors = plan.Errors;
 
         Groups.Clear();
 
@@ -221,7 +231,7 @@ public partial class PreviewViewModel : ViewModelBase
         return (folders > 0) ? $"Will {action} {files} files and {folders} folders" : $"Will {action} {files} files";
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasNoErrors))]
     private void Run()
     {
         RunRequested?.Invoke();

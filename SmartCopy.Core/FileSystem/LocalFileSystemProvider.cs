@@ -14,7 +14,8 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
             CanAtomicMove: !_isNetworkPath,
             CanWatch: !_isNetworkPath,
             MaxPathLength: int.MaxValue,
-            CanTrash: !_isNetworkPath);
+            CanTrash: !_isNetworkPath,
+            CanQueryFreeSpace: !_isNetworkPath);
     }
 
     public string RootPath { get; }
@@ -200,6 +201,20 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
             var fullPath = Resolve(path);
             return File.Exists(fullPath) || Directory.Exists(fullPath);
         }, ct);
+    }
+
+    public Task<long?> GetAvailableFreeSpaceAsync(CancellationToken ct)
+    {
+        if (_isNetworkPath) return Task.FromResult<long?>(null);
+        try
+        {
+            var drive = new DriveInfo(RootPath);
+            return Task.FromResult<long?>(drive.AvailableFreeSpace);
+        }
+        catch
+        {
+            return Task.FromResult<long?>(null);
+        }
     }
 
     private string CombinePath(string basePath, string relativePath)

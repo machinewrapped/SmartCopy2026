@@ -6,7 +6,7 @@ using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
-public sealed class MoveStep : IPipelineStep, IHasDestinationPath
+public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpaceCheck
 {
     public StepKind StepType => StepKind.Move;
     public bool IsExecutable => true;
@@ -37,6 +37,14 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
     }
 
     public bool HasDestinationPath => !string.IsNullOrWhiteSpace(DestinationPath);
+
+    public IFileSystemProvider? ResolveFreeSpaceTarget(IFileSystemProvider sourceProvider, FileSystemProviderRegistry registry)
+    {
+        if (!HasDestinationPath) return null;
+        var target = registry.ResolveProvider(DestinationPath!);
+        var sameVolume = sourceProvider.VolumeId is { } vid && target?.VolumeId == vid;
+        return sameVolume ? null : target;
+    }
 
     public void Validate(StepValidationContext context)
     {
@@ -106,6 +114,7 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
                 ? DestinationResult.Overwritten
                 : DestinationResult.Created;
 
+            var selectedBytes = GetSelectedFileBytes(node);
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: node,
@@ -114,8 +123,8 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
                 DestinationResult: destResult,
                 NumberOfFilesAffected: node.CountSelectedFiles(),
                 NumberOfFoldersAffected: node.CountSelectedFolders(),
-                InputBytes: node.Size,
-                OutputBytes: node.Size);
+                InputBytes: selectedBytes,
+                OutputBytes: selectedBytes);
         }
     }
 
@@ -233,6 +242,23 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
                 InputBytes: file.Size,
                 OutputBytes: file.Size);
         }
+    }
+
+    /// <summary>
+    /// Recursively sums the sizes of all selected files within <paramref name="node"/>.
+    /// Used to report accurate byte counts for directory-level move actions in preview,
+    /// since <see cref="DirectoryTreeNode.Size"/> is always 0 for directory nodes.
+    /// </summary>
+    private static long GetSelectedFileBytes(DirectoryTreeNode node)
+    {
+        if (!node.IsDirectory)
+            return node.IsSelected ? node.Size : 0;
+        long total = 0;
+        foreach (var file in node.Files)
+            if (file.IsSelected) total += file.Size;
+        foreach (var child in node.Children)
+            total += GetSelectedFileBytes(child);
+        return total;
     }
 
     /// <summary>

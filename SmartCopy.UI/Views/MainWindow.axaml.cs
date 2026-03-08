@@ -62,6 +62,7 @@ public partial class MainWindow : Window
 
     // Options menu — Debug
     private MenuItem? _artificialDelayMenuItem;
+    private MenuItem? _limitMemoryFilesystemCapacityMenuItem;
 
     public MainWindow()
     {
@@ -301,6 +302,12 @@ public partial class MainWindow : Window
             _mainVm?.AddArtificialDelay ?? false,
             () => { if (_mainVm is not null) _mainVm.AddArtificialDelay = !_mainVm.AddArtificialDelay; });
         OptionsMenu.Items.Add(_artificialDelayMenuItem);
+
+        _limitMemoryFilesystemCapacityMenuItem = Toggle(
+            "Limit Memory Filesystem Capacity",
+            _mainVm?.LimitMemoryFilesystemCapacity ?? false,
+            () => { if (_mainVm is not null) _mainVm.LimitMemoryFilesystemCapacity = !_mainVm.LimitMemoryFilesystemCapacity; });
+        OptionsMenu.Items.Add(_limitMemoryFilesystemCapacityMenuItem);
 
         return;
 

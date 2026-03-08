@@ -15,12 +15,20 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
     // Add artificial delay to simulate real I/O for testing progress reporting.
     public bool AddArtificialDelay { get; set; }
 
-    public MemoryFileSystemProvider(bool addArtificialDelay = false, string? customRootPath = null, string? volumeId = null)
+    /// <summary>Capacity of the filesystem to report on this filesystem.</summary>
+    public long? SimulatedCapacity { get; set; }
+
+    public MemoryFileSystemProvider(
+        bool addArtificialDelay = false,
+        string? customRootPath = null,
+        string? volumeId = null,
+        long? capacity = null)
     {
         AddArtificialDelay = addArtificialDelay;
+        SimulatedCapacity = capacity;
         RootPath = customRootPath ?? DefaultRoot;
         VolumeId = volumeId ?? "MEM";
-        Debug.Assert(RootPath.StartsWith("/"));
+        Debug.Assert(RootPath.StartsWith('/'));
         _entries[RootPath] = MemoryEntry.CreateDirectory();
     }
 
@@ -33,7 +41,8 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         CanAtomicMove: true,
         CanWatch: false,
         MaxPathLength: int.MaxValue,
-        CanTrash: false);
+        CanTrash: false,
+        CanQueryFreeSpace: SimulatedCapacity.HasValue);
 
     public Task<IReadOnlyList<FileSystemNode>> GetChildrenAsync(string path, CancellationToken ct)
     {
@@ -251,6 +260,21 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         ct.ThrowIfCancellationRequested();
         var normalizedPath = Normalize(path);
         return Task.FromResult(_entries.ContainsKey(normalizedPath));
+    }
+
+    public Task<long?> GetAvailableFreeSpaceAsync(CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        if (SimulatedCapacity.HasValue == false)
+        {
+            throw new ApplicationException("Simulated drive has unlimited capacity");
+        }
+
+        long totalBytesUsed = _entries.Values.Sum(x => x.Size);
+        long? totalBytesRemaining = SimulatedCapacity.Value - totalBytesUsed;
+
+        return Task.FromResult(totalBytesRemaining);
     }
 
     private string CombinePath(string basePath, string relativePath)

@@ -47,6 +47,9 @@ public sealed class AppSettings
     /// </summary>
     public bool AddArtificialDelay { get; set; } = false;
 
+    /// <summary>When enabled, the MemoryFileSystemProvider will have limited capacity.</summary>
+    public bool LimitMemoryFilesystemCapacity { get; set; } = false;
+
     public int LogRetentionDays { get; set; } = 30;
     public List<string> RecentSources { get; set; } = [];
     public List<string> RecentTargets { get; set; } = [];
@@ -95,6 +98,7 @@ public sealed class AppSettings
         AllowOverwriteWithoutPreview = saved.AllowOverwriteWithoutPreview;
         SaveSessionLocally = saved.SaveSessionLocally;
         AddArtificialDelay = saved.AddArtificialDelay;
+        LimitMemoryFilesystemCapacity = saved.LimitMemoryFilesystemCapacity;
         LogRetentionDays = saved.LogRetentionDays;
         RecentSources = saved.RecentSources;
         RecentTargets = saved.RecentTargets;
