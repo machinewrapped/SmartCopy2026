@@ -501,6 +501,7 @@ Scope:
 - [x] Introduce `TrashService` abstraction/adapters with timeout and fallback behavior
 - [x] Route delete behavior through capability/availability checks (trash when available, permanent fallback)
 - [x] Surface capability-derived safety messaging in preview/run UX
+- [x] Linux remote-mount capability gating via mount type detection (`/proc/self/mountinfo`) for watcher/trash/atomic-move safety
 
 Verification:
 - [x] Manual validation of operations over SMB

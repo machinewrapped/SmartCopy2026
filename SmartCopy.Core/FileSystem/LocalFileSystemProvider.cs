@@ -1,5 +1,3 @@
-using System;
-
 namespace SmartCopy.Core.FileSystem;
 
 public sealed class LocalFileSystemProvider : IFileSystemProvider
@@ -7,10 +5,10 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     private readonly bool _isNetworkPath;
     private readonly ProviderCapabilities _capabilities;
 
-    public LocalFileSystemProvider(string rootPath)
+    public LocalFileSystemProvider(string rootPath, Func<string>? readLinuxMountInfo = null)
     {
         RootPath = NormalizePath(rootPath);
-        _isNetworkPath = Uri.TryCreate(RootPath, UriKind.Absolute, out var uri) && uri.IsUnc;
+        _isNetworkPath = LocalPathNetworkClassifier.IsNetworkPath(RootPath, readLinuxMountInfo);
         _capabilities = new ProviderCapabilities(
             CanSeek: true,
             CanAtomicMove: !_isNetworkPath,
