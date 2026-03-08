@@ -555,6 +555,19 @@ Exit criteria:
 - [ ] Automated tests for free-space gate logic using a mock/capped provider
 - [ ] Manual smoke: attempt copy to a near-full volume and confirm warning appears
 
+### Phase 5.2.11 Swap Source & Destination Paths
+
+*Goal: allow the user to swap the source path with the destination of a copy/move step.*
+
+Scope:
+- [ ] Context menu on pipeline steps with IHasDestinationPath with "swap destination with source path"
+
+Validation:
+- [ ] Add tests for the functionality
+
+Exit criteria:
+- [ ] Manual smoke: swap source and destination paths and confirm the directory tree and file list update correctly, and the pipeline step target is set to the previous source
+
 #### 5.3 Validation and initial release
 
 Validation:
