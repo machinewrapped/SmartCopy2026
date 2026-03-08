@@ -79,6 +79,8 @@ public partial class PipelineViewModel : ViewModelBase
         set 
         {
             SetProperty(ref _isRunning, value);
+            OnPropertyChanged(nameof(IsNotRunning));
+            OnPropertyChanged(nameof(CanRun));
             UpdateButtonStates();
         }
     }
@@ -87,7 +89,12 @@ public partial class PipelineViewModel : ViewModelBase
     public bool IsScanning
     {
         get => _isScanning;
-        set { SetProperty(ref _isScanning, value); UpdateButtonStates(); }
+        set 
+        { 
+            SetProperty(ref _isScanning, value); 
+            OnPropertyChanged(nameof(CanRun));
+            UpdateButtonStates(); 
+        }
     }
 
     public bool IsNotRunning => !IsRunning;

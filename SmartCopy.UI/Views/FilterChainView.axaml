@@ -153,6 +153,7 @@
                                 CornerRadius="4" Padding="8,7" Background="Transparent"
                                 Cursor="Hand" Opacity="0.55"
                                 HorizontalAlignment="Stretch"
+                                IsVisible="{Binding IsNotLocked}"
                                 AutomationProperties.Name="Add filter"
                                 Click="OnAddFilterButtonClick">
                             <TextBlock Text="+ Add filter" Foreground="#4facfe"

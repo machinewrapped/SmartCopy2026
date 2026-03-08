@@ -105,7 +105,14 @@ public partial class FilterChainViewModel : ViewModelBase
     public bool IsLocked
     {
         get => _isLocked;
-        set { if (SetProperty(ref _isLocked, value)) NotifyFilterCommandsChanged(); }
+        set 
+        { 
+            if (SetProperty(ref _isLocked, value))
+            {
+                OnPropertyChanged(nameof(IsNotLocked));
+                NotifyFilterCommandsChanged();  
+            }
+        }
     }
 
     public bool IsNotLocked => !IsLocked;

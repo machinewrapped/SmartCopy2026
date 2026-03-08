@@ -218,6 +218,7 @@
                                 Background="Transparent"
                                 Cursor="Hand" Opacity="0.55"
                                 VerticalAlignment="Center"
+                                IsVisible="{Binding IsNotRunning}"
                                 AutomationProperties.Name="Add step"
                                 Click="OnAddStepButtonClick">
                             <TextBlock Text="+ Add step"
