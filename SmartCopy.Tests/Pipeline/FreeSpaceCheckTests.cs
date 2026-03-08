@@ -76,6 +76,40 @@ public sealed class FreeSpaceCheckTests
     }
 
     [Fact]
+    public async Task TwoCopySteps_SameVolume_CumulativeConsumptionChecked()
+    {
+        // 600 bytes free, each Copy step needs 100 bytes → both fit individually,
+        // but if there were 150 bytes per step and only 200 free the second would fail.
+        // Use 400 bytes per step with 600 free so second step (400 > 200 remaining) warns.
+        var provider = MemoryFileSystemFixtures.Create(b => b
+            .WithFile("/src/file.txt", new byte[400])
+            .WithDirectory("/other"),
+            volumeId: "SRC");
+        var root = await provider.BuildDirectoryTree();
+        root.FindNodeByPathSegments(["src"])!.CheckState = CheckState.Checked;
+        var registry = provider.CreateRegistry();
+
+        var target = MakeTarget(capacity: 600, customRootPath: "/target");
+        registry.Register(target);
+
+        var runner = new PipelineRunner(new TransformPipeline([
+            new CopyStep("/target/dst1"),
+            new CopyStep("/target/dst2"),
+        ]));
+        var plan = await runner.PreviewAsync(new PipelineJob
+        {
+            RootNode = root,
+            SourceProvider = provider,
+            ProviderRegistry = registry,
+        });
+
+        // First step: 400 <= 600 free → no warning; cache updated to 200.
+        // Second step: 400 > 200 → warning.
+        Assert.Single(plan.Warnings);
+        Assert.Contains("Not enough space", plan.Warnings[0]);
+    }
+
+    [Fact]
     public async Task Copy_NoCapability_NoError()
     {
         var (source, root, registry) = MakeSource();

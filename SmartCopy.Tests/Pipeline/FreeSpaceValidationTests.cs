@@ -164,6 +164,46 @@ public sealed class FreeSpaceValidationTests
     }
 
     [Fact]
+    public void TwoCopySteps_SameVolume_CumulativeSpaceChecked()
+    {
+        // 600 bytes free, two Copy steps each needing 400 bytes → second step should warn
+        var (source, registry) = MakeSource();
+        var target = MakeTarget(capacity: 600, rootPath: "/target");
+        registry.Register(target);
+
+        var cache = new Dictionary<string, long?> { [target.RootPath] = 600L };
+        var context = MakeContext(source, registry, selectedBytes: 400, cache);
+
+        var result = PipelineValidator.Validate(
+            [new CopyStep("/target/dst1"), new CopyStep("/target/dst2")],
+            context);
+
+        Assert.True(result.CanRun);
+        // First step: 400 <= 600 → no warning; cache updated to 200
+        // Second step: 400 > 200 → warning
+        var issue = Assert.Single(result.Issues, i => i.Code == "Step.InsufficientSpace");
+        Assert.Equal(1, issue.StepIndex);
+    }
+
+    [Fact]
+    public void TwoCopySteps_SameVolume_BothFit_NoWarning()
+    {
+        var (source, registry) = MakeSource();
+        var target = MakeTarget(capacity: 1_000_000, rootPath: "/target");
+        registry.Register(target);
+
+        var cache = new Dictionary<string, long?> { [target.RootPath] = 1_000_000L };
+        var context = MakeContext(source, registry, selectedBytes: 400, cache);
+
+        var result = PipelineValidator.Validate(
+            [new CopyStep("/target/dst1"), new CopyStep("/target/dst2")],
+            context);
+
+        Assert.True(result.CanRun);
+        Assert.DoesNotContain(result.Issues, i => i.Code == "Step.InsufficientSpace");
+    }
+
+    [Fact]
     public void BlockingIssueFirst_NoSpaceWarning()
     {
         // CopyStep with no destination → blocking issue only; space warning is a no-op

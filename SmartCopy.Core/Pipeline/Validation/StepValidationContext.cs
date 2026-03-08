@@ -10,7 +10,8 @@ namespace SmartCopy.Core.Pipeline.Validation;
 public sealed class StepValidationContext
 {
     private readonly List<PipelineValidationIssue> _issues = new();
-    private readonly IReadOnlyDictionary<string, long?>? _cachedFreeSpace;
+    // Mutable shadow copy so each step sees free space reduced by earlier steps' consumption.
+    private readonly Dictionary<string, long?>? _cachedFreeSpace;
 
     public StepValidationContext(
         bool hasSelectedIncludedInputs,
@@ -25,7 +26,7 @@ public sealed class StepValidationContext
         SelectedBytes = selectedBytes;
         SourceProvider = sourceProvider;
         ProviderRegistry = providerRegistry;
-        _cachedFreeSpace = cachedFreeSpace;
+        _cachedFreeSpace = cachedFreeSpace is not null ? new Dictionary<string, long?>(cachedFreeSpace) : null;
     }
 
     /// <summary>Index of the step currently being validated. Set by <see cref="PipelineValidator"/> before each call.</summary>
@@ -95,8 +96,11 @@ public sealed class StepValidationContext
             || SourceProvider is null
             || ProviderRegistry is null) return;
         var result = step.ValidateFreeSpace(SelectedBytes, SourceProvider, ProviderRegistry, _cachedFreeSpace);
-        if (result is not null)
+        if (result is null) return;
+        if (result.IsViolation)
             AddStepWarning("Step.InsufficientSpace", result.ShortMessage);
+        // Deduct this step's consumption so subsequent steps on the same volume see accurate remaining space.
+        _cachedFreeSpace[result.TargetRootPath] = Math.Max(0, result.FreeBytes - result.NeededBytes);
     }
 
     /// <summary>

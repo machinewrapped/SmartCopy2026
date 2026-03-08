@@ -5,9 +5,14 @@ namespace SmartCopy.Core.Pipeline;
 /// <summary>
 /// Structured result of a free-space check, carrying raw byte counts so callers
 /// can format messages appropriate to their context (step card vs preview pane).
+/// Also carries <see cref="TargetRootPath"/> so callers can update a running
+/// free-space cache to account for cumulative consumption across multiple steps.
 /// </summary>
-public sealed record FreeSpaceValidationResult(long NeededBytes, long FreeBytes)
+public sealed record FreeSpaceValidationResult(long NeededBytes, long FreeBytes, string TargetRootPath)
 {
+    /// <summary>True when <see cref="NeededBytes"/> exceeds <see cref="FreeBytes"/>.</summary>
+    public bool IsViolation => NeededBytes > FreeBytes;
+
     public long OverBytes => NeededBytes - FreeBytes;
 
     /// <summary>Compact message for step cards.</summary>
@@ -16,7 +21,7 @@ public sealed record FreeSpaceValidationResult(long NeededBytes, long FreeBytes)
 
     /// <summary>Full message for the preview warnings pane.</summary>
     public string LongMessage =>
-        $"Not enough space — {FileSizeFormatter.FormatBytes(NeededBytes)} needed, " +
+        $"Not enough space on {TargetRootPath} — {FileSizeFormatter.FormatBytes(NeededBytes)} needed, " +
         $"{FileSizeFormatter.FormatBytes(FreeBytes)} free " +
         $"({FileSizeFormatter.FormatBytes(OverBytes)} over)";
 }
@@ -35,9 +40,12 @@ public interface IHasFreeSpaceCheck
     IFileSystemProvider? ResolveFreeSpaceTarget(IFileSystemProvider sourceProvider, IPathResolver registry);
 
     /// <summary>
-    /// Synchronous check against a pre-cached free-space map (keyed by provider RootPath).
-    /// Returns a <see cref="FreeSpaceValidationResult"/> if space is insufficient, null otherwise.
-    /// Used by PipelineValidator for real-time step-card warnings.
+    /// Checks free space using a pre-cached map (keyed by provider RootPath).
+    /// Returns null when no check is applicable (same-volume move, no destination, unknown free space).
+    /// Returns a result in all other cases — examine <see cref="FreeSpaceValidationResult.IsViolation"/>
+    /// to determine whether space is insufficient. The result always carries
+    /// <see cref="FreeSpaceValidationResult.NeededBytes"/> so callers can deduct consumption
+    /// from the cache to correctly account for cumulative multi-step usage.
     /// </summary>
     FreeSpaceValidationResult? ValidateFreeSpace(
         long bytesNeeded,

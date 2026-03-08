@@ -31,6 +31,8 @@ public sealed class PipelineRunner
         var actions = new List<PlannedAction>();
         var warnings = new List<string>();
         var errors = new List<string>();
+        // Populated lazily; persists across steps so cumulative consumption is tracked.
+        var freeSpaceCache = new Dictionary<string, long?>();
 
         foreach (var step in _pipeline.Steps)
         {
@@ -60,11 +62,15 @@ public sealed class PipelineRunner
                 var target = fsCheck.ResolveFreeSpaceTarget(job.SourceProvider, job.ProviderRegistry);
                 if (target?.Capabilities.CanQueryFreeSpace == true)
                 {
+                    if (!freeSpaceCache.ContainsKey(target.RootPath))
+                        freeSpaceCache[target.RootPath] = await target.GetAvailableFreeSpaceAsync(ct);
                     long needed = stepActions.Sum(a => a.OutputBytes);
-                    long? free = await target.GetAvailableFreeSpaceAsync(ct);
-                    var singleEntryCache = new Dictionary<string, long?> { [target.RootPath] = free };
-                    var fsResult = fsCheck.ValidateFreeSpace(needed, job.SourceProvider, job.ProviderRegistry, singleEntryCache);
-                    if (fsResult is not null) warnings.Add(fsResult.LongMessage);
+                    var fsResult = fsCheck.ValidateFreeSpace(needed, job.SourceProvider, job.ProviderRegistry, freeSpaceCache);
+                    if (fsResult is not null)
+                    {
+                        if (fsResult.IsViolation) warnings.Add(fsResult.LongMessage);
+                        freeSpaceCache[fsResult.TargetRootPath] = Math.Max(0, fsResult.FreeBytes - fsResult.NeededBytes);
+                    }
                 }
             }
 

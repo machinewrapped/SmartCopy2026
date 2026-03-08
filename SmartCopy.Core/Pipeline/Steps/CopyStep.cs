@@ -49,8 +49,7 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
         var target = ResolveFreeSpaceTarget(source, registry);
         if (target is null) return null;
         if (!freeSpaceCache.TryGetValue(target.RootPath, out var free) || free is null) return null;
-        if (bytesNeeded <= free.Value) return null;
-        return new FreeSpaceValidationResult(bytesNeeded, free.Value);
+        return new FreeSpaceValidationResult(bytesNeeded, free.Value, target.RootPath);
     }
 
     public void Validate(StepValidationContext context)
