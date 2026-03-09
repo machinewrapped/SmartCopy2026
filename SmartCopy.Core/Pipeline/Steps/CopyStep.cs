@@ -36,26 +36,25 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
 
     public bool HasDestinationPath => !string.IsNullOrWhiteSpace(DestinationPath);
 
-    public Task<FreeSpaceValidationResult?> ValidateFreeSpace(
+    public FreeSpaceValidationResult? ValidateFreeSpace(
         long bytesNeeded,
         IFileSystemProvider source,
         IPathResolver registry,
-        FreeSpaceCache freeSpaceCache,
-        CancellationToken ct)
+        FreeSpaceCache freeSpaceCache)
     {
-        if (bytesNeeded <= 0) return FreeSpaceValidationResult.NullResult;
-        if (DestinationPath is null) return FreeSpaceValidationResult.NullResult;
+        if (bytesNeeded <= 0) return null;
+        if (DestinationPath is null) return null;
 
         var target = registry.ResolveProvider(DestinationPath);
-        if (target is null) return FreeSpaceValidationResult.NullResult;
+        if (target is null) return null;
 
         var cachedFreeSpace = freeSpaceCache.GetForProvider(target);
-        if (cachedFreeSpace is null) return FreeSpaceValidationResult.NullResult;
+        if (cachedFreeSpace is null) return null;
 
-        return FreeSpaceValidationResult.Result(bytesNeeded, cachedFreeSpace.Value, target.RootPath);
+        return new FreeSpaceValidationResult(bytesNeeded, cachedFreeSpace.Value, target.RootPath);
     }
 
-    public async Task Validate(StepValidationContext context, CancellationToken ct = default)
+    public Task Validate(StepValidationContext context, CancellationToken ct = default)
     {
         context.ValidateHasSelectedInputs();
         context.ValidateSourceExists("Copy");
@@ -63,7 +62,8 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
         {
             context.AddBlockingIssue("Step.MissingDestination", "Copy requires a destination path.");
         }
-        await context.AddFreeSpaceWarning(this, ct);
+        context.AddFreeSpaceWarning(this, ct);
+        return Task.CompletedTask;
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(

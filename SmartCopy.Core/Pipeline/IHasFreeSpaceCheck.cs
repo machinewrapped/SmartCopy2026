@@ -25,13 +25,6 @@ public sealed record FreeSpaceValidationResult(long NeededBytes, long FreeBytes,
         $"{FileSizeFormatter.FormatBytes(FreeBytes)} free " +
         $"({FileSizeFormatter.FormatBytes(OverBytes)} over)";
 
-    /// <summary>Null result for when no check is possible or needed.</summary>
-    public static Task<FreeSpaceValidationResult?> NullResult 
-        => Task.FromResult<FreeSpaceValidationResult?>(null);
-
-    /// <summary>Result for when free space check is completed.</summary>
-    public static Task<FreeSpaceValidationResult?> Result(long neededBytes, long freeBytes, string targetRootPath)
-        => Task.FromResult<FreeSpaceValidationResult?>(new FreeSpaceValidationResult(neededBytes, freeBytes, targetRootPath));
 }
 
 /// <summary>
@@ -44,10 +37,9 @@ public interface IHasFreeSpaceCheck
     /// Returns null when inapplicable or no check is possible (same-volume move, no destination, unknown free space).
     /// Otherwise, returns a <see cref="FreeSpaceValidationResult"/> with IsViolation set if free space is insufficient.
     /// </summary>
-    Task<FreeSpaceValidationResult?> ValidateFreeSpace(
+    FreeSpaceValidationResult? ValidateFreeSpace(
         long bytesNeeded,
         IFileSystemProvider source,
         IPathResolver registry,
-        FreeSpaceCache freeSpaceCache,
-        CancellationToken ct);
+        FreeSpaceCache freeSpaceCache);
 }

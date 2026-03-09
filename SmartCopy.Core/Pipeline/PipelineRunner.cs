@@ -78,7 +78,7 @@ public sealed class PipelineRunner
             if (step is IHasFreeSpaceCheck fsCheck)
             {
                 long needed = stepActions.Sum(a => a.OutputBytes);
-                var fsResult = await fsCheck.ValidateFreeSpace(needed, job.SourceProvider, job.ProviderRegistry, freeSpaceCache, ct);
+                var fsResult = fsCheck.ValidateFreeSpace(needed, job.SourceProvider, job.ProviderRegistry, freeSpaceCache);
                 if (fsResult != null)
                 {
                     if (fsResult.IsViolation)
