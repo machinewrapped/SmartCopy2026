@@ -32,6 +32,7 @@ public partial class PipelineViewModel : ViewModelBase
     private long _selectedBytes;
     private IFileSystemProvider? _sourceProvider;
     private FreeSpaceCache _cachedFreeSpace = new();
+    private CancellationTokenSource _revalidateCts = new();
 
     public ObservableCollection<PipelineStepViewModel> Steps { get; } = [];
 
@@ -135,8 +136,15 @@ public partial class PipelineViewModel : ViewModelBase
 
     private async void OnStepPresetPicked(StepPreset preset)
     {
-        var step = PipelineStepFactory.FromConfig(preset.Config);
-        await AddStepFromResult(step, preset.Name);
+        try
+        {
+            var step = PipelineStepFactory.FromConfig(preset.Config);
+            await AddStepFromResult(step, preset.Name);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ERROR] OnStepPresetPicked failed: {ex}");
+        }
     }
 
     public async Task DeletePipelinePresetAsync(string name)
@@ -335,8 +343,15 @@ public partial class PipelineViewModel : ViewModelBase
     {
         _ = sender;
         _ = e;
-        await RefreshFreeSpaceCacheAsync();
-        Revalidate();
+        try
+        {
+            await RefreshFreeSpaceCacheAsync();
+            Revalidate();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ERROR] OnStepChanged failed: {ex}");
+        }
     }
 
     private async void InitializePresetsInBackground()
@@ -385,6 +400,10 @@ public partial class PipelineViewModel : ViewModelBase
 
     private async void Revalidate()
     {
+        _revalidateCts.Cancel();
+        _revalidateCts = new CancellationTokenSource();
+        var ct = _revalidateCts.Token;
+
         foreach (var step in Steps)
         {
             step.ValidationMessage = null;
@@ -395,59 +414,73 @@ public partial class PipelineViewModel : ViewModelBase
 
         _capabilityBlocked = false;
 
-        var result = await PipelineValidator.ValidateAsync(
-            [.. Steps.Select(step => step.Step)],
-            new PipelineValidationContext(
-                SourceProvider:   _sourceProvider,
-                ProviderRegistry: _appContext,
-                CachedFreeSpace:  _cachedFreeSpace,
-                HasSelectedIncludedInputs: _selectedIncludedFileCount > 0,
-                SelectedBytes:    _selectedBytes));
-
-        ValidationResult = result;
-        BlockingValidationMessage = result.FirstBlockingIssue?.Message;
-
-        foreach (var issue in result.Issues.Where(i => i.StepIndex.HasValue))
+        try
         {
-            var index = issue.StepIndex!.Value;
-            if (index < 0 || index >= Steps.Count)
-            {
-                continue;
-            }
+            var result = await PipelineValidator.ValidateAsync(
+                [.. Steps.Select(step => step.Step)],
+                new PipelineValidationContext(
+                    SourceProvider:   _sourceProvider,
+                    ProviderRegistry: _appContext,
+                    CachedFreeSpace:  _cachedFreeSpace,
+                    HasSelectedIncludedInputs: _selectedIncludedFileCount > 0,
+                    SelectedBytes:    _selectedBytes),
+                ct);
 
-            var step = Steps[index];
-            if (string.IsNullOrWhiteSpace(step.ValidationMessage))
-            {
-                step.ValidationMessage = issue.Message;
-                step.HasValidationError = issue.Severity == PipelineValidationSeverity.Blocking;
-                step.HasValidationWarning = issue.Severity == PipelineValidationSeverity.Warning;
-            }
-        }
+            ct.ThrowIfCancellationRequested();
 
-        // Capability-derived blocking: Trash mode is unavailable for this source path.
-        if (!SourceCapabilities.CanTrash)
-        {
-            foreach (var step in Steps)
+            ValidationResult = result;
+            BlockingValidationMessage = result.FirstBlockingIssue?.Message;
+
+            foreach (var issue in result.Issues.Where(i => i.StepIndex.HasValue))
             {
-                if (step.Step is DeleteStep ds && ds.Mode == DeleteMode.Trash)
+                var index = issue.StepIndex!.Value;
+                if (index < 0 || index >= Steps.Count)
                 {
-                    step.TrashUnavailable = true;
-                    _capabilityBlocked = true;
+                    continue;
+                }
+
+                var step = Steps[index];
+                if (string.IsNullOrWhiteSpace(step.ValidationMessage))
+                {
+                    step.ValidationMessage = issue.Message;
+                    step.HasValidationError = issue.Severity == PipelineValidationSeverity.Blocking;
+                    step.HasValidationWarning = issue.Severity == PipelineValidationSeverity.Warning;
                 }
             }
+
+            // Capability-derived blocking: Trash mode is unavailable for this source path.
+            if (!SourceCapabilities.CanTrash)
+            {
+                foreach (var step in Steps)
+                {
+                    if (step.Step is DeleteStep ds && ds.Mode == DeleteMode.Trash)
+                    {
+                        step.TrashUnavailable = true;
+                        _capabilityBlocked = true;
+                    }
+                }
+            }
+
+            if (_capabilityBlocked && BlockingValidationMessage is null)
+                BlockingValidationMessage = "Trash is not available for this path";
+
+            OnPropertyChanged(nameof(FirstDestinationPath));
+            OnPropertyChanged(nameof(HasDeleteStep));
+            OnPropertyChanged(nameof(HasOverwriteStep));
+            OnPropertyChanged(nameof(RunButtonLabel));
+            OnPropertyChanged(nameof(HasSteps));
+            UpdateButtonStates();
+
+            PipelineChanged?.Invoke(this, EventArgs.Empty);
         }
-
-        if (_capabilityBlocked && BlockingValidationMessage is null)
-            BlockingValidationMessage = "Trash is not available for this path";
-
-        OnPropertyChanged(nameof(FirstDestinationPath));
-        OnPropertyChanged(nameof(HasDeleteStep));
-        OnPropertyChanged(nameof(HasOverwriteStep));
-        OnPropertyChanged(nameof(RunButtonLabel));
-        OnPropertyChanged(nameof(HasSteps));
-        UpdateButtonStates();
-
-        PipelineChanged?.Invoke(this, EventArgs.Empty);
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer validation; discard this result.
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ERROR] Revalidate failed: {ex}");
+        }
     }
 
     private async Task RefreshFreeSpaceCacheAsync(CancellationToken ct = default)
