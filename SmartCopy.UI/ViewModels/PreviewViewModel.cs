@@ -220,6 +220,7 @@ public partial class PreviewViewModel : ViewModelBase
         return (folders > 0) ? $"Will {action} {files} files and {folders} folders" : $"Will {action} {files} files";
     }
 
+    [RelayCommand]
     private void Run()
     {
         RunRequested?.Invoke();
