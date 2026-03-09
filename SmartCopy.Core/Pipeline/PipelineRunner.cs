@@ -100,16 +100,6 @@ public sealed class PipelineRunner
             {
                 warnings.Add("Trash not available for this path — files will be permanently deleted");
             }
-
-            if (step is MoveStep ms && ms.HasDestinationPath)
-            {
-                var targetProvider = job.ProviderRegistry.ResolveProvider(ms.DestinationPath!);
-                var sameVolume = job.SourceProvider.VolumeId is { } vid && targetProvider?.VolumeId == vid;
-                if (!sameVolume)
-                {
-                    warnings.Add("Destination is on another drive, atomic move is not possible");
-                }
-            }
         }
 
         return new OperationPlan
@@ -117,8 +107,7 @@ public sealed class PipelineRunner
             Actions = actions,
             TotalInputBytes = actions.Sum(a => a.InputBytes),
             TotalEstimatedOutputBytes = actions.Sum(a => a.OutputBytes),
-            Warnings = warnings,
-            Errors = errors,
+            Warnings = warnings
         };
     }
 

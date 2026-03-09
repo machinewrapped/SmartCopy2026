@@ -53,7 +53,7 @@ public sealed class FreeSpaceCheckTests
             ProviderRegistry = registry,
         });
 
-        Assert.Empty(plan.Errors);
+        Assert.Empty(plan.Warnings);
     }
 
     [Fact]
@@ -126,7 +126,7 @@ public sealed class FreeSpaceCheckTests
             ProviderRegistry = registry,
         });
 
-        Assert.Empty(plan.Errors);
+        Assert.Empty(plan.Warnings);
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public sealed class FreeSpaceCheckTests
             ProviderRegistry = provider.CreateRegistry(),
         });
 
-        Assert.Empty(plan.Errors);
+        Assert.Empty(plan.Warnings);
     }
 
     [Fact]
@@ -168,7 +168,7 @@ public sealed class FreeSpaceCheckTests
             ProviderRegistry = registry,
         });
 
-        Assert.Empty(plan.Errors);
+        Assert.Empty(plan.Warnings);
     }
 
     [Fact]

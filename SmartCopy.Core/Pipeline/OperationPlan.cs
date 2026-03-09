@@ -20,7 +20,6 @@ public sealed class OperationPlan
     public required long TotalInputBytes { get; init; }
     public required long TotalEstimatedOutputBytes { get; init; }
     public IReadOnlyList<string> Warnings { get; init; } = [];
-    public IReadOnlyList<string> Errors { get; init; } = [];
     public int TotalFilesAffected   => Actions.Sum(a => a.NumberOfFilesAffected);
     public int TotalFoldersAffected => Actions.Sum(a => a.NumberOfFoldersAffected);
     public int TotalFilesSkipped    => Actions.Sum(a => a.NumberOfFilesSkipped);
