@@ -128,6 +128,10 @@ public sealed class PipelineRunner
 
     public async Task<IReadOnlyList<TransformResult>> ExecuteAsync(PipelineJob job)
     {
+        // Make sure selection stats are up to date
+        job.RootNode.BuildStats();
+
+        // Check that the pipeline is still valid
         await _pipeline.ValidateAsync(new PipelineValidationContext(
             job.SourceProvider,
             job.ProviderRegistry,

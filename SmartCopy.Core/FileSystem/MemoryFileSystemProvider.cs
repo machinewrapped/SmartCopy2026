@@ -268,7 +268,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
 
         if (SimulatedCapacity.HasValue == false)
         {
-            throw new ApplicationException("Simulated drive has unlimited capacity");
+            return Task.FromResult<long?>(null);
         }
 
         long totalBytesUsed = _entries.Values.Sum(x => x.Size);
