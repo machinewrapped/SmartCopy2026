@@ -217,21 +217,6 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         }
     }
 
-    private string CombinePath(string basePath, string relativePath)
-    {
-        if (Path.IsPathFullyQualified(relativePath))
-        {
-            return NormalizePath(relativePath);
-        }
-
-        if (string.IsNullOrWhiteSpace(basePath))
-        {
-            return NormalizePath(relativePath);
-        }
-
-        return NormalizePath(Path.Combine(basePath, relativePath));
-    }
-
     public string GetRelativePath(string basePath, string fullPath)
     {
         string normalBase = NormalizePath(basePath);
@@ -258,7 +243,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         return NormalizePath(Path.Combine(basePath, Path.Combine([.. segments])));
     }
 
-    public string NormalizePath(string path)
+    public static string NormalizePath(string path)
     {
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -284,7 +269,22 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         return CombinePath(RootPath, path);
     }
 
-    private FileSystemNode CreateDirectoryNode(string directoryPath)
+    private static string CombinePath(string basePath, string relativePath)
+    {
+        if (Path.IsPathFullyQualified(relativePath))
+        {
+            return NormalizePath(relativePath);
+        }
+
+        if (string.IsNullOrWhiteSpace(basePath))
+        {
+            return NormalizePath(relativePath);
+        }
+
+        return NormalizePath(Path.Combine(basePath, relativePath));
+    }
+
+    private static FileSystemNode CreateDirectoryNode(string directoryPath)
     {
         var info = new DirectoryInfo(directoryPath);
         return new FileSystemNode
@@ -299,7 +299,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         };
     }
 
-    private FileSystemNode CreateFileNode(string filePath)
+    private static FileSystemNode CreateFileNode(string filePath)
     {
         var info = new FileInfo(filePath);
         return new FileSystemNode
