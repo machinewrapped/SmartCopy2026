@@ -81,7 +81,7 @@ public sealed class PipelineRunner
                 var fsResult = await fsCheck.ValidateFreeSpace(needed, job.SourceProvider, job.ProviderRegistry, freeSpaceCache, ct);
                 if (fsResult != null)
                 {
-                    if (fsResult.IsViolation == true)
+                    if (fsResult.IsViolation)
                         warnings.Add(fsResult.LongMessage);
 
                     // Update free space cache
