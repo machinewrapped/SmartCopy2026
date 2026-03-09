@@ -62,7 +62,7 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
         {
             context.AddBlockingIssue("Step.MissingDestination", "Copy requires a destination path.");
         }
-        await context.AddFreeSpaceWarning(this);
+        await context.AddFreeSpaceWarning(this, ct);
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(

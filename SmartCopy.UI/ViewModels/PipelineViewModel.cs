@@ -331,10 +331,11 @@ public partial class PipelineViewModel : ViewModelBase
         Revalidate();
     }
 
-    private void OnStepChanged(object? sender, EventArgs e)
+    private async void OnStepChanged(object? sender, EventArgs e)
     {
         _ = sender;
         _ = e;
+        await RefreshFreeSpaceCacheAsync();
         Revalidate();
     }
 

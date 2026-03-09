@@ -67,7 +67,7 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
         {
             context.AddBlockingIssue("Step.MissingDestination", "Move requires a destination path.");
         }
-        await context.AddFreeSpaceWarning(this);
+        await context.AddFreeSpaceWarning(this, ct);
         context.SourceExists = false;
     }
 
