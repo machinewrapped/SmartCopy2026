@@ -104,6 +104,7 @@ public partial class PipelineViewModel : ViewModelBase
     public event EventHandler? RunRequested;
     public event EventHandler? PreviewRequested;
     public event EventHandler<PipelineStepViewModel>? EditStepRequested;
+    public event EventHandler<PipelineStepViewModel>? SwapSourceRequested;
     public event EventHandler? SavePipelineRequested;
 
     public PipelineViewModel(IAppContext appContext)
@@ -268,6 +269,12 @@ public partial class PipelineViewModel : ViewModelBase
     private void PreviewPipeline()
     {
         PreviewRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void RequestSwapWithSource(PipelineStepViewModel step)
+    {
+        if (IsRunning || !step.HasDestination) return;
+        SwapSourceRequested?.Invoke(this, step);
     }
 
     [RelayCommand(CanExecute = nameof(IsNotRunning))]

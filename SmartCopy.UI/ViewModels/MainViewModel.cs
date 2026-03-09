@@ -177,6 +177,7 @@ public partial class MainViewModel : ViewModelBase
         };
         Pipeline.RunRequested += async (_, _) => await RunPipelineAsync();
         Pipeline.PreviewRequested += async (_, _) => await PreviewPipelineAsync();
+        Pipeline.SwapSourceRequested += async (_, step) => await SwapSourceWithDestinationAsync(step);
         FilterChain.PipelineDestinationPath = Pipeline.FirstDestinationPath;
 
         // Subscribe to chain changes — re-evaluate filters within ~100 ms.
@@ -626,6 +627,27 @@ public partial class MainViewModel : ViewModelBase
         var dialog = new ConfirmDialog { DataContext = confirmVm };
         var result = await dialog.ShowDialog<bool?>(mainWindow);
         return result == true;
+    }
+
+    private async Task SwapSourceWithDestinationAsync(PipelineStepViewModel step)
+    {
+        if (step.Step is not IHasDestinationPath dest || !dest.HasDestinationPath)
+            return;
+
+        var oldSource = SourcePath;
+        var oldDestination = dest.DestinationPath!;
+
+        IPipelineStep? replacement = step.Step switch
+        {
+            CopyStep copy => new CopyStep(oldSource, copy.OverwriteMode),
+            MoveStep move => new MoveStep(oldSource, move.OverwriteMode),
+            _ => null
+        };
+
+        if (replacement is null) return;
+
+        await Pipeline.ReplaceStep(step, replacement, step.CustomName);
+        await ApplySourcePathCoreAsync(oldDestination);
     }
 
     private async Task ApplySourcePathCoreAsync(string path)
