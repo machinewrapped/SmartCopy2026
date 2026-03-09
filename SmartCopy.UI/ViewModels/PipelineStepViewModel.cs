@@ -51,6 +51,9 @@ public partial class PipelineStepViewModel : ViewModelBase
     public bool _hasValidationError;
 
     [ObservableProperty]
+    public bool _hasValidationWarning;
+
+    [ObservableProperty]
     public bool _isActiveStep;
 
     public event EventHandler? StepChanged;

@@ -212,7 +212,6 @@ public partial class PreviewViewModel : ViewModelBase
         AddGroup(GroupKey.Copy, copyActions);
         AddGroup(GroupKey.Skip, skipActions);
 
-        RunCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(ConfirmButtonText));
     }
 

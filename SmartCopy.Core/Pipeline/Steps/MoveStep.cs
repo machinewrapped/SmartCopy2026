@@ -6,7 +6,7 @@ using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
-public sealed class MoveStep : IPipelineStep, IHasDestinationPath
+public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpaceCheck
 {
     public StepKind StepType => StepKind.Move;
     public bool IsExecutable => true;
@@ -38,15 +38,39 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
 
     public bool HasDestinationPath => !string.IsNullOrWhiteSpace(DestinationPath);
 
-    public void Validate(StepValidationContext context)
+    public FreeSpaceValidationResult? ValidateFreeSpace(
+        long bytesNeeded,
+        IFileSystemProvider source,
+        IPathResolver registry,
+        FreeSpaceCache freeSpaceCache)
     {
+        if (bytesNeeded <= 0) return null;
+        if (DestinationPath is null) return null;
+
+        var target = registry.ResolveProvider(DestinationPath);
+        if (target is null) return null;
+
+        // No space consumed by move on the same volume
+        if (source.VolumeId is { } vid && target.VolumeId == vid) return null;
+
+        var cachedFreeSpace = freeSpaceCache.GetForProvider(target);
+        if (cachedFreeSpace is null) return null;
+
+        return new FreeSpaceValidationResult(bytesNeeded, cachedFreeSpace.Value, target.RootPath);
+    }
+
+    public Task Validate(StepValidationContext context, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
         context.ValidateHasSelectedInputs();
         context.ValidateSourceExists("Move");
         if (!HasDestinationPath)
         {
             context.AddBlockingIssue("Step.MissingDestination", "Move requires a destination path.");
         }
+        context.AddFreeSpaceWarning(this);
         context.SourceExists = false;
+        return Task.CompletedTask;
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(
@@ -106,6 +130,7 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
                 ? DestinationResult.Overwritten
                 : DestinationResult.Created;
 
+            var selectedBytes = node.TotalSelectedBytes;
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: node,
@@ -114,8 +139,8 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
                 DestinationResult: destResult,
                 NumberOfFilesAffected: node.CountSelectedFiles(),
                 NumberOfFoldersAffected: node.CountSelectedFolders(),
-                InputBytes: node.Size,
-                OutputBytes: node.Size);
+                InputBytes: selectedBytes,
+                OutputBytes: selectedBytes);
         }
     }
 
@@ -233,6 +258,23 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath
                 InputBytes: file.Size,
                 OutputBytes: file.Size);
         }
+    }
+
+    /// <summary>
+    /// Recursively sums the sizes of all selected files within <paramref name="node"/>.
+    /// Used to report accurate byte counts for directory-level move actions in preview,
+    /// since <see cref="DirectoryTreeNode.Size"/> is always 0 for directory nodes.
+    /// </summary>
+    private static long GetSelectedFileBytes(DirectoryTreeNode node)
+    {
+        if (!node.IsDirectory)
+            return node.IsSelected ? node.Size : 0;
+        long total = 0;
+        foreach (var file in node.Files)
+            if (file.IsSelected) total += file.Size;
+        foreach (var child in node.Children)
+            total += GetSelectedFileBytes(child);
+        return total;
     }
 
     /// <summary>

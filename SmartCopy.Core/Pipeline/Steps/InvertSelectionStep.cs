@@ -16,12 +16,14 @@ public sealed class InvertSelectionStep : IPipelineStep
 
     public TransformStepConfig Config => new(StepType, new JsonObject());
 
-    public void Validate(StepValidationContext context)
+    public Task Validate(StepValidationContext context, CancellationToken ct = default)
     {
         // No preconditions. Post-condition: reset SourceExists so downstream steps
         // are not blocked by a prior destructive step.
         context.SourceExists = true;
         context.HasSelectedIncludedInputs = true;
+        context.ByteEstimateUnknown = true;
+        return Task.CompletedTask;
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(
@@ -61,5 +63,7 @@ public sealed class InvertSelectionStep : IPipelineStep
                 SourceNode: node,
                 SourceNodeResult: SourceResult.None);
         }
-    }
+ 
+        context.RootNode.BuildStats();
+   }
 }

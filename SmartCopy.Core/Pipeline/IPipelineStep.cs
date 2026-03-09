@@ -32,5 +32,5 @@ public interface IPipelineStep
     IAsyncEnumerable<TransformResult> ApplyAsync(IStepContext context, CancellationToken ct);
 
     /// <summary>Validates whether this step is logically valid within the pipeline.</summary>
-    void Validate(StepValidationContext context);
+    Task Validate(StepValidationContext context, CancellationToken ct = default);
 }

@@ -5,7 +5,7 @@ using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
-public sealed class CopyStep : IPipelineStep, IHasDestinationPath
+public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpaceCheck
 {
     public StepKind StepType => StepKind.Copy;
     public bool IsExecutable => true;
@@ -36,14 +36,35 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath
 
     public bool HasDestinationPath => !string.IsNullOrWhiteSpace(DestinationPath);
 
-    public void Validate(StepValidationContext context)
+    public FreeSpaceValidationResult? ValidateFreeSpace(
+        long bytesNeeded,
+        IFileSystemProvider source,
+        IPathResolver registry,
+        FreeSpaceCache freeSpaceCache)
     {
+        if (bytesNeeded <= 0) return null;
+        if (DestinationPath is null) return null;
+
+        var target = registry.ResolveProvider(DestinationPath);
+        if (target is null) return null;
+
+        var cachedFreeSpace = freeSpaceCache.GetForProvider(target);
+        if (cachedFreeSpace is null) return null;
+
+        return new FreeSpaceValidationResult(bytesNeeded, cachedFreeSpace.Value, target.RootPath);
+    }
+
+    public Task Validate(StepValidationContext context, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
         context.ValidateHasSelectedInputs();
         context.ValidateSourceExists("Copy");
         if (string.IsNullOrWhiteSpace(DestinationPath))
         {
             context.AddBlockingIssue("Step.MissingDestination", "Copy requires a destination path.");
         }
+        context.AddFreeSpaceWarning(this);
+        return Task.CompletedTask;
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(

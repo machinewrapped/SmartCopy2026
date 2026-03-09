@@ -203,6 +203,13 @@
                                                            Foreground="#f0ad4e"
                                                            FontSize="10"
                                                            TextWrapping="Wrap" />
+
+                                                <TextBlock IsVisible="{Binding HasValidationWarning}"
+                                                           Text="{Binding ValidationMessage}"
+                                                           Foreground="#f0ad4e"
+                                                           FontSize="10"
+                                                           Opacity="0.75"
+                                                           TextWrapping="Wrap" />
                                             </StackPanel>
                                         </Grid>
                                     </Border>

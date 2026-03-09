@@ -48,12 +48,13 @@ public sealed class RebaseStep : IPipelineStep
     public TransformStepConfig Config => new(StepType,
         new JsonObject { ["stripPrefix"] = StripPrefix, ["addPrefix"] = AddPrefix, });
 
-    public void Validate(StepValidationContext context)
+    public Task Validate(StepValidationContext context, CancellationToken ct = default)
     {
         context.ValidateSourceExists("Rebase");
         if (string.IsNullOrWhiteSpace(StripPrefix) && string.IsNullOrWhiteSpace(AddPrefix))
             context.AddBlockingIssue("Step.RebaseConfigRequired",
                 "Rebase requires StripPrefix or AddPrefix.");
+        return Task.CompletedTask;
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(

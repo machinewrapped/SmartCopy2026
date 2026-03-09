@@ -549,14 +549,14 @@ Exit criteria:
 *Goal: detect and surface insufficient disk space before committing to a copy or cross-volume move.*
 
 Scope:
-- [ ] Free space check against target volume for Copy steps
-- [ ] Free space check against target volume for Move steps that cross volumes (copy+delete fallback path)
-- [ ] Surface warning/blocking message in PreviewView when space is insufficient
+- [x] Free space check against target volume for Copy steps
+- [x] Free space check against target volume for Move steps that cross volumes (copy+delete fallback path)
+- [x] Surface warning/blocking message in PreviewView when space is insufficient
 
 Exit criteria:
-- [ ] Insufficient-space condition surfaces as a blocking warning in the preview before any file I/O begins
-- [ ] Automated tests for free-space gate logic using a mock/capped provider
-- [ ] Manual smoke: attempt copy to a near-full volume and confirm warning appears
+- [x] Insufficient-space condition surfaces as a blocking warning in the preview before any file I/O begins
+- [x] Automated tests for free-space gate logic using a mock/capped provider
+- [x] Manual smoke: attempt copy to a near-full volume and confirm warning appears
 
 ### Phase 5.2.11 Swap Source & Destination Paths
 

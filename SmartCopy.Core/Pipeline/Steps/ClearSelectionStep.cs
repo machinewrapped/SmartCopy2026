@@ -16,9 +16,12 @@ public sealed class ClearSelectionStep : IPipelineStep
 
     public TransformStepConfig Config => new(StepType, new JsonObject());
 
-    public void Validate(StepValidationContext context)
+    public Task Validate(StepValidationContext context, CancellationToken ct = default)
     {
-        // No preconditions or postconditions.
+        context.HasSelectedIncludedInputs = false;
+        context.ByteEstimateUnknown = false;
+        context.SelectedBytes = 0;
+        return Task.CompletedTask;
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(
@@ -51,5 +54,7 @@ public sealed class ClearSelectionStep : IPipelineStep
                 SourceNode: node,
                 SourceNodeResult: SourceResult.None);
         }
+
+        context.RootNode.BuildStats();
     }
 }
