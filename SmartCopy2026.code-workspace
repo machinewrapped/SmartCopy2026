@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"dotnet.backgroundAnalysis.compilerDiagnosticsScope": "fullSolution",
+		"csharp.inlayHints.enableInlayHintsForImplicitObjectCreation": true,
+		"csharp.preview.improvedLaunchExperience": true
+	}
+}
