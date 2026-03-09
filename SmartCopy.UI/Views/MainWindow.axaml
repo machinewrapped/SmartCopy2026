@@ -31,7 +31,8 @@
                 <MenuItem Header="_Options" x:Name="OptionsMenu" />
                 <MenuItem Header="_Selection" x:Name="SelectionMenu" />
                 <MenuItem Header="_Workflows" x:Name="WorkflowsMenu" />
-                <MenuItem Header="_Help" />
+                <MenuItem Header="_Help" x:Name="HelpMenu">
+                    <MenuItem Header="_About SmartCopy 2026" x:Name="AboutMenuItem" /></MenuItem>
             </Menu>
         </Border>
 

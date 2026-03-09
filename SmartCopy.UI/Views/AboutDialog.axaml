@@ -1,0 +1,63 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
+        x:Class="SmartCopy.UI.Views.AboutDialog"
+        x:DataType="vm:AboutDialogViewModel"
+        Title="About SmartCopy 2026"
+        Width="360"
+        SizeToContent="Height"
+        CanResize="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#1e1e1e">
+
+    <StackPanel Spacing="16" Margin="28,24,28,20">
+
+        <!-- App name -->
+        <TextBlock Text="SmartCopy 2026"
+                   FontSize="22"
+                   FontWeight="SemiBold"
+                   HorizontalAlignment="Center" />
+
+        <!-- Version -->
+        <TextBlock Text="{Binding AppVersion, StringFormat='Version {0}'}"
+                   FontSize="13"
+                   Opacity="0.6"
+                   HorizontalAlignment="Center" />
+
+        <Separator Background="#3e3e42" Height="1" Margin="0,4" />
+
+        <!-- Description -->
+        <TextBlock TextWrapping="Wrap"
+                   TextAlignment="Center"
+                   Opacity="0.85"
+                   Text="A cross-platform tool for selectively and intelligently working with large directories using composable filter chains and transform pipelines." />
+
+        <!-- Origin -->
+        <TextBlock TextWrapping="Wrap"
+                   TextAlignment="Center"
+                   FontSize="12"
+                   Opacity="0.5"
+                   Text="An evolution of SmartCopyTool (2012), rewritten with .NET 10 and Avalonia UI." />
+
+        <Separator Background="#3e3e42" Height="1" Margin="0,4" />
+
+        <!-- License -->
+        <TextBlock Text="Released under the MIT License"
+                   FontSize="12"
+                   Opacity="0.5"
+                   HorizontalAlignment="Center" />
+
+        <!-- Close button -->
+        <Button Content="Close"
+                Command="{Binding CloseCommand}"
+                HorizontalAlignment="Center"
+                Width="90"
+                IsDefault="True"
+                IsCancel="True"
+                Margin="0,4,0,0"
+                AutomationProperties.Name="Close About dialog" />
+
+    </StackPanel>
+</Window>

@@ -69,6 +69,13 @@ public partial class MainWindow : Window
         InitializeComponent();
 
         DataContextChanged += OnMainDataContextChanged;
+        AboutMenuItem.Click += async (_, _) => await ShowAboutDialogAsync();
+    }
+
+    private async Task ShowAboutDialogAsync()
+    {
+        var dialog = new AboutDialog { DataContext = new AboutDialogViewModel() };
+        await dialog.ShowDialog(this);
     }
 
     private void OnMainDataContextChanged(object? sender, EventArgs e)
