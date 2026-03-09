@@ -213,6 +213,12 @@ public partial class PipelineView : UserControl
 
     // ---- Keyboard handling for step list ----
 
+    private void OnStepContextRequested(object? sender, ContextRequestedEventArgs e)
+    {
+        if (sender is StackPanel { DataContext: PipelineStepViewModel step } && !step.HasDestination)
+            e.Handled = true;
+    }
+
     private void OnSwapWithSourceClick(object? sender, RoutedEventArgs e)
     {
         if (sender is not MenuItem { DataContext: PipelineStepViewModel step }) return;

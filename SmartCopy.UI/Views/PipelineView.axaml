@@ -130,11 +130,11 @@
                         </ListBox.ItemsPanel>
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="vm:PipelineStepViewModel">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                            ContextRequested="OnStepContextRequested">
                                     <StackPanel.ContextMenu>
                                         <ContextMenu>
                                             <MenuItem Header="Swap destination with source path"
-                                                      IsEnabled="{Binding HasDestination}"
                                                       Click="OnSwapWithSourceClick" />
                                         </ContextMenu>
                                     </StackPanel.ContextMenu>
