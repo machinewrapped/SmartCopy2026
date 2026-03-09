@@ -41,8 +41,6 @@ public sealed class PipelineRunner
         var actions = new List<PlannedAction>();
         var warnings = new List<string>();
         var errors = new List<string>();
-        // Populated lazily; persists across steps so cumulative consumption is tracked.
-        var freeSpaceCache = new FreeSpaceCache();
 
         foreach (var step in _pipeline.Steps)
         {
@@ -69,7 +67,7 @@ public sealed class PipelineRunner
 
             if (step is IHasDestinationPath destination)
             {
-                await freeSpaceCache.CacheForDestinationAsync(
+                await _freeSpaceCache.CacheForDestinationAsync(
                     destination, 
                     job.ProviderRegistry, 
                     ct);
@@ -78,14 +76,14 @@ public sealed class PipelineRunner
             if (step is IHasFreeSpaceCheck fsCheck)
             {
                 long needed = stepActions.Sum(a => a.OutputBytes);
-                var fsResult = fsCheck.ValidateFreeSpace(needed, job.SourceProvider, job.ProviderRegistry, freeSpaceCache);
+                var fsResult = fsCheck.ValidateFreeSpace(needed, job.SourceProvider, job.ProviderRegistry, _freeSpaceCache);
                 if (fsResult != null)
                 {
                     if (fsResult.IsViolation)
                         warnings.Add(fsResult.LongMessage);
 
                     // Update free space cache
-                    freeSpaceCache.ReduceForPath(job.ProviderRegistry, fsResult.TargetRootPath, fsResult.NeededBytes);
+                    _freeSpaceCache.ReduceForPath(job.ProviderRegistry, fsResult.TargetRootPath, fsResult.NeededBytes);
                 }
             }
 
@@ -111,10 +109,12 @@ public sealed class PipelineRunner
         };
     }
 
-    public async Task<IReadOnlyList<TransformResult>> ExecuteAsync(PipelineJob job)
+    public async Task<IReadOnlyList<TransformResult>> ExecuteAsync(PipelineJob job, CancellationToken ct = default)
     {
         // Make sure selection stats are up to date
         job.RootNode.BuildStats();
+
+        _freeSpaceCache = await FreeSpaceCache.BuildForPipelineAsync(_pipeline.Steps, job.ProviderRegistry, ct);
 
         // Check that the pipeline is still valid
         await _pipeline.ValidateAsync(new PipelineValidationContext(
@@ -124,6 +124,9 @@ public sealed class PipelineRunner
             job.RootNode.GetSelectedDescendants().Any(),
             job.RootNode.TotalSelectedBytes));
 
+        // TODO: if there is a free space issue, fire off a preview
+
+        // TODO: this does not respect the user setting
         if (_pipeline.HasDeleteStep && !_previewCompleted)
         {
             throw new InvalidOperationException(
