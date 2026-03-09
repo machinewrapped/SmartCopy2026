@@ -569,7 +569,7 @@ Validation:
 - [x] Add tests for the functionality
 
 Exit criteria:
-- [X] Manual smoke: swap source and destination paths and confirm the directory tree and file list update correctly, and the pipeline step target is set to the previous source
+- [x] Manual smoke: swap source and destination paths and confirm the directory tree and file list update correctly, and the pipeline step target is set to the previous source
 
 ### Phase 5.2 Bug fixes
 
@@ -578,15 +578,15 @@ Exit criteria:
 - [x] Incorrect progress bar for multi-step pipelines (e.g. Copy + Move shows 500/400 files during Move)
 
 Exit criteria:
-- [ ] All bug fixes are implemented and tests are added
-- [ ] Manual smoke tests confirm the bug fixes
+- [x] All bug fixes are implemented and tests are added
+- [x] Manual smoke tests confirm the bug fixes
 
 #### 5.3 Validation and initial release
 
 Validation:
 
-- [ ] End-to-end scan/filter/preview/run flows validated against real file systems
-- [ ] Large tree scan (>100k nodes) remains responsive with cancellable scan
+- [x] End-to-end scan/filter/preview/run flows validated against real file systems
+- [x] Large tree scan (>100k nodes) remains responsive with cancellable scan
 - [ ] Long-path and non-ASCII filename handling validated
 - [ ] Locked/in-use file behavior validated (copy/move/delete error reporting)
 - [ ] Cross-volume/local-network move/copy behavior validated
