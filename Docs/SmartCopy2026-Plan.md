@@ -563,13 +563,13 @@ Exit criteria:
 *Goal: allow the user to swap the source path with the destination of a copy/move step.*
 
 Scope:
-- [ ] Context menu on pipeline steps with IHasDestinationPath with "swap destination with source path"
+- [x] Context menu on pipeline steps with IHasDestinationPath with "swap destination with source path"
 
 Validation:
-- [ ] Add tests for the functionality
+- [x] Add tests for the functionality
 
 Exit criteria:
-- [ ] Manual smoke: swap source and destination paths and confirm the directory tree and file list update correctly, and the pipeline step target is set to the previous source
+- [X] Manual smoke: swap source and destination paths and confirm the directory tree and file list update correctly, and the pipeline step target is set to the previous source
 
 ### Phase 5.2 Bug fixes
 
