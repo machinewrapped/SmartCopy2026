@@ -556,7 +556,7 @@ Scope:
 Exit criteria:
 - [x] Insufficient-space condition surfaces as a blocking warning in the preview before any file I/O begins
 - [x] Automated tests for free-space gate logic using a mock/capped provider
-- [ ] Manual smoke: attempt copy to a near-full volume and confirm warning appears
+- [x] Manual smoke: attempt copy to a near-full volume and confirm warning appears
 
 ### Phase 5.2.11 Swap Source & Destination Paths
 
