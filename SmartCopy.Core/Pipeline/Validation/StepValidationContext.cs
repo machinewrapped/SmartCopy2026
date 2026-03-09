@@ -10,8 +10,9 @@ namespace SmartCopy.Core.Pipeline.Validation;
 public sealed class StepValidationContext
 {
     private readonly List<PipelineValidationIssue> _issues = new();
+
     // Mutable shadow copy so each step sees free space reduced by earlier steps' consumption.
-    private readonly Dictionary<string, long?>? _cachedFreeSpace;
+    private readonly FreeSpaceCache? _cachedFreeSpace;
 
     public StepValidationContext(
         bool hasSelectedIncludedInputs,
@@ -19,14 +20,14 @@ public sealed class StepValidationContext
         long selectedBytes = 0,
         IFileSystemProvider? sourceProvider = null,
         IPathResolver? providerRegistry = null,
-        IReadOnlyDictionary<string, long?>? cachedFreeSpace = null)
+        FreeSpaceCache? cachedFreeSpace = null)
     {
         HasSelectedIncludedInputs = hasSelectedIncludedInputs;
         SourceExists = sourceExists;
         SelectedBytes = selectedBytes;
         SourceProvider = sourceProvider;
         ProviderRegistry = providerRegistry;
-        _cachedFreeSpace = cachedFreeSpace is not null ? new Dictionary<string, long?>(cachedFreeSpace) : null;
+        _cachedFreeSpace = cachedFreeSpace is not null ? new FreeSpaceCache(cachedFreeSpace) : null;
     }
 
     /// <summary>Index of the step currently being validated. Set by <see cref="PipelineValidator"/> before each call.</summary>
@@ -106,7 +107,7 @@ public sealed class StepValidationContext
         }
 
         // Update free space cache
-        PipelineHelper.ReduceFreeSpaceCacheForProvider(_cachedFreeSpace, ProviderRegistry.ResolveProvider(result.TargetRootPath)!, result.NeededBytes);
+        _cachedFreeSpace.ReduceForProvider(ProviderRegistry.ResolveProvider(result.TargetRootPath)!, result.NeededBytes);
     }
 
     /// <summary>

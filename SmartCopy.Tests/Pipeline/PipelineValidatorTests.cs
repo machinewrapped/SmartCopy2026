@@ -10,14 +10,14 @@ public sealed class PipelineValidatorTests
     private static PipelineValidationContext MakeContext(
         IFileSystemProvider? sourceProvider = null,
         FileSystemProviderRegistry? registry = null,
-        Dictionary<string,long?>? freeSpaceCache = null,
+        FreeSpaceCache? freeSpaceCache = null,
         bool hasSelectedInputs = true, 
         long totalSelectedBytes = 1)
     {
         return new PipelineValidationContext(
             sourceProvider ?? new MemoryFileSystemProvider(),
             registry ?? new FileSystemProviderRegistry(),
-            freeSpaceCache ?? new Dictionary<string, long?>(),
+            freeSpaceCache ?? new FreeSpaceCache(),
             hasSelectedInputs,
             totalSelectedBytes
         );

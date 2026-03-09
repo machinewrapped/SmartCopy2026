@@ -38,7 +38,7 @@ public sealed class FreeSpaceValidationTests
         => new(
             SourceProvider: source,
             ProviderRegistry: registry,
-            CachedFreeSpace: await PipelineHelper.BuildFreeSpaceCacheForPipeline(steps, registry, CancellationToken.None),
+            CachedFreeSpace: await FreeSpaceCache.BuildForPipelineAsync(steps, registry, CancellationToken.None),
             HasSelectedIncludedInputs: true,
             SelectedBytes: selectedBytes
             );

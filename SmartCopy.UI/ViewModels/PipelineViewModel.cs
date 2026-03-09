@@ -31,7 +31,7 @@ public partial class PipelineViewModel : ViewModelBase
     private int _selectedIncludedFileCount;
     private long _selectedBytes;
     private IFileSystemProvider? _sourceProvider;
-    private Dictionary<string, long?> _cachedFreeSpace = new();
+    private FreeSpaceCache _cachedFreeSpace = new();
 
     public ObservableCollection<PipelineStepViewModel> Steps { get; } = [];
 
@@ -452,12 +452,12 @@ public partial class PipelineViewModel : ViewModelBase
 
     private async Task RefreshFreeSpaceCacheAsync(CancellationToken ct = default)
     {
-        var cache = new Dictionary<string, long?>();
+        var cache = new FreeSpaceCache();
         foreach (var stepVm in Steps)
         {
             if (stepVm.Step is IHasDestinationPath destination)
             {
-                await PipelineHelper.CacheFreeSpaceForDestination(cache, destination, _appContext, ct);
+                await cache.CacheForDestinationAsync(destination, _appContext, ct);
             }
         }
         _cachedFreeSpace = cache;

@@ -5,6 +5,6 @@ namespace SmartCopy.Core.Pipeline.Validation;
 public sealed record PipelineValidationContext(
     IFileSystemProvider? SourceProvider,
     IPathResolver ProviderRegistry,
-    IReadOnlyDictionary<string, long?> CachedFreeSpace,
+    FreeSpaceCache CachedFreeSpace,
     bool HasSelectedIncludedInputs = true,
     long SelectedBytes = 0);

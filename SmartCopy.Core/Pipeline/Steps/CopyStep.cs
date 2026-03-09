@@ -40,7 +40,7 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
         long bytesNeeded,
         IFileSystemProvider source,
         IPathResolver registry,
-        IReadOnlyDictionary<string, long?> freeSpaceCache,
+        FreeSpaceCache freeSpaceCache,
         CancellationToken ct)
     {
         if (bytesNeeded <= 0) return FreeSpaceValidationResult.NullResult;
@@ -49,7 +49,7 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
         var target = registry.ResolveProvider(DestinationPath);
         if (target is null) return FreeSpaceValidationResult.NullResult;
 
-        var cachedFreeSpace = PipelineHelper.GetFreeSpaceCacheForProvider(freeSpaceCache, target);
+        var cachedFreeSpace = freeSpaceCache.GetForProvider(target);
         if (cachedFreeSpace is null) return FreeSpaceValidationResult.NullResult;
 
         return FreeSpaceValidationResult.Result(bytesNeeded, cachedFreeSpace.Value, target.RootPath);

@@ -40,7 +40,7 @@ public sealed record FreeSpaceValidationResult(long NeededBytes, long FreeBytes,
 public interface IHasFreeSpaceCheck
 {
     /// <summary>
-    /// Checks free space using a cache keyed by provider RootPath.
+    /// Checks free space for the destination volume using a cumulative cache.
     /// Returns null when inapplicable or no check is possible (same-volume move, no destination, unknown free space).
     /// Otherwise, returns a <see cref="FreeSpaceValidationResult"/> with IsViolation set if free space is insufficient.
     /// </summary>
@@ -48,6 +48,6 @@ public interface IHasFreeSpaceCheck
         long bytesNeeded,
         IFileSystemProvider source,
         IPathResolver registry,
-        IReadOnlyDictionary<string, long?> freeSpaceCache,
+        FreeSpaceCache freeSpaceCache,
         CancellationToken ct);
 }

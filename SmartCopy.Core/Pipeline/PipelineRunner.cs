@@ -15,7 +15,7 @@ public sealed class PipelineRunner
     // Tracks that PreviewAsync was called before ExecuteAsync on delete pipelines.
     private bool _previewCompleted;
 
-    private Dictionary<string,long?> _freeSpaceCache = new();
+    private FreeSpaceCache _freeSpaceCache = new();
 
     public PipelineRunner(TransformPipeline pipeline)
     {
@@ -28,7 +28,7 @@ public sealed class PipelineRunner
     {
         job.RootNode.BuildStats();
 
-        _freeSpaceCache = await PipelineHelper.BuildFreeSpaceCacheForPipeline(_pipeline.Steps, job.ProviderRegistry, ct);
+        _freeSpaceCache = await FreeSpaceCache.BuildForPipelineAsync(_pipeline.Steps, job.ProviderRegistry, ct);
 
         await _pipeline.ValidateAsync(new PipelineValidationContext(
             job.SourceProvider,
@@ -42,7 +42,7 @@ public sealed class PipelineRunner
         var warnings = new List<string>();
         var errors = new List<string>();
         // Populated lazily; persists across steps so cumulative consumption is tracked.
-        var freeSpaceCache = new Dictionary<string, long?>();
+        var freeSpaceCache = new FreeSpaceCache();
 
         foreach (var step in _pipeline.Steps)
         {
@@ -69,7 +69,7 @@ public sealed class PipelineRunner
 
             if (step is IHasDestinationPath destination)
             {
-                await PipelineHelper.CacheFreeSpaceForDestination(freeSpaceCache,
+                await freeSpaceCache.CacheForDestinationAsync(
                     destination, 
                     job.ProviderRegistry, 
                     ct);
@@ -85,7 +85,7 @@ public sealed class PipelineRunner
                         warnings.Add(fsResult.LongMessage);
 
                     // Update free space cache
-                    PipelineHelper.ReduceFreeSpaceCacheForProvider(freeSpaceCache, job.ProviderRegistry.ResolveProvider(fsResult.TargetRootPath)!, fsResult.NeededBytes);
+                    freeSpaceCache.ReduceForProvider(job.ProviderRegistry.ResolveProvider(fsResult.TargetRootPath)!, fsResult.NeededBytes);
                 }
             }
 
