@@ -36,25 +36,25 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
 
     public bool HasDestinationPath => !string.IsNullOrWhiteSpace(DestinationPath);
 
-    public async Task<FreeSpaceValidationResult?> ValidateFreeSpace(
+    public Task<FreeSpaceValidationResult?> ValidateFreeSpace(
         long bytesNeeded,
         IFileSystemProvider source,
         IPathResolver registry,
         IReadOnlyDictionary<string, long?> freeSpaceCache,
         CancellationToken ct)
     {
-        if (bytesNeeded <= 0) return null;
-        if (DestinationPath is null) return null;
+        if (bytesNeeded <= 0) return FreeSpaceValidationResult.NullResult;
+        if (DestinationPath is null) return FreeSpaceValidationResult.NullResult;
 
         var target = registry.ResolveProvider(DestinationPath);
-        if (target is null) return null;
-        if (target.Capabilities.CanQueryFreeSpace == false) return null;
-        if (!freeSpaceCache.TryGetValue(target.RootPath, out var free) || free is null) return null;
+        if (target is null) return FreeSpaceValidationResult.NullResult;
+        if (target.Capabilities.CanQueryFreeSpace == false) return FreeSpaceValidationResult.NullResult;
+        if (!freeSpaceCache.TryGetValue(target.RootPath, out var free) || free is null) return FreeSpaceValidationResult.NullResult;
 
-        return new FreeSpaceValidationResult(bytesNeeded, free.Value, target.RootPath);
+        return FreeSpaceValidationResult.Result(bytesNeeded, free.Value, target.RootPath);
     }
 
-    public async Task Validate(StepValidationContext context)
+    public async Task Validate(StepValidationContext context, CancellationToken ct = default)
     {
         context.ValidateHasSelectedInputs();
         context.ValidateSourceExists("Copy");

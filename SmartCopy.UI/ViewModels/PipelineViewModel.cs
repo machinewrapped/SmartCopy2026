@@ -456,7 +456,7 @@ public partial class PipelineViewModel : ViewModelBase
         {
             if (stepVm.Step is IHasDestinationPath destination)
             {
-                PipelineHelper.CacheFreeSpaceForDestination(cache, destination, _appContext, ct);
+                await PipelineHelper.CacheFreeSpaceForDestination(cache, destination, _appContext, ct);
             }
         }
         _cachedFreeSpace = cache;

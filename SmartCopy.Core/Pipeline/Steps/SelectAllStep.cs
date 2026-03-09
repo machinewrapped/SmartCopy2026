@@ -14,12 +14,13 @@ public sealed class SelectAllStep : IPipelineStep
     public string AutoSummary => StepType.ForDisplay();
     public string Description => "Mark all files as selected";
 
-    public async Task Validate(StepValidationContext context)
+    public Task Validate(StepValidationContext context, CancellationToken ct = default)
     {
         // No preconditions. Post-condition: reset SourceExists so downstream steps
         // are not blocked by a prior destructive step.
         context.SourceExists = true;
         context.HasSelectedIncludedInputs = true;
+        return Task.CompletedTask;
     }
 
     public TransformStepConfig Config => new(StepType, new JsonObject());

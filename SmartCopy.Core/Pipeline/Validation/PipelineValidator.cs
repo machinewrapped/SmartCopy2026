@@ -30,7 +30,7 @@ public sealed class PipelineValidator
         {
             validationContext.StepIndex = i;
 
-            await steps[i].Validate(validationContext);
+            await steps[i].Validate(validationContext, ct);
 
             if (validationContext.HasBlockingIssue)
             {

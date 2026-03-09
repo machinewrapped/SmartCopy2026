@@ -22,13 +22,14 @@ public sealed class RenameStep : IPipelineStep
 
     public TransformStepConfig Config => new(StepType, new JsonObject { ["pattern"] = Pattern });
 
-    public async Task Validate(StepValidationContext context)
+    public Task Validate(StepValidationContext context, CancellationToken ct = default)
     {
         context.ValidateSourceExists("Rename");
         if (string.IsNullOrWhiteSpace(Pattern))
         {
             context.AddBlockingIssue("Step.RenamePatternRequired", "Rename requires a non-empty pattern.");
         }
+        return Task.CompletedTask;
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(

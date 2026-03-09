@@ -24,11 +24,18 @@ public sealed record FreeSpaceValidationResult(long NeededBytes, long FreeBytes,
         $"Not enough space in {TargetRootPath} — {FileSizeFormatter.FormatBytes(NeededBytes)} needed, " +
         $"{FileSizeFormatter.FormatBytes(FreeBytes)} free " +
         $"({FileSizeFormatter.FormatBytes(OverBytes)} over)";
+
+    /// <summary>Null result for when no check is possible or needed.</summary>
+    public static Task<FreeSpaceValidationResult?> NullResult 
+        => Task.FromResult<FreeSpaceValidationResult?>(null);
+
+    /// <summary>Result for when free space check is completed.</summary>
+    public static Task<FreeSpaceValidationResult?> Result(long neededBytes, long freeBytes, string targetRootPath)
+        => Task.FromResult<FreeSpaceValidationResult?>(new FreeSpaceValidationResult(neededBytes, freeBytes, targetRootPath));
 }
 
 /// <summary>
-/// Implemented by pipeline steps that write data to a target volume,
-/// allowing <see cref="PipelineRunner"/> to perform a pre-flight free-space check.
+/// Implemented by pipeline steps that write data to a target volume, allowing pre-flight free-space validation.
 /// </summary>
 public interface IHasFreeSpaceCheck
 {
@@ -36,7 +43,6 @@ public interface IHasFreeSpaceCheck
     /// Checks free space using a cache keyed by provider RootPath.
     /// Returns null when inapplicable or no check is possible (same-volume move, no destination, unknown free space).
     /// Otherwise, returns a <see cref="FreeSpaceValidationResult"/> with IsViolation set if free space is insufficient.
-    /// The free space cache is updated to subtract the space consumed by this operation.
     /// </summary>
     Task<FreeSpaceValidationResult?> ValidateFreeSpace(
         long bytesNeeded,

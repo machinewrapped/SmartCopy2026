@@ -16,9 +16,10 @@ public sealed class ClearSelectionStep : IPipelineStep
 
     public TransformStepConfig Config => new(StepType, new JsonObject());
 
-    public async Task Validate(StepValidationContext context)
+    public Task Validate(StepValidationContext context, CancellationToken ct = default)
     {
         // No preconditions or postconditions.
+        return Task.CompletedTask;
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(

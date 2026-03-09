@@ -21,9 +21,10 @@ public sealed class FlattenStep : IPipelineStep
 
     public TransformStepConfig Config => new(StepType, new JsonObject { ["conflictStrategy"] = ConflictStrategy.ToString() });
 
-    public async Task Validate(StepValidationContext context)
+    public Task Validate(StepValidationContext context, CancellationToken ct = default)
     {
         context.ValidateSourceExists("Flatten");
+        return Task.CompletedTask;
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(

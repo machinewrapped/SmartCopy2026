@@ -69,7 +69,7 @@ public sealed class PipelineRunner
 
             if (step is IHasDestinationPath destination)
             {
-                PipelineHelper.CacheFreeSpaceForDestination(freeSpaceCache,
+                await PipelineHelper.CacheFreeSpaceForDestination(freeSpaceCache,
                     destination, 
                     job.ProviderRegistry, 
                     ct);

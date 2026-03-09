@@ -7,7 +7,7 @@ namespace SmartCopy.Core.Pipeline;
 /// </summary>
 public static class PipelineHelper
 {
-    public async static void CacheFreeSpaceForDestination(
+    public async static Task CacheFreeSpaceForDestination(
         Dictionary<string, long?> freeSpaceCache,
         IHasDestinationPath destination,
         IPathResolver pathResolver,
@@ -18,7 +18,7 @@ public static class PipelineHelper
 
         if (target is not null && target.Capabilities.CanQueryFreeSpace)
         {
-            if (freeSpaceCache.Keys.Contains(target.RootPath)) 
+            if (freeSpaceCache.ContainsKey(target.RootPath)) 
                 return;
 
             long? freeSpace = await target.GetAvailableFreeSpaceAsync(ct);
@@ -36,7 +36,7 @@ public static class PipelineHelper
         {
             if (step is IHasDestinationPath destination)
             {
-                CacheFreeSpaceForDestination(cache, destination, pathResolver, ct);
+                await CacheFreeSpaceForDestination(cache, destination, pathResolver, ct);
             }
         }
 
