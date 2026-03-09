@@ -106,10 +106,7 @@ public sealed class StepValidationContext
         }
 
         // Update free space cache
-        var currentFreeSpace = _cachedFreeSpace[result.TargetRootPath];
-        if (currentFreeSpace == null) return;
-
-        _cachedFreeSpace[result.TargetRootPath] = Math.Max(0, currentFreeSpace.Value - result.NeededBytes);
+        PipelineHelper.ReduceFreeSpaceCacheForProvider(_cachedFreeSpace, ProviderRegistry.ResolveProvider(result.TargetRootPath)!, result.NeededBytes);
     }
 
     /// <summary>

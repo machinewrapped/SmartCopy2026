@@ -48,10 +48,11 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
 
         var target = registry.ResolveProvider(DestinationPath);
         if (target is null) return FreeSpaceValidationResult.NullResult;
-        if (target.Capabilities.CanQueryFreeSpace == false) return FreeSpaceValidationResult.NullResult;
-        if (!freeSpaceCache.TryGetValue(target.RootPath, out var free) || free is null) return FreeSpaceValidationResult.NullResult;
 
-        return FreeSpaceValidationResult.Result(bytesNeeded, free.Value, target.RootPath);
+        var cachedFreeSpace = PipelineHelper.GetFreeSpaceCacheForProvider(freeSpaceCache, target);
+        if (cachedFreeSpace is null) return FreeSpaceValidationResult.NullResult;
+
+        return FreeSpaceValidationResult.Result(bytesNeeded, cachedFreeSpace.Value, target.RootPath);
     }
 
     public async Task Validate(StepValidationContext context, CancellationToken ct = default)
