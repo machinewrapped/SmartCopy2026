@@ -22,7 +22,6 @@ public sealed class InvertSelectionStep : IPipelineStep
         // are not blocked by a prior destructive step.
         context.SourceExists = true;
         context.HasSelectedIncludedInputs = true;
-        context.SelectedBytes = 0;
         context.ByteEstimateUnknown = true;
         return Task.CompletedTask;
     }
@@ -64,5 +63,7 @@ public sealed class InvertSelectionStep : IPipelineStep
                 SourceNode: node,
                 SourceNodeResult: SourceResult.None);
         }
-    }
+ 
+        context.RootNode.BuildStats();
+   }
 }

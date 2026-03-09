@@ -123,4 +123,21 @@ public sealed class PipelineValidatorTests
         Assert.True(result.CanRun);
         Assert.Empty(result.Issues);
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ClearSelection
+    // ─────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ClearSelection_then_Copy_IsInvalid()
+    {
+        var pipeline = new TransformPipeline(
+        [
+            new ClearSelectionStep(),
+            new CopyStep("/mem/dest"),
+        ]);
+
+        var result = await PipelineValidator.ValidateAsync(pipeline.Steps, MakeContext());
+        Assert.False(result.CanRun);
+    }
 }

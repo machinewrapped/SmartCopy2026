@@ -20,6 +20,7 @@ public sealed class SelectAllStep : IPipelineStep
         // are not blocked by a prior destructive step.
         context.SourceExists = true;
         context.HasSelectedIncludedInputs = true;
+        context.ByteEstimateUnknown = true;
         return Task.CompletedTask;
     }
 
@@ -33,12 +34,17 @@ public sealed class SelectAllStep : IPipelineStep
         {
             ct.ThrowIfCancellationRequested();
             if (!node.IsDirectory)
+            {
                 context.GetNodeContext(node).VirtualCheckState = CheckState.Checked;
+            }
+
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: node,
                 SourceNodeResult: SourceResult.None);
         }
+
+        context.RootNode.BuildStats();
     }
 
     public async IAsyncEnumerable<TransformResult> ApplyAsync(

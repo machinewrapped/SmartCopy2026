@@ -2,6 +2,7 @@ using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
+using SmartCopy.Core.Pipeline.Validation;
 using SmartCopy.Tests.TestInfrastructure;
 
 namespace SmartCopy.Tests.Pipeline;
@@ -171,40 +172,6 @@ public sealed class PipelineRunnerSelectionTests
         Assert.True(await provider.ExistsAsync("/dest/src/x.txt", CancellationToken.None));
         Assert.True(await provider.ExistsAsync("/dest/src/y.txt", CancellationToken.None));
         Assert.True(await provider.ExistsAsync("/dest/src/z.txt", CancellationToken.None));
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // ClearSelection
-    // ─────────────────────────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task ClearSelection_then_Copy_CopiesNothing()
-    {
-        var (provider, root, p, q, r) = await CreateThreeFileFixtureAsync("p", "q", "r");
-
-        // All three initially selected
-        p.CheckState = CheckState.Checked;
-        q.CheckState = CheckState.Checked;
-        r.CheckState = CheckState.Checked;
-
-        var runner = new PipelineRunner(new TransformPipeline(
-        [
-            new ClearSelectionStep(),
-            new CopyStep("/mem/dest"),
-        ]));
-
-        await runner.ExecuteAsync(
-            new PipelineJob
-            {
-                RootNode       = root,
-                SourceProvider = provider,
-                ProviderRegistry = provider.CreateRegistry(),
-            });
-
-        // Nothing should be copied — ClearSelection empties the working set
-        Assert.False(await provider.ExistsAsync("/dest/src/p.txt", CancellationToken.None));
-        Assert.False(await provider.ExistsAsync("/dest/src/q.txt", CancellationToken.None));
-        Assert.False(await provider.ExistsAsync("/dest/src/r.txt", CancellationToken.None));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
