@@ -56,13 +56,14 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
 
     public Task Validate(StepValidationContext context, CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
         context.ValidateHasSelectedInputs();
         context.ValidateSourceExists("Copy");
         if (string.IsNullOrWhiteSpace(DestinationPath))
         {
             context.AddBlockingIssue("Step.MissingDestination", "Copy requires a destination path.");
         }
-        context.AddFreeSpaceWarning(this, ct);
+        context.AddFreeSpaceWarning(this);
         return Task.CompletedTask;
     }
 

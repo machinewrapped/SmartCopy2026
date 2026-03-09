@@ -61,13 +61,14 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
 
     public Task Validate(StepValidationContext context, CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
         context.ValidateHasSelectedInputs();
         context.ValidateSourceExists("Move");
         if (!HasDestinationPath)
         {
             context.AddBlockingIssue("Step.MissingDestination", "Move requires a destination path.");
         }
-        context.AddFreeSpaceWarning(this, ct);
+        context.AddFreeSpaceWarning(this);
         context.SourceExists = false;
         return Task.CompletedTask;
     }
@@ -129,7 +130,7 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
                 ? DestinationResult.Overwritten
                 : DestinationResult.Created;
 
-            var selectedBytes = GetSelectedFileBytes(node);
+            var selectedBytes = node.TotalSelectedBytes;
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: node,

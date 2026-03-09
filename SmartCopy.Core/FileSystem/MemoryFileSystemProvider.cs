@@ -272,14 +272,14 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         }
 
         long totalBytesUsed = _entries.Values.Sum(x => x.Size);
-        long? totalBytesRemaining = SimulatedCapacity.Value - totalBytesUsed;
+        long totalBytesRemaining = SimulatedCapacity.Value - totalBytesUsed;
 
-        if (totalBytesRemaining.Value < 0)
+        if (totalBytesRemaining < 0)
         {
             totalBytesRemaining = 0;
         }
 
-        return Task.FromResult(totalBytesRemaining);
+        return Task.FromResult<long?>(totalBytesRemaining);
     }
 
     private string CombinePath(string basePath, string relativePath)

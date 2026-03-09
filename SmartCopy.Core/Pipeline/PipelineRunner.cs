@@ -85,7 +85,7 @@ public sealed class PipelineRunner
                         warnings.Add(fsResult.LongMessage);
 
                     // Update free space cache
-                    freeSpaceCache.ReduceForProvider(job.ProviderRegistry.ResolveProvider(fsResult.TargetRootPath)!, fsResult.NeededBytes);
+                    freeSpaceCache.ReduceForPath(job.ProviderRegistry, fsResult.TargetRootPath, fsResult.NeededBytes);
                 }
             }
 

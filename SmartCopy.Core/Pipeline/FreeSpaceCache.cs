@@ -67,6 +67,18 @@ public sealed class FreeSpaceCache
     }
 
     /// <summary>
+    /// Decrements the cached free-space for the provider of <paramref name="path"/> by <paramref name="bytes"/>,
+    /// flooring at zero. No-op when the entry is absent or already null.
+    /// </summary>
+    public void ReduceForPath(IPathResolver resolver, string path, long bytes)
+    {
+        IFileSystemProvider? provider = resolver.ResolveProvider(path);
+        if (provider == null) return;
+
+        ReduceForProvider(provider, bytes);
+    }
+
+    /// <summary>
     /// Returns <see langword="true"/> when the cache already contains an entry for the given key,
     /// regardless of whether the stored value is null.
     /// </summary>

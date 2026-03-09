@@ -90,10 +90,8 @@ public sealed class StepValidationContext
     /// Checks free space using the cached map and adds a step-scoped warning if insufficient.
     /// No-op when estimate is unknown, bytes ≤ 0, or context lacks providers/cache.
     /// </summary>
-    public void AddFreeSpaceWarning(IHasFreeSpaceCheck step, CancellationToken ct = default)
+    public void AddFreeSpaceWarning(IHasFreeSpaceCheck step)
     {
-        ct.ThrowIfCancellationRequested();
-
         if (ByteEstimateUnknown || SelectedBytes <= 0
             || _cachedFreeSpace is null
             || SourceProvider is null
@@ -107,7 +105,7 @@ public sealed class StepValidationContext
         }
 
         // Update free space cache
-        _cachedFreeSpace.ReduceForProvider(ProviderRegistry.ResolveProvider(result.TargetRootPath)!, result.NeededBytes);
+        _cachedFreeSpace.ReduceForPath(ProviderRegistry, result.TargetRootPath, result.NeededBytes);
     }
 
     /// <summary>
