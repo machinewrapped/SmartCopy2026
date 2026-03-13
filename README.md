@@ -1,7 +1,7 @@
 # SmartCopy2026
-A tool for selectively and intelligently working with large directories
+A tool for selectively and intelligently working with large directories.
 
-This is an evolution of SmartCopyTool (https://sourceforge.net/projects/smartcopytool/), originally written in 2012 to provide an alternative to Windows Explorer for managing large directories. File management in Windows has improved a lot since Windows XP/Vista, but it still lacks some features that made SmartCopyTool useful.
+This is an evolution of SmartCopyTool (https://sourceforge.net/projects/smartcopytool/), originally written well over a decade ago to provide an alternative to Windows Explorer for managing large directories. File management in Windows has improved a lot since those days, but it still lacks some features that made SmartCopyTool useful.
 
 SmartCopy2026 is a complete rewrite of the application using modern .NET technologies and a more sophisticated UI framework. It is cross-platform and supports advanced workflows, which can be configured and saved as presets.
 
@@ -10,49 +10,37 @@ The principles that drive the design of SmartCopy2026 are:
 - Selective operations
 - User control and configuration
 - Safety and preview
-- Cross-platform
 
 ## Features
 
+**Directory tree view**
+- View the contents of a directory as a hierarchy, and select which files and folders to include in the pipeline
+- Progressive scanning allows you to interact with the tree whilst deeper levels are still being scanned
+- Filesystem watcher — detects exteral changes to the directory, on supported file systems
+- Bookmark frequently used paths to quickly select them as the source or destination of an operation
+- Save and restore selections in `.txt`, `.m3u` or `.sc2sel` format
+
 **Filtering**
-- Composable filter chain — combine as many filters as you need, in any order
+- Composable filter chain — combine filters to determine which files are included in the working set
 - Filter types: file extension, wildcard pattern, date range, size range, file attributes
-- Mirror filter — skip files already present at a destination (by name, name+size, or extension-agnostic)
-- Enable/disable individual filters without removing them
-- Save filter chains as named presets and load them instantly
+- Mirror filter — include or exclude files that exist in another location
+- Save filter chains as named presets
 
 **Transform pipeline**
-- Build a sequential pipeline of steps to execute against your selection
-- Step types: Copy, Move, Delete, Flatten (remove directory nesting), Rebase (change root path), Rename
-- Preview (dry-run) every pipeline before committing — especially enforced for delete operations
-- Free-space validation before copy/move steps execute
-- Overwrite policy per step: skip, always overwrite, or overwrite if newer
-- Safe deletes via trash/recycle bin by default; permanent delete available with confirmation
-- Save pipelines as named presets; save the entire workflow (source + filters + pipeline) as a `.sc2workflow`
-
-**Directory tree**
-- Tri-state checkboxes with correct parent/child propagation
-- Progressive scanning — tree populates as directories are read, with pause/cancel
-- Live filesystem watcher — incremental updates when files change externally, without losing your selection
-- Drag-and-drop or browse to set the source path; recent paths and bookmarks remembered
-
-**Selection management**
-- Save and restore selections in `.txt`, `.m3u`, `.m3u8`, or `.sc2sel` formats
-- Relative paths make selections portable across machines
-- Bulk operations: Select All, Clear All, Invert
-
-**Usability**
-- Full keyboard navigation — every action reachable without a mouse
-- Structured operation log with per-file outcomes
-- Pause and resume long-running operations
+- Build a sequence of actions to perform - copy, move, delete
+- Selected, filtered file list is used as the source for the operation
+- Apply transforms such as flattening the directory hierarchy or renaming files
+- Preview before executing to see exactly what will happen to each folder or file
+- Safe delete via trash/recycle bin (if supported on the file system)
+- Save pipelines as presets, or complete workflows
 
 ## How it works
 
 The UI is organized as a left-to-right data flow:
 
-1. **Filters** (left panel) — define which files are eligible. Filters narrow the view in the directory tree and file list. Excluded files are dimmed or hidden.
-2. **Directory tree + file list** (centre) — browse the source directory and check the files you want to act on. Tri-state checkboxes propagate up and down the tree automatically.
-3. **Transform pipeline** (bottom) — define what to do with your selection. Add steps, configure each one, then click Preview to see exactly what will happen before you click Run.
+1. **Filters** (left panel) — Filters narrow the directory tree and file list, defining which files are selectable.
+2. **Directory tree + file list** (centre) — browse the source directory and select files and folders to act on.
+3. **Transform pipeline** (bottom) — define a sequence of actions to perform with the selected files.
 
 ## Platform support
 
@@ -62,7 +50,6 @@ The UI is organized as a left-to-right data flow:
 | MTP devices (phones, cameras) | Yes | — | — |
 | Filesystem watcher | Yes | Yes | Yes |
 | Trash / recycle bin | Yes | Yes | Yes |
-| Single-file self-contained publish | Yes | Yes | Yes |
 
 ## Building and running
 
