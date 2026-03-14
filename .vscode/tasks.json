@@ -24,8 +24,9 @@
             "args": [
                 "publish",
                 "${workspaceFolder}/SmartCopy.App/SmartCopy.App.csproj",
-                "/property:GenerateFullPaths=true",
-                "/consoleloggerparameters:NoSummary"
+                "-p:PublishProfile=${input:publishProfile}",
+                "/tl:off",
+                "/clp:ErrorsOnly"
             ],
             "problemMatcher": "$msCompile"
         },
@@ -54,6 +55,19 @@
                 "/consoleloggerparameters:NoSummary"
             ],
             "problemMatcher": "$msCompile"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "publishProfile",
+            "type": "pickString",
+            "description": "Select the target platform publish profile",
+            "options": [
+                "win-x64",
+                "linux-x64",
+                "osx-arm64"
+            ],
+            "default": "win-x64"
         }
     ]
 }
