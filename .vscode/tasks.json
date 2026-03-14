@@ -40,6 +40,20 @@
                 "${workspaceFolder}/SmartCopy.App/SmartCopy.App.csproj"
             ],
             "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-release",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "-c",
+                "Release",
+                "${workspaceFolder}/SmartCopy.App/SmartCopy.App.csproj",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary"
+            ],
+            "problemMatcher": "$msCompile"
         }
     ]
 }

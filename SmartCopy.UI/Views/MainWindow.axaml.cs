@@ -60,9 +60,12 @@ public partial class MainWindow : Window
     private MenuItem? _followSymlinksMenuItem;
     private MenuItem? _showHiddenFilesMenuItem;
 
+#if DEBUG
     // Options menu — Debug
+    private MenuItem? _enableMemoryFileSystemMenuItem;
     private MenuItem? _artificialDelayMenuItem;
-    private MenuItem? _limitMemoryFilesystemCapacityMenuItem;
+    private MenuItem? _limitMemoryFileSystemCapacityMenuItem;
+#endif
 
     public MainWindow()
     {
@@ -302,21 +305,33 @@ public partial class MainWindow : Window
             () => { if (_mainVm is not null) _mainVm.FullPreScan = !_mainVm.FullPreScan; });
         OptionsMenu.Items.Add(_fullPreScanMenuItem);
 
+#if DEBUG
         // ── Section: Debug  ───────────────────────────────────────────────────
         OptionsMenu.Items.Add(new Separator());
         OptionsMenu.Items.Add(SectionHeader("Debug"));
 
+        _enableMemoryFileSystemMenuItem = Toggle(
+            "Enable Memory File System",
+            _mainVm?.EnableMemoryFileSystem ?? false,
+            () => { if (_mainVm is not null) _mainVm.EnableMemoryFileSystem = !_mainVm.EnableMemoryFileSystem; });
+        OptionsMenu.Items.Add(_enableMemoryFileSystemMenuItem);
+
         _artificialDelayMenuItem = Toggle(
             "Add Artificial Delays to Mock Provider",
             _mainVm?.AddArtificialDelay ?? false,
-            () => { if (_mainVm is not null) _mainVm.AddArtificialDelay = !_mainVm.AddArtificialDelay; });
+            () => { if (_mainVm is not null) _mainVm.AddArtificialDelay = !_mainVm.AddArtificialDelay; },
+            isEnabled: _mainVm?.EnableMemoryFileSystem ?? false
+            );
         OptionsMenu.Items.Add(_artificialDelayMenuItem);
 
-        _limitMemoryFilesystemCapacityMenuItem = Toggle(
+        _limitMemoryFileSystemCapacityMenuItem = Toggle(
             "Limit Memory Filesystem Capacity",
-            _mainVm?.LimitMemoryFilesystemCapacity ?? false,
-            () => { if (_mainVm is not null) _mainVm.LimitMemoryFilesystemCapacity = !_mainVm.LimitMemoryFilesystemCapacity; });
-        OptionsMenu.Items.Add(_limitMemoryFilesystemCapacityMenuItem);
+            _mainVm?.LimitMemoryFileSystemCapacity ?? false,
+            () => { if (_mainVm is not null) _mainVm.LimitMemoryFileSystemCapacity = !_mainVm.LimitMemoryFileSystemCapacity; },
+            isEnabled: _mainVm?.EnableMemoryFileSystem ?? false
+            );
+        OptionsMenu.Items.Add(_limitMemoryFileSystemCapacityMenuItem);
+#endif
 
         return;
 
@@ -332,13 +347,14 @@ public partial class MainWindow : Window
             return header;
         }
 
-        static MenuItem Toggle(string header, bool isChecked, Action onClick)
+        static MenuItem Toggle(string header, bool isChecked, Action onClick, bool isEnabled = true)
         {
             var item = new MenuItem
             {
                 Header = header,
                 ToggleType = MenuItemToggleType.CheckBox,
                 IsChecked = isChecked,
+                IsEnabled = isEnabled,
             };
             item.Click += (_, _) => onClick();
             return item;
@@ -470,17 +486,31 @@ public partial class MainWindow : Window
                 }
                 break;
 
+#if DEBUG
+            case nameof(MainViewModel.EnableMemoryFileSystem):
+                if (_enableMemoryFileSystemMenuItem is not null)
+                    _enableMemoryFileSystemMenuItem.IsChecked = _mainVm?.EnableMemoryFileSystem ?? false;
+
+                if (_artificialDelayMenuItem is not null)
+                    _artificialDelayMenuItem.IsEnabled = _mainVm?.EnableMemoryFileSystem ?? false;
+
+                if (_limitMemoryFileSystemCapacityMenuItem is not null)
+                    _limitMemoryFileSystemCapacityMenuItem.IsEnabled = _mainVm?.EnableMemoryFileSystem ?? false;
+
+                break;
+
             case nameof(MainViewModel.AddArtificialDelay):
                 if (_artificialDelayMenuItem is not null)
                     _artificialDelayMenuItem.IsChecked = _mainVm?.AddArtificialDelay ?? false;
 
                 break;
 
-            case nameof(MainViewModel.LimitMemoryFilesystemCapacity):
-                if (_limitMemoryFilesystemCapacityMenuItem is not null)
-                    _limitMemoryFilesystemCapacityMenuItem.IsChecked = _mainVm?.LimitMemoryFilesystemCapacity ?? false;
+            case nameof(MainViewModel.LimitMemoryFileSystemCapacity):
+                if (_limitMemoryFileSystemCapacityMenuItem is not null)
+                    _limitMemoryFileSystemCapacityMenuItem.IsChecked = _mainVm?.LimitMemoryFileSystemCapacity ?? false;
 
                 break;
+#endif
 
         }
     }

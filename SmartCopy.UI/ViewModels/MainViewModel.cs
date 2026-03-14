@@ -67,12 +67,6 @@ public partial class MainViewModel : ViewModelBase
     private bool _followSymlinks;
 
     [ObservableProperty]
-    private bool _addArtificialDelay = false;
-
-    [ObservableProperty]
-    private bool _limitMemoryFilesystemCapacity = false;
-
-    [ObservableProperty]
     private OverwriteMode _defaultOverwriteMode = OverwriteMode.Skip;
 
     [ObservableProperty]
@@ -83,6 +77,17 @@ public partial class MainViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _allowDeleteReadOnly;
+
+#if DEBUG
+    [ObservableProperty]
+    private bool _enableMemoryFileSystem = false;
+
+    [ObservableProperty]
+    private bool _addArtificialDelay = false;
+
+    [ObservableProperty]
+    private bool _limitMemoryFileSystemCapacity = false;
+#endif
 
     public string SourcePath
     {
@@ -108,7 +113,9 @@ public partial class MainViewModel : ViewModelBase
     private readonly SelectionManager _selectionManager = new();
     private readonly SelectionSerializer _selectionSerializer = new();
     private readonly SemaphoreSlim _watcherApplyGate = new(1, 1);
+#if DEBUG
     private MemoryFileSystemProvider? _memoryProvider;
+#endif
     private IDirectoryWatcher? _directoryWatcher;
     private CancellationTokenSource? _filterCts;
     private CancellationTokenSource? _scanCts;
@@ -267,14 +274,16 @@ public partial class MainViewModel : ViewModelBase
         DefaultDeleteMode = _settings.DefaultDeleteMode;
         ShowHiddenFiles = _settings.ShowHiddenFiles;
         AllowDeleteReadOnly = _settings.AllowDeleteReadOnly;
+#if DEBUG
+        EnableMemoryFileSystem = _settings.EnableMemoryFileSystem;
         AddArtificialDelay = _settings.AddArtificialDelay;
-        LimitMemoryFilesystemCapacity = _settings.LimitMemoryFilesystemCapacity;
+        LimitMemoryFileSystemCapacity = _settings.LimitMemoryFileSystemCapacity;
 
-        // Create an in-memory virtual file system for testing.
-        // TODO: this should be a debug option, not exposed in release builds
-        long? capacity = LimitMemoryFilesystemCapacity ? 100_000_000_000 : null;
-        _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: AddArtificialDelay, capacity: capacity);
-        _providerRegistry.Register(_memoryProvider);
+        if (EnableMemoryFileSystem)
+        {
+            SetupMemoryFileSystem();
+        }
+#endif
 
         SourcePathPicker.RefreshSettings();
 
@@ -302,10 +311,12 @@ public partial class MainViewModel : ViewModelBase
             SourcePath = _settings.LastSourcePath;
         }
         else
-        {
+#if DEBUG
             // TEMP: set a safe default path
             SourcePath = MockMemoryFileSystemFactory.SourcePath;
-        }
+#else
+            SourcePath = string.Empty;
+#endif
 
         RefreshSourceBookmarks();
 
@@ -439,6 +450,23 @@ public partial class MainViewModel : ViewModelBase
         _ = SaveSettingsAsync();
     }
 
+#if DEBUG
+    partial void OnEnableMemoryFileSystemChanged(bool value)
+    {
+        _settings.EnableMemoryFileSystem = value;
+        _ = SaveSettingsAsync();
+
+        if (value)
+        {
+            SetupMemoryFileSystem();
+        }
+        else if (_memoryProvider != null)
+        {
+            _providerRegistry.Unregister(_memoryProvider);
+            _memoryProvider = null;
+        }
+    }
+
     partial void OnAddArtificialDelayChanged(bool value)
     {
         if (_memoryProvider != null)
@@ -449,15 +477,16 @@ public partial class MainViewModel : ViewModelBase
         _ = SaveSettingsAsync();
     }
 
-    partial void OnLimitMemoryFilesystemCapacityChanged(bool value)
+    partial void OnLimitMemoryFileSystemCapacityChanged(bool value)
     {
         if (_memoryProvider != null)
         {
             _memoryProvider.SimulatedCapacity = value ? 100_000_000_000 : null;
         }
-        _settings.LimitMemoryFilesystemCapacity = value;
+        _settings.LimitMemoryFileSystemCapacity = value;
         _ = SaveSettingsAsync();
     }
+#endif
 
     private async Task SaveSettingsAsync()
     {
@@ -612,7 +641,7 @@ public partial class MainViewModel : ViewModelBase
         SourcePath = _lastCommittedSourcePath;
     }
 
-    private async Task<bool> ConfirmCancelPipelineForSourceChangeAsync()
+    private static async Task<bool> ConfirmCancelPipelineForSourceChangeAsync()
     {
         var mainWindow = GetMainWindow();
         if (mainWindow is null) return false;
@@ -1380,4 +1409,16 @@ public partial class MainViewModel : ViewModelBase
         if (OperatingSystem.IsMacOS())   return new MacOsTrashService();
         return new NullTrashService();
     }
+
+#if DEBUG
+    private void SetupMemoryFileSystem()
+    {
+        // Create an in-memory virtual file system for testing.
+        long? capacity = LimitMemoryFileSystemCapacity ? 100_000_000_000 : null;
+        _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: AddArtificialDelay, capacity: capacity);
+        _providerRegistry.Register(_memoryProvider);
+
+        // Enable the AddArtificialDelay and LimitMemoryFileSystemCapacity menu items
+    }
+#endif
 }

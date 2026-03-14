@@ -11,6 +11,17 @@
             "cwd": "${workspaceFolder}/SmartCopy.App",
             "console": "internalConsole",
             "stopAtEntry": false
+        },
+        {
+            "name": ".NET Launch Release (SmartCopy.App)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build-release",
+            "program": "${workspaceFolder}/SmartCopy.App/bin/Release/net10.0/SmartCopy.App.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/SmartCopy.App",
+            "console": "internalConsole",
+            "stopAtEntry": false
         }
     ]
 }
