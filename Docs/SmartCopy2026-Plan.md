@@ -587,9 +587,9 @@ Validation:
 
 - [x] End-to-end scan/filter/preview/run flows validated against real file systems
 - [x] Large tree scan (>100k nodes) remains responsive with cancellable scan
-- [ ] Long-path and non-ASCII filename handling validated
+- [x] Long-path and non-ASCII filename handling validated
 - [ ] Locked/in-use file behavior validated (copy/move/delete error reporting)
-- [ ] Cross-volume/local-network move/copy behavior validated
+- [x] Cross-volume/local-network move/copy behavior validated
 - [ ] Watcher overflow/error path handled without app crash
 - [ ] Operation journal correctness validated for copy/move/delete/trash outcomes
 - [ ] Automated suites cover provider contract, watcher behavior, and capability-gated operations
@@ -598,7 +598,7 @@ Validation:
 Exit criteria:
 - [ ] User acceptance tests confirms ready to launch
 - [ ] Release candidate passes cross-platform smoke checklist
-- [ ] Initial release published
+- [x] Initial release published
 
 ### 5.4 MTP and media devices support
 
