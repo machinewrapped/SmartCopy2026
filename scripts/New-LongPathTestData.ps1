@@ -6,8 +6,8 @@ param(
 # Each segment is 10 chars; keep nesting until the path to a file inside exceeds 260.
 $seg = "aaaaaaaaaa"
 $cur = $Root
-while ([System.IO.Path]::Combine($cur, "file.txt").Length -le 260) {
-    $cur = [System.IO.Path]::Combine($cur, $seg)
+while ((Join-Path $cur "file.txt").Length -le 260) {
+    $cur = Join-Path $cur $seg
 }
 
 New-Item -ItemType Directory -Force -Path $cur | Out-Null
