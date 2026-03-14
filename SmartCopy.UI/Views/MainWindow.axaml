@@ -11,7 +11,8 @@
         WindowStartupLocation="CenterScreen"
         Width="1400" Height="860"
         Background="#1e1e1e"
-        Foreground="#e0e0e0">
+        Foreground="#e0e0e0"
+        Icon="avares://SmartCopy.UI/Assets/icon.png">
 
     <Window.KeyBindings>
         <KeyBinding Gesture="Ctrl+A"       Command="{Binding SelectAllCommand}"/>

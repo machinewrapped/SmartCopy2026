@@ -10,9 +10,16 @@
         ExtendClientAreaToDecorationsHint="True"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
-        Background="#1e1e1e">
+        Background="#1e1e1e"
+        Icon="avares://SmartCopy.UI/Assets/icon.png">
 
     <StackPanel Spacing="16" Margin="28,24,28,20">
+
+        <!-- App Icon -->
+        <Image Source="avares://SmartCopy.UI/Assets/icon.png" 
+               Width="80" Height="80" 
+               HorizontalAlignment="Center" 
+               Margin="0,0,0,8"/>
 
         <!-- App name -->
         <TextBlock Text="SmartCopy 2026"
