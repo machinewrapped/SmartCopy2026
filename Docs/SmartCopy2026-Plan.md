@@ -600,7 +600,21 @@ Exit criteria:
 - [x] Release candidate passes cross-platform smoke checklist
 - [x] Initial release published
 
-### 5.4 MTP and media devices support
+### 5.4 Bug fixes and polish
+
+- [ ] Loading a workflow with a Move step does not correctly restore the Overwrite mode
+- [ ] Pipeline step serialisation should use EnumToString converters, not parse strings manually
+- [ ] Log panel displays messages as stacked panels with no line wrapping, so long messages are cropped
+- [ ] Multiple lines of text cannot be selected in the log window
+- [ ] Log window tab header should show error and warning counts
+
+Exit criteria:
+- [ ] All bug fixes are implemented and tests are added
+- [ ] All polish items are addressed
+- [ ] Manual smoke tests confirm the bug fixes
+
+
+### 5.5 MTP and media devices support
 
 Scope:
 - [ ] MTP provider (`MtpFileSystemProvider`) + device picker integration
@@ -613,7 +627,7 @@ Exit criteria:
 - [ ] MTP copy round-trip validated
 - [ ] Move/Delete operations validated
 
-### 5.5 — Plug-Ins and Extensibility
+### 5.6 — Plug-Ins and Extensibility
 
 Scope:
 - [ ] `ConvertStep` + plugin loader + per-plugin settings UI

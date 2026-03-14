@@ -93,15 +93,32 @@ public sealed class DeleteStep : IPipelineStep
                 yield break;
             }
 
-            var actualResult = await DeleteNodeAsync(context.RootNode.FullPath, useTrash, context, ct);
-            yield return new TransformResult(
-                IsSuccess: true,
-                SourceNode: context.RootNode,
-                SourceNodeResult: actualResult,
-                NumberOfFilesAffected: context.RootNode.CountAllFiles(),
-                NumberOfFoldersAffected: context.RootNode.CountAllFolders(),
-                InputBytes: context.RootNode.Size);
-            yield break;
+            SourceResult? rootActualResult = null;
+            bool rootDeleted = false;
+            try
+            {
+                rootActualResult = await DeleteNodeAsync(context.RootNode.FullPath, useTrash, context, ct);
+                rootDeleted = true;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Atomic delete failed; fall back to per-node deletion below.
+                context.MarkFailed(context.RootNode);
+                _ = ex;
+            }
+
+            if (rootDeleted)
+            {
+                yield return new TransformResult(
+                    IsSuccess: true,
+                    SourceNode: context.RootNode,
+                    SourceNodeResult: rootActualResult!.Value,
+                    NumberOfFilesAffected: context.RootNode.CountAllFiles(),
+                    NumberOfFoldersAffected: context.RootNode.CountAllFolders(),
+                    InputBytes: context.RootNode.Size);
+                yield break;
+            }
+            // Atomic delete failed — fall through to per-node loop below.
         }
 
         foreach (var node in context.RootNode.GetSelectedDescendants())
@@ -109,7 +126,8 @@ public sealed class DeleteStep : IPipelineStep
             ct.ThrowIfCancellationRequested();
             if (context.IsNodeFailed(node)) continue;
             // Skip nodes whose parent is also selected — the parent delete covers them.
-            if (node.Parent?.IsSelected == true) continue;
+            // Exception: if the parent's atomic delete already failed, process children individually.
+            if (node.Parent?.IsSelected == true && !context.IsNodeFailed(node.Parent)) continue;
 
             if (!context.AllowDeleteReadOnly && (node.Attributes & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
             {
@@ -124,14 +142,39 @@ public sealed class DeleteStep : IPipelineStep
                 continue;
             }
 
-            var actualResult = await DeleteNodeAsync(node.FullPath, useTrash, context, ct);
-            yield return new TransformResult(
-                IsSuccess: true,
-                SourceNode: node,
-                SourceNodeResult: actualResult,
-                NumberOfFilesAffected: node.CountAllFiles(),
-                NumberOfFoldersAffected: node.CountAllFolders(),
-                InputBytes: node.Size);
+            SourceResult? actualResult = null;
+            string? deleteError = null;
+            try
+            {
+                actualResult = await DeleteNodeAsync(node.FullPath, useTrash, context, ct);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                deleteError = ex.Message;
+            }
+
+            if (deleteError is not null)
+            {
+                context.MarkFailed(node);
+                yield return new TransformResult(
+                    IsSuccess: false,
+                    SourceNode: node,
+                    SourceNodeResult: SourceResult.Skipped,
+                    NumberOfFilesSkipped: node.CountAllFiles(),
+                    NumberOfFoldersSkipped: node.CountAllFolders(),
+                    InputBytes: node.Size,
+                    ErrorMessage: deleteError);
+            }
+            else
+            {
+                yield return new TransformResult(
+                    IsSuccess: true,
+                    SourceNode: node,
+                    SourceNodeResult: actualResult!.Value,
+                    NumberOfFilesAffected: node.CountAllFiles(),
+                    NumberOfFoldersAffected: node.CountAllFolders(),
+                    InputBytes: node.Size);
+            }
         }
     }
 
