@@ -20,7 +20,7 @@
                     Content="Cancel"
                     Padding="6,1"
                     VerticalAlignment="Center"
-                    Background="#c0392b"
+                    Background="{DynamicResource CancelButtonBackgroundBrush}"
                     Foreground="White"
                     BorderThickness="0"
                     CornerRadius="3" />

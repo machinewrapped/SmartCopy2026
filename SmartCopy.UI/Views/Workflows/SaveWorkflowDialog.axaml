@@ -10,7 +10,7 @@
         ExtendClientAreaToDecorationsHint="True"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
-        Background="#1e1e1e">
+        Background="{DynamicResource AppBackgroundBrush}">
     <Window.KeyBindings>
         <KeyBinding Gesture="Escape" Command="{Binding CancelCommand}" />
     </Window.KeyBindings>

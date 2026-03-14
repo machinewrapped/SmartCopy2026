@@ -10,7 +10,7 @@
         ExtendClientAreaToDecorationsHint="True"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
-        Background="#1e1e1e"
+        Background="{DynamicResource AppBackgroundBrush}"
         Icon="avares://SmartCopy.UI/Assets/icon.png">
 
     <StackPanel Spacing="16" Margin="28,24,28,20">
@@ -33,7 +33,7 @@
                    Opacity="0.6"
                    HorizontalAlignment="Center" />
 
-        <Separator Background="#3e3e42" Height="1" Margin="0,4" />
+        <Separator Background="{DynamicResource PanelBorderBrush}" Height="1" Margin="0,4" />
 
         <!-- Description -->
         <TextBlock TextWrapping="Wrap"
@@ -48,7 +48,7 @@
                    Opacity="0.5"
                    Text="An evolution of SmartCopyTool (2012), rewritten with .NET 10 and Avalonia UI." />
 
-        <Separator Background="#3e3e42" Height="1" Margin="0,4" />
+        <Separator Background="{DynamicResource PanelBorderBrush}" Height="1" Margin="0,4" />
 
         <!-- License -->
         <TextBlock Text="Released under the MIT License"
