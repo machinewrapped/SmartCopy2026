@@ -14,7 +14,7 @@ Architectural overview and design principles are detailed in `Docs/Architecture.
 
 ## UI/UX Design Documentation
 
-Canonical UI and interaction designs can be found in `Docs/UI+UX.md`. Refer to this document for UI consistency, update it when UI/UX decisions are made.
+Canonical UI and interaction designs can be found in `Docs/UIUX.md`. Refer to this document for UI consistency, update it when UI/UX decisions are made.
 
 ## Commands
 

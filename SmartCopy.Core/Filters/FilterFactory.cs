@@ -32,8 +32,7 @@ public static class FilterFactory
     private static IFilter BuildExtension(FilterConfig c, FilterMode mode)
     {
         var raw = c.Parameters["extensions"]?.GetValue<string>() ?? string.Empty;
-        var extensions = raw
-            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var extensions = ExtensionFilter.ParseExtensions(raw);
         return new ExtensionFilter(extensions, mode, c.IsEnabled);
     }
 

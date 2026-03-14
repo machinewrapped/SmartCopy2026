@@ -162,6 +162,15 @@ A **modal `Window`** opened via "＋ Configure..." or the edit pencil on any car
 - Filter changes propagate within ~100 ms via a debounced `CancellationTokenSource`
 - Drag handle `≡` reorders the filter chain; order affects chain evaluation sequence
 
+### Validation UX
+
+For free-text inputs that require validation (such as the Extension filter's add field), the following pattern is used:
+
+- **Error Display**: Descriptive error text is shown in **Red** (`Foreground="Red"`) directly below the input control.
+- **IsVisible Logic**: The error message is only visible when the underlying `InputError` property is not empty.
+- **Auto-Clear**: To minimize friction, any change to the input field automatically clears the error message, assuming the user is attempting to correct it.
+- **Rejection**: Invalid tokens are omitted from the processing result, and only valid ones are added to the list or configuration.
+
 ---
 
 ## 4. Pipeline UX Flow

@@ -105,7 +105,7 @@ installed, `global.json` can pin the SDK version. Self-contained publish (`--sel
 ---
 ## 4. UI Design Reference
 
-Canonical UI/interaction behavior lives in `Docs/UI+UX.md`. This plan tracks implementation and validation only.
+Canonical UI/interaction behavior lives in `Docs/UIUX.md`. This plan tracks implementation and validation only.
 
 ---
 ## 5. Implementation Phases
@@ -199,7 +199,7 @@ Verification:
 
 #### 5.1.4 — Filter Chain
 
-Full filter chain implementation delivered across six sub-steps. Implementation details and UI flows are in Architecture and UI+UX documentation.
+Full filter chain implementation delivered across six sub-steps. Implementation details and UI flows are in Architecture and UIUX documentation.
 
 Delivered:
 - [x] Core filter engine: `IFilter`, `FilterChain`, `FilterConfig`, `FilterChainConfig`
