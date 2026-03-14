@@ -41,14 +41,14 @@ public sealed class AppSettings
     /// Lets each portable copy of the app remember its own last-used session.</summary>
     public bool SaveSessionLocally { get; set; } = false;
 
-    /// <summary>
-    /// When enabled, the app will add artificial delay to the MemoryFileSystemProvider to simulate real I/O.
-    /// Disabled for tests so that they run fast.
-    /// </summary>
+    /// <summary>Enable the in-memory file system provider for debug/testing.</summary>
+    public bool EnableMemoryFileSystem { get; set; } = false;
+
+    /// <summary>When enabled, the app will add artificial delay to the MemoryFileSystemProvider to simulate I/O.</summary>
     public bool AddArtificialDelay { get; set; } = false;
 
     /// <summary>When enabled, the MemoryFileSystemProvider will have limited capacity.</summary>
-    public bool LimitMemoryFilesystemCapacity { get; set; } = false;
+    public bool LimitMemoryFileSystemCapacity { get; set; } = false;
 
     public int LogRetentionDays { get; set; } = 30;
     public List<string> RecentSources { get; set; } = [];
@@ -97,8 +97,9 @@ public sealed class AppSettings
         AllowDeleteWithoutPreview = saved.AllowDeleteWithoutPreview;
         AllowOverwriteWithoutPreview = saved.AllowOverwriteWithoutPreview;
         SaveSessionLocally = saved.SaveSessionLocally;
+        EnableMemoryFileSystem = saved.EnableMemoryFileSystem;
         AddArtificialDelay = saved.AddArtificialDelay;
-        LimitMemoryFilesystemCapacity = saved.LimitMemoryFilesystemCapacity;
+        LimitMemoryFileSystemCapacity = saved.LimitMemoryFileSystemCapacity;
         LogRetentionDays = saved.LogRetentionDays;
         RecentSources = saved.RecentSources;
         RecentTargets = saved.RecentTargets;

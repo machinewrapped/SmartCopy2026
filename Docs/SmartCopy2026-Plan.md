@@ -638,7 +638,7 @@ Possible
 
 | Topic | Default for v1 | Target date | Status |
 |---|---|---|---|
-| Packaging/distribution | Ship self-contained binaries first; add `winget` manifest next | 2026-03-15 | Open |
+| Packaging/distribution | Portable .NET Publish Profiles + MSBuild asset bundling | 2026-03-14 | Addressed |
 | Plugin trust model | Prompt on first load; remember user choice per plugin hash | 2026-03-20 | Open |
 
 Decision notes:

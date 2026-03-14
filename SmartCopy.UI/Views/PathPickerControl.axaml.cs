@@ -112,7 +112,7 @@ public partial class PathPickerControl : UserControl
         // Defer detailed validation to the drop handler. Only check for presence of files or folders.
         if (e.DataTransfer.Items.Any(x => x.Formats.Contains(DataFormat.File)))
         {
-            e.DragEffects = e.DragEffects & (DragDropEffects.Copy | DragDropEffects.Move);
+            e.DragEffects &= DragDropEffects.Copy | DragDropEffects.Move;
         }
         else
         {

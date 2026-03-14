@@ -11,7 +11,8 @@
         WindowStartupLocation="CenterScreen"
         Width="1400" Height="860"
         Background="#1e1e1e"
-        Foreground="#e0e0e0">
+        Foreground="#e0e0e0"
+        Icon="avares://SmartCopy.UI/Assets/icon.png">
 
     <Window.KeyBindings>
         <KeyBinding Gesture="Ctrl+A"       Command="{Binding SelectAllCommand}"/>
@@ -26,12 +27,13 @@
         <Border Grid.Row="0" Background="#2d2d30" BorderBrush="#3e3e42" BorderThickness="0,0,0,1">
             <Menu>
                 <MenuItem Header="_File">
-                    <MenuItem Header="_Quit" />
+                    <MenuItem Header="_Quit" x:Name="QuitMenuItem" InputGesture="Ctrl+Q" />
                 </MenuItem>
                 <MenuItem Header="_Options" x:Name="OptionsMenu" />
                 <MenuItem Header="_Selection" x:Name="SelectionMenu" />
                 <MenuItem Header="_Workflows" x:Name="WorkflowsMenu" />
-                <MenuItem Header="_Help" />
+                <MenuItem Header="_Help" x:Name="HelpMenu">
+                    <MenuItem Header="_About SmartCopy 2026" x:Name="AboutMenuItem" /></MenuItem>
             </Menu>
         </Border>
 

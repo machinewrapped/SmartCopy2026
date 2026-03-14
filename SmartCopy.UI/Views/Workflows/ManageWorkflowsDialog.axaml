@@ -79,7 +79,7 @@
                     Content="Close"
                     Command="{Binding CloseCommand}"
                     HorizontalAlignment="Right"
-                    Width="80"
+                    MinWidth="80"
                     Margin="12" />
         </Grid>
     </Border>
