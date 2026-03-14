@@ -278,11 +278,6 @@ public partial class MainViewModel : ViewModelBase
         EnableMemoryFileSystem = _settings.EnableMemoryFileSystem;
         AddArtificialDelay = _settings.AddArtificialDelay;
         LimitMemoryFileSystemCapacity = _settings.LimitMemoryFileSystemCapacity;
-
-        if (EnableMemoryFileSystem)
-        {
-            SetupMemoryFileSystem();
-        }
 #endif
 
         SourcePathPicker.RefreshSettings();
