@@ -130,32 +130,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Homebrew token missing notice
-        if: ${{ secrets.HOMEBREW_TAP_TOKEN == '' }}
-        run: echo "::notice::HOMEBREW_TAP_TOKEN not set. Skipping Homebrew update."
-
-      - name: Check tap repo exists
-        id: tap
+      - name: Check prerequisites
+        id: prereqs
         run: |
-          if git ls-remote "https://github.com/machinewrapped/homebrew-smartcopy.git" > /dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
+          ENABLED=true
+          if [ -z "${{ secrets.HOMEBREW_TAP_TOKEN }}" ]; then
+            echo "::notice::HOMEBREW_TAP_TOKEN not set. Skipping Homebrew update."
+            ENABLED=false
           fi
-
-      - name: Tap repo missing notice
-        if: steps.tap.outputs.exists != 'true'
-        run: echo "::notice::Homebrew tap repo 'machinewrapped/homebrew-smartcopy' not found. Skipping Homebrew update."
+          if ! git ls-remote "https://github.com/machinewrapped/homebrew-smartcopy.git" > /dev/null 2>&1; then
+            echo "::notice::Homebrew tap repo 'machinewrapped/homebrew-smartcopy' not found. Skipping Homebrew update."
+            ENABLED=false
+          fi
+          echo "enabled=$ENABLED" >> "$GITHUB_OUTPUT"
 
       - name: Download macOS artifact
-        if: steps.tap.outputs.exists == 'true'
+        if: steps.prereqs.outputs.enabled == 'true'
         uses: actions/download-artifact@v4
         with:
           name: SmartCopy-osx-arm64
           path: dist
 
       - name: Compute SHA256
-        if: steps.tap.outputs.exists == 'true'
+        if: steps.prereqs.outputs.enabled == 'true'
         id: sha
         run: |
           FILE=$(ls dist/SmartCopy-*-osx-arm64.tar.gz)
@@ -163,12 +160,12 @@ jobs:
           echo "SHA256=$SHA" >> "$GITHUB_OUTPUT"
 
       - name: Extract version
-        if: steps.tap.outputs.exists == 'true'
+        if: steps.prereqs.outputs.enabled == 'true'
         id: version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout homebrew tap
-        if: steps.tap.outputs.exists == 'true'
+        if: steps.prereqs.outputs.enabled == 'true'
         uses: actions/checkout@v4
         with:
           repository: machinewrapped/homebrew-smartcopy
@@ -176,13 +173,13 @@ jobs:
           path: tap
 
       - name: Update cask
-        if: steps.tap.outputs.exists == 'true'
+        if: steps.prereqs.outputs.enabled == 'true'
         run: |
           sed -i "s/version \".*\"/version \"${{ steps.version.outputs.VERSION }}\"/" tap/Casks/smartcopy.rb
           sed -i "s/sha256 \".*\"/sha256 \"${{ steps.sha.outputs.SHA256 }}\"/" tap/Casks/smartcopy.rb
 
       - name: Commit and push
-        if: steps.tap.outputs.exists == 'true'
+        if: steps.prereqs.outputs.enabled == 'true'
         working-directory: tap
         run: |
           git config user.name "github-actions[bot]"
