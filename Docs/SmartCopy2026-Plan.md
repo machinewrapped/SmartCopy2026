@@ -587,18 +587,18 @@ Validation:
 
 - [x] End-to-end scan/filter/preview/run flows validated against real file systems
 - [x] Large tree scan (>100k nodes) remains responsive with cancellable scan
-- [ ] Long-path and non-ASCII filename handling validated
-- [ ] Locked/in-use file behavior validated (copy/move/delete error reporting)
-- [ ] Cross-volume/local-network move/copy behavior validated
-- [ ] Watcher overflow/error path handled without app crash
-- [ ] Operation journal correctness validated for copy/move/delete/trash outcomes
-- [ ] Automated suites cover provider contract, watcher behavior, and capability-gated operations
-- [ ] Cross-platform CI execution validates local file system tests on Windows, macOS and Linux
+- [x] Long-path and non-ASCII filename handling validated
+- [x] Locked/in-use file behavior validated (copy/move/delete error reporting)
+- [x] Cross-volume/local-network move/copy behavior validated
+- [x] Watcher overflow/error path handled without app crash
+- [x] Operation journal correctness validated for copy/move/delete/trash outcomes
+- [x] Automated suites cover provider contract, watcher behavior, and capability-gated operations
+- [x] Cross-platform CI execution validates local file system tests on Windows, macOS and Linux
 
 Exit criteria:
-- [ ] User acceptance tests confirms ready to launch
-- [ ] Release candidate passes cross-platform smoke checklist
-- [ ] Initial release published
+- [x] User acceptance tests confirms ready to launch
+- [x] Release candidate passes cross-platform smoke checklist
+- [x] Initial release published
 
 ### 5.4 Bug fixes and polish
 
