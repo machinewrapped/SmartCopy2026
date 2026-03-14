@@ -73,6 +73,7 @@ public partial class MainWindow : Window
 
         DataContextChanged += OnMainDataContextChanged;
         AboutMenuItem.Click += async (_, _) => await ShowAboutDialogAsync();
+        QuitMenuItem.Click += (_, _) => Close();
     }
 
     private async Task ShowAboutDialogAsync()

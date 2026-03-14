@@ -26,7 +26,7 @@
         <Border Grid.Row="0" Background="#2d2d30" BorderBrush="#3e3e42" BorderThickness="0,0,0,1">
             <Menu>
                 <MenuItem Header="_File">
-                    <MenuItem Header="_Quit" />
+                    <MenuItem Header="_Quit" x:Name="QuitMenuItem" InputGesture="Ctrl+Q" />
                 </MenuItem>
                 <MenuItem Header="_Options" x:Name="OptionsMenu" />
                 <MenuItem Header="_Selection" x:Name="SelectionMenu" />
