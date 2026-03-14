@@ -1412,8 +1412,6 @@ public partial class MainViewModel : ViewModelBase
         long? capacity = LimitMemoryFileSystemCapacity ? 100_000_000_000 : null;
         _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: AddArtificialDelay, capacity: capacity);
         _providerRegistry.Register(_memoryProvider);
-
-        // Enable the AddArtificialDelay and LimitMemoryFileSystemCapacity menu items
     }
 #endif
 }

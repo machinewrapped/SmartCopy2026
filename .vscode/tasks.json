@@ -24,9 +24,7 @@
             "args": [
                 "publish",
                 "${workspaceFolder}/SmartCopy.App/SmartCopy.App.csproj",
-                "-p:PublishProfile=${input:publishProfile}",
-                "/tl:off",
-                "/clp:ErrorsOnly"
+                "-p:PublishProfile=${input:publishProfile}"
             ],
             "problemMatcher": "$msCompile"
         },

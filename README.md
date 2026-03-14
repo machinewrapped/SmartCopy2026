@@ -66,7 +66,7 @@ dotnet watch run --project SmartCopy.App
 dotnet test
 
 # Publish self-contained single-file executable
-dotnet publish SmartCopy.App -c Release --self-contained true -p:PublishSingleFile=true
+dotnet publish SmartCopy.App/SmartCopy.App.csproj -p:PublishProfile=win-x64
 ```
 
 ## License

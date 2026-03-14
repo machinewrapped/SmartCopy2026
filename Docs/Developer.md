@@ -136,4 +136,4 @@ Two secrets must be configured in the SmartCopy2026 repo (Settings â†’ Secrets â
 
 ## Versioning
 
-Versions are driven entirely by git tags (`v{major}.{minor}.{patch}`). The tag is passed to `dotnet publish` as `-p:Version=...` at build time, so the assembly version matches the release tag. There is no version property in the `.csproj`.
+Versions are driven entirely by git tags (`v{major}.{minor}.{patch}`). The tag is passed to `dotnet publish` as `-p:Version=...` at build time, so the assembly version matches the release tag. There is no version property in any `.csproj`; `Directory.Build.props` provides a fallback of `2.0.0` for local builds, which the release pipeline overrides with the git tag.

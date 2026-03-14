@@ -1,5 +1,6 @@
 <Project>
   <PropertyGroup>
+    <!-- Fallback version for local builds. The release pipeline overrides this with the git tag via -p:Version=... -->
     <Version>2.0.0</Version>
     <UseArtifactsOutput>true</UseArtifactsOutput>
     <CopyOutputSymbolsToPublishDirectory Condition="'$(Configuration)' == 'Release'">false</CopyOutputSymbolsToPublishDirectory>
