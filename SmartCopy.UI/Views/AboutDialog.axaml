@@ -60,7 +60,7 @@
         <Button Content="Close"
                 Command="{Binding CloseCommand}"
                 HorizontalAlignment="Center"
-                Width="90"
+                MinWidth="90"
                 IsDefault="True"
                 IsCancel="True"
                 Margin="0,4,0,0"
