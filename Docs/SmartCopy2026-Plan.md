@@ -602,11 +602,11 @@ Exit criteria:
 
 ### 5.4 Bug fixes and polish
 
-- [ ] Loading a workflow with a Move step does not correctly restore the Overwrite mode
-- [ ] Pipeline step serialisation should use EnumToString converters, not parse strings manually
+- [X] Loading a workflow with a Move step does not correctly restore the Overwrite mode
 - [ ] Log panel displays messages as stacked panels with no line wrapping, so long messages are cropped
 - [ ] Multiple lines of text cannot be selected in the log window
 - [ ] Log window tab header should show error and warning counts
+- [ ] Users should be able to filter log view on error/warning/info (category toggles?)
 
 Exit criteria:
 - [ ] All bug fixes are implemented and tests are added
