@@ -185,17 +185,38 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
             // even when an atomic move would otherwise be possible.
             if (!destExists && canAtomicMove && CanMoveEntireSubtree(child))
             {
-                await context.SourceProvider.MoveAsync(child.FullPath, dest, ct);
-                yield return new TransformResult(
-                    IsSuccess: true,
-                    SourceNode: child,
-                    SourceNodeResult: SourceResult.Moved,
-                    DestinationPath: dest,
-                    DestinationResult: DestinationResult.Created,
-                    NumberOfFilesAffected: child.CountAllFiles(),
-                    NumberOfFoldersAffected: child.CountAllFolders(),
-                    InputBytes: child.Size,
-                    OutputBytes: child.Size);
+                string? moveError = null;
+                try
+                {
+                    await context.SourceProvider.MoveAsync(child.FullPath, dest, ct);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    moveError = ex.Message;
+                }
+
+                if (moveError is not null)
+                {
+                    context.MarkFailed(child);
+                    yield return new TransformResult(
+                        IsSuccess: false,
+                        SourceNode: child,
+                        SourceNodeResult: SourceResult.Skipped,
+                        ErrorMessage: moveError);
+                }
+                else
+                {
+                    yield return new TransformResult(
+                        IsSuccess: true,
+                        SourceNode: child,
+                        SourceNodeResult: SourceResult.Moved,
+                        DestinationPath: dest,
+                        DestinationResult: DestinationResult.Created,
+                        NumberOfFilesAffected: child.CountAllFiles(),
+                        NumberOfFoldersAffected: child.CountAllFolders(),
+                        InputBytes: child.Size,
+                        OutputBytes: child.Size);
+                }
             }
             else
             {
@@ -203,14 +224,21 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
                 var allMoved = true;
                 await foreach (var result in WalkAndMoveAsync(child, context, destinationPath, targetProvider, canAtomicMove, overwriteMode, ct))
                 {
-                    if (result.SourceNodeResult == SourceResult.Skipped)
+                    if (!result.IsSuccess || result.SourceNodeResult == SourceResult.Skipped)
                         allMoved = false;
                     yield return result;
                 }
 
                 // Delete the now-empty source directory when the subtree was fully selected and nothing was skipped.
                 if (allMoved && !context.IsNodeFailed(child) && CanMoveEntireSubtree(child))
-                    await context.SourceProvider.DeleteAsync(child.FullPath, ct);
+                {
+                    try { await context.SourceProvider.DeleteAsync(child.FullPath, ct); }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        // Files were moved but the source dir could not be cleaned up — non-fatal, log via MarkFailed.
+                        context.MarkFailed(child);
+                    }
+                }
             }
         }
 
@@ -235,17 +263,47 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
                 continue;
             }
 
+            string? fileError = null;
             if (canAtomicMove)
             {
-                await context.SourceProvider.MoveAsync(file.FullPath, fileDest, ct);
+                try
+                {
+                    await context.SourceProvider.MoveAsync(file.FullPath, fileDest, ct);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    fileError = ex.Message;
+                }
             }
             else
             {
-                await using (var stream = await context.SourceProvider.OpenReadAsync(file.FullPath, ct))
+                bool copied = false;
+                try
                 {
-                    await targetProvider.WriteAsync(fileDest, stream, progress: null, ct);
+                    await using (var stream = await context.SourceProvider.OpenReadAsync(file.FullPath, ct))
+                    {
+                        await targetProvider.WriteAsync(fileDest, stream, progress: null, ct);
+                    }
+                    copied = true;
+                    await context.SourceProvider.DeleteAsync(file.FullPath, ct);
                 }
-                await context.SourceProvider.DeleteAsync(file.FullPath, ct);
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    fileError = copied
+                        ? $"Copied but source could not be deleted: {ex.Message}"
+                        : ex.Message;
+                }
+            }
+
+            if (fileError is not null)
+            {
+                context.MarkFailed(file);
+                yield return new TransformResult(
+                    IsSuccess: false,
+                    SourceNode: file,
+                    SourceNodeResult: SourceResult.Skipped,
+                    ErrorMessage: fileError);
+                continue;
             }
 
             yield return new TransformResult(

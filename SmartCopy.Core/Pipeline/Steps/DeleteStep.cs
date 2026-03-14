@@ -93,14 +93,39 @@ public sealed class DeleteStep : IPipelineStep
                 yield break;
             }
 
-            var actualResult = await DeleteNodeAsync(context.RootNode.FullPath, useTrash, context, ct);
-            yield return new TransformResult(
-                IsSuccess: true,
-                SourceNode: context.RootNode,
-                SourceNodeResult: actualResult,
-                NumberOfFilesAffected: context.RootNode.CountAllFiles(),
-                NumberOfFoldersAffected: context.RootNode.CountAllFolders(),
-                InputBytes: context.RootNode.Size);
+            SourceResult? rootActualResult = null;
+            string? rootDeleteError = null;
+            try
+            {
+                rootActualResult = await DeleteNodeAsync(context.RootNode.FullPath, useTrash, context, ct);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                rootDeleteError = ex.Message;
+            }
+
+            if (rootDeleteError is not null)
+            {
+                context.MarkFailed(context.RootNode);
+                yield return new TransformResult(
+                    IsSuccess: false,
+                    SourceNode: context.RootNode,
+                    SourceNodeResult: SourceResult.Skipped,
+                    NumberOfFilesSkipped: context.RootNode.CountAllFiles(),
+                    NumberOfFoldersSkipped: context.RootNode.CountAllFolders(),
+                    InputBytes: context.RootNode.Size,
+                    ErrorMessage: rootDeleteError);
+            }
+            else
+            {
+                yield return new TransformResult(
+                    IsSuccess: true,
+                    SourceNode: context.RootNode,
+                    SourceNodeResult: rootActualResult!.Value,
+                    NumberOfFilesAffected: context.RootNode.CountAllFiles(),
+                    NumberOfFoldersAffected: context.RootNode.CountAllFolders(),
+                    InputBytes: context.RootNode.Size);
+            }
             yield break;
         }
 
@@ -124,14 +149,39 @@ public sealed class DeleteStep : IPipelineStep
                 continue;
             }
 
-            var actualResult = await DeleteNodeAsync(node.FullPath, useTrash, context, ct);
-            yield return new TransformResult(
-                IsSuccess: true,
-                SourceNode: node,
-                SourceNodeResult: actualResult,
-                NumberOfFilesAffected: node.CountAllFiles(),
-                NumberOfFoldersAffected: node.CountAllFolders(),
-                InputBytes: node.Size);
+            SourceResult? actualResult = null;
+            string? deleteError = null;
+            try
+            {
+                actualResult = await DeleteNodeAsync(node.FullPath, useTrash, context, ct);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                deleteError = ex.Message;
+            }
+
+            if (deleteError is not null)
+            {
+                context.MarkFailed(node);
+                yield return new TransformResult(
+                    IsSuccess: false,
+                    SourceNode: node,
+                    SourceNodeResult: SourceResult.Skipped,
+                    NumberOfFilesSkipped: node.CountAllFiles(),
+                    NumberOfFoldersSkipped: node.CountAllFolders(),
+                    InputBytes: node.Size,
+                    ErrorMessage: deleteError);
+            }
+            else
+            {
+                yield return new TransformResult(
+                    IsSuccess: true,
+                    SourceNode: node,
+                    SourceNodeResult: actualResult!.Value,
+                    NumberOfFilesAffected: node.CountAllFiles(),
+                    NumberOfFoldersAffected: node.CountAllFolders(),
+                    InputBytes: node.Size);
+            }
         }
     }
 

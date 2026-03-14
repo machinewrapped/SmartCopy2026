@@ -165,8 +165,27 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
                 continue;
             }
 
-            await using var sourceStream = await context.SourceProvider.OpenReadAsync(node.FullPath, ct);
-            await targetProvider.WriteAsync(destination, sourceStream, progress: null, ct);
+            string? copyError = null;
+            try
+            {
+                await using var sourceStream = await context.SourceProvider.OpenReadAsync(node.FullPath, ct);
+                await targetProvider.WriteAsync(destination, sourceStream, progress: null, ct);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                copyError = ex.Message;
+            }
+
+            if (copyError is not null)
+            {
+                context.MarkFailed(node);
+                yield return new TransformResult(
+                    IsSuccess: false,
+                    SourceNode: node,
+                    SourceNodeResult: SourceResult.Skipped,
+                    ErrorMessage: copyError);
+                continue;
+            }
 
             yield return new TransformResult(
                 IsSuccess: true,
