@@ -10,7 +10,7 @@
         ExtendClientAreaToDecorationsHint="True"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
-        Background="#1e1e1e">
+        Background="{DynamicResource AppBackgroundBrush}">
     <StackPanel Spacing="12" Margin="20">
 
         <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />

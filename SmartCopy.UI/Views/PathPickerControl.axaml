@@ -20,7 +20,7 @@
             <ComboBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:SourceBookmarkItem">
                     <Grid ColumnDefinitions="20, *, Auto">
-                        <TextBlock Grid.Column="0" Text="★" IsVisible="{Binding IsBookmark}" Foreground="#EED202" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                        <TextBlock Grid.Column="0" Text="★" IsVisible="{Binding IsBookmark}" Foreground="{DynamicResource BookmarkStarBrush}" VerticalAlignment="Center" HorizontalAlignment="Center" />
                         <TextBlock Grid.Column="1" Text="{Binding Path}" VerticalAlignment="Center" Margin="4,0,0,0" />
                         <Button Grid.Column="2"
                                 Content="🗑"
@@ -28,7 +28,7 @@
                                 HorizontalContentAlignment="Center"
                                 VerticalContentAlignment="Center"
                                 CornerRadius="4" Background="Transparent"
-                                Foreground="#f44736" FontSize="12"
+                                Foreground="{DynamicResource DangerForegroundBrush}" FontSize="12"
                                 VerticalAlignment="Center"
                                 ToolTip.Tip="Delete item"
                                 Command="{ReflectionBinding $parent[UserControl].DataContext.RemoveBookmarkCommand}"
@@ -61,7 +61,7 @@
                    Grid.ColumnSpan="3"
                    Text="{Binding ValidationMessage}"
                    IsVisible="{Binding ValidationMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                   Foreground="#f48771"
+                   Foreground="{DynamicResource ValidationErrorForegroundBrush}"
                    Margin="0,6,0,0"
                    TextWrapping="Wrap" />
     </Grid>

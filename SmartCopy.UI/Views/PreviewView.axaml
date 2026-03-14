@@ -16,7 +16,7 @@
         <KeyBinding Gesture="Escape" Command="{Binding CancelCommand}" />
     </Window.KeyBindings>
 
-    <Border Background="#1e1e1e" BorderBrush="#555" BorderThickness="1" CornerRadius="6">
+    <Border Background="{DynamicResource AppBackgroundBrush}" BorderBrush="{DynamicResource PopupBorderBrush}" BorderThickness="1" CornerRadius="6">
         <Grid RowDefinitions="Auto, *, Auto">
 
             <!-- Title bar -->
@@ -25,7 +25,7 @@
                 <TextBlock Grid.Column="0"
                            Text="Preparing preview…"
                            FontWeight="SemiBold"
-                           Foreground="#4facfe"
+                           Foreground="{DynamicResource AccentBrush}"
                            VerticalAlignment="Center"
                            Margin="4,2,0,2"
                            IsHitTestVisible="False"
@@ -34,7 +34,7 @@
                 <TextBlock Grid.Column="0"
                            Text="{Binding TotalActionCount, StringFormat=Preview (\{0\} actions)}"
                            FontWeight="SemiBold"
-                           Foreground="#4facfe"
+                           Foreground="{DynamicResource AccentBrush}"
                            VerticalAlignment="Center"
                            Margin="4,2,0,2"
                            IsHitTestVisible="False"
@@ -46,10 +46,10 @@
                         Padding="6,2"
                         CornerRadius="4"
                         FontSize="12"
-                        Foreground="#a0a0a0" />
+                        Foreground="{DynamicResource MutedForegroundBrush}" />
             </Grid>
 
-            <Separator Grid.Row="0" VerticalAlignment="Bottom" Height="1" Background="#3e3e42" Margin="4,0" IsHitTestVisible="False" />
+            <Separator Grid.Row="0" VerticalAlignment="Bottom" Height="1" Background="{DynamicResource PanelBorderBrush}" Margin="4,0" IsHitTestVisible="False" />
 
             <!-- Main content area -->
             <Grid Grid.Row="1">
@@ -64,7 +64,7 @@
                                  Width="320"
                                  Height="4" />
                     <TextBlock Text="{Binding PreparationMessage}"
-                               Foreground="#a0a0a0"
+                               Foreground="{DynamicResource MutedForegroundBrush}"
                                FontSize="13"
                                HorizontalAlignment="Center" />
                 </StackPanel>
@@ -75,23 +75,23 @@
                       IsVisible="{Binding !IsPreparingPlan}">
                     <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,10">
                         <Border IsVisible="{Binding HasWarnings}"
-                                Background="#2d2d1b"
+                                Background="{DynamicResource WarningBannerBackgroundBrush}"
                                 CornerRadius="4"
                                 Padding="8">
                             <ItemsControl ItemsSource="{Binding Warnings}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding}" Foreground="#f0d060" />
+                                        <TextBlock Text="{Binding}" Foreground="{DynamicResource WarningYellowForegroundBrush}" />
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
                         </Border>
                         <Border IsVisible="{Binding IsDeletePipeline}"
-                                Background="#3a2f1b"
+                                Background="{DynamicResource DangerBannerBackgroundBrush}"
                                 CornerRadius="4"
                                 Padding="8">
                             <TextBlock Text="Delete confirmation is required before running."
-                                       Foreground="#f0ad4e" />
+                                       Foreground="{DynamicResource WarningForegroundBrush}" />
                         </Border>
                     </StackPanel>
 

@@ -8,11 +8,11 @@
         <ComboBox ItemsSource="{Binding DeleteModes}"
                   SelectedItem="{Binding DeleteMode, Mode=TwoWay}" />
         <TextBlock Text="Permanent delete cannot be recovered."
-                   Foreground="#f0ad4e"
+                   Foreground="{DynamicResource WarningForegroundBrush}"
                    FontSize="11"
                    IsVisible="{Binding IsPermanentDelete}" />
         <TextBlock Text="{Binding CapabilityWarning}"
-                   Foreground="#f0d060"
+                   Foreground="{DynamicResource WarningYellowForegroundBrush}"
                    FontSize="11"
                    IsVisible="{Binding CapabilityWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
     </StackPanel>

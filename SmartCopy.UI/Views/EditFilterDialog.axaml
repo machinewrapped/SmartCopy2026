@@ -12,7 +12,7 @@
         ExtendClientAreaToDecorationsHint="True"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
-        Background="#1e1e1e">
+        Background="{DynamicResource AppBackgroundBrush}">
     <StackPanel Spacing="12" Margin="20">
 
         <!-- Only / Add / Exclude toggle -->
@@ -41,7 +41,7 @@
         </StackPanel>
 
         <!-- Type-specific editor (dispatched by DataTemplate) -->
-        <Border BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="4" Padding="10">
+        <Border BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="10">
             <ContentControl Content="{Binding Editor}">
                 <ContentControl.DataTemplates>
                     <DataTemplate DataType="vmFilters:ExtensionFilterEditorViewModel">

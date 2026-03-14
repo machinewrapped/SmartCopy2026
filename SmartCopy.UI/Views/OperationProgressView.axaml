@@ -7,7 +7,7 @@
         <StackPanel Orientation="Horizontal"  HorizontalAlignment="Right" Spacing="12">
             <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" FontWeight="SemiBold" />
             <TextBlock Text="|" VerticalAlignment="Center" Opacity="0.5" />
-            <ProgressBar Value="{Binding PercentComplete}" Width="150" Height="14" CornerRadius="7" Foreground="#4facfe"
+            <ProgressBar Value="{Binding PercentComplete}" Width="150" Height="14" CornerRadius="7" Foreground="{DynamicResource AccentBrush}"
                          AutomationProperties.Name="Operation progress" />
             <TextBlock Text="{Binding PercentComplete, StringFormat=\{0\}%}" VerticalAlignment="Center" HorizontalAlignment="Right" MinWidth="50" />
             <TextBlock Text="{Binding TimeRemaining}" VerticalAlignment="Center" HorizontalAlignment="Right" MinWidth="50" />
