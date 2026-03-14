@@ -68,13 +68,13 @@
             </Border>
         </Grid>
 
-        <!-- Pipeline Area -->
-        <views:PipelineView Grid.Row="3" DataContext="{Binding Pipeline}" Margin="10,5,10,10" />
-
-        <!-- Log Panel (Row 4) -->
-        <Border Grid.Row="4" Background="#1e1e1e" BorderBrush="#3e3e42" BorderThickness="0,1,0,0">
+        <!-- Log Panel -->
+        <Border Grid.Row="3" Background="#1e1e1e" BorderBrush="#3e3e42" BorderThickness="0,1,0,0">
             <views:LogPanelView DataContext="{Binding LogPanel}" />
         </Border>
+
+        <!-- Pipeline Area -->
+        <views:PipelineView Grid.Row="4" DataContext="{Binding Pipeline}" Margin="10,5,10,10" />
 
         <!-- Status Bar -->
         <Border Grid.Row="5" Background="#007acc" BorderBrush="#3e3e42" BorderThickness="0,1,0,0" Padding="12,6">

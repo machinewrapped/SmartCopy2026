@@ -1100,7 +1100,10 @@ public partial class MainViewModel : ViewModelBase
             {
                 if (!r.IsSuccess)
                 {
-                    LogPanel.AddEntry($"Failed: {r.SourceNode.Name}", LogLevel.Error);
+                    var failMsg = r.ErrorMessage is { Length: > 0 } e
+                        ? $"Failed: {r.SourceNode.Name} — {e}"
+                        : $"Failed: {r.SourceNode.Name}";
+                    LogPanel.AddEntry(failMsg, LogLevel.Error);
                 }
                 else if (r.SourceNodeResult == SourceResult.Copied)
                 {

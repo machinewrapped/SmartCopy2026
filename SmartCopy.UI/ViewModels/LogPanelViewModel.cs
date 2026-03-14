@@ -29,6 +29,8 @@ public partial class LogPanelViewModel : ViewModelBase
     {
         Entries.Add(new LogEntry(DateTime.Now, message, level));
         OnPropertyChanged(nameof(EntryCount));
+        if (level >= LogLevel.Warning)
+            IsExpanded = true;
     }
 
     [RelayCommand]
