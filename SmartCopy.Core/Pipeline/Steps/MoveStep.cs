@@ -183,40 +183,33 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
 
             // If the destination already exists we must recurse to merge contents,
             // even when an atomic move would otherwise be possible.
+            bool atomicMoved = false;
             if (!destExists && canAtomicMove && CanMoveEntireSubtree(child))
             {
-                string? moveError = null;
                 try
                 {
                     await context.SourceProvider.MoveAsync(child.FullPath, dest, ct);
+                    atomicMoved = true;
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
-                    moveError = ex.Message;
+                    // Atomic move failed; fall back to piecewise walk below.
+                    _ = ex;
                 }
+            }
 
-                if (moveError is not null)
-                {
-                    context.MarkFailed(child);
-                    yield return new TransformResult(
-                        IsSuccess: false,
-                        SourceNode: child,
-                        SourceNodeResult: SourceResult.Skipped,
-                        ErrorMessage: moveError);
-                }
-                else
-                {
-                    yield return new TransformResult(
-                        IsSuccess: true,
-                        SourceNode: child,
-                        SourceNodeResult: SourceResult.Moved,
-                        DestinationPath: dest,
-                        DestinationResult: DestinationResult.Created,
-                        NumberOfFilesAffected: child.CountAllFiles(),
-                        NumberOfFoldersAffected: child.CountAllFolders(),
-                        InputBytes: child.Size,
-                        OutputBytes: child.Size);
-                }
+            if (atomicMoved)
+            {
+                yield return new TransformResult(
+                    IsSuccess: true,
+                    SourceNode: child,
+                    SourceNodeResult: SourceResult.Moved,
+                    DestinationPath: dest,
+                    DestinationResult: DestinationResult.Created,
+                    NumberOfFilesAffected: child.CountAllFiles(),
+                    NumberOfFoldersAffected: child.CountAllFolders(),
+                    InputBytes: child.Size,
+                    OutputBytes: child.Size);
             }
             else
             {

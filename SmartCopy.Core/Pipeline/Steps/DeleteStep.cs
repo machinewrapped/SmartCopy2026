@@ -94,29 +94,20 @@ public sealed class DeleteStep : IPipelineStep
             }
 
             SourceResult? rootActualResult = null;
-            string? rootDeleteError = null;
+            bool rootDeleted = false;
             try
             {
                 rootActualResult = await DeleteNodeAsync(context.RootNode.FullPath, useTrash, context, ct);
+                rootDeleted = true;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                rootDeleteError = ex.Message;
+                // Atomic delete failed; fall back to per-node deletion below.
+                context.MarkFailed(context.RootNode);
+                _ = ex;
             }
 
-            if (rootDeleteError is not null)
-            {
-                context.MarkFailed(context.RootNode);
-                yield return new TransformResult(
-                    IsSuccess: false,
-                    SourceNode: context.RootNode,
-                    SourceNodeResult: SourceResult.Skipped,
-                    NumberOfFilesSkipped: context.RootNode.CountAllFiles(),
-                    NumberOfFoldersSkipped: context.RootNode.CountAllFolders(),
-                    InputBytes: context.RootNode.Size,
-                    ErrorMessage: rootDeleteError);
-            }
-            else
+            if (rootDeleted)
             {
                 yield return new TransformResult(
                     IsSuccess: true,
@@ -125,8 +116,9 @@ public sealed class DeleteStep : IPipelineStep
                     NumberOfFilesAffected: context.RootNode.CountAllFiles(),
                     NumberOfFoldersAffected: context.RootNode.CountAllFolders(),
                     InputBytes: context.RootNode.Size);
+                yield break;
             }
-            yield break;
+            // Atomic delete failed — fall through to per-node loop below.
         }
 
         foreach (var node in context.RootNode.GetSelectedDescendants())
@@ -134,7 +126,8 @@ public sealed class DeleteStep : IPipelineStep
             ct.ThrowIfCancellationRequested();
             if (context.IsNodeFailed(node)) continue;
             // Skip nodes whose parent is also selected — the parent delete covers them.
-            if (node.Parent?.IsSelected == true) continue;
+            // Exception: if the parent's atomic delete already failed, process children individually.
+            if (node.Parent?.IsSelected == true && !context.IsNodeFailed(node.Parent)) continue;
 
             if (!context.AllowDeleteReadOnly && (node.Attributes & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
             {

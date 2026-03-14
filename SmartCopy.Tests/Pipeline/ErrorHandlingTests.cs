@@ -240,4 +240,86 @@ public sealed class ErrorHandlingTests
         Assert.False(await inner.ExistsAsync("/src/b.txt", CancellationToken.None));
         Assert.True(await inner.ExistsAsync("/src/a.txt", CancellationToken.None));
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // MoveStep — atomic directory move fallback
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// When the atomic directory-level MoveAsync throws (e.g. a locked file inside the
+    /// directory prevents the OS rename), MoveStep falls back to a piecewise recursive
+    /// walk and still moves all files individually.
+    /// </summary>
+    [Fact]
+    public async Task MoveStep_AtomicDirectoryMove_FailsAndFallsBack()
+    {
+        var inner = MemoryFileSystemFixtures.Create(s => s
+            .WithFile("/src/subdir/a.txt", "aaa"u8)
+            .WithFile("/src/subdir/b.txt", "bbb"u8), volumeId: "VOL");
+
+        var root = await inner.BuildDirectoryTree("/src");
+        var subdir = root.Children.Single();
+        foreach (var f in subdir.Files)
+            f.CheckState = CheckState.Checked;
+
+        // Fault only the directory-level atomic move, not individual file moves.
+        var source = new FaultingProvider(inner) { FaultOnMove = path => path == subdir.FullPath };
+
+        var ctx = new TestContext(root, source);
+        var step = new MoveStep("/mem/dest");
+
+        var results = new List<TransformResult>();
+        await foreach (var r in step.ApplyAsync(ctx, CancellationToken.None))
+            results.Add(r);
+
+        // Both files moved individually via piecewise fallback — no failures.
+        Assert.Equal(2, results.Count);
+        Assert.All(results, r => Assert.True(r.IsSuccess));
+        Assert.All(results, r => Assert.Equal(SourceResult.Moved, r.SourceNodeResult));
+        Assert.True(await inner.ExistsAsync("/mem/dest/subdir/a.txt", CancellationToken.None));
+        Assert.True(await inner.ExistsAsync("/mem/dest/subdir/b.txt", CancellationToken.None));
+        Assert.False(await inner.ExistsAsync("/src/subdir/a.txt", CancellationToken.None));
+        Assert.False(await inner.ExistsAsync("/src/subdir/b.txt", CancellationToken.None));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // DeleteStep — atomic root delete fallback
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// When the atomic root DeleteAsync throws (e.g. a locked file inside prevents the
+    /// whole-directory delete), DeleteStep falls back to deleting each selected file
+    /// individually so the rest of the tree is still cleaned up.
+    /// </summary>
+    [Fact]
+    public async Task DeleteStep_AtomicRootDelete_FailsAndFallsBack()
+    {
+        var inner = MemoryFileSystemFixtures.Create(s => s
+            .WithFile("/src/a.txt", "aaa"u8)
+            .WithFile("/src/b.txt", "bbb"u8));
+
+        var root = await inner.BuildDirectoryTree("/src");
+        foreach (var f in root.Files) f.CheckState = CheckState.Checked;
+        // Root is now Checked → DeleteStep takes the atomic-root path first.
+
+        // Fault only the root directory delete, not individual file deletes.
+        var source = new FaultingProvider(inner) { FaultOnDelete = path => path == root.FullPath };
+        var ctx = new TestContext(root, source);
+        var step = new DeleteStep(DeleteMode.Permanent);
+
+        var previewResults = new List<TransformResult>();
+        await foreach (var r in step.PreviewAsync(ctx, CancellationToken.None))
+            previewResults.Add(r);
+
+        var results = new List<TransformResult>();
+        await foreach (var r in step.ApplyAsync(ctx, CancellationToken.None))
+            results.Add(r);
+
+        // Both files deleted individually via piecewise fallback — no failures.
+        Assert.Equal(2, results.Count);
+        Assert.All(results, r => Assert.True(r.IsSuccess));
+        Assert.All(results, r => Assert.Equal(SourceResult.Deleted, r.SourceNodeResult));
+        Assert.False(await inner.ExistsAsync("/src/a.txt", CancellationToken.None));
+        Assert.False(await inner.ExistsAsync("/src/b.txt", CancellationToken.None));
+    }
 }
