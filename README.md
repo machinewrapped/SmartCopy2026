@@ -5,6 +5,8 @@ This is an evolution of SmartCopyTool (https://sourceforge.net/projects/smartcop
 
 SmartCopy2026 is a complete rewrite of the application using modern .NET technologies and a more sophisticated UI framework. It is cross-platform and supports advanced workflows, which can be configured and saved as presets.
 
+<img width="2850" height="1530" alt="SmartCopy 2026" src="https://github.com/user-attachments/assets/428f3724-62ed-41cd-8210-2429dab03356" />
+
 The principles that drive the design of SmartCopy2026 are:
 - Composable pipelines
 - Selective operations
