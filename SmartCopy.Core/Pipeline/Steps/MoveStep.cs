@@ -225,11 +225,24 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
                 // Delete the now-empty source directory when the subtree was fully selected and nothing was skipped.
                 if (allMoved && !context.IsNodeFailed(child) && CanMoveEntireSubtree(child))
                 {
-                    try { await context.SourceProvider.DeleteAsync(child.FullPath, ct); }
+                    string? dirCleanupError = null;
+                    try
+                    { 
+                        await context.SourceProvider.DeleteAsync(child.FullPath, ct); 
+                    }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                     {
-                        // Files were moved but the source dir could not be cleaned up — non-fatal, log via MarkFailed.
+                        dirCleanupError = ex.Message;
+                    }
+
+                    if (dirCleanupError is not null)
+                    {
                         context.MarkFailed(child);
+                        yield return new TransformResult(
+                            IsSuccess: false,
+                            SourceNode: child,
+                            SourceNodeResult: SourceResult.Moved,
+                            ErrorMessage: $"Moved contents but source directory could not be deleted: {dirCleanupError}");
                     }
                 }
             }
