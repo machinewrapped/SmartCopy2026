@@ -590,7 +590,7 @@ Validation:
 - [x] Long-path and non-ASCII filename handling validated
 - [ ] Locked/in-use file behavior validated (copy/move/delete error reporting)
 - [x] Cross-volume/local-network move/copy behavior validated
-- [ ] Watcher overflow/error path handled without app crash
+- [x] Watcher overflow/error path handled without app crash
 - [ ] Operation journal correctness validated for copy/move/delete/trash outcomes
 - [ ] Automated suites cover provider contract, watcher behavior, and capability-gated operations
 - [ ] Cross-platform CI execution validates local file system tests on Windows, macOS and Linux
