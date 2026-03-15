@@ -161,11 +161,11 @@ public partial class MainWindow : Window
     {
         SelectionMenu.Items.Clear();
 
-        Add(item("Select _All",       new KeyGesture(Key.A, KeyModifiers.Control)),
+        Add(item("Select _All",       new KeyGesture(Key.A, KeyModifiers.Control | KeyModifiers.Shift)),
             () => _mainVm?.SelectAllCommand.Execute(null));
-        Add(item("_Invert Selection", new KeyGesture(Key.I, KeyModifiers.Control)),
+        Add(item("_Invert Selection", new KeyGesture(Key.I, KeyModifiers.Control | KeyModifiers.Shift)),
             () => _mainVm?.InvertSelectionCommand.Execute(null));
-        Add(item("_Clear Selection",  new KeyGesture(Key.A, KeyModifiers.Control | KeyModifiers.Shift)),
+        Add(item("_Clear Selection",  new KeyGesture(Key.C, KeyModifiers.Control | KeyModifiers.Shift)),
             () => _mainVm?.ClearSelectionCommand.Execute(null));
 
         SelectionMenu.Items.Add(new Separator());
@@ -527,24 +527,40 @@ public partial class MainWindow : Window
         var mods = e.KeyModifiers;
         var key  = e.Key;
 
-        if (key == Key.A && mods == KeyModifiers.Control)
+        if (mods == (KeyModifiers.Control | KeyModifiers.Shift))
         {
-            // Skip when the log panel has focus — it intercepts Ctrl+A itself.
+            // Skip selection chords when the log panel has focus — it intercepts Ctrl+A itself.
             if (FocusManager?.GetFocusedElement() is SelectableTextBlock) return;
-            _mainVm?.SelectAllCommand.Execute(null);
-        }
-        else if (key == Key.A     && mods == (KeyModifiers.Control | KeyModifiers.Shift))
-            _mainVm?.ClearSelectionCommand.Execute(null);
-        else if (key == Key.I     && mods == KeyModifiers.Control)
-            _mainVm?.InvertSelectionCommand.Execute(null);
-        else if (key == Key.F5    && mods == KeyModifiers.None)
-            _mainVm?.RescanCommand.Execute(null);
-        else if (key == Key.Escape && mods == KeyModifiers.None)
-            _mainVm?.CancelOperationCommand.Execute(null);
-        else
-            return;
 
-        e.Handled = true;
+            switch (key)
+            {
+                case Key.A:
+                    _mainVm?.SelectAllCommand.Execute(null);
+                    e.Handled = true;
+                    break;
+
+                case Key.C:
+                    _mainVm?.ClearSelectionCommand.Execute(null);
+                    e.Handled = true;
+                    break;
+
+                case Key.I:
+                    _mainVm?.InvertSelectionCommand.Execute(null);
+                    e.Handled = true;
+                    break;
+            }
+        }
+        else if (key == Key.F5 && mods == KeyModifiers.None)
+        {
+            _mainVm?.RescanCommand.Execute(null);            
+            e.Handled = true;
+        }
+        else if (key == Key.Escape && mods == KeyModifiers.None)
+        {
+            // TODO: pause the operation and show a confirmation dialog before cancelling
+            _mainVm?.CancelOperationCommand.Execute(null);
+            e.Handled = true;
+        }
     }
 
     // ── Restore ────────────────────────────────────────────────────────────────
