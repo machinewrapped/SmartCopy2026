@@ -12,10 +12,8 @@ public static class PipelineStepFactory
             StepKind.Move => MoveStep.FromConfig(config),
             StepKind.Delete => DeleteStep.FromConfig(config),
             StepKind.Flatten => FlattenStep.FromConfig(config),
-            StepKind.Rename => new RenameStep(config.GetRequired("pattern")),
-            StepKind.Rebase => new RebaseStep(
-                config.GetOptional("stripPrefix"),
-                config.GetOptional("addPrefix")),
+            StepKind.Rename => RenameStep.FromConfig(config),
+            StepKind.Rebase => RebaseStep.FromConfig(config),
             StepKind.SelectAll => new SelectAllStep(),
             StepKind.InvertSelection => new InvertSelectionStep(),
             StepKind.ClearSelection => new ClearSelectionStep(),
