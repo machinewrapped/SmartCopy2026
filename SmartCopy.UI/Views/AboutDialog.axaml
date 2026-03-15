@@ -3,7 +3,7 @@
         xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
         x:Class="SmartCopy.UI.Views.AboutDialog"
         x:DataType="vm:AboutDialogViewModel"
-        Title="About SmartCopy 2026"
+        Title="About SmartCopy 2[026]"
         Width="360"
         SizeToContent="Height"
         CanResize="False"
@@ -22,7 +22,7 @@
                Margin="0,0,0,8"/>
 
         <!-- App name -->
-        <TextBlock Text="SmartCopy 2026"
+        <TextBlock Text="SmartCopy 2[026]"
                    FontSize="22"
                    FontWeight="SemiBold"
                    HorizontalAlignment="Center" />

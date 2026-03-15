@@ -349,7 +349,7 @@ public partial class MainViewModel : ViewModelBase
             }
         }
 
-        LogPanel.AddEntry("SmartCopy 2026 ready");
+        LogPanel.AddEntry("SmartCopy 2[026] ready");
     }
 
     partial void OnSelectedSourceBookmarkChanged(SourceBookmarkItem? value)

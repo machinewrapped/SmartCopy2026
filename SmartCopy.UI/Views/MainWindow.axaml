@@ -7,7 +7,7 @@
         mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="860"
         x:Class="SmartCopy.UI.Views.MainWindow"
         x:DataType="vm:MainViewModel"
-        Title="SmartCopy 2026"
+        Title="SmartCopy 2[026]"
         WindowStartupLocation="CenterScreen"
         Width="1400" Height="860"
         Background="{DynamicResource AppBackgroundBrush}"
@@ -26,7 +26,7 @@
                 <MenuItem Header="_Selection" x:Name="SelectionMenu" />
                 <MenuItem Header="_Workflows" x:Name="WorkflowsMenu" />
                 <MenuItem Header="_Help" x:Name="HelpMenu">
-                    <MenuItem Header="_About SmartCopy 2026" x:Name="AboutMenuItem" /></MenuItem>
+                    <MenuItem Header="_About SmartCopy 2[026]" x:Name="AboutMenuItem" /></MenuItem>
             </Menu>
         </Border>
 
