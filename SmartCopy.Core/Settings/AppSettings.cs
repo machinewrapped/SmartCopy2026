@@ -73,7 +73,7 @@ public sealed class AppSettings
     public bool AutoOpenLogOnRun { get; set; } = true;
 
     /// <summary>Show full diagnostic output (exception stack traces, etc.) in the log panel.
-    /// Useful for capturing details when reporting bugs. No effect in DEBUG builds.</summary>
+    /// Useful for capturing details when reporting bugs.
     public bool VerboseLogging { get; set; } = false;
 
     /// <summary>
