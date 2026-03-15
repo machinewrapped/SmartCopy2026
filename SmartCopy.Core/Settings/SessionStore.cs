@@ -1,6 +1,6 @@
-using System;
-using System.Diagnostics;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using SmartCopy.Core.Workflows;
 
 namespace SmartCopy.Core.Settings;
@@ -15,7 +15,13 @@ public sealed class SessionStore
 {
     private const string SessionFileName = "session.sc2session";
 
+    private readonly ILogger<SessionStore> _logger;
     private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
+
+    public SessionStore(ILogger<SessionStore>? logger = null)
+    {
+        _logger = logger ?? NullLogger<SessionStore>.Instance;
+    }
 
     /// <summary>
     /// Writes the current session state to <c>session.sc2session</c>.
@@ -48,7 +54,7 @@ public sealed class SessionStore
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
-            Debug.WriteLine($"[SessionStore] Failed to load session: {ex.Message}");
+            _logger.LogError(ex, "Failed to load session from '{Path}'", path);
             return null;
         }
     }

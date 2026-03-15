@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -16,6 +15,8 @@ using SmartCopy.Core.Selection;
 using SmartCopy.Core.Settings;
 using SmartCopy.Core.Trash;
 using SmartCopy.Core.Workflows;
+using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using SmartCopy.UI.Services;
 using SmartCopy.UI.ViewModels.Workflows;
 using SmartCopy.UI.Views;
@@ -104,13 +105,15 @@ public partial class MainViewModel : ViewModelBase
         set => SourcePathPicker.ValidationMessage = value;
     }
 
+    private readonly ILoggerFactory _loggerFactory;
+    private readonly ILogger<MainViewModel> _logger;
     private readonly SmartCopyAppContext _appContext;
     private readonly ITrashService _trashService;
     private readonly FileSystemProviderRegistry _providerRegistry = new();
     private readonly LocalDirectoryWatcherFactory _watcherFactory = new();
     private readonly AppSettings _settings;
     private readonly AppSettingsStore _settingsStore = new();
-    private readonly SessionStore _sessionStore = new();
+    private readonly SessionStore _sessionStore;
     private readonly OperationJournal _operationJournal;
     private readonly WorkflowPresetStore _workflowStore;
     private readonly SelectionManager _selectionManager = new();
@@ -139,6 +142,9 @@ public partial class MainViewModel : ViewModelBase
 
     public MainViewModel()
     {
+        _loggerFactory = LoggerFactory.Create(b => b.AddProvider(new LogPanelLoggerProvider(LogPanel)));
+        _logger = _loggerFactory.CreateLogger<MainViewModel>();
+
         var dataStore = LocalAppDataStore.ForCurrentUser();
         _settings = new AppSettings { SettingsFilePath = dataStore.GetFilePath("settings.json") };
         _appContext = new SmartCopyAppContext(_settings, dataStore, _providerRegistry);
@@ -146,13 +152,14 @@ public partial class MainViewModel : ViewModelBase
         _trashService = CreateTrashService();
 
         _operationJournal = new OperationJournal(dataStore.GetDirectoryPath("Logs"));
-        _workflowStore = new WorkflowPresetStore(dataStore.GetDirectoryPath("Workflows"));
+        _sessionStore = new SessionStore(_loggerFactory.CreateLogger<SessionStore>());
+        _workflowStore = new WorkflowPresetStore(dataStore.GetDirectoryPath("Workflows"), _loggerFactory.CreateLogger<WorkflowPresetStore>());
 
         // Create the ViewModel for the filter chain
         FilterChain = new FilterChainViewModel(_appContext);
 
         // Create the pipeline view model
-        Pipeline = new PipelineViewModel(_appContext);
+        Pipeline = new PipelineViewModel(_appContext, _loggerFactory);
 
         // Create the source path picker
         SourcePathPicker = new PathPickerViewModel(_settings, PathPickerMode.Source);
@@ -213,7 +220,7 @@ public partial class MainViewModel : ViewModelBase
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"Failed to load files for directory: {ex}");
+                        _logger.LogError(ex, "Failed to load files for directory");
                     }
                 }
             }
@@ -252,7 +259,7 @@ public partial class MainViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"Initialization failed: {ex}");
+            _logger.LogError(ex, "Initialization failed");
         }
     }
 
@@ -302,7 +309,7 @@ public partial class MainViewModel : ViewModelBase
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
             {
-                Debug.WriteLine($"Failed to restore session snapshot: {ex}");
+                _logger.LogError(ex, "Failed to restore session snapshot");
             }
         }
         else if (_settings.RestoreLastSourcePath && _settings.LastSourcePath is { Length: > 0 })
@@ -327,7 +334,7 @@ public partial class MainViewModel : ViewModelBase
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Failed to set initial source path to '{SourcePath}': {ex}");
+                _logger.LogError(ex, "Failed to set initial source path to '{Path}'", SourcePath);
                 RevertSourcePath();
             }
         }
@@ -502,7 +509,7 @@ public partial class MainViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[Settings] Failed to save settings: {ex.Message}");
+            _logger.LogError(ex, "Failed to save settings");
         }
     }
 
@@ -634,8 +641,9 @@ public partial class MainViewModel : ViewModelBase
         RefreshIdleStats();
 
         if (result.HasUnmatched)
-            Debug.WriteLine($"[Selection] Restored {result.MatchedCount} of {snapshot.Paths.Count}; "
-                + $"{result.UnmatchedPaths.Count} unmatched: {string.Join(", ", result.UnmatchedPaths)}");
+            _logger.LogWarning("Restored {Matched} of {Total}; {Unmatched} unmatched: {Paths}",
+                result.MatchedCount, snapshot.Paths.Count,
+                result.UnmatchedPaths.Count, string.Join(", ", result.UnmatchedPaths));
     }
 
     private static Window? GetMainWindow()
@@ -738,7 +746,7 @@ public partial class MainViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"Failed to change source path to '{normalizedPath}': {ex}");
+            _logger.LogError(ex, "Failed to change source path to '{Path}'", normalizedPath);
 
             SourcePathValidationMessage = BuildSourcePathValidationMessage(normalizedPath, ex);
             LogPanel.AddEntry(SourcePathValidationMessage, LogLevel.Error);
@@ -1208,7 +1216,7 @@ public partial class MainViewModel : ViewModelBase
 
         if (preset is null)
         {
-            Debug.WriteLine($"Failed to find workflow preset with name '{name}'.");
+            _logger.LogWarning("Failed to find workflow preset with name '{Name}'", name);
             return;
         }
 
@@ -1270,7 +1278,7 @@ public partial class MainViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"Failed to save session snapshot: {ex}");
+            _logger.LogError(ex, "Failed to save session snapshot");
         }
     }
 
@@ -1348,11 +1356,8 @@ public partial class MainViewModel : ViewModelBase
 
     private void OnDirectoryWatcherError(object? sender, Exception error)
     {
-        Debug.WriteLine($"[Watcher] {error}");
-        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-            LogPanel.AddEntry(
-                $"Filesystem watcher warning: {error.Message}. Live updates may be incomplete; use Rescan to refresh.",
-                LogLevel.Warning));
+        _logger.LogWarning(error,
+            "Filesystem watcher warning: live updates may be incomplete; use Rescan to refresh.");
     }
 
     private void OnDirectoryWatcherNodeWillBeRemoved(object? sender, string[] relativeSegments)

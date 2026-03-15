@@ -1,21 +1,22 @@
-using System;
-using System.Diagnostics;
-using System.Linq;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace SmartCopy.Core.Workflows;
 
 public sealed class WorkflowPresetStore
 {
     private readonly string _directory;
+    private readonly ILogger<WorkflowPresetStore> _logger;
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         WriteIndented = true,
     };
 
-    public WorkflowPresetStore(string directory)
+    public WorkflowPresetStore(string directory, ILogger<WorkflowPresetStore>? logger = null)
     {
         _directory = directory;
+        _logger = logger ?? NullLogger<WorkflowPresetStore>.Instance;
     }
 
     public async Task<IReadOnlyList<WorkflowPreset>> GetUserPresetsAsync(
@@ -49,9 +50,9 @@ public sealed class WorkflowPresetStore
                     Config = config,
                 });
             }
-            catch (JsonException ex)                 { Debug.WriteLine($"[WorkflowPresetStore] Skipping preset '{file}': {ex.Message}"); }
-            catch (IOException ex)                   { Debug.WriteLine($"[WorkflowPresetStore] Skipping preset '{file}': {ex.Message}"); }
-            catch (UnauthorizedAccessException ex)   { Debug.WriteLine($"[WorkflowPresetStore] Skipping preset '{file}': {ex.Message}"); }
+            catch (JsonException ex)                 { _logger.LogError(ex, "Skipping preset '{File}'", file); }
+            catch (IOException ex)                   { _logger.LogError(ex, "Skipping preset '{File}'", file); }
+            catch (UnauthorizedAccessException ex)   { _logger.LogError(ex, "Skipping preset '{File}'", file); }
         }
 
         return [.. presets.OrderBy(preset => preset.Name, StringComparer.OrdinalIgnoreCase)];

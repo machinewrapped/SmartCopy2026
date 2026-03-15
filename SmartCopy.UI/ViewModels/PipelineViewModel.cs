@@ -3,6 +3,8 @@ using System.Collections.Specialized;
 using System.Text.Json.Nodes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
@@ -24,6 +26,8 @@ public partial class PipelineViewModel : ViewModelBase
 {
     private const string CustomNameParameter = "customName";
     private const int MaxRecentTargets = 10;
+    private readonly ILogger<PipelineViewModel> _logger;
+    private readonly ILoggerFactory? _loggerFactory;
     private readonly IAppContext _appContext;
     private readonly PipelinePresetStore _presetStore;
     private readonly StepPresetStore _stepPresetStore;
@@ -107,12 +111,14 @@ public partial class PipelineViewModel : ViewModelBase
     public event EventHandler<PipelineStepViewModel>? SwapSourceRequested;
     public event EventHandler? SavePipelineRequested;
 
-    public PipelineViewModel(IAppContext appContext)
+    public PipelineViewModel(IAppContext appContext, ILoggerFactory? loggerFactory = null)
     {
+        _loggerFactory = loggerFactory;
+        _logger = loggerFactory?.CreateLogger<PipelineViewModel>() ?? NullLogger<PipelineViewModel>.Instance;
         _appContext = appContext;
         _appSettings = appContext.Settings;
-        _presetStore = new PipelinePresetStore(appContext.DataStore.GetDirectoryPath("Pipelines"));
-        _stepPresetStore = new StepPresetStore(appContext.DataStore.GetFilePath("step-presets.json"));
+        _presetStore = new PipelinePresetStore(appContext.DataStore.GetDirectoryPath("Pipelines"), loggerFactory?.CreateLogger<PipelinePresetStore>());
+        _stepPresetStore = new StepPresetStore(appContext.DataStore.GetFilePath("step-presets.json"), loggerFactory?.CreateLogger<StepPresetStore>());
 
         AddStep = new AddStepViewModel(_appContext);
         AddStep.StepPresetPicked += OnStepPresetPicked;
@@ -144,7 +150,7 @@ public partial class PipelineViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ERROR] OnStepPresetPicked failed: {ex}");
+            _logger.LogError(ex, "OnStepPresetPicked failed");
         }
     }
 
@@ -157,7 +163,7 @@ public partial class PipelineViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ERROR] Failed to delete pipeline preset '{name}': {ex.Message}");
+            _logger.LogError(ex, "Failed to delete pipeline preset '{Name}'", name);
         }
     }
 
@@ -357,7 +363,7 @@ public partial class PipelineViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ERROR] OnStepChanged failed: {ex}");
+            _logger.LogError(ex, "OnStepChanged failed");
         }
     }
 
@@ -486,7 +492,7 @@ public partial class PipelineViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ERROR] Revalidate failed: {ex}");
+            _logger.LogError(ex, "Revalidate failed");
         }
     }
 

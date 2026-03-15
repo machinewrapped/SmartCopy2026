@@ -578,7 +578,7 @@ public partial class MainWindow : Window
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[ERR] Cancel operation failed: {ex.Message}");
+                _mainVm?.LogPanel.AddEntry($"Cancel operation failed: {ex.Message}", LogLevel.Error);
             }
         }
     }
