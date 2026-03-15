@@ -1,11 +1,13 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
              x:Class="SmartCopy.UI.Views.LogPanelView"
              x:DataType="vm:LogPanelViewModel">
     <DockPanel>
         <!-- Header: always visible -->
         <DockPanel DockPanel.Dock="Top" Margin="8,4">
+            <!-- Right-docked controls (declared first so they get priority) -->
             <Button DockPanel.Dock="Right"
                     Content="Clear"
                     Command="{Binding ClearCommand}"
@@ -14,39 +16,51 @@
                     Padding="8,2"
                     CornerRadius="4"
                     VerticalAlignment="Center" />
-            <ToggleButton IsChecked="{Binding IsExpanded, Mode=TwoWay}"
-                          AutomationProperties.Name="Toggle log panel"
-                          VerticalAlignment="Center"
-                          Padding="4,2"
-                          CornerRadius="4">
-                <TextBlock Text="{Binding EntryCount, StringFormat='Log ({0})'}" />
-            </ToggleButton>
+            <ComboBox DockPanel.Dock="Right"
+                      IsVisible="{Binding IsExpanded}"
+                      SelectedItem="{Binding MinimumLevel, Mode=TwoWay}"
+                      AutomationProperties.Name="Minimum log level"
+                      Margin="4,0"
+                      Padding="6,2"
+                      VerticalAlignment="Center">
+                <ComboBox.Items>
+                    <vm:LogLevel>Info</vm:LogLevel>
+                    <vm:LogLevel>Warning</vm:LogLevel>
+                    <vm:LogLevel>Error</vm:LogLevel>
+                </ComboBox.Items>
+            </ComboBox>
+            <!-- Toggle + count badges, left-aligned together -->
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="6">
+                <ToggleButton IsChecked="{Binding IsExpanded, Mode=TwoWay}"
+                              AutomationProperties.Name="Toggle log panel"
+                              Padding="4,2"
+                              CornerRadius="4">
+                    <TextBlock Text="{Binding EntryCount, StringFormat='Log ({0})'}" />
+                </ToggleButton>
+                <TextBlock Text="{Binding WarningCount, StringFormat='⚠ {0}'}"
+                           IsVisible="{Binding WarningCount}"
+                           Foreground="#ffa500"
+                           FontSize="12"
+                           VerticalAlignment="Center" />
+                <TextBlock Text="{Binding ErrorCount, StringFormat='✕ {0}'}"
+                           IsVisible="{Binding ErrorCount}"
+                           Foreground="#fa8072"
+                           FontSize="12"
+                           VerticalAlignment="Center" />
+            </StackPanel>
         </DockPanel>
 
-        <!-- Body: collapsible log list with auto-scroll -->
+        <!-- Body: collapsible log with auto-scroll and cross-line selection -->
         <ScrollViewer x:Name="LogScrollViewer"
                       IsVisible="{Binding IsExpanded}"
                       MaxHeight="150"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto">
-            <ItemsControl ItemsSource="{Binding Entries}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:LogEntry">
-                        <SelectableTextBlock FontFamily="Consolas, Courier New, monospace"
-                                             FontSize="13"
-                                             TextWrapping="NoWrap"
-                                             Padding="4,1"
-                                             Foreground="{Binding ForegroundColor}">
-                            <SelectableTextBlock.Text>
-                                <MultiBinding StringFormat="{}{0:HH:mm:ss}  {1}">
-                                    <Binding Path="Timestamp" />
-                                    <Binding Path="Message" />
-                                </MultiBinding>
-                            </SelectableTextBlock.Text>
-                        </SelectableTextBlock>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            <SelectableTextBlock x:Name="LogTextBlock"
+                                 FontFamily="Consolas, Courier New, monospace"
+                                 FontSize="13"
+                                 TextWrapping="Wrap"
+                                 Padding="4,2" />
         </ScrollViewer>
     </DockPanel>
 </UserControl>

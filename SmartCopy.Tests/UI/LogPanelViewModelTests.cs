@@ -50,4 +50,51 @@ public sealed class LogPanelViewModelTests
 
         Assert.False(vm.IsExpanded);
     }
+
+    [Fact]
+    public void MinimumLevel_DefaultsToInfo()
+    {
+        var vm = new LogPanelViewModel();
+
+        Assert.Equal(LogLevel.Info, vm.MinimumLevel);
+    }
+
+    [Fact]
+    public void WarningCount_IncrementsOnlyForWarnings()
+    {
+        var vm = new LogPanelViewModel();
+
+        vm.AddEntry("info", LogLevel.Info);
+        vm.AddEntry("warn", LogLevel.Warning);
+        vm.AddEntry("warn2", LogLevel.Warning);
+        vm.AddEntry("err", LogLevel.Error);
+
+        Assert.Equal(2, vm.WarningCount);
+    }
+
+    [Fact]
+    public void ErrorCount_IncrementsOnlyForErrors()
+    {
+        var vm = new LogPanelViewModel();
+
+        vm.AddEntry("info", LogLevel.Info);
+        vm.AddEntry("warn", LogLevel.Warning);
+        vm.AddEntry("err", LogLevel.Error);
+        vm.AddEntry("err2", LogLevel.Error);
+
+        Assert.Equal(2, vm.ErrorCount);
+    }
+
+    [Fact]
+    public void Clear_ResetsCounts()
+    {
+        var vm = new LogPanelViewModel();
+        vm.AddEntry("warn", LogLevel.Warning);
+        vm.AddEntry("err", LogLevel.Error);
+
+        vm.ClearCommand.Execute(null);
+
+        Assert.Equal(0, vm.WarningCount);
+        Assert.Equal(0, vm.ErrorCount);
+    }
 }
