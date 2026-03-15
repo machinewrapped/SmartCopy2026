@@ -603,10 +603,12 @@ Exit criteria:
 ### 5.4 Bug fixes and polish
 
 - [X] Loading a workflow with a Move step does not correctly restore the Overwrite mode
+- [ ] Loading a workflow with a Move step does not correctly restore the Overwrite mode
+- [ ] Log panel only shows messages that are explicitly added with LogPanel.AddEntry, messages written with e.g. Debug.WriteLine are not surfaced, yet often contain important feedback for the user or essential diagnostic information for bug reports.
+- [ ] Log panel tab header should show error and warning counts
+- [ ] Users should be able to filter log on error/warning/info (category toggles or minimum severity dropdown?)
 - [ ] Log panel displays messages as stacked panels with no line wrapping, so long messages are cropped
-- [ ] Multiple lines of text cannot be selected in the log window
-- [ ] Log window tab header should show error and warning counts
-- [ ] Users should be able to filter log view on error/warning/info (category toggles?)
+- [ ] Text selection only works within a single log message, cannot select multiple lines or across lines (non-idiomatic)
 
 Exit criteria:
 - [ ] All bug fixes are implemented and tests are added
