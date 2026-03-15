@@ -67,15 +67,32 @@ public sealed class ExtensionFilterTests
     [InlineData("mp3",    true)]
     [InlineData("FLAC",   true)]
     [InlineData("x.y",    false)] // embedded dot
-    [InlineData("x*y",    false)] // illegal char
-    [InlineData("x?y",    false)] // illegal char
-    [InlineData("x:y",    false)] // illegal char
     [InlineData("",       false)] // empty
     [InlineData(" ",      false)] // whitespace
     public void IsValidExtension_ValidatesCorrectly(string normalized, bool expected)
     {
         var result = ExtensionFilter.IsValidExtension(normalized);
         Assert.Equal(expected, result);
+    }
+
+    [Theory]
+    [InlineData("x*y")]
+    [InlineData("x?y")]
+    [InlineData("x:y")]
+    public void IsValidExtension_WildcardsAndSpecialChars_AreInvalidOnlyOnWindows(string normalized)
+    {
+        var result = ExtensionFilter.IsValidExtension(normalized);
+        
+        // On Windows, these are invalid filename chars. 
+        // On Linux/macOS, they are technically allowed, so ExtensionFilter accepts them.
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.False(result);
+        }
+        else
+        {
+            Assert.True(result);
+        }
     }
 
     // -------------------------------------------------------------------------
