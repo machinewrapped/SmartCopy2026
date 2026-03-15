@@ -37,6 +37,9 @@ public partial class MainViewModel : ViewModelBase
     private bool _autoOpenLogOnRun = true;
 
     [ObservableProperty]
+    private bool _verboseLogging;
+
+    [ObservableProperty]
     private bool _showExcludedNodesByDefault = true;
 
     [ObservableProperty]
@@ -261,6 +264,7 @@ public partial class MainViewModel : ViewModelBase
 
         UseAbsolutePathsForSelection = _settings.UseAbsolutePathsForSelectionSave;
         AutoOpenLogOnRun = _settings.AutoOpenLogOnRun;
+        VerboseLogging = _settings.VerboseLogging;
         ShowExcludedNodesByDefault = _settings.ShowFilteredNodesInTree;
         RestoreLastWorkflow = _settings.RestoreLastWorkflow;
         RestoreLastSourcePath = _settings.RestoreLastSourcePath;
@@ -350,6 +354,13 @@ public partial class MainViewModel : ViewModelBase
     partial void OnAutoOpenLogOnRunChanged(bool value)
     {
         _settings.AutoOpenLogOnRun = value;
+        _ = SaveSettingsAsync();
+    }
+
+    partial void OnVerboseLoggingChanged(bool value)
+    {
+        _settings.VerboseLogging = value;
+        LogPanel.VerboseLogging = value;
         _ = SaveSettingsAsync();
     }
 
