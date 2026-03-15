@@ -81,6 +81,16 @@
             <SolidColorBrush x:Key="CancelButtonBackgroundBrush"    Color="#c0392b" />
 
             <!-- ═══════════════════════════════════════════════════════════
+                 LOG PANEL TEXT TOKENS
+            ════════════════════════════════════════════════════════════ -->
+            <!-- Timestamp column in log entries -->
+            <SolidColorBrush x:Key="LogTimestampBrush"               Color="#888888" />
+            <!-- Warning log entries and ⚠ badge -->
+            <SolidColorBrush x:Key="LogWarningBrush"                 Color="#ffa500" />
+            <!-- Error log entries and ✕ badge -->
+            <SolidColorBrush x:Key="LogErrorBrush"                   Color="#fa8072" />
+
+            <!-- ═══════════════════════════════════════════════════════════
                  ACTION BUTTON TOKENS
             ════════════════════════════════════════════════════════════ -->
             <!-- "Run" pipeline button -->

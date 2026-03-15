@@ -18,14 +18,19 @@ public sealed class LogPanelTraceListener : TraceListener
     public override void Write(string? message)
     {
         if (message is not null)
-            _buffer.Append(message);
+            lock (_buffer)
+                _buffer.Append(message);
     }
 
     public override void WriteLine(string? message)
     {
-        _buffer.Append(message);
-        var line = _buffer.ToString();
-        _buffer.Clear();
+        string line;
+        lock (_buffer)
+        {
+            _buffer.Append(message);
+            line = _buffer.ToString();
+            _buffer.Clear();
+        }
 
         var level = DetectLevel(line);
         Dispatcher.UIThread.Post(() => _vm.AddEntry(line, level), DispatcherPriority.Background);

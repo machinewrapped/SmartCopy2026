@@ -1,5 +1,6 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Media;
@@ -12,10 +13,21 @@ public partial class LogPanelView : UserControl
 {
     private LogPanelViewModel? _vm;
 
+    private readonly IBrush _timestampBrush;
+    private readonly IBrush _infoBrush;
+    private readonly IBrush _warningBrush;
+    private readonly IBrush _errorBrush;
+
     public LogPanelView()
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+
+        var res = Application.Current!.Resources;
+        _timestampBrush = (IBrush)res["LogTimestampBrush"]!;
+        _infoBrush      = (IBrush)res["DefaultForegroundBrush"]!;
+        _warningBrush   = (IBrush)res["LogWarningBrush"]!;
+        _errorBrush     = (IBrush)res["LogErrorBrush"]!;
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
@@ -83,11 +95,19 @@ public partial class LogPanelView : UserControl
     {
         LogTextBlock.Inlines!.Add(new Run($"{entry.Timestamp:HH:mm:ss}  ")
         {
-            Foreground = new SolidColorBrush(Color.Parse("#888888"))
+            Foreground = _timestampBrush
         });
+
+        var messageBrush = entry.Level switch
+        {
+            LogLevel.Warning => _warningBrush,
+            LogLevel.Error   => _errorBrush,
+            _                => _infoBrush
+        };
+
         LogTextBlock.Inlines!.Add(new Run($"{LevelPrefix(entry.Level)}{entry.Message}\n")
         {
-            Foreground = new SolidColorBrush(Color.Parse(entry.ForegroundColor))
+            Foreground = messageBrush
         });
     }
 

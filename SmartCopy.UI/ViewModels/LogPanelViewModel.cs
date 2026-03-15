@@ -6,15 +6,7 @@ namespace SmartCopy.UI.ViewModels;
 
 public enum LogLevel { Info, Warning, Error }
 
-public record LogEntry(DateTime Timestamp, string Message, LogLevel Level = LogLevel.Info)
-{
-    public string ForegroundColor => Level switch
-    {
-        LogLevel.Warning => "#ffa500",
-        LogLevel.Error => "#fa8072",
-        _ => "#e0e0e0",
-    };
-}
+public record LogEntry(DateTime Timestamp, string Message, LogLevel Level = LogLevel.Info);
 
 public partial class LogPanelViewModel : ViewModelBase
 {
@@ -24,26 +16,37 @@ public partial class LogPanelViewModel : ViewModelBase
     [ObservableProperty]
     private LogLevel _minimumLevel = LogLevel.Info;
 
+    public Array LogLevels { get; } = Enum.GetValues<LogLevel>();
+
     public ObservableCollection<LogEntry> Entries { get; } = [];
 
     public int EntryCount => Entries.Count;
-    public int WarningCount { get; private set; }
-    public int ErrorCount { get; private set; }
+
+    private int _warningCount;
+    public int WarningCount
+    {
+        get => _warningCount;
+        private set { if (SetProperty(ref _warningCount, value)) OnPropertyChanged(nameof(IsWarningBadgeVisible)); }
+    }
+
+    private int _errorCount;
+    public int ErrorCount
+    {
+        get => _errorCount;
+        private set { if (SetProperty(ref _errorCount, value)) OnPropertyChanged(nameof(IsErrorBadgeVisible)); }
+    }
+
+    public bool IsWarningBadgeVisible => WarningCount > 0;
+    public bool IsErrorBadgeVisible => ErrorCount > 0;
 
     public void AddEntry(string message, LogLevel level = LogLevel.Info)
     {
         Entries.Add(new LogEntry(DateTime.Now, message, level));
         OnPropertyChanged(nameof(EntryCount));
         if (level == LogLevel.Warning)
-        {
             WarningCount++;
-            OnPropertyChanged(nameof(WarningCount));
-        }
         else if (level == LogLevel.Error)
-        {
             ErrorCount++;
-            OnPropertyChanged(nameof(ErrorCount));
-        }
         if (level >= LogLevel.Warning)
             IsExpanded = true;
     }
@@ -55,7 +58,5 @@ public partial class LogPanelViewModel : ViewModelBase
         WarningCount = 0;
         ErrorCount = 0;
         OnPropertyChanged(nameof(EntryCount));
-        OnPropertyChanged(nameof(WarningCount));
-        OnPropertyChanged(nameof(ErrorCount));
     }
 }
