@@ -39,6 +39,16 @@ public sealed class LogPanelTraceListener : TraceListener
             _buffer.Clear();
         }
 
+        // Avalonia binding diagnostics are internal noise — never useful to end users.
+        if (line.StartsWith("[Binding]", StringComparison.Ordinal))
+            return;
+
+        // Suppress stack-trace dumps (multi-line exception ToString() output) unless the
+        // user has opted into verbose logging for bug reporting. The explicit [ERR] log
+        // entries already surface the user-facing message; raw stack frames are not actionable.
+        if (!_vm.VerboseLogging && line.Contains('\n'))
+            return;
+
         var level = DetectLevel(line);
         Dispatcher.UIThread.Post(() => _vm.AddEntry(line, level), DispatcherPriority.Background);
     }

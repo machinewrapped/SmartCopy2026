@@ -43,6 +43,7 @@ public partial class MainWindow : Window
     // Options menu — Display
     private MenuItem? _autoOpenLogMenuItem;
     private MenuItem? _showExcludedNodesMenuItem;
+    private MenuItem? _verboseLoggingMenuItem;
 
     // Options menu — Startup
     private MenuItem? _restoreLastWorkflowMenuItem;
@@ -247,6 +248,12 @@ public partial class MainWindow : Window
             () => { if (_mainVm is not null) _mainVm.AutoOpenLogOnRun = !_mainVm.AutoOpenLogOnRun; });
         OptionsMenu.Items.Add(_autoOpenLogMenuItem);
 
+        _verboseLoggingMenuItem = Toggle(
+            "_Verbose Logging (for bug reports)",
+            _mainVm?.VerboseLogging ?? false,
+            () => { if (_mainVm is not null) _mainVm.VerboseLogging = !_mainVm.VerboseLogging; });
+        OptionsMenu.Items.Add(_verboseLoggingMenuItem);
+
         // ── Section: Pipeline ──────────────────────────────────────────────────
         OptionsMenu.Items.Add(new Separator());
         OptionsMenu.Items.Add(SectionHeader("Pipeline"));
@@ -405,6 +412,11 @@ public partial class MainWindow : Window
             case nameof(MainViewModel.AutoOpenLogOnRun):
                 if (_autoOpenLogMenuItem is not null)
                     _autoOpenLogMenuItem.IsChecked = _mainVm?.AutoOpenLogOnRun ?? true;
+                break;
+
+            case nameof(MainViewModel.VerboseLogging):
+                if (_verboseLoggingMenuItem is not null)
+                    _verboseLoggingMenuItem.IsChecked = _mainVm?.VerboseLogging ?? false;
                 break;
 
             case nameof(MainViewModel.ShowExcludedNodesByDefault):

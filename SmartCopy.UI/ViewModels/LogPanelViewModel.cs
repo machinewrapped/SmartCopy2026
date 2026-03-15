@@ -13,6 +13,9 @@ public partial class LogPanelViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isExpanded = false;
 
+    [ObservableProperty]
+    private bool _verboseLogging;
+
     private LogLevel? _filterLevel;
     public LogLevel? FilterLevel
     {

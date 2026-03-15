@@ -72,6 +72,10 @@ public sealed class AppSettings
     public bool UseAbsolutePathsForSelectionSave { get; set; }
     public bool AutoOpenLogOnRun { get; set; } = true;
 
+    /// <summary>Show full diagnostic output (exception stack traces, etc.) in the log panel.
+    /// Useful for capturing details when reporting bugs. No effect in DEBUG builds.</summary>
+    public bool VerboseLogging { get; set; } = false;
+
     /// <summary>
     /// Copies all persisted properties from <paramref name="saved"/> into this instance,
     /// preserving <see cref="SettingsFilePath"/> which is not serialised to JSON.
@@ -110,6 +114,7 @@ public sealed class AppSettings
         StepTypeMruPresetIds = saved.StepTypeMruPresetIds;
         UseAbsolutePathsForSelectionSave = saved.UseAbsolutePathsForSelectionSave;
         AutoOpenLogOnRun = saved.AutoOpenLogOnRun;
+        VerboseLogging = saved.VerboseLogging;
     }
 }
 
