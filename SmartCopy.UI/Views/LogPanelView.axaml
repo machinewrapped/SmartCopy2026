@@ -34,15 +34,20 @@
     <DockPanel>
         <!-- Header: always visible -->
         <DockPanel DockPanel.Dock="Top" Margin="8,4">
-            <!-- Right-docked clear button -->
-            <Button DockPanel.Dock="Right"
-                    Content="Clear"
-                    Command="{Binding ClearCommand}"
-                    IsVisible="{Binding IsExpanded}"
-                    AutomationProperties.Name="Clear log"
-                    Padding="8,2"
-                    CornerRadius="4"
-                    VerticalAlignment="Center" />
+            <!-- Right-docked action buttons -->
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4"
+                        IsVisible="{Binding IsExpanded}" VerticalAlignment="Center">
+                <Button x:Name="CopyButton"
+                        Content="Copy"
+                        AutomationProperties.Name="Copy log to clipboard"
+                        Padding="8,2"
+                        CornerRadius="4"/>
+                <Button Content="Clear"
+                        Command="{Binding ClearCommand}"
+                        AutomationProperties.Name="Clear log"
+                        Padding="8,2"
+                        CornerRadius="4"/>
+            </StackPanel>
             <!-- Toggle + filter buttons, left-aligned together -->
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="6">
                 <ToggleButton IsChecked="{Binding IsExpanded, Mode=TwoWay}"
@@ -70,18 +75,52 @@
             </StackPanel>
         </DockPanel>
 
-        <!-- Body: collapsible log with auto-scroll and cross-line selection -->
-        <ScrollViewer x:Name="LogScrollViewer"
-                      IsVisible="{Binding IsExpanded}"
-                      MaxHeight="150"
-                      HorizontalScrollBarVisibility="Disabled"
-                      VerticalScrollBarVisibility="Auto">
-            <SelectableTextBlock x:Name="LogTextBlock"
-                                 Background="Transparent"
-                                 FontFamily="Consolas, Courier New, monospace"
-                                 FontSize="13"
-                                 TextWrapping="Wrap"
-                                 Padding="4,2" />
-        </ScrollViewer>
+        <!-- Body: collapsible, virtualized log -->
+        <ListBox x:Name="LogListBox"
+                 ItemsSource="{Binding DisplayedEntries}"
+                 IsVisible="{Binding IsExpanded}"
+                 SelectionMode="Multiple"
+                 MaxHeight="150"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 Padding="0">
+            <ListBox.Styles>
+                <Style Selector="ListBoxItem">
+                    <Setter Property="Padding" Value="4,1"/>
+                </Style>
+                <Style Selector="TextBlock.ts">
+                    <Setter Property="Foreground" Value="{DynamicResource LogTimestampBrush}"/>
+                </Style>
+                <Style Selector="TextBlock.msg">
+                    <Setter Property="Foreground" Value="{DynamicResource DefaultForegroundBrush}"/>
+                </Style>
+                <Style Selector="TextBlock.msg.warn">
+                    <Setter Property="Foreground" Value="{DynamicResource LogWarningBrush}"/>
+                </Style>
+                <Style Selector="TextBlock.msg.err">
+                    <Setter Property="Foreground" Value="{DynamicResource LogErrorBrush}"/>
+                </Style>
+            </ListBox.Styles>
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:LogEntry">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Left"
+                                   Classes="ts"
+                                   FontFamily="Consolas, Courier New, monospace"
+                                   FontSize="13"
+                                   Text="{Binding FormattedTimestamp}"
+                                   VerticalAlignment="Top"/>
+                        <TextBlock Classes="msg"
+                                   Classes.warn="{Binding IsWarning}"
+                                   Classes.err="{Binding IsError}"
+                                   FontFamily="Consolas, Courier New, monospace"
+                                   FontSize="13"
+                                   TextWrapping="Wrap"
+                                   Text="{Binding DisplayText}"/>
+                    </DockPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
     </DockPanel>
 </UserControl>

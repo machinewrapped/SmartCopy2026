@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using Avalonia;
+using Avalonia.Threading;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
@@ -1100,7 +1102,11 @@ public partial class MainViewModel : ViewModelBase
 
     private async Task ExecutePipelineAsync(PipelineRunner runner, PipelineJob job)
     {
-        var nodeProgress = new Progress<TransformResult>(OnNodeCompleted);
+        var resultQueue = new ConcurrentQueue<TransformResult>();
+        var logTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+        logTimer.Tick += (_, _) => DrainResultQueue(resultQueue);
+
+        var nodeProgress = new SynchronousProgress<TransformResult>(resultQueue.Enqueue);
         var executionJob = StatusBar.Progress.Begin(job with
         {
             NodeProgress = nodeProgress,
@@ -1110,6 +1116,7 @@ public partial class MainViewModel : ViewModelBase
 
         Pipeline.IsRunning = true;
         FilterChain.IsLocked = true;
+        logTimer.Start();
 
         if (AutoOpenLogOnRun)
             LogPanel.IsExpanded = true;
@@ -1117,44 +1124,17 @@ public partial class MainViewModel : ViewModelBase
         try
         {
             var results = await runner.ExecuteAsync(executionJob);
+            logTimer.Stop();
+            DrainResultQueue(resultQueue);
 
             await _operationJournal.WriteAsync(results.Where(r => r.SourceNodeResult != SourceResult.None));
-
-            foreach (var r in results)
-            {
-                if (!r.IsSuccess)
-                {
-                    var failMsg = r.ErrorMessage is { Length: > 0 } e
-                        ? $"Failed: {r.SourceNode.Name} — {e}"
-                        : $"Failed: {r.SourceNode.Name}";
-                    LogPanel.AddEntry(failMsg, LogLevel.Error);
-                }
-                else if (r.SourceNodeResult == SourceResult.Copied)
-                {
-                    LogPanel.AddEntry($"Copied {r.SourceNode.Name} → {r.DestinationPath} ({FileSizeFormatter.FormatBytes(r.OutputBytes)})");
-                }
-                else if (r.SourceNodeResult == SourceResult.Moved)
-                {
-                    LogPanel.AddEntry($"Moved {r.SourceNode.Name} → {r.DestinationPath} ({FileSizeFormatter.FormatBytes(r.OutputBytes)})");
-                }
-                else if (r.SourceNodeResult is SourceResult.Trashed or SourceResult.Deleted)
-                {
-                    LogPanel.AddEntry($"Deleted {r.SourceNode.Name} ({FileSizeFormatter.FormatBytes(r.InputBytes)})");
-                }
-
-                if (r.DestinationResult != DestinationResult.None)
-                {
-                    if (r.DestinationResult == DestinationResult.Overwritten)
-                    {
-                        LogPanel.AddEntry($"Overwrote {r.DestinationPath ?? "(unknown)"}");
-                    }
-                }
-            }
 
             StatusBar.Progress.Complete();
         }
         catch (OperationCanceledException)
         {
+            logTimer.Stop();
+            DrainResultQueue(resultQueue);
             StatusBar.Progress.Cancelled();
         }
         finally
@@ -1168,15 +1148,41 @@ public partial class MainViewModel : ViewModelBase
         }
     }
 
+    private void DrainResultQueue(ConcurrentQueue<TransformResult> queue)
+    {
+        while (queue.TryDequeue(out var result))
+            OnNodeCompleted(result);
+    }
+
     private void OnNodeCompleted(TransformResult result)
     {
         if (!result.IsSuccess)
+        {
+            var failMsg = result.ErrorMessage is { Length: > 0 } e
+                ? $"Failed: {result.SourceNode.Name} — {e}"
+                : $"Failed: {result.SourceNode.Name}";
+            LogPanel.AddEntry(failMsg, LogLevel.Error);
             return;
+        }
 
         if (result.SourceNodeResult is SourceResult.Moved or SourceResult.Trashed or SourceResult.Deleted)
-        {
             result.SourceNode.MarkForRemoval();
+
+        switch (result.SourceNodeResult)
+        {
+            case SourceResult.Copied:
+                LogPanel.AddEntry($"Copied {result.SourceNode.Name} → {result.DestinationPath} ({FileSizeFormatter.FormatBytes(result.OutputBytes)})");
+                break;
+            case SourceResult.Moved:
+                LogPanel.AddEntry($"Moved {result.SourceNode.Name} → {result.DestinationPath} ({FileSizeFormatter.FormatBytes(result.OutputBytes)})");
+                break;
+            case SourceResult.Trashed or SourceResult.Deleted:
+                LogPanel.AddEntry($"Deleted {result.SourceNode.Name} ({FileSizeFormatter.FormatBytes(result.InputBytes)})");
+                break;
         }
+
+        if (result.DestinationResult == DestinationResult.Overwritten)
+            LogPanel.AddEntry($"Overwrote {result.DestinationPath ?? "(unknown)"}");
     }
 
     private async Task SaveWorkflowAsync()
@@ -1438,4 +1444,9 @@ public partial class MainViewModel : ViewModelBase
         _providerRegistry.Register(_memoryProvider);
     }
 #endif
+
+    private sealed class SynchronousProgress<T>(Action<T> callback) : IProgress<T>
+    {
+        public void Report(T value) => callback(value);
+    }
 }

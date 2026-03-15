@@ -5,7 +5,20 @@ using Microsoft.Extensions.Logging;
 
 namespace SmartCopy.UI.ViewModels;
 
-public record LogEntry(DateTime Timestamp, string Message, LogLevel Level = LogLevel.Information);
+public record LogEntry(DateTime Timestamp, string Message, LogLevel Level = LogLevel.Information)
+{
+    public string FormattedTimestamp => $"{Timestamp:HH:mm:ss}  ";
+    public string DisplayText        => LevelPrefix() + Message;
+    public bool   IsWarning          => Level == LogLevel.Warning;
+    public bool   IsError            => Level >= LogLevel.Error;
+
+    private string LevelPrefix() => Level switch
+    {
+        LogLevel.Warning  => "[WARN]  ",
+        >= LogLevel.Error => "[ERR]   ",
+        _                 => ""
+    };
+}
 
 public partial class LogPanelViewModel : ViewModelBase
 {
@@ -25,6 +38,7 @@ public partial class LogPanelViewModel : ViewModelBase
             {
                 OnPropertyChanged(nameof(IsWarningFilterActive));
                 OnPropertyChanged(nameof(IsErrorFilterActive));
+                RebuildDisplayedEntries();
             }
         }
     }
@@ -32,7 +46,8 @@ public partial class LogPanelViewModel : ViewModelBase
     public bool IsWarningFilterActive => FilterLevel == LogLevel.Warning;
     public bool IsErrorFilterActive   => FilterLevel == LogLevel.Error;
 
-    public ObservableCollection<LogEntry> Entries { get; } = [];
+    public ObservableCollection<LogEntry> Entries          { get; } = [];
+    public ObservableCollection<LogEntry> DisplayedEntries { get; } = [];
 
     public int EntryCount => Entries.Count;
 
@@ -55,8 +70,10 @@ public partial class LogPanelViewModel : ViewModelBase
 
     public void AddEntry(string message, LogLevel level = LogLevel.Information)
     {
-        Entries.Add(new LogEntry(DateTime.Now, message, level));
+        var entry = new LogEntry(DateTime.Now, message, level);
+        Entries.Add(entry);
         OnPropertyChanged(nameof(EntryCount));
+        if (PassesFilter(entry)) DisplayedEntries.Add(entry);
         if (level == LogLevel.Warning)
             WarningCount++;
         else if (level >= LogLevel.Error)
@@ -77,9 +94,19 @@ public partial class LogPanelViewModel : ViewModelBase
     private void Clear()
     {
         Entries.Clear();
+        DisplayedEntries.Clear();
         WarningCount = 0;
         ErrorCount = 0;
         FilterLevel = null;
         OnPropertyChanged(nameof(EntryCount));
+    }
+
+    private bool PassesFilter(LogEntry e) => _filterLevel == null || e.Level == _filterLevel;
+
+    private void RebuildDisplayedEntries()
+    {
+        DisplayedEntries.Clear();
+        foreach (var e in Entries)
+            if (PassesFilter(e)) DisplayedEntries.Add(e);
     }
 }
