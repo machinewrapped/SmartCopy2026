@@ -529,7 +529,7 @@ public partial class MainWindow : Window
 
         if (mods == (KeyModifiers.Control | KeyModifiers.Shift))
         {
-            // Skip selection chords when the log panel has focus — it intercepts Ctrl+A itself.
+            // Skip selection chords when the log panel has focus as user may not expect them to apply to the directory tree
             if (FocusManager?.GetFocusedElement() is SelectableTextBlock) return;
 
             switch (key)
