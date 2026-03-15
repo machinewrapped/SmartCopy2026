@@ -57,12 +57,9 @@ The UI is organized as a left-to-right data flow:
 
 Pre-built binaries are available on the [Releases](https://github.com/machinewrapped/SmartCopy2026/releases) page for Windows, Linux, and macOS.
 
-Download the archive, extract it anywhere you like and run the executable. There is no installer.
+Simply download the archive, extract it anywhere you like and run it. There is no installer, it should run from anywhere.
 
-### Windows
-```
-(coming soon) winget install machinewrapped.SmartCopy
-```
+Alternatively, you can install it via homebrew or winget:
 
 ### macOS / Linux / WSL
 ```
@@ -72,12 +69,14 @@ brew install smartcopy
 
 > **Note:** The macOS binary is not code-signed. On first launch, right-click → Open to bypass Gatekeeper.
 
-### Linux (without Homebrew)
-Download the `linux-x64` archive from the Releases page, extract, and run the `SmartCopy` binary directly.
-
 ---
 
-## Building and running
+### Windows
+```
+(coming soon) winget install machinewrapped.SmartCopy
+```
+
+## Building and running from source
 
 Requires [.NET 10 SDK](https://dotnet.microsoft.com/download).
 
