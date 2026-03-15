@@ -1,22 +1,21 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
+using SmartCopy.Core.Logging;
 
 namespace SmartCopy.Core.Workflows;
 
 public sealed class WorkflowPresetStore
 {
     private readonly string _directory;
-    private readonly ILogger<WorkflowPresetStore> _logger;
+    private readonly ILogger<WorkflowPresetStore> _logger = AppLog.CreateLogger<WorkflowPresetStore>();
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         WriteIndented = true,
     };
 
-    public WorkflowPresetStore(string directory, ILogger<WorkflowPresetStore>? logger = null)
+    public WorkflowPresetStore(string directory)
     {
         _directory = directory;
-        _logger = logger ?? NullLogger<WorkflowPresetStore>.Instance;
     }
 
     public async Task<IReadOnlyList<WorkflowPreset>> GetUserPresetsAsync(

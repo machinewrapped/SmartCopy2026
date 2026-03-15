@@ -1,22 +1,21 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
+using SmartCopy.Core.Logging;
 
 namespace SmartCopy.Core.Filters;
 
 public sealed class FilterChainPresetStore
 {
     private readonly string _directory;
-    private readonly ILogger<FilterChainPresetStore> _logger;
+    private readonly ILogger<FilterChainPresetStore> _logger = AppLog.CreateLogger<FilterChainPresetStore>();
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         WriteIndented = true,
     };
 
-    public FilterChainPresetStore(string directory, ILogger<FilterChainPresetStore>? logger = null)
+    public FilterChainPresetStore(string directory)
     {
         _directory = directory;
-        _logger = logger ?? NullLogger<FilterChainPresetStore>.Instance;
     }
 
     public async Task<IReadOnlyList<FilterChainPreset>> GetUserPresetsAsync(
