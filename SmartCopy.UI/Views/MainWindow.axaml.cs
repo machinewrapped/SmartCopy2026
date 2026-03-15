@@ -579,7 +579,7 @@ public partial class MainWindow : Window
             }
             catch (Exception ex)
             {
-                _mainVm?.LogPanel.AddEntry($"Cancel operation failed: {ex.Message}", LogLevel.Error);
+                _mainVm?.Logger.LogError(ex, $"Cancel operation failed: {ex.Message}", LogLevel.Error);
             }
         }
     }

@@ -144,6 +144,8 @@ public partial class MainViewModel : ViewModelBase
     public WorkflowMenuViewModel WorkflowMenu { get; }
     public LogPanelViewModel LogPanel { get; } = new();
 
+    public ILogger Logger => _logger;
+
     public MainViewModel()
     {
         _loggerFactory = LoggerFactory.Create(b => b
