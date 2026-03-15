@@ -13,6 +13,9 @@ public sealed class FlattenStep : IPipelineStep
 
     public FlattenConflictStrategy ConflictStrategy { get; set; }
 
+    internal static FlattenStep FromConfig(TransformStepConfig config) =>
+        new(config.ParseEnum("conflictStrategy", FlattenConflictStrategy.AutoRenameCounter));
+
     public StepKind StepType => StepKind.Flatten;
     public bool IsExecutable => false;
 

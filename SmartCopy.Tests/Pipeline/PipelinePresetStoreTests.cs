@@ -97,4 +97,26 @@ public sealed class PipelinePresetStoreTests
 
         Assert.Throws<UnknownStepTypeException>(() => PipelineStepFactory.FromConfig(config));
     }
+
+    [Theory]
+    [InlineData(OverwriteMode.Skip)]
+    [InlineData(OverwriteMode.Always)]
+    [InlineData(OverwriteMode.IfNewer)]
+    public void PipelineStepFactory_CopyStep_RoundTripsOverwriteMode(OverwriteMode mode)
+    {
+        var step = new CopyStep("/dest", mode);
+        var rebuilt = (CopyStep)PipelineStepFactory.FromConfig(step.Config);
+        Assert.Equal(mode, rebuilt.OverwriteMode);
+    }
+
+    [Theory]
+    [InlineData(OverwriteMode.Skip)]
+    [InlineData(OverwriteMode.Always)]
+    [InlineData(OverwriteMode.IfNewer)]
+    public void PipelineStepFactory_MoveStep_RoundTripsOverwriteMode(OverwriteMode mode)
+    {
+        var step = new MoveStep("/dest", mode);
+        var rebuilt = (MoveStep)PipelineStepFactory.FromConfig(step.Config);
+        Assert.Equal(mode, rebuilt.OverwriteMode);
+    }
 }
