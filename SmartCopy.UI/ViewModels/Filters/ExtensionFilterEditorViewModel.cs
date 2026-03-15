@@ -1,4 +1,4 @@
-using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -16,7 +16,15 @@ public partial class ExtensionFilterEditorViewModel : FilterEditorViewModelBase
     [NotifyCanExecuteChangedFor(nameof(AddExtensionCommand))]
     private string _inputText = string.Empty;
 
+    [ObservableProperty]
+    private string _inputError = string.Empty;
+
     public override bool IsValid => Extensions.Count > 0;
+
+    partial void OnInputTextChanged(string value)
+    {
+        InputError = string.Empty;
+    }
 
     [RelayCommand(CanExecute = nameof(CanAddExtension))]
     private void AddExtension()
@@ -24,14 +32,28 @@ public partial class ExtensionFilterEditorViewModel : FilterEditorViewModelBase
         var raw = InputText;
         InputText = string.Empty;
 
-        foreach (var token in raw.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        var tokens = raw.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var rejected = new List<string>();
+
+        foreach (var token in tokens)
         {
-            var normalized = token.TrimStart('.').ToLowerInvariant();
-            if (!string.IsNullOrEmpty(normalized) && !Extensions.Contains(normalized, StringComparer.OrdinalIgnoreCase))
+            var normalized = ExtensionFilter.Normalize(token);
+
+            if (!ExtensionFilter.IsValidExtension(normalized))
+            {
+                rejected.Add(token.Trim());
+                continue;
+            }
+
+            if (!Extensions.Contains(normalized, StringComparer.OrdinalIgnoreCase))
             {
                 Extensions.Add(normalized);
             }
         }
+
+        InputError = rejected.Count > 0
+            ? $"Invalid extension{(rejected.Count > 1 ? "s" : "")}: {string.Join(", ", rejected)}"
+            : string.Empty;
 
         OnPropertyChanged(nameof(IsValid));
         AutoUpdateName();
