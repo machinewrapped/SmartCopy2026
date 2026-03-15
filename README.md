@@ -1,4 +1,4 @@
-# SmartCopy2026
+# SmartCopy 2[026]
 A tool for working with large directories that aims to combine the steerability and configurability of a GUI with the power and flexibility of command line tools.
 
 This is an evolution of SmartCopyTool (https://sourceforge.net/projects/smartcopytool/), itself an evolution of a tool I wrote around 2 decades ago to provide an alternative to Windows Explorer for managing large directories. File management in Windows has improved a lot since those days, but it still lacks some features that made SmartCopyTool useful.
