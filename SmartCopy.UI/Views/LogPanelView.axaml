@@ -3,9 +3,38 @@
              xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
              x:Class="SmartCopy.UI.Views.LogPanelView"
              x:DataType="vm:LogPanelViewModel">
+    <UserControl.Styles>
+        <Style Selector="Button.filter-warning">
+            <Setter Property="Background"   Value="#3d2800" />
+            <Setter Property="Foreground"   Value="{DynamicResource LogWarningBrush}" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding"      Value="8,2" />
+        </Style>
+        <Style Selector="Button.filter-warning:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#5a3d00" />
+        </Style>
+        <Style Selector="Button.filter-warning.active">
+            <Setter Property="Background" Value="{DynamicResource LogWarningBrush}" />
+            <Setter Property="Foreground" Value="#1e1e1e" />
+        </Style>
+        <Style Selector="Button.filter-error">
+            <Setter Property="Background"   Value="#3d1a1a" />
+            <Setter Property="Foreground"   Value="{DynamicResource LogErrorBrush}" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding"      Value="8,2" />
+        </Style>
+        <Style Selector="Button.filter-error:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#5a2020" />
+        </Style>
+        <Style Selector="Button.filter-error.active">
+            <Setter Property="Background" Value="{DynamicResource LogErrorBrush}" />
+            <Setter Property="Foreground" Value="#1e1e1e" />
+        </Style>
+    </UserControl.Styles>
     <DockPanel>
         <!-- Header: always visible -->
         <DockPanel DockPanel.Dock="Top" Margin="8,4">
+            <!-- Right-docked clear button -->
             <Button DockPanel.Dock="Right"
                     Content="Clear"
                     Command="{Binding ClearCommand}"
@@ -14,39 +43,45 @@
                     Padding="8,2"
                     CornerRadius="4"
                     VerticalAlignment="Center" />
-            <ToggleButton IsChecked="{Binding IsExpanded, Mode=TwoWay}"
-                          AutomationProperties.Name="Toggle log panel"
-                          VerticalAlignment="Center"
-                          Padding="4,2"
-                          CornerRadius="4">
-                <TextBlock Text="{Binding EntryCount, StringFormat='Log ({0})'}" />
-            </ToggleButton>
+            <!-- Toggle + filter buttons, left-aligned together -->
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="6">
+                <ToggleButton IsChecked="{Binding IsExpanded, Mode=TwoWay}"
+                              AutomationProperties.Name="Toggle log panel"
+                              Padding="4,2"
+                              CornerRadius="4">
+                    <TextBlock Text="{Binding EntryCount, StringFormat='Log ({0})'}" />
+                </ToggleButton>
+                <Button Classes="filter-warning"
+                        Classes.active="{Binding IsWarningFilterActive}"
+                        Command="{Binding ToggleWarningFilterCommand}"
+                        IsVisible="{Binding IsWarningBadgeVisible}"
+                        VerticalAlignment="Center"
+                        AutomationProperties.Name="Filter warnings">
+                    <TextBlock Text="{Binding WarningCount, StringFormat='Warnings ({0})'}" />
+                </Button>
+                <Button Classes="filter-error"
+                        Classes.active="{Binding IsErrorFilterActive}"
+                        Command="{Binding ToggleErrorFilterCommand}"
+                        IsVisible="{Binding IsErrorBadgeVisible}"
+                        VerticalAlignment="Center"
+                        AutomationProperties.Name="Filter errors">
+                    <TextBlock Text="{Binding ErrorCount, StringFormat='Errors ({0})'}" />
+                </Button>
+            </StackPanel>
         </DockPanel>
 
-        <!-- Body: collapsible log list with auto-scroll -->
+        <!-- Body: collapsible log with auto-scroll and cross-line selection -->
         <ScrollViewer x:Name="LogScrollViewer"
                       IsVisible="{Binding IsExpanded}"
                       MaxHeight="150"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto">
-            <ItemsControl ItemsSource="{Binding Entries}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:LogEntry">
-                        <SelectableTextBlock FontFamily="Consolas, Courier New, monospace"
-                                             FontSize="13"
-                                             TextWrapping="NoWrap"
-                                             Padding="4,1"
-                                             Foreground="{Binding ForegroundColor}">
-                            <SelectableTextBlock.Text>
-                                <MultiBinding StringFormat="{}{0:HH:mm:ss}  {1}">
-                                    <Binding Path="Timestamp" />
-                                    <Binding Path="Message" />
-                                </MultiBinding>
-                            </SelectableTextBlock.Text>
-                        </SelectableTextBlock>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            <SelectableTextBlock x:Name="LogTextBlock"
+                                 Background="Transparent"
+                                 FontFamily="Consolas, Courier New, monospace"
+                                 FontSize="13"
+                                 TextWrapping="Wrap"
+                                 Padding="4,2" />
         </ScrollViewer>
     </DockPanel>
 </UserControl>

@@ -3,6 +3,8 @@ using System.ComponentModel;
 using System.Text.Json;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.VisualTree;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.UI.ViewModels;
 using SmartCopy.UI.ViewModels.Workflows;
@@ -71,6 +73,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
+        AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
         DataContextChanged += OnMainDataContextChanged;
         AboutMenuItem.Click += async (_, _) => await ShowAboutDialogAsync();
         QuitMenuItem.Click += (_, _) => Close();
@@ -159,11 +162,11 @@ public partial class MainWindow : Window
     {
         SelectionMenu.Items.Clear();
 
-        Add(item("Select _All",       new KeyGesture(Key.A, KeyModifiers.Control)),
+        Add(item("Select _All",       new KeyGesture(Key.A, KeyModifiers.Control | KeyModifiers.Shift)),
             () => _mainVm?.SelectAllCommand.Execute(null));
-        Add(item("_Invert Selection", new KeyGesture(Key.I, KeyModifiers.Control)),
+        Add(item("_Invert Selection", new KeyGesture(Key.I, KeyModifiers.Control | KeyModifiers.Shift)),
             () => _mainVm?.InvertSelectionCommand.Execute(null));
-        Add(item("_Clear Selection",  new KeyGesture(Key.A, KeyModifiers.Control | KeyModifiers.Shift)),
+        Add(item("_Clear Selection",  new KeyGesture(Key.C, KeyModifiers.Control | KeyModifiers.Shift)),
             () => _mainVm?.ClearSelectionCommand.Execute(null));
 
         SelectionMenu.Items.Add(new Separator());
@@ -516,6 +519,58 @@ public partial class MainWindow : Window
         }
     }
 
+    // ── Keyboard ────────────────────────────────────────────────────────────────
+
+    private async void OnWindowKeyDown(object? sender, KeyEventArgs e)
+    {
+        // All window-level key bindings are handled here via tunnel routing so that
+        // child controls (e.g. the log panel) can intercept specific chords first.
+        var mods = e.KeyModifiers;
+        var key  = e.Key;
+
+        if (mods == (KeyModifiers.Control | KeyModifiers.Shift))
+        {
+            // Skip selection chords when the log panel has focus — user may not expect them to apply to the directory tree.
+            // Check ancestor chain rather than element type to avoid false-positives from other SelectableTextBlocks.
+            if (FocusManager?.GetFocusedElement() is Control focused && focused.FindAncestorOfType<LogPanelView>() is not null) return;
+
+            switch (key)
+            {
+                case Key.A:
+                    _mainVm?.SelectAllCommand.Execute(null);
+                    e.Handled = true;
+                    break;
+
+                case Key.C:
+                    _mainVm?.ClearSelectionCommand.Execute(null);
+                    e.Handled = true;
+                    break;
+
+                case Key.I:
+                    _mainVm?.InvertSelectionCommand.Execute(null);
+                    e.Handled = true;
+                    break;
+            }
+        }
+        else if (key == Key.F5 && mods == KeyModifiers.None)
+        {
+            _mainVm?.RescanCommand.Execute(null);            
+            e.Handled = true;
+        }
+        else if (key == Key.Escape && mods == KeyModifiers.None)
+        {
+            e.Handled = true;
+            try
+            {
+                await HandleCancelOperationAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ERR] Cancel operation failed: {ex.Message}");
+            }
+        }
+    }
+
     // ── Restore ────────────────────────────────────────────────────────────────
 
     protected override void OnOpened(EventArgs e)
@@ -633,6 +688,39 @@ public partial class MainWindow : Window
             _confirmingClose = true;
             Close();
         }
+    }
+
+    private async Task<bool> ConfirmCancelOperationAsync()
+    {
+        var confirmVm = new ConfirmDialogViewModel
+        {
+            Title = "Cancel Operation",
+            Message = "The operation is paused. Cancel it?",
+            ConfirmText = "Cancel",
+            CancelText = "Keep Running",
+        };
+        var dialog = new SmartCopy.UI.Views.Workflows.ConfirmDialog { DataContext = confirmVm };
+        var confirmed = await dialog.ShowDialog<bool?>(this);
+        return confirmed == true;
+    }
+
+    private async Task HandleCancelOperationAsync()
+    {
+        if (_mainVm is null) return;
+
+        var progress = _mainVm.StatusBar.Progress;
+        if (!progress.IsActive)
+        {
+            _mainVm.CancelOperationCommand.Execute(null);
+            return;
+        }
+
+        progress.PauseCommand.Execute(null);
+        var confirmed = await ConfirmCancelOperationAsync();
+        if (confirmed)
+            _mainVm.CancelOperationCommand.Execute(null);
+        else
+            progress.ResumeCommand.Execute(null);
     }
 
     private void TrySaveWindowState()
