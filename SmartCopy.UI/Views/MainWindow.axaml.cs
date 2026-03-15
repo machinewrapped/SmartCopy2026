@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using SmartCopy.Core.Pipeline;
+using Microsoft.Extensions.Logging;
 using SmartCopy.UI.ViewModels;
 using SmartCopy.UI.ViewModels.Workflows;
 
@@ -578,7 +579,7 @@ public partial class MainWindow : Window
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[ERR] Cancel operation failed: {ex.Message}");
+                _mainVm?.Logger.LogError(ex, $"Cancel operation failed: {ex.Message}", LogLevel.Error);
             }
         }
     }

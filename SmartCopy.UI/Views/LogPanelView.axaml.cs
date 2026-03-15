@@ -1,12 +1,9 @@
 using System.Collections.Specialized;
-using System.ComponentModel;
-using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Documents;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.Media;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using SmartCopy.UI.ViewModels;
 
 namespace SmartCopy.UI.Views;
@@ -15,131 +12,69 @@ public partial class LogPanelView : UserControl
 {
     private LogPanelViewModel? _vm;
 
-    private readonly IBrush _timestampBrush;
-    private readonly IBrush _infoBrush;
-    private readonly IBrush _warningBrush;
-    private readonly IBrush _errorBrush;
-
     public LogPanelView()
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
-        LogScrollViewer.AddHandler(KeyDownEvent, OnLogKeyDown, RoutingStrategies.Tunnel);
-
-        if (Application.Current is { } app)
-        {
-            _timestampBrush = (IBrush)app.Resources["LogTimestampBrush"]!;
-            _infoBrush      = (IBrush)app.Resources["DefaultForegroundBrush"]!;
-            _warningBrush   = (IBrush)app.Resources["LogWarningBrush"]!;
-            _errorBrush     = (IBrush)app.Resources["LogErrorBrush"]!;
-        }
-        else
-        {
-            // Fallback for design-time or test contexts where Application is unavailable.
-            _timestampBrush = Brushes.Gray;
-            _infoBrush      = Brushes.WhiteSmoke;
-            _warningBrush   = Brushes.Orange;
-            _errorBrush     = Brushes.Salmon;
-        }
-    }
-
-    private void OnLogKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.KeyModifiers == KeyModifiers.Control)
-        {
-            if (e.Key == Key.A)
-            {
-                LogTextBlock.SelectAll();
-                e.Handled = true;
-            }            
-        }
+        LogListBox.AddHandler(KeyDownEvent, OnLogKeyDown, RoutingStrategies.Tunnel);
+        CopyButton.Click += (_, _) => _ = CopyToClipboardAsync(selectedOnly: false);
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
         if (_vm is not null)
-        {
-            _vm.Entries.CollectionChanged -= OnEntriesChanged;
-            _vm.PropertyChanged -= OnVmPropertyChanged;
-        }
+            _vm.DisplayedEntries.CollectionChanged -= OnDisplayedEntriesChanged;
 
         _vm = DataContext as LogPanelViewModel;
 
         if (_vm is not null)
+            _vm.DisplayedEntries.CollectionChanged += OnDisplayedEntriesChanged;
+    }
+
+    private void OnDisplayedEntriesChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.Action != NotifyCollectionChangedAction.Add || _vm is null) return;
+
+        var sv = LogListBox.FindDescendantOfType<ScrollViewer>();
+        bool wasAtBottom = sv == null || sv.Extent.Height - sv.Offset.Y <= sv.Viewport.Height + 2.0;
+
+        if (wasAtBottom && _vm.DisplayedEntries.Count > 0)
+            Dispatcher.UIThread.Post(
+                () => LogListBox.ScrollIntoView(_vm.DisplayedEntries[^1]),
+                DispatcherPriority.Render);
+    }
+
+    private void OnLogKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.KeyModifiers != KeyModifiers.Control) return;
+
+        switch (e.Key)
         {
-            _vm.Entries.CollectionChanged += OnEntriesChanged;
-            _vm.PropertyChanged += OnVmPropertyChanged;
-            RebuildInlines();
+            case Key.A:
+                LogListBox.SelectAll();
+                e.Handled = true;
+                break;
+            case Key.C:
+                _ = CopyToClipboardAsync(selectedOnly: true);
+                e.Handled = true;
+                break;
         }
     }
 
-    private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(LogPanelViewModel.FilterLevel))
-            RebuildInlines();
-    }
-
-    private void OnEntriesChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    private async Task CopyToClipboardAsync(bool selectedOnly)
     {
         if (_vm is null) return;
 
-        if (e.Action == NotifyCollectionChangedAction.Reset)
-        {
-            RebuildInlines();
-            return;
-        }
+        var entries = selectedOnly && LogListBox.SelectedItems?.Count > 0
+            ? LogListBox.SelectedItems.Cast<LogEntry>()
+            : _vm.DisplayedEntries.AsEnumerable();
 
-        if (e.Action != NotifyCollectionChangedAction.Add || e.NewItems is null) return;
+        var text = string.Join(
+            Environment.NewLine,
+            entries.Select(e => $"{e.FormattedTimestamp}{e.DisplayText}"));
 
-        var sv = LogScrollViewer;
-        bool wasAtBottom = sv.Extent.Height - sv.Offset.Y <= sv.Viewport.Height + 2.0;
-
-        foreach (LogEntry entry in e.NewItems)
-        {
-            if (_vm.FilterLevel == null || entry.Level == _vm.FilterLevel)
-                AppendEntryInlines(entry);
-        }
-
-        if (wasAtBottom)
-            Dispatcher.UIThread.Post(() => sv.ScrollToEnd(), DispatcherPriority.Render);
+        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        if (clipboard is not null)
+            await clipboard.SetTextAsync(text);
     }
-
-    private void RebuildInlines()
-    {
-        LogTextBlock.Inlines!.Clear();
-        if (_vm is null) return;
-
-        foreach (var entry in _vm.Entries)
-        {
-            if (_vm.FilterLevel == null || entry.Level == _vm.FilterLevel)
-                AppendEntryInlines(entry);
-        }
-    }
-
-    private void AppendEntryInlines(LogEntry entry)
-    {
-        LogTextBlock.Inlines!.Add(new Run($"{entry.Timestamp:HH:mm:ss}  ")
-        {
-            Foreground = _timestampBrush
-        });
-
-        var messageBrush = entry.Level switch
-        {
-            LogLevel.Warning => _warningBrush,
-            LogLevel.Error   => _errorBrush,
-            _                => _infoBrush
-        };
-
-        LogTextBlock.Inlines!.Add(new Run($"{LevelPrefix(entry.Level)}{entry.Message}\n")
-        {
-            Foreground = messageBrush
-        });
-    }
-
-    private static string LevelPrefix(LogLevel level) => level switch
-    {
-        LogLevel.Warning => "[WARN]  ",
-        LogLevel.Error   => "[ERR]   ",
-        _                => ""
-    };
 }
