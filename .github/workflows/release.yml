@@ -151,13 +151,19 @@ jobs:
           name: SmartCopy-osx-arm64
           path: dist
 
+      - name: Download Linux artifact
+        if: steps.prereqs.outputs.enabled == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: SmartCopy-linux-x64
+          path: dist
+
       - name: Compute SHA256
         if: steps.prereqs.outputs.enabled == 'true'
         id: sha
         run: |
-          FILE=$(ls dist/SmartCopy-*-osx-arm64.tar.gz)
-          SHA=$(sha256sum "$FILE" | cut -d ' ' -f1)
-          echo "SHA256=$SHA" >> "$GITHUB_OUTPUT"
+          echo "MACOS_SHA=$(sha256sum dist/SmartCopy-*-osx-arm64.tar.gz | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "LINUX_SHA=$(sha256sum dist/SmartCopy-*-linux-x64.tar.gz | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
 
       - name: Extract version
         if: steps.prereqs.outputs.enabled == 'true'
@@ -172,11 +178,12 @@ jobs:
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           path: tap
 
-      - name: Update cask
+      - name: Update formula
         if: steps.prereqs.outputs.enabled == 'true'
         run: |
-          sed -i "s/version \".*\"/version \"${{ steps.version.outputs.VERSION }}\"/" tap/Casks/smartcopy.rb
-          sed -i "s/sha256 \".*\"/sha256 \"${{ steps.sha.outputs.SHA256 }}\"/" tap/Casks/smartcopy.rb
+          sed -i "s/version \".*\"/version \"${{ steps.version.outputs.VERSION }}\"/" tap/Formula/smartcopy.rb
+          sed -i "s/sha256 \".*\" # macos-arm64/sha256 \"${{ steps.sha.outputs.MACOS_SHA }}\" # macos-arm64/" tap/Formula/smartcopy.rb
+          sed -i "s/sha256 \".*\" # linux-x64/sha256 \"${{ steps.sha.outputs.LINUX_SHA }}\" # linux-x64/" tap/Formula/smartcopy.rb
 
       - name: Commit and push
         if: steps.prereqs.outputs.enabled == 'true'
@@ -184,6 +191,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Casks/smartcopy.rb
+          git add Formula/smartcopy.rb
           git commit -m "Update SmartCopy to ${{ github.ref_name }}"
           git push

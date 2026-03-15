@@ -5,7 +5,7 @@ This is an evolution of SmartCopyTool (https://sourceforge.net/projects/smartcop
 
 SmartCopy2026 is a complete rewrite, using modern .NET technologies and a more sophisticated UI framework. It is cross-platform and supports advanced workflows, which can be configured and saved as presets.
 
-<img width="2850" height="1530" alt="SmartCopy 2026" src="https://github.com/user-attachments/assets/428f3724-62ed-41cd-8210-2429dab03356" />
+<img width="2850" height="1530" alt="SmartCopy 2[026]" src="https://github.com/user-attachments/assets/428f3724-62ed-41cd-8210-2429dab03356" />
 
 The principles that drive the design of SmartCopy2026 are:
 - Composable pipelines
@@ -52,6 +52,30 @@ The UI is organized as a left-to-right data flow:
 | MTP devices (phones, cameras) | Yes | — | — |
 | Filesystem watcher | Yes | Yes | Yes |
 | Trash / recycle bin | Yes | Yes | Yes |
+
+## Installation
+
+Pre-built binaries are available on the [Releases](https://github.com/machinewrapped/SmartCopy2026/releases) page for Windows, Linux, and macOS.
+
+Download the archive, extract it anywhere you like and run the executable. There is no installer.
+
+### Windows
+```
+(coming soon) winget install machinewrapped.SmartCopy
+```
+
+### macOS / Linux / WSL
+```
+brew tap machinewrapped/smartcopy
+brew install smartcopy
+```
+
+> **Note:** The macOS binary is not code-signed. On first launch, right-click → Open to bypass Gatekeeper.
+
+### Linux (without Homebrew)
+Download the `linux-x64` archive from the Releases page, extract, and run the `SmartCopy` binary directly.
+
+---
 
 ## Building and running
 
