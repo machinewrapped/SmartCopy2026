@@ -520,7 +520,7 @@ public partial class MainWindow : Window
 
     // ── Keyboard ────────────────────────────────────────────────────────────────
 
-    private void OnWindowKeyDown(object? sender, KeyEventArgs e)
+    private async void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
         // All window-level key bindings are handled here via tunnel routing so that
         // child controls (e.g. the log panel) can intercept specific chords first.
@@ -557,9 +557,8 @@ public partial class MainWindow : Window
         }
         else if (key == Key.Escape && mods == KeyModifiers.None)
         {
-            // TODO: pause the operation and show a confirmation dialog before cancelling
-            _mainVm?.CancelOperationCommand.Execute(null);
             e.Handled = true;
+            await HandleCancelOperationAsync();
         }
     }
 
@@ -680,6 +679,39 @@ public partial class MainWindow : Window
             _confirmingClose = true;
             Close();
         }
+    }
+
+    private async Task<bool> ConfirmCancelOperationAsync()
+    {
+        var confirmVm = new ConfirmDialogViewModel
+        {
+            Title = "Cancel Operation",
+            Message = "The operation is paused. Cancel it?",
+            ConfirmText = "Cancel",
+            CancelText = "Keep Running",
+        };
+        var dialog = new SmartCopy.UI.Views.Workflows.ConfirmDialog { DataContext = confirmVm };
+        var confirmed = await dialog.ShowDialog<bool?>(this);
+        return confirmed == true;
+    }
+
+    private async Task HandleCancelOperationAsync()
+    {
+        if (_mainVm is null) return;
+
+        var progress = _mainVm.StatusBar.Progress;
+        if (!progress.IsActive)
+        {
+            _mainVm.CancelOperationCommand.Execute(null);
+            return;
+        }
+
+        progress.PauseCommand.Execute(null);
+        var confirmed = await ConfirmCancelOperationAsync();
+        if (confirmed)
+            _mainVm.CancelOperationCommand.Execute(null);
+        else
+            progress.ResumeCommand.Execute(null);
     }
 
     private void TrySaveWindowState()
