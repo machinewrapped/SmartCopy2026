@@ -602,6 +602,7 @@ Exit criteria:
 
 ### 5.4 Bug fixes and polish
 
+- [X] Loading a workflow with a Move step does not correctly restore the Overwrite mode
 - [ ] Loading a workflow with a Move step does not correctly restore the Overwrite mode
 - [ ] Log panel only shows messages that are explicitly added with LogPanel.AddEntry, messages written with e.g. Debug.WriteLine are not surfaced, yet often contain important feedback for the user or essential diagnostic information for bug reports.
 - [ ] Log panel tab header should show error and warning counts

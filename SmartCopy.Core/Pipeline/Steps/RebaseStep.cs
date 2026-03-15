@@ -48,6 +48,9 @@ public sealed class RebaseStep : IPipelineStep
     public TransformStepConfig Config => new(StepType,
         new JsonObject { ["stripPrefix"] = StripPrefix, ["addPrefix"] = AddPrefix, });
 
+    internal static RebaseStep FromConfig(TransformStepConfig config)
+        => new(config.GetOptional("stripPrefix"), config.GetOptional("addPrefix"));
+
     public Task Validate(StepValidationContext context, CancellationToken ct = default)
     {
         context.ValidateSourceExists("Rebase");

@@ -14,6 +14,9 @@ public sealed class DeleteStep : IPipelineStep
 
     public DeleteMode Mode { get; set; }
 
+    internal static DeleteStep FromConfig(TransformStepConfig config) =>
+        new(config.ParseEnum("deleteMode", DeleteMode.Trash));
+
     public StepKind StepType => StepKind.Delete;
     public bool IsExecutable => true;
 
