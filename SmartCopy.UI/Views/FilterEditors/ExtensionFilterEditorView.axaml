@@ -50,6 +50,10 @@
                     Padding="10,0" />
         </Grid>
 
+        <TextBlock Text="{Binding InputError}"
+                   FontSize="11" Foreground="Red"
+                   IsVisible="{Binding InputError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
         <TextBlock Text="Type extensions separated by ; or press Enter after each"
                    FontSize="11" Opacity="0.5" />
 

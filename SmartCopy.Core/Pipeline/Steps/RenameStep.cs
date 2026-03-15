@@ -22,6 +22,9 @@ public sealed class RenameStep : IPipelineStep
 
     public TransformStepConfig Config => new(StepType, new JsonObject { ["pattern"] = Pattern });
 
+    internal static RenameStep FromConfig(TransformStepConfig config)
+        => new(config.GetRequired("pattern"));
+
     public Task Validate(StepValidationContext context, CancellationToken ct = default)
     {
         context.ValidateSourceExists("Rename");

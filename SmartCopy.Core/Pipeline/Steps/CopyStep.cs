@@ -18,6 +18,10 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
 
     public OverwriteMode OverwriteMode { get; set; }
 
+    internal static CopyStep FromConfig(TransformStepConfig config) =>
+        new(config.GetRequired("destinationPath"),
+            config.ParseEnum("overwriteMode", OverwriteMode.Skip));
+
     public TransformStepConfig Config => new(StepType, new JsonObject 
     { 
         ["destinationPath"] = DestinationPath,

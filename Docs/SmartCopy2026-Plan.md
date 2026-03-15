@@ -105,7 +105,7 @@ installed, `global.json` can pin the SDK version. Self-contained publish (`--sel
 ---
 ## 4. UI Design Reference
 
-Canonical UI/interaction behavior lives in `Docs/UI+UX.md`. This plan tracks implementation and validation only.
+Canonical UI/interaction behavior lives in `Docs/UIUX.md`. This plan tracks implementation and validation only.
 
 ---
 ## 5. Implementation Phases
@@ -199,7 +199,7 @@ Verification:
 
 #### 5.1.4 — Filter Chain
 
-Full filter chain implementation delivered across six sub-steps. Implementation details and UI flows are in Architecture and UI+UX documentation.
+Full filter chain implementation delivered across six sub-steps. Implementation details and UI flows are in Architecture and UIUX documentation.
 
 Delivered:
 - [x] Core filter engine: `IFilter`, `FilterChain`, `FilterConfig`, `FilterChainConfig`
@@ -602,6 +602,7 @@ Exit criteria:
 
 ### 5.4 Bug fixes and polish
 
+- [X] Loading a workflow with a Move step does not correctly restore the Overwrite mode
 - [ ] Loading a workflow with a Move step does not correctly restore the Overwrite mode
 - [ ] Log panel only shows messages that are explicitly added with LogPanel.AddEntry, messages written with e.g. Debug.WriteLine are not surfaced, yet often contain important feedback for the user or essential diagnostic information for bug reports.
 - [ ] Log panel tab header should show error and warning counts
