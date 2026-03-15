@@ -50,7 +50,7 @@ public partial class LogPanelView : UserControl
 
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(LogPanelViewModel.MinimumLevel))
+        if (e.PropertyName == nameof(LogPanelViewModel.FilterLevel))
             RebuildInlines();
     }
 
@@ -71,7 +71,7 @@ public partial class LogPanelView : UserControl
 
         foreach (LogEntry entry in e.NewItems)
         {
-            if (entry.Level >= _vm.MinimumLevel)
+            if (_vm.FilterLevel == null || entry.Level == _vm.FilterLevel)
                 AppendEntryInlines(entry);
         }
 
@@ -86,7 +86,7 @@ public partial class LogPanelView : UserControl
 
         foreach (var entry in _vm.Entries)
         {
-            if (entry.Level >= _vm.MinimumLevel)
+            if (_vm.FilterLevel == null || entry.Level == _vm.FilterLevel)
                 AppendEntryInlines(entry);
         }
     }

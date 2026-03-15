@@ -13,10 +13,22 @@ public partial class LogPanelViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isExpanded = false;
 
-    [ObservableProperty]
-    private LogLevel _minimumLevel = LogLevel.Info;
+    private LogLevel? _filterLevel;
+    public LogLevel? FilterLevel
+    {
+        get => _filterLevel;
+        private set
+        {
+            if (SetProperty(ref _filterLevel, value))
+            {
+                OnPropertyChanged(nameof(IsWarningFilterActive));
+                OnPropertyChanged(nameof(IsErrorFilterActive));
+            }
+        }
+    }
 
-    public Array LogLevels { get; } = Enum.GetValues<LogLevel>();
+    public bool IsWarningFilterActive => FilterLevel == LogLevel.Warning;
+    public bool IsErrorFilterActive   => FilterLevel == LogLevel.Error;
 
     public ObservableCollection<LogEntry> Entries { get; } = [];
 
@@ -37,7 +49,7 @@ public partial class LogPanelViewModel : ViewModelBase
     }
 
     public bool IsWarningBadgeVisible => WarningCount > 0;
-    public bool IsErrorBadgeVisible => ErrorCount > 0;
+    public bool IsErrorBadgeVisible   => ErrorCount > 0;
 
     public void AddEntry(string message, LogLevel level = LogLevel.Info)
     {
@@ -52,11 +64,20 @@ public partial class LogPanelViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void ToggleWarningFilter() =>
+        FilterLevel = IsWarningFilterActive ? null : LogLevel.Warning;
+
+    [RelayCommand]
+    private void ToggleErrorFilter() =>
+        FilterLevel = IsErrorFilterActive ? null : LogLevel.Error;
+
+    [RelayCommand]
     private void Clear()
     {
         Entries.Clear();
         WarningCount = 0;
         ErrorCount = 0;
+        FilterLevel = null;
         OnPropertyChanged(nameof(EntryCount));
     }
 }

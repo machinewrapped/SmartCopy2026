@@ -52,11 +52,13 @@ public sealed class LogPanelViewModelTests
     }
 
     [Fact]
-    public void MinimumLevel_DefaultsToInfo()
+    public void FilterLevel_DefaultsToNull()
     {
         var vm = new LogPanelViewModel();
 
-        Assert.Equal(LogLevel.Info, vm.MinimumLevel);
+        Assert.Null(vm.FilterLevel);
+        Assert.False(vm.IsWarningFilterActive);
+        Assert.False(vm.IsErrorFilterActive);
     }
 
     [Fact]
@@ -96,5 +98,42 @@ public sealed class LogPanelViewModelTests
 
         Assert.Equal(0, vm.WarningCount);
         Assert.Equal(0, vm.ErrorCount);
+    }
+
+    [Fact]
+    public void ToggleWarningFilter_SetsFilterLevel()
+    {
+        var vm = new LogPanelViewModel();
+
+        vm.ToggleWarningFilterCommand.Execute(null);
+
+        Assert.Equal(LogLevel.Warning, vm.FilterLevel);
+        Assert.True(vm.IsWarningFilterActive);
+        Assert.False(vm.IsErrorFilterActive);
+    }
+
+    [Fact]
+    public void ToggleWarningFilter_WhenActive_ClearsFilterLevel()
+    {
+        var vm = new LogPanelViewModel();
+        vm.ToggleWarningFilterCommand.Execute(null);
+
+        vm.ToggleWarningFilterCommand.Execute(null);
+
+        Assert.Null(vm.FilterLevel);
+        Assert.False(vm.IsWarningFilterActive);
+    }
+
+    [Fact]
+    public void ToggleErrorFilter_IsExclusive_ClearsWarningFilter()
+    {
+        var vm = new LogPanelViewModel();
+        vm.ToggleWarningFilterCommand.Execute(null);
+
+        vm.ToggleErrorFilterCommand.Execute(null);
+
+        Assert.Equal(LogLevel.Error, vm.FilterLevel);
+        Assert.True(vm.IsErrorFilterActive);
+        Assert.False(vm.IsWarningFilterActive);
     }
 }
