@@ -1,7 +1,5 @@
 using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
-using MLogLevel = Microsoft.Extensions.Logging.LogLevel;
-using PanelLogLevel = SmartCopy.UI.ViewModels.LogLevel;
 
 namespace SmartCopy.UI.ViewModels;
 
@@ -19,9 +17,9 @@ internal sealed class LogPanelLogger(string category, LogPanelViewModel vm) : IL
 
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
-    public bool IsEnabled(MLogLevel logLevel) => logLevel != MLogLevel.None;
+    public bool IsEnabled(LogLevel logLevel) => logLevel != LogLevel.None;
 
-    public void Log<TState>(MLogLevel logLevel, EventId eventId, TState state,
+    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
         Exception? exception, Func<TState, Exception?, string> formatter)
     {
         if (!IsEnabled(logLevel)) return;
@@ -35,9 +33,9 @@ internal sealed class LogPanelLogger(string category, LogPanelViewModel vm) : IL
                 message += Environment.NewLine + exception;
         }
 
-        var panelLevel = logLevel >= MLogLevel.Error   ? PanelLogLevel.Error
-                       : logLevel >= MLogLevel.Warning ? PanelLogLevel.Warning
-                       : PanelLogLevel.Info;
+        var panelLevel = logLevel >= LogLevel.Error   ? LogLevel.Error
+                       : logLevel >= LogLevel.Warning ? LogLevel.Warning
+                       : LogLevel.Information;
 
         Dispatcher.UIThread.Post(() => vm.AddEntry(message, panelLevel), DispatcherPriority.Background);
     }

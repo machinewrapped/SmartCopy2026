@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using SmartCopy.UI.ViewModels;
 
 namespace SmartCopy.Tests.UI;
@@ -21,11 +22,11 @@ public sealed class LogPanelViewModelTests
     {
         var vm = new LogPanelViewModel();
 
-        vm.AddEntry("info message", LogLevel.Info);
+        vm.AddEntry("info message", LogLevel.Information);
         vm.AddEntry("warn message", LogLevel.Warning);
         vm.AddEntry("error message", LogLevel.Error);
 
-        Assert.Equal(LogLevel.Info, vm.Entries[0].Level);
+        Assert.Equal(LogLevel.Information, vm.Entries[0].Level);
         Assert.Equal(LogLevel.Warning, vm.Entries[1].Level);
         Assert.Equal(LogLevel.Error, vm.Entries[2].Level);
     }
@@ -66,7 +67,7 @@ public sealed class LogPanelViewModelTests
     {
         var vm = new LogPanelViewModel();
 
-        vm.AddEntry("info", LogLevel.Info);
+        vm.AddEntry("info", LogLevel.Information);
         vm.AddEntry("warn", LogLevel.Warning);
         vm.AddEntry("warn2", LogLevel.Warning);
         vm.AddEntry("err", LogLevel.Error);
@@ -79,7 +80,7 @@ public sealed class LogPanelViewModelTests
     {
         var vm = new LogPanelViewModel();
 
-        vm.AddEntry("info", LogLevel.Info);
+        vm.AddEntry("info", LogLevel.Information);
         vm.AddEntry("warn", LogLevel.Warning);
         vm.AddEntry("err", LogLevel.Error);
         vm.AddEntry("err2", LogLevel.Error);

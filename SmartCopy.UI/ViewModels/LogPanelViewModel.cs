@@ -1,12 +1,11 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Logging;
 
 namespace SmartCopy.UI.ViewModels;
 
-public enum LogLevel { Info, Warning, Error }
-
-public record LogEntry(DateTime Timestamp, string Message, LogLevel Level = LogLevel.Info);
+public record LogEntry(DateTime Timestamp, string Message, LogLevel Level = LogLevel.Information);
 
 public partial class LogPanelViewModel : ViewModelBase
 {
@@ -54,13 +53,13 @@ public partial class LogPanelViewModel : ViewModelBase
     public bool IsWarningBadgeVisible => WarningCount > 0;
     public bool IsErrorBadgeVisible   => ErrorCount > 0;
 
-    public void AddEntry(string message, LogLevel level = LogLevel.Info)
+    public void AddEntry(string message, LogLevel level = LogLevel.Information)
     {
         Entries.Add(new LogEntry(DateTime.Now, message, level));
         OnPropertyChanged(nameof(EntryCount));
         if (level == LogLevel.Warning)
             WarningCount++;
-        else if (level == LogLevel.Error)
+        else if (level >= LogLevel.Error)
             ErrorCount++;
         if (level >= LogLevel.Warning)
             IsExpanded = true;

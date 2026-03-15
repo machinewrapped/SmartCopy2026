@@ -17,6 +17,8 @@ using SmartCopy.Core.Trash;
 using SmartCopy.Core.Workflows;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Console;
+using Microsoft.Extensions.Logging.Debug;
 using SmartCopy.UI.Services;
 using SmartCopy.UI.ViewModels.Workflows;
 using SmartCopy.UI.Views;
@@ -142,7 +144,10 @@ public partial class MainViewModel : ViewModelBase
 
     public MainViewModel()
     {
-        _loggerFactory = LoggerFactory.Create(b => b.AddProvider(new LogPanelLoggerProvider(LogPanel)));
+        _loggerFactory = LoggerFactory.Create(b => b
+            .AddProvider(new LogPanelLoggerProvider(LogPanel))
+            .AddFilter<DebugLoggerProvider>(null, LogLevel.Warning).AddDebug()
+            .AddFilter<ConsoleLoggerProvider>(null, LogLevel.Warning).AddConsole());
         _logger = _loggerFactory.CreateLogger<MainViewModel>();
 
         var dataStore = LocalAppDataStore.ForCurrentUser();
