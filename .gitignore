@@ -57,3 +57,4 @@ nunit-*.xml
 .claude/settings.local.json
 kill-dotnet-processes.ps1
 git-cleanup-gone.ps1
+/.claude/worktrees
