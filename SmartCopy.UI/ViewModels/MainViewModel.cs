@@ -21,6 +21,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
 using Microsoft.Extensions.Logging.Debug;
+using SmartCopy.Core.Logging;
 using SmartCopy.UI.Services;
 using SmartCopy.UI.ViewModels.Workflows;
 using SmartCopy.UI.Views;
@@ -109,7 +110,6 @@ public partial class MainViewModel : ViewModelBase
         set => SourcePathPicker.ValidationMessage = value;
     }
 
-    private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<MainViewModel> _logger;
     private readonly SmartCopyAppContext _appContext;
     private readonly ITrashService _trashService;
@@ -148,11 +148,12 @@ public partial class MainViewModel : ViewModelBase
 
     public MainViewModel()
     {
-        _loggerFactory = LoggerFactory.Create(b => b
+        var loggerFactory = LoggerFactory.Create(b => b
             .AddProvider(new LogPanelLoggerProvider(LogPanel))
             .AddFilter<DebugLoggerProvider>(null, LogLevel.Warning).AddDebug()
             .AddFilter<ConsoleLoggerProvider>(null, LogLevel.Warning).AddConsole());
-        _logger = _loggerFactory.CreateLogger<MainViewModel>();
+        AppLog.Configure(loggerFactory);
+        _logger = AppLog.CreateLogger<MainViewModel>();
 
         var dataStore = LocalAppDataStore.ForCurrentUser();
         _settings = new AppSettings { SettingsFilePath = dataStore.GetFilePath("settings.json") };
@@ -161,14 +162,14 @@ public partial class MainViewModel : ViewModelBase
         _trashService = CreateTrashService();
 
         _operationJournal = new OperationJournal(dataStore.GetDirectoryPath("Logs"));
-        _sessionStore = new SessionStore(_loggerFactory.CreateLogger<SessionStore>());
-        _workflowStore = new WorkflowPresetStore(dataStore.GetDirectoryPath("Workflows"), _loggerFactory.CreateLogger<WorkflowPresetStore>());
+        _sessionStore = new SessionStore();
+        _workflowStore = new WorkflowPresetStore(dataStore.GetDirectoryPath("Workflows"));
 
         // Create the ViewModel for the filter chain
         FilterChain = new FilterChainViewModel(_appContext);
 
         // Create the pipeline view model
-        Pipeline = new PipelineViewModel(_appContext, _loggerFactory);
+        Pipeline = new PipelineViewModel(_appContext);
 
         // Create the source path picker
         SourcePathPicker = new PathPickerViewModel(_settings, PathPickerMode.Source);

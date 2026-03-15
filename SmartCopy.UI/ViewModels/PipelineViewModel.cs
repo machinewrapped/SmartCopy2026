@@ -4,8 +4,8 @@ using System.Text.Json.Nodes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.Logging;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Pipeline.Validation;
@@ -26,8 +26,7 @@ public partial class PipelineViewModel : ViewModelBase
 {
     private const string CustomNameParameter = "customName";
     private const int MaxRecentTargets = 10;
-    private readonly ILogger<PipelineViewModel> _logger;
-    private readonly ILoggerFactory? _loggerFactory;
+    private readonly ILogger<PipelineViewModel> _logger = AppLog.CreateLogger<PipelineViewModel>();
     private readonly IAppContext _appContext;
     private readonly PipelinePresetStore _presetStore;
     private readonly StepPresetStore _stepPresetStore;
@@ -111,14 +110,12 @@ public partial class PipelineViewModel : ViewModelBase
     public event EventHandler<PipelineStepViewModel>? SwapSourceRequested;
     public event EventHandler? SavePipelineRequested;
 
-    public PipelineViewModel(IAppContext appContext, ILoggerFactory? loggerFactory = null)
+    public PipelineViewModel(IAppContext appContext)
     {
-        _loggerFactory = loggerFactory;
-        _logger = loggerFactory?.CreateLogger<PipelineViewModel>() ?? NullLogger<PipelineViewModel>.Instance;
         _appContext = appContext;
         _appSettings = appContext.Settings;
-        _presetStore = new PipelinePresetStore(appContext.DataStore.GetDirectoryPath("Pipelines"), loggerFactory?.CreateLogger<PipelinePresetStore>());
-        _stepPresetStore = new StepPresetStore(appContext.DataStore.GetFilePath("step-presets.json"), loggerFactory?.CreateLogger<StepPresetStore>());
+        _presetStore = new PipelinePresetStore(appContext.DataStore.GetDirectoryPath("Pipelines"));
+        _stepPresetStore = new StepPresetStore(appContext.DataStore.GetFilePath("step-presets.json"));
 
         AddStep = new AddStepViewModel(_appContext);
         AddStep.StepPresetPicked += OnStepPresetPicked;

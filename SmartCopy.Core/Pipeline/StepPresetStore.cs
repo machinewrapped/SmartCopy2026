@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
+using SmartCopy.Core.Logging;
 
 namespace SmartCopy.Core.Pipeline;
 
@@ -12,16 +12,15 @@ namespace SmartCopy.Core.Pipeline;
 public sealed class StepPresetStore
 {
     private readonly string _presetPath;
-    private readonly ILogger<StepPresetStore> _logger;
+    private readonly ILogger<StepPresetStore> _logger = AppLog.CreateLogger<StepPresetStore>();
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         WriteIndented = true,
     };
 
-    public StepPresetStore(string presetPath, ILogger<StepPresetStore>? logger = null)
+    public StepPresetStore(string presetPath)
     {
         _presetPath = presetPath;
-        _logger = logger ?? NullLogger<StepPresetStore>.Instance;
     }
 
     /// <summary>

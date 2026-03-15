@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
+using SmartCopy.Core.Logging;
 using SmartCopy.Core.Workflows;
 
 namespace SmartCopy.Core.Settings;
@@ -15,13 +15,8 @@ public sealed class SessionStore
 {
     private const string SessionFileName = "session.sc2session";
 
-    private readonly ILogger<SessionStore> _logger;
+    private readonly ILogger<SessionStore> _logger = AppLog.CreateLogger<SessionStore>();
     private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
-
-    public SessionStore(ILogger<SessionStore>? logger = null)
-    {
-        _logger = logger ?? NullLogger<SessionStore>.Instance;
-    }
 
     /// <summary>
     /// Writes the current session state to <c>session.sc2session</c>.

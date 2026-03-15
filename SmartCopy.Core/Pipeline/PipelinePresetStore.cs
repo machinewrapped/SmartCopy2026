@@ -1,23 +1,22 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
+using SmartCopy.Core.Logging;
 
 namespace SmartCopy.Core.Pipeline;
 
 public sealed class PipelinePresetStore
 {
     private readonly string _directory;
-    private readonly ILogger<PipelinePresetStore> _logger;
+    private readonly ILogger<PipelinePresetStore> _logger = AppLog.CreateLogger<PipelinePresetStore>();
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         WriteIndented = true,
     };
 
-    public PipelinePresetStore(string directory, ILogger<PipelinePresetStore>? logger = null)
+    public PipelinePresetStore(string directory)
     {
         _directory = directory;
-        _logger = logger ?? NullLogger<PipelinePresetStore>.Instance;
     }
 
     public async Task<IReadOnlyList<PipelinePreset>> GetUserPresetsAsync(
