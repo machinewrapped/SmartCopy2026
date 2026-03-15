@@ -3,6 +3,8 @@ using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
 using SmartCopy.UI.ViewModels;
@@ -22,12 +24,25 @@ public partial class LogPanelView : UserControl
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+        LogScrollViewer.AddHandler(KeyDownEvent, OnLogKeyDown, RoutingStrategies.Tunnel);
 
         var res = Application.Current!.Resources;
         _timestampBrush = (IBrush)res["LogTimestampBrush"]!;
         _infoBrush      = (IBrush)res["DefaultForegroundBrush"]!;
         _warningBrush   = (IBrush)res["LogWarningBrush"]!;
         _errorBrush     = (IBrush)res["LogErrorBrush"]!;
+    }
+
+    private void OnLogKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.KeyModifiers == KeyModifiers.Control)
+        {
+            if (e.Key == Key.A)
+            {
+                LogTextBlock.SelectAll();
+                e.Handled = true;
+            }            
+        }
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)

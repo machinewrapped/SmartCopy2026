@@ -77,6 +77,7 @@
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto">
             <SelectableTextBlock x:Name="LogTextBlock"
+                                 Background="Transparent"
                                  FontFamily="Consolas, Courier New, monospace"
                                  FontSize="13"
                                  TextWrapping="Wrap"

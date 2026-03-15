@@ -14,13 +14,6 @@
         Foreground="{DynamicResource DefaultForegroundBrush}"
         Icon="avares://SmartCopy.UI/Assets/icon.png">
 
-    <Window.KeyBindings>
-        <KeyBinding Gesture="Ctrl+A"       Command="{Binding SelectAllCommand}"/>
-        <KeyBinding Gesture="Ctrl+Shift+A" Command="{Binding ClearSelectionCommand}"/>
-        <KeyBinding Gesture="Ctrl+I"       Command="{Binding InvertSelectionCommand}"/>
-        <KeyBinding Gesture="F5"           Command="{Binding RescanCommand}"/>
-        <KeyBinding Gesture="Escape"       Command="{Binding CancelOperationCommand}"/>
-    </Window.KeyBindings>
 
     <Grid RowDefinitions="Auto, Auto, *, Auto, Auto, Auto">
         <!-- Menu Bar -->

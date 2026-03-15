@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.UI.ViewModels;
 using SmartCopy.UI.ViewModels.Workflows;
@@ -71,6 +72,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
+        AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
         DataContextChanged += OnMainDataContextChanged;
         AboutMenuItem.Click += async (_, _) => await ShowAboutDialogAsync();
         QuitMenuItem.Click += (_, _) => Close();
@@ -514,6 +516,35 @@ public partial class MainWindow : Window
 #endif
 
         }
+    }
+
+    // ── Keyboard ────────────────────────────────────────────────────────────────
+
+    private void OnWindowKeyDown(object? sender, KeyEventArgs e)
+    {
+        // All window-level key bindings are handled here via tunnel routing so that
+        // child controls (e.g. the log panel) can intercept specific chords first.
+        var mods = e.KeyModifiers;
+        var key  = e.Key;
+
+        if (key == Key.A && mods == KeyModifiers.Control)
+        {
+            // Skip when the log panel has focus — it intercepts Ctrl+A itself.
+            if (FocusManager?.GetFocusedElement() is SelectableTextBlock) return;
+            _mainVm?.SelectAllCommand.Execute(null);
+        }
+        else if (key == Key.A     && mods == (KeyModifiers.Control | KeyModifiers.Shift))
+            _mainVm?.ClearSelectionCommand.Execute(null);
+        else if (key == Key.I     && mods == KeyModifiers.Control)
+            _mainVm?.InvertSelectionCommand.Execute(null);
+        else if (key == Key.F5    && mods == KeyModifiers.None)
+            _mainVm?.RescanCommand.Execute(null);
+        else if (key == Key.Escape && mods == KeyModifiers.None)
+            _mainVm?.CancelOperationCommand.Execute(null);
+        else
+            return;
+
+        e.Handled = true;
     }
 
     // ── Restore ────────────────────────────────────────────────────────────────
