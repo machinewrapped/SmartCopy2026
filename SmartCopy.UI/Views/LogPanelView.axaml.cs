@@ -26,11 +26,21 @@ public partial class LogPanelView : UserControl
         DataContextChanged += OnDataContextChanged;
         LogScrollViewer.AddHandler(KeyDownEvent, OnLogKeyDown, RoutingStrategies.Tunnel);
 
-        var res = Application.Current!.Resources;
-        _timestampBrush = (IBrush)res["LogTimestampBrush"]!;
-        _infoBrush      = (IBrush)res["DefaultForegroundBrush"]!;
-        _warningBrush   = (IBrush)res["LogWarningBrush"]!;
-        _errorBrush     = (IBrush)res["LogErrorBrush"]!;
+        if (Application.Current is { } app)
+        {
+            _timestampBrush = (IBrush)app.Resources["LogTimestampBrush"]!;
+            _infoBrush      = (IBrush)app.Resources["DefaultForegroundBrush"]!;
+            _warningBrush   = (IBrush)app.Resources["LogWarningBrush"]!;
+            _errorBrush     = (IBrush)app.Resources["LogErrorBrush"]!;
+        }
+        else
+        {
+            // Fallback for design-time or test contexts where Application is unavailable.
+            _timestampBrush = Brushes.Gray;
+            _infoBrush      = Brushes.WhiteSmoke;
+            _warningBrush   = Brushes.Orange;
+            _errorBrush     = Brushes.Salmon;
+        }
     }
 
     private void OnLogKeyDown(object? sender, KeyEventArgs e)

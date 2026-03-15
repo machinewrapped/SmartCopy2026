@@ -4,6 +4,7 @@ using System.Text.Json;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.VisualTree;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.UI.ViewModels;
 using SmartCopy.UI.ViewModels.Workflows;
@@ -529,8 +530,9 @@ public partial class MainWindow : Window
 
         if (mods == (KeyModifiers.Control | KeyModifiers.Shift))
         {
-            // Skip selection chords when the log panel has focus as user may not expect them to apply to the directory tree
-            if (FocusManager?.GetFocusedElement() is SelectableTextBlock) return;
+            // Skip selection chords when the log panel has focus — user may not expect them to apply to the directory tree.
+            // Check ancestor chain rather than element type to avoid false-positives from other SelectableTextBlocks.
+            if (FocusManager?.GetFocusedElement() is Control focused && focused.FindAncestorOfType<LogPanelView>() is not null) return;
 
             switch (key)
             {
@@ -558,7 +560,14 @@ public partial class MainWindow : Window
         else if (key == Key.Escape && mods == KeyModifiers.None)
         {
             e.Handled = true;
-            await HandleCancelOperationAsync();
+            try
+            {
+                await HandleCancelOperationAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ERR] Cancel operation failed: {ex.Message}");
+            }
         }
     }
 
