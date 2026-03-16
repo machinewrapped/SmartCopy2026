@@ -272,8 +272,7 @@ public partial class AddStepViewModel : ObservableObject
         {
             StepCategory.Path =>
             [
-                new(StepKind.Flatten, "Flatten", "Strip directory structure"),
-                new(StepKind.Rebase, "Rebase", "Adjust path roots and prefixes"),
+                new(StepKind.Flatten, "Flatten", "Trim leading levels or flatten to filename"),
                 new(StepKind.Rename, "Rename", "Rename using a pattern"),
             ],
             StepCategory.Content =>

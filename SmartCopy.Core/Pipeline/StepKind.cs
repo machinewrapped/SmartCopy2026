@@ -10,11 +10,7 @@ public enum StepKind
     [StepIcon("⊞")]
     Flatten,
 
-    [Display(Name = "Rebase paths")]
-    [StepIcon("⤢")]
-    Rebase,
-
-    [Display(Name = "Rename files")]
+[Display(Name = "Rename files")]
     [StepIcon("✏")]
     Rename,
 
