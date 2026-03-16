@@ -32,7 +32,7 @@ public sealed class AddStepViewModelTests
 
         Assert.True(vm.IsLevel2Visible);
         Assert.Equal(StepCategory.Path, vm.SelectedCategory);
-        Assert.True(vm.StepTypeItems.Count >= 3);
+        Assert.True(vm.StepTypeItems.Count >= 2);
     }
 
     [Fact]
@@ -55,8 +55,7 @@ public sealed class AddStepViewModelTests
 
         vm.NavigateToCategoryCommand.Execute(StepCategory.Path);
         Assert.Contains(vm.StepTypeItems, item => item.Kind == StepKind.Flatten);
-        Assert.Contains(vm.StepTypeItems, item => item.Kind == StepKind.Rebase);
-        Assert.Contains(vm.StepTypeItems, item => item.Kind == StepKind.Rename);
+Assert.Contains(vm.StepTypeItems, item => item.Kind == StepKind.Rename);
 
         vm.NavigateToCategoryCommand.Execute(StepCategory.Content);
         Assert.Contains(vm.StepTypeItems, item => item.Kind == StepKind.Convert);

@@ -4,8 +4,29 @@
              x:Class="SmartCopy.UI.Views.Pipeline.StepEditors.FlattenStepEditor"
              x:DataType="vmPipeline:FlattenStepEditorViewModel">
     <StackPanel Spacing="8">
-        <TextBlock Text="Conflict Strategy" FontSize="12" Opacity="0.7" />
+        <StackPanel Orientation="Horizontal" Spacing="16">
+            <RadioButton Content="Keep from end"
+                         IsChecked="{Binding IsKeepTrailingMode, Mode=TwoWay}" />
+            <RadioButton Content="Strip from start"
+                         IsChecked="{Binding IsStripLeadingMode, Mode=TwoWay}" />
+        </StackPanel>
+
+        <TextBlock Text="{Binding LevelsLabel}" FontSize="12" Opacity="0.7" />
+        <NumericUpDown Value="{Binding Levels, Mode=TwoWay}"
+                       Minimum="1"
+                       Increment="1"
+                       Watermark="—" />
+
+        <TextBlock Text="Conflict strategy" FontSize="12" Opacity="0.7" />
         <ComboBox ItemsSource="{Binding ConflictStrategies}"
-                  SelectedItem="{Binding ConflictStrategy, Mode=TwoWay}" />
+                  SelectedItem="{Binding ConflictStrategy, Mode=TwoWay}">
+            <ComboBox.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding Converter={StaticResource EnumToDisplayNameConverter}}" />
+                </DataTemplate>
+            </ComboBox.ItemTemplate>
+        </ComboBox>
+
+        <TextBlock Text="{Binding LivePreview}" Opacity="0.7" FontSize="11" FontStyle="Italic" />
     </StackPanel>
 </UserControl>
