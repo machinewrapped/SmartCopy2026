@@ -608,6 +608,8 @@ Exit criteria:
 - [x] Users should be able to filter log on error/warning/info (category toggles or minimum severity dropdown?)
 - [x] Log panel displays messages as stacked panels with no line wrapping, so long messages are cropped
 - [x] Text selection only works within a single log message, cannot select multiple lines or across lines (non-idiomatic)
+- [ ] Delete Step presets cover all possible values, "+ Configure" menu option is redundant (but the step should still be editable)
+- [ ] Path step and Selection step would work better as flyout menus
 
 Exit criteria:
 - [ ] All bug fixes are implemented and tests are added
