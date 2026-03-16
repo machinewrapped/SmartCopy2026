@@ -88,17 +88,23 @@
                                 <Border BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="4"
                                         Margin="0,0,0,0" Background="{DynamicResource ItemBackgroundBrush}"
                                         Tag="{Binding}">
-                                    <Grid ColumnDefinitions="Auto, *, Auto" Margin="8,7">
+                                    <Grid ColumnDefinitions="Auto, Auto, *, Auto" Margin="8,7">
+
+                                        <!-- Far Left: drag handle -->
+                                        <TextBlock Grid.Column="0" x:Name="DragHandle"
+                                                   Text="≡" Foreground="Gray"
+                                                   VerticalAlignment="Center"
+                                                   Cursor="Hand" Margin="0,0,6,0" />
 
                                         <!-- Left: enabled checkbox -->
-                                        <CheckBox Grid.Column="0"
+                                        <CheckBox Grid.Column="1"
                                                   IsChecked="{Binding IsEnabled}"
                                                   AutomationProperties.Name="Enable filter"
                                                   VerticalAlignment="Center"
                                                   Margin="0,0,8,0" />
 
                                         <!-- Centre: summary + technical description -->
-                                        <StackPanel Grid.Column="1" Orientation="Vertical" Spacing="2"
+                                        <StackPanel Grid.Column="2" Orientation="Vertical" Spacing="2"
                                                     VerticalAlignment="Center">
                                             <TextBlock Text="{Binding Summary}"
                                                        FontWeight="Medium"
@@ -108,15 +114,10 @@
                                                        TextWrapping="Wrap" />
                                         </StackPanel>
 
-                                        <!-- Right: drag handle · edit · delete -->
-                                        <StackPanel Grid.Column="2" Orientation="Horizontal"
+                                        <!-- Right: edit · delete -->
+                                        <StackPanel Grid.Column="3" Orientation="Horizontal"
                                                     Spacing="2" VerticalAlignment="Center"
                                                     Margin="8,0,0,0">
-                                            <!-- Drag handle: PointerPressed handler set in code-behind -->
-                                            <TextBlock x:Name="DragHandle"
-                                                       Text="≡" Foreground="Gray"
-                                                       VerticalAlignment="Center"
-                                                       Cursor="Hand" Margin="0,0,4,0" />
                                             <Button Content="✎"
                                                     Width="26" Height="26" CornerRadius="4"
                                                     Padding="0"
