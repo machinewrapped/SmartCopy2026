@@ -77,7 +77,7 @@ jobs:
 
       - name: Install AppImage dependencies
         if: matrix.rid == 'linux-x64'
-        run: sudo apt-get install -y squashfs-tools
+        run: sudo apt-get install -y squashfs-tools libfuse2
 
       - name: Build AppImage
         if: matrix.rid == 'linux-x64'
@@ -90,9 +90,9 @@ jobs:
           cp .github/appimage/SmartCopy.desktop AppDir/
           cp .github/appimage/AppRun AppDir/
           chmod +x AppDir/AppRun
-          wget -q "https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage" -O appimagetool
+          wget -q "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage" -O appimagetool
           chmod +x appimagetool
-          ARCH=x86_64 ./appimagetool --appimage-extract-and-run AppDir "SmartCopy-${{ steps.version.outputs.VERSION }}-x86_64.AppImage"
+          ARCH=x86_64 ./appimagetool AppDir "SmartCopy-${{ steps.version.outputs.VERSION }}-x86_64.AppImage"
 
       - name: Upload AppImage artifact
         if: matrix.rid == 'linux-x64'
