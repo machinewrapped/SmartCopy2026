@@ -75,6 +75,10 @@ jobs:
           path: ${{ env.ARCHIVE }}
           if-no-files-found: error
 
+      - name: Install AppImage dependencies
+        if: matrix.rid == 'linux-x64'
+        run: sudo apt-get install -y squashfs-tools
+
       - name: Build AppImage
         if: matrix.rid == 'linux-x64'
         run: |
