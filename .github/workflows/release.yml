@@ -75,6 +75,29 @@ jobs:
           path: ${{ env.ARCHIVE }}
           if-no-files-found: error
 
+      - name: Build AppImage
+        if: matrix.rid == 'linux-x64'
+        run: |
+          PUBLISH_DIR="artifacts/publish/SmartCopy.App/release_linux-x64"
+          mkdir -p AppDir
+          cp "$PUBLISH_DIR/SmartCopy" AppDir/
+          chmod +x AppDir/SmartCopy
+          cp SmartCopy.UI/Assets/icon.png AppDir/smartcopy.png
+          cp .github/appimage/SmartCopy.desktop AppDir/
+          cp .github/appimage/AppRun AppDir/
+          chmod +x AppDir/AppRun
+          wget -q "https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage" -O appimagetool
+          chmod +x appimagetool
+          ARCH=x86_64 ./appimagetool --appimage-extract-and-run AppDir "SmartCopy-${{ steps.version.outputs.VERSION }}-x86_64.AppImage"
+
+      - name: Upload AppImage artifact
+        if: matrix.rid == 'linux-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SmartCopy-linux-x64-AppImage
+          path: SmartCopy-${{ steps.version.outputs.VERSION }}-x86_64.AppImage
+          if-no-files-found: error
+
   release:
     name: Create GitHub Release
     needs: build

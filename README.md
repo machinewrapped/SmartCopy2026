@@ -57,9 +57,7 @@ The UI is organized as a left-to-right data flow:
 
 Pre-built binaries are available on the [Releases](https://github.com/machinewrapped/SmartCopy2026/releases) page for Windows, Linux, and macOS.
 
-Simply download the archive, extract it anywhere you like and run it. There is no installer, it should run from anywhere.
-
-Alternatively, you can install it via homebrew or winget:
+Alternatively, you can install it via a package manager:
 
 ### macOS / Linux / WSL
 ```
@@ -68,6 +66,13 @@ brew install smartcopy
 ```
 
 > **Note:** The macOS binary is not code-signed. On first launch, right-click → Open to bypass Gatekeeper.
+
+### Linux (AppImage)
+Or download the `x86_64.AppImage` from the [Releases](https://github.com/machinewrapped/SmartCopy2026/releases) page — no installation required:
+```bash
+chmod +x SmartCopy-*-x86_64.AppImage
+./SmartCopy-*-x86_64.AppImage
+```
 
 ---
 

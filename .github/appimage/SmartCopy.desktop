@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=SmartCopy 2[026]
+Exec=SmartCopy
+Icon=smartcopy
+Categories=Utility;FileTools;
+Comment=Intelligently copies large directories via composable filters and transform pipelines
+Terminal=false
