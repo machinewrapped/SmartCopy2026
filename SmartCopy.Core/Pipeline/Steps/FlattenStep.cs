@@ -31,8 +31,8 @@ public sealed class FlattenStep : IPipelineStep
     public string AutoSummary => StepType.ForDisplay();
 
     public string Description => TrimMode == FlattenTrimMode.StripLeading
-        ? $"Strip {Levels} from start; {ConflictStrategy}"
-        : $"Keep {Levels} from end; {ConflictStrategy}";
+        ? $"Strip {Levels} from start; {ConflictStrategy.GetDisplayName()}"
+        : $"Keep {Levels} from end; {ConflictStrategy.GetDisplayName()}";
 
     public TransformStepConfig Config => new(StepType, new JsonObject
     {
