@@ -26,10 +26,10 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
 
@@ -69,7 +69,7 @@ jobs:
           echo "ARCHIVE=$ARCHIVE" >> "$GITHUB_ENV"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: SmartCopy-${{ matrix.rid }}
           path: ${{ env.ARCHIVE }}
@@ -96,7 +96,7 @@ jobs:
 
       - name: Upload AppImage artifact
         if: matrix.rid == 'linux-x64'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: SmartCopy-linux-x64-AppImage
           path: SmartCopy-${{ steps.version.outputs.VERSION }}-x86_64.AppImage
@@ -112,7 +112,7 @@ jobs:
 
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
@@ -173,14 +173,14 @@ jobs:
 
       - name: Download macOS artifact
         if: steps.prereqs.outputs.enabled == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: SmartCopy-osx-arm64
           path: dist
 
       - name: Download Linux artifact
         if: steps.prereqs.outputs.enabled == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: SmartCopy-linux-x64
           path: dist
@@ -199,7 +199,7 @@ jobs:
 
       - name: Checkout homebrew tap
         if: steps.prereqs.outputs.enabled == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: machinewrapped/homebrew-smartcopy
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
