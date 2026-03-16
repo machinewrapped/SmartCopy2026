@@ -39,9 +39,6 @@
                     <DataTemplate DataType="vmPipeline:RenameStepEditorViewModel">
                         <editorViews:RenameStepEditor />
                     </DataTemplate>
-                    <DataTemplate DataType="vmPipeline:RebaseStepEditorViewModel">
-                        <editorViews:RebaseStepEditor />
-                    </DataTemplate>
                 </ContentControl.DataTemplates>
             </ContentControl>
         </Border>

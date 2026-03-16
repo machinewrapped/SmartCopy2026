@@ -80,7 +80,7 @@ public sealed class PipelinePresetStoreTests
             new DeleteStep(),
             new FlattenStep(FlattenConflictStrategy.Skip),
             new RenameStep("{name}_new"),
-            new RebaseStep("source", "target"),
+            new FlattenStep(FlattenConflictStrategy.Skip, FlattenTrimMode.StripLeading, 2),
         };
 
         foreach (var step in input)

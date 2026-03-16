@@ -212,38 +212,35 @@ public sealed class PipelineDirectoryTests
     }
 
     [Fact]
-    public async Task Move_DirectoryNodeRespectsRebasedPath()
+    public async Task Copy_FileRespectsLeadingStrip()
     {
         var provider = MemoryFileSystemFixtures.Create(f => f
-            .WithSimulatedFile("/src/music/a.flac", 1000)
+            .WithSimulatedFile("/src/level1/a.flac", 1000)
+            .WithSimulatedFile("/src/level1/b.flac", 1000)  // keeps level1 Indeterminate when only a is selected
             .WithDirectory("/dest"));
 
-        // Build from /src so "music" is a direct child of the scan root.
-        var srcRoot = await provider.BuildDirectoryTree("/src");
-        var dirNode = srcRoot.Children.Single(n => n.Name == "music");
-        dirNode.FilterResult = FilterResult.Included;
-        dirNode.CheckState = CheckState.Checked;
+        // Scan from /src: segments are relative to /src, so a.flac = ["level1", "a.flac"].
+        var root = await provider.BuildDirectoryTree("/src");
+        var aNode = root.FindNodeByPathSegments(["level1", "a.flac"]);
+        Assert.NotNull(aNode);
+        aNode.FilterResult = FilterResult.Included;
+        aNode.CheckState = CheckState.Checked;
 
-        var ct = CancellationToken.None;
         var runner = new PipelineRunner(new TransformPipeline(
         [
-            new RebaseStep(stripPrefix: "src", addPrefix: "archive"),
-            new MoveStep("/mem/dest"),
+            new FlattenStep(trimMode: FlattenTrimMode.StripLeading, levels: 1),
+            new CopyStep("/mem/dest"),
         ]));
-        var results = await runner.ExecuteAsync(
+        await runner.ExecuteAsync(
             new PipelineJob
             {
-                RootNode       = srcRoot,
+                RootNode       = root,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
             });
 
-        var moveResult = results.Single(r => r.SourceNodeResult == SourceResult.Moved);
-        Assert.True(moveResult.IsSuccess);
-        // music at scan root → segments ["music"] → add "archive" → ["archive","music"] → /dest/archive/music
-        Assert.True(await provider.ExistsAsync("/dest/archive/music", ct));
-        Assert.True(await provider.ExistsAsync("/dest/archive/music/a.flac", ct));
-        Assert.False(await provider.ExistsAsync("/src/music", ct));
+        // segments ["level1", "a.flac"] → strip 1 leading → ["a.flac"] → /dest/a.flac
+        Assert.True(await provider.ExistsAsync("/dest/a.flac", CancellationToken.None));
     }
 
     // ─────────────────────────────────────────────────────────────────────────

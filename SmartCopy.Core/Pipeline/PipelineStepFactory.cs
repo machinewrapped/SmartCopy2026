@@ -13,7 +13,6 @@ public static class PipelineStepFactory
             StepKind.Delete => DeleteStep.FromConfig(config),
             StepKind.Flatten => FlattenStep.FromConfig(config),
             StepKind.Rename => RenameStep.FromConfig(config),
-            StepKind.Rebase => RebaseStep.FromConfig(config),
             StepKind.SelectAll => new SelectAllStep(),
             StepKind.InvertSelection => new InvertSelectionStep(),
             StepKind.ClearSelection => new ClearSelectionStep(),

@@ -23,4 +23,10 @@ internal static class StepConfigExtensions
         var raw = config.GetOptional(key);
         return Enum.TryParse<T>(raw, ignoreCase: true, out var value) ? value : defaultValue;
     }
+
+    internal static int GetOptionalInt(this TransformStepConfig config, string key, int defaultValue)
+    {
+        var raw = config.GetOptional(key);
+        return int.TryParse(raw, out var v) ? v : defaultValue;
+    }
 }
