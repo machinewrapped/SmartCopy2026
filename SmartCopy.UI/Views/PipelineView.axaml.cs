@@ -239,11 +239,12 @@ public partial class PipelineView : UserControl
         var isDragHandle = false;
         while (el is not null && !ReferenceEquals(el, container))
         {
-            if (el is TextBlock { Text: "≡" })
+            if (el is Control { Name: "DragHandle" })
             {
                 isDragHandle = true;
                 break;
             }
+
             el = el.GetVisualParent();
         }
         if (!isDragHandle) return;
