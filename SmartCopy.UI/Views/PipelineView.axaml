@@ -99,7 +99,8 @@
                           HorizontalScrollBarVisibility="Auto"
                           VerticalScrollBarVisibility="Disabled">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="0">
-                    <ListBox ItemsSource="{Binding Steps}"
+                    <ListBox x:Name="StepsItemsControl"
+                             ItemsSource="{Binding Steps}"
                              SelectedItem="{Binding SelectedStep, Mode=TwoWay}"
                              Background="Transparent" BorderThickness="0"
                              KeyDown="OnStepListKeyDown">
@@ -144,18 +145,24 @@
                                             MinWidth="140"
                                             Classes.activeStep="{Binding IsActiveStep}">
                                         <Grid RowDefinitions="Auto, Auto, Auto">
-                                            <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto, Auto">
+                                            <Grid Grid.Row="0" ColumnDefinitions="Auto, Auto, *, Auto, Auto">
+                                                <!-- Drag handle -->
                                                 <TextBlock Grid.Column="0"
+                                                           x:Name="DragHandle"
+                                                           Text="≡" Foreground="Gray"
+                                                           VerticalAlignment="Center"
+                                                           Cursor="Hand" Margin="0,0,6,0" />
+                                                <TextBlock Grid.Column="1"
                                                            Text="{Binding Icon}"
                                                            FontSize="13"
                                                            VerticalAlignment="Center"
                                                            Margin="0,0,6,0" />
-                                                <TextBlock Grid.Column="1"
+                                                <TextBlock Grid.Column="2"
                                                            Text="{Binding Label}"
                                                            FontWeight="Medium"
                                                            TextWrapping="Wrap"
                                                            VerticalAlignment="Center" />
-                                                <Button Grid.Column="2"
+                                                <Button Grid.Column="3"
                                                         Content="✎"
                                                         IsVisible="{Binding IsConfigurable}"
                                                         Command="{Binding $parent[UserControl].((vm:PipelineViewModel)DataContext).RequestEditStepCommand}"
@@ -170,7 +177,7 @@
                                                         FontSize="10"
                                                         VerticalAlignment="Top"
                                                         Margin="6,0,0,0" />
-                                                <Button Grid.Column="3"
+                                                <Button Grid.Column="4"
                                                         Content="✕"
                                                         Command="{Binding $parent[UserControl].((vm:PipelineViewModel)DataContext).RemoveStepCommand}"
                                                         CommandParameter="{Binding}"

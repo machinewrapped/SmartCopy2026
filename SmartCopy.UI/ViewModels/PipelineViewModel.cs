@@ -218,6 +218,18 @@ public partial class PipelineViewModel : ViewModelBase
         Revalidate();
     }
 
+    public void MoveStep(int oldIndex, int newIndex)
+    {
+        if (oldIndex < 0 || oldIndex >= Steps.Count || newIndex < 0 || newIndex >= Steps.Count || oldIndex == newIndex)
+        {
+            return;
+        }
+
+        Steps.Move(oldIndex, newIndex);
+        _ = RefreshFreeSpaceCacheAsync();
+        Revalidate();
+    }
+
     [RelayCommand]
     private async Task LoadPresetAsync(string name)
     {
