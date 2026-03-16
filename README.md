@@ -5,7 +5,7 @@ This is an evolution of SmartCopyTool (https://sourceforge.net/projects/smartcop
 
 SmartCopy 2 is a complete rewrite, using modern .NET technologies and a more sophisticated UI framework. It is cross-platform and supports advanced workflows, which can be configured and saved as presets.
 
-<img width="2850" height="1530" alt="SmartCopy 2[026]" src="https://github.com/user-attachments/assets/428f3724-62ed-41cd-8210-2429dab03356" />
+<img width="2926" height="1779" alt="SmartCopy 2[026]" src="https://github.com/user-attachments/assets/40774c3e-f2c1-4d61-bc5b-83e0540ec6be" />
 
 The principles that drive the design of SmartCopy 2 are:
 - Composable pipelines
