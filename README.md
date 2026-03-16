@@ -3,11 +3,11 @@ A tool for working with large directories that aims to combine the steerability 
 
 This is an evolution of SmartCopyTool (https://sourceforge.net/projects/smartcopytool/), itself an evolution of a tool I wrote around 2 decades ago to provide an alternative to Windows Explorer for managing large directories. File management in Windows has improved a lot since those days, but it still lacks some features that made SmartCopyTool useful.
 
-SmartCopy2026 is a complete rewrite, using modern .NET technologies and a more sophisticated UI framework. It is cross-platform and supports advanced workflows, which can be configured and saved as presets.
+SmartCopy 2 is a complete rewrite, using modern .NET technologies and a more sophisticated UI framework. It is cross-platform and supports advanced workflows, which can be configured and saved as presets.
 
 <img width="2850" height="1530" alt="SmartCopy 2[026]" src="https://github.com/user-attachments/assets/428f3724-62ed-41cd-8210-2429dab03356" />
 
-The principles that drive the design of SmartCopy2026 are:
+The principles that drive the design of SmartCopy 2 are:
 - Composable pipelines
 - Selective operations
 - User control and configuration
