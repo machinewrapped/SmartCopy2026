@@ -9,7 +9,7 @@ public sealed class SelectionViewModelTests
     {
         var vm = new SelectionViewModel();
 
-        vm.UpdateStats(0, 0, 0);
+        vm.UpdateStats(0, 0, 0, 0, 0);
 
         Assert.Equal("No files selected", vm.StatusText);
     }
@@ -19,7 +19,7 @@ public sealed class SelectionViewModelTests
     {
         var vm = new SelectionViewModel();
 
-        vm.UpdateStats(3, 1536, 0);
+        vm.UpdateStats(3, 1536, 3, 1536, 0);
 
         Assert.Contains("3 files selected", vm.StatusText);
         Assert.Contains("1.5KB", vm.StatusText);
@@ -30,9 +30,20 @@ public sealed class SelectionViewModelTests
     {
         var vm = new SelectionViewModel();
 
-        vm.UpdateStats(2, 2048, 5);
+        vm.UpdateStats(2, 2048, 2, 2048, 5);
 
         Assert.Contains("2 files selected", vm.StatusText);
         Assert.Contains("5 files filtered out", vm.StatusText);
+    }
+
+    [Fact]
+    public void UpdateStats_PartialSelection_ShowsOfTotals()
+    {
+        var vm = new SelectionViewModel();
+
+        vm.UpdateStats(3, 1536, 10, 5120, 0);
+
+        Assert.Contains("3 of 10 files selected", vm.StatusText);
+        Assert.Contains("of", vm.StatusText);
     }
 }

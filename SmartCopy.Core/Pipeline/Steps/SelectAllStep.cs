@@ -19,8 +19,8 @@ public sealed class SelectAllStep : IPipelineStep
         // No preconditions. Post-condition: reset SourceExists so downstream steps
         // are not blocked by a prior destructive step.
         context.SourceExists = true;
-        context.HasSelectedIncludedInputs = true;
-        context.ByteEstimateUnknown = true;
+        context.SelectedFileCount = context.NumFilterIncludedFiles;
+        context.SelectedBytes = context.TotalFilterIncludedBytes;
         return Task.CompletedTask;
     }
 

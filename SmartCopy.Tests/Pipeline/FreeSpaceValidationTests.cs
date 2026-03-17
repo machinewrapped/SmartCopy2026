@@ -34,13 +34,18 @@ public sealed class FreeSpaceValidationTests
         IFileSystemProvider source,
         IPathResolver registry,
         IReadOnlyList<IPipelineStep> steps,
-        long selectedBytes)
+        long selectedBytes,
+        int selectedFileCount = 1,
+        int numFilterIncludedFiles = 1,
+        long totalFilterIncludedBytes = 0)
         => new(
             SourceProvider: source,
             ProviderRegistry: registry,
             CachedFreeSpace: await FreeSpaceCache.BuildForPipelineAsync(steps, registry, CancellationToken.None),
-            HasSelectedIncludedInputs: true,
-            SelectedBytes: selectedBytes
+            SelectedBytes: selectedBytes,
+            SelectedFileCount: selectedFileCount,
+            NumFilterIncludedFiles: numFilterIncludedFiles,
+            TotalFilterIncludedBytes: totalFilterIncludedBytes > 0 ? totalFilterIncludedBytes : selectedBytes
             );
 
     [Fact]
@@ -148,17 +153,21 @@ public sealed class FreeSpaceValidationTests
     }
 
     [Fact]
-    public async Task InvertSelection_ResetsBytes_DownstreamCopySkipsCheck()
+    public async Task InvertSelection_ComputesExactBytes_DownstreamCopyChecksInvertedBytes()
     {
         var (source, registry) = MakeSource();
-        var target = MakeTarget(capacity: 1, rootPath: "/target");
+        // Target has 600 bytes free. Selected = 500 of 1000 total → inverted = 500 bytes → fits.
+        var target = MakeTarget(capacity: 600, rootPath: "/target");
         registry.Register(target);
 
-        // InvertSelectionStep resets SelectedBytes → CopyStep should not warn
         IReadOnlyList<IPipelineStep> steps = [new InvertSelectionStep(), new CopyStep("/target/dst")];
         var result = await PipelineValidator.ValidateAsync(
             steps,
-            await MakeContext(source, registry, steps, selectedBytes: 500));
+            await MakeContext(source, registry, steps,
+                selectedBytes: 500,
+                selectedFileCount: 1,
+                numFilterIncludedFiles: 2,
+                totalFilterIncludedBytes: 1000));
 
         Assert.True(result.CanRun);
         Assert.DoesNotContain(result.Issues, i => i.Code == "Step.InsufficientSpace");

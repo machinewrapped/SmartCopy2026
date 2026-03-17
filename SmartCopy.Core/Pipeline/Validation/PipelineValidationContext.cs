@@ -6,5 +6,7 @@ public sealed record PipelineValidationContext(
     IFileSystemProvider? SourceProvider,
     IPathResolver ProviderRegistry,
     FreeSpaceCache CachedFreeSpace,
-    bool HasSelectedIncludedInputs = true,
-    long SelectedBytes = 0);
+    long SelectedBytes = 0,
+    int SelectedFileCount = 0,
+    int NumFilterIncludedFiles = 0,
+    long TotalFilterIncludedBytes = 0);

@@ -21,8 +21,9 @@ public sealed class InvertSelectionStep : IPipelineStep
         // No preconditions. Post-condition: reset SourceExists so downstream steps
         // are not blocked by a prior destructive step.
         context.SourceExists = true;
-        context.HasSelectedIncludedInputs = true;
-        context.ByteEstimateUnknown = true;
+        var invertedCount = context.NumFilterIncludedFiles - context.SelectedFileCount;
+        context.SelectedBytes     = context.TotalFilterIncludedBytes - context.SelectedBytes;
+        context.SelectedFileCount = invertedCount;
         return Task.CompletedTask;
     }
 

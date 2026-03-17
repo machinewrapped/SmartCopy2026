@@ -11,15 +11,19 @@ public sealed class PipelineValidatorTests
         IFileSystemProvider? sourceProvider = null,
         FileSystemProviderRegistry? registry = null,
         FreeSpaceCache? freeSpaceCache = null,
-        bool hasSelectedInputs = true, 
-        long totalSelectedBytes = 1)
+        long totalSelectedBytes = 1,
+        int selectedFileCount = 1,
+        int numFilterIncludedFiles = 5,
+        long totalFilterIncludedBytes = 5)
     {
         return new PipelineValidationContext(
             sourceProvider ?? new MemoryFileSystemProvider(),
             registry ?? new FileSystemProviderRegistry(),
             freeSpaceCache ?? new FreeSpaceCache(),
-            hasSelectedInputs,
-            totalSelectedBytes
+            totalSelectedBytes,
+            selectedFileCount,
+            numFilterIncludedFiles,
+            totalFilterIncludedBytes
         );
     }
 
@@ -50,7 +54,7 @@ public sealed class PipelineValidatorTests
     {
         var result = await PipelineValidator.ValidateAsync(
             [new CopyStep("/mem/out")],
-            MakeContext(hasSelectedInputs: false));
+            MakeContext(selectedFileCount: 0));
 
         Assert.False(result.CanRun);
         Assert.Contains(result.Issues, issue => issue.Code == "Pipeline.NoSelectedInputs" && issue.StepIndex is null);
@@ -75,7 +79,7 @@ public sealed class PipelineValidatorTests
     {
         var result = await PipelineValidator.ValidateAsync(
             [new FlattenStep()],
-            MakeContext(hasSelectedInputs: false));
+            MakeContext(selectedFileCount: 0));
 
         Assert.DoesNotContain(result.Issues, issue => issue.Code == "Pipeline.NoSelectedInputs");
     }
