@@ -110,7 +110,7 @@ public partial class PipelineView : UserControl
         if (_currentViewModel is null || this.VisualRoot is not Window parentWindow)
             return;
 
-        if (!step.Step.IsConfigurable)
+        if (!step.Step.IsEditable)
             return;
 
         var vm = EditStepDialogViewModel.ForEdit(step, _currentViewModel.AppSettings, _currentViewModel.SourceCapabilities);

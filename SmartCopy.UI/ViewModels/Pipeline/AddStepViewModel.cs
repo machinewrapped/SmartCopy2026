@@ -66,9 +66,13 @@ public partial class AddStepViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SelectedStepTypeName))]
+    [NotifyPropertyChangedFor(nameof(SelectedStepIsConfigurable))]
     private StepTypeItem? _selectedStepType;
 
     public string SelectedStepTypeName => SelectedStepType?.DisplayName ?? string.Empty;
+
+    public bool SelectedStepIsConfigurable => SelectedStepType is null
+        || StepEditorViewModelFactory.Create(SelectedStepType.Kind, _settings).BuildStep().IsConfigurable;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasPresets))]

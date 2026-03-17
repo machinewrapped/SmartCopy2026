@@ -16,6 +16,9 @@ public interface IPipelineStep
     /// <summary>Whether this step has any configurable parameters.</summary>
     bool IsConfigurable => true;
 
+    /// <summary>Whether the placed step card exposes an edit button.</summary>
+    bool IsEditable => IsConfigurable;
+
     /// <summary>A short summary of the actions this step will perform.</summary>
     string AutoSummary { get; }
 

@@ -29,6 +29,8 @@ public partial class PipelineStepViewModel : ViewModelBase
 
     public bool IsConfigurable => Step.IsConfigurable;
 
+    public bool IsEditable => Step.IsEditable;
+
     public bool HasDestination => Step is IHasDestinationPath pathProvider && pathProvider.HasDestinationPath;
 
     public string DestinationPath => (Step as IHasDestinationPath)?.DestinationPath ?? string.Empty;

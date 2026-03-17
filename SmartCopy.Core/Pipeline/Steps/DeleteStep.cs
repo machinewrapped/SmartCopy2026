@@ -19,6 +19,8 @@ public sealed class DeleteStep : IPipelineStep
 
     public StepKind StepType => StepKind.Delete;
     public bool IsExecutable => true;
+    public bool IsConfigurable => false;
+    public bool IsEditable => true;
 
     public string AutoSummary => Mode == DeleteMode.Permanent ? "Delete" : "Trash";
     public string Description => Mode == DeleteMode.Permanent ? "Delete permanently" : "Delete to Trash";

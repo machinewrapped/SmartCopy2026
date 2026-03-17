@@ -162,16 +162,18 @@
                 </Grid>
                 <Separator Height="1" Background="{DynamicResource PanelBorderBrush}" Margin="4,0" />
 
-                <!-- ＋ Configure... -->
-                <Button Background="Transparent"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Left"
-                        Padding="8,6"
-                        CornerRadius="4"
-                        Command="{Binding RequestNewStepCommand}">
-                    <TextBlock Text="＋ Configure..." Foreground="{DynamicResource AccentBrush}" />
-                </Button>
-                <Separator Height="1" Background="{DynamicResource PanelBorderBrush}" Margin="4,0" />
+                <!-- ＋ Configure... (hidden when the step type covers all options via presets) -->
+                <StackPanel IsVisible="{Binding SelectedStepIsConfigurable}">
+                    <Button Background="Transparent"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left"
+                            Padding="8,6"
+                            CornerRadius="4"
+                            Command="{Binding RequestNewStepCommand}">
+                        <TextBlock Text="＋ Configure..." Foreground="{DynamicResource AccentBrush}" />
+                    </Button>
+                    <Separator Height="1" Background="{DynamicResource PanelBorderBrush}" Margin="4,0" />
+                </StackPanel>
 
                 <!-- Recently used section -->
                 <StackPanel IsVisible="{Binding HasRecentPresets}">
