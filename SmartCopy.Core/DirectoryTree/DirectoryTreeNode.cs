@@ -210,7 +210,7 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
                 included++;
                 includedBytes += file.Size;
             }
-            if (file.CheckState == CheckState.Checked && IsFilterIncluded)
+            if (file.IsSelected)
             {
                 files++;
                 bytes += file.Size;

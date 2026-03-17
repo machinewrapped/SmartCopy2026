@@ -12,13 +12,13 @@ public partial class SelectionViewModel : ViewModelBase
         if (selectedFiles == 0)
         {
             StatusText = filteredOut > 0
-                ? $"No files selected  ·  {filteredOut} files filtered out"
+                ? $"No files selected  ·  {filteredOut} {(filteredOut == 1 ? "file" : "files")} filtered out"
                 : "No files selected";
             return;
         }
 
         var filesText = selectedFiles == totalIncluded
-            ? $"{selectedFiles} files selected"
+            ? $"{selectedFiles} {(selectedFiles == 1 ? "file" : "files")} selected"
             : $"{selectedFiles} of {totalIncluded} files selected";
 
         var bytesText = selectedFiles == totalIncluded
@@ -26,7 +26,7 @@ public partial class SelectionViewModel : ViewModelBase
             : $"{FileSizeFormatter.FormatBytes(selectedBytes)} of {FileSizeFormatter.FormatBytes(totalIncludedBytes)}";
 
         StatusText = filteredOut > 0
-            ? $"{filesText}  ·  {bytesText}  ·  {filteredOut} files filtered out"
+            ? $"{filesText}  ·  {bytesText}  ·  {filteredOut} {(filteredOut == 1 ? "file" : "files")} filtered out"
             : $"{filesText}  ·  {bytesText}";
     }
 
