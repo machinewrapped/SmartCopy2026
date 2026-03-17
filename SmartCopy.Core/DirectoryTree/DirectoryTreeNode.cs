@@ -61,8 +61,11 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
 
     public bool IsDirty { get; private set; } = false;
     public int NumSelectedFiles { get; private set; }
-    public int NumFilterExcludedFiles { get; private set;}
     public long TotalSelectedBytes { get; private set; }
+    public int TotalFiles { get; private set; }
+    public int NumFilterIncludedFiles { get; private set; }
+    public long TotalFilterIncludedBytes { get; private set; }
+    public int NumFilterExcludedFiles => TotalFiles - NumFilterIncludedFiles;
 
     public override string ToString() => CanonicalRelativePath + (IsDirectory ? "/" : "");
 
@@ -195,21 +198,22 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
     {
         int files = 0;
         long bytes = 0;
-        int excluded = 0;
+        int total = 0;
+        int included = 0;
+        long includedBytes = 0;
 
         foreach (var file in Files)
         {
-            if (file.CheckState == CheckState.Checked)
-            { 
-                if (IsFilterIncluded)
-                {
-                    files++;
-                    bytes += file.Size;                     
-                }
-                else
-                {
-                    excluded++;
-                }
+            total++;
+            if (file.IsFilterIncluded)
+            {
+                included++;
+                includedBytes += file.Size;
+            }
+            if (file.CheckState == CheckState.Checked && IsFilterIncluded)
+            {
+                files++;
+                bytes += file.Size;
             }
         }
 
@@ -217,17 +221,21 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
         {
             if (child.IsDirty)
             {
-                child.BuildStats();                
+                child.BuildStats();
             }
 
-            files += child.NumSelectedFiles;
-            bytes += child.TotalSelectedBytes;
-            excluded += child.NumFilterExcludedFiles;
+            files    += child.NumSelectedFiles;
+            bytes    += child.TotalSelectedBytes;
+            total    += child.TotalFiles;
+            included += child.NumFilterIncludedFiles;
+            includedBytes += child.TotalFilterIncludedBytes;
         }
 
-        NumSelectedFiles = files;
-        TotalSelectedBytes = bytes;
-        NumFilterExcludedFiles = excluded;
+        NumSelectedFiles       = files;
+        TotalSelectedBytes     = bytes;
+        TotalFiles             = total;
+        NumFilterIncludedFiles = included;
+        TotalFilterIncludedBytes = includedBytes;
         ClearDirty();
     }
 

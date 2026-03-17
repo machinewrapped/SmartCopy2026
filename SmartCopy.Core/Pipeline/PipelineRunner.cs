@@ -34,8 +34,10 @@ public sealed class PipelineRunner
             job.SourceProvider,
             job.ProviderRegistry,
             _freeSpaceCache,
-            job.RootNode.GetSelectedDescendants().Any(),
-            job.RootNode.TotalSelectedBytes));
+            job.RootNode.TotalSelectedBytes,
+            job.RootNode.NumSelectedFiles,
+            job.RootNode.NumFilterIncludedFiles,
+            job.RootNode.TotalFilterIncludedBytes));
 
         var context = new StepContext(job);
         var actions = new List<PlannedAction>();
@@ -121,8 +123,10 @@ public sealed class PipelineRunner
             job.SourceProvider,
             job.ProviderRegistry,
             _freeSpaceCache,
-            job.RootNode.GetSelectedDescendants().Any(),
-            job.RootNode.TotalSelectedBytes));
+            job.RootNode.TotalSelectedBytes,
+            job.RootNode.NumSelectedFiles,
+            job.RootNode.NumFilterIncludedFiles,
+            job.RootNode.TotalFilterIncludedBytes));
 
         // TODO: if there is a free space issue, fire off a preview
 

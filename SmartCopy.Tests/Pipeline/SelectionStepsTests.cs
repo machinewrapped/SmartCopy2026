@@ -76,7 +76,7 @@ public sealed class SelectionStepsTests
     }
 
     private static StepValidationContext MakeValidationContext(bool sourceExists = true) =>
-        new(hasSelectedIncludedInputs: true, sourceExists: sourceExists);
+        new(sourceExists: sourceExists, selectedFileCount: 1, numFilterIncludedFiles: 5);
 
     // -------------------------------------------------------------------------
     // SelectAllStep

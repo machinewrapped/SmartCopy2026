@@ -33,6 +33,8 @@ public partial class PipelineViewModel : ViewModelBase
     private readonly AppSettings _appSettings;
     private int _selectedIncludedFileCount;
     private long _selectedBytes;
+    private int _numFilterIncludedFiles;
+    private long _totalFilterIncludedBytes;
     private IFileSystemProvider? _sourceProvider;
     private FreeSpaceCache _cachedFreeSpace = new();
     private CancellationTokenSource _revalidateCts = new();
@@ -329,6 +331,22 @@ public partial class PipelineViewModel : ViewModelBase
         Revalidate();
     }
 
+    internal void SetNumFilterIncludedFiles(int count)
+    {
+        var normalized = Math.Max(0, count);
+        if (_numFilterIncludedFiles == normalized) return;
+        _numFilterIncludedFiles = normalized;
+        Revalidate();
+    }
+
+    internal void SetTotalFilterIncludedBytes(long bytes)
+    {
+        var normalized = Math.Max(0, bytes);
+        if (_totalFilterIncludedBytes == normalized) return;
+        _totalFilterIncludedBytes = normalized;
+        Revalidate();
+    }
+
     internal void RecordRecentTarget(string path)
     {
         if (string.IsNullOrWhiteSpace(path)) return;
@@ -441,11 +459,13 @@ public partial class PipelineViewModel : ViewModelBase
             var result = await PipelineValidator.ValidateAsync(
                 [.. Steps.Select(step => step.Step)],
                 new PipelineValidationContext(
-                    SourceProvider:   _sourceProvider,
-                    ProviderRegistry: _appContext,
-                    CachedFreeSpace:  _cachedFreeSpace,
-                    HasSelectedIncludedInputs: _selectedIncludedFileCount > 0,
-                    SelectedBytes:    _selectedBytes),
+                    SourceProvider:           _sourceProvider,
+                    ProviderRegistry:         _appContext,
+                    CachedFreeSpace:          _cachedFreeSpace,
+                    SelectedBytes:            _selectedBytes,
+                    SelectedFileCount:        _selectedIncludedFileCount,
+                    NumFilterIncludedFiles:   _numFilterIncludedFiles,
+                    TotalFilterIncludedBytes: _totalFilterIncludedBytes),
                 ct);
 
             ct.ThrowIfCancellationRequested();

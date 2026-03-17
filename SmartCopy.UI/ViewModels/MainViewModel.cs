@@ -925,20 +925,25 @@ public partial class MainViewModel : ViewModelBase
         if (DirectoryTree.RootNode == null)
         {
             Pipeline.SetSelectedIncludedFileCount(0);
-            StatusBar.Selection.UpdateStats(0,0,0);
+            Pipeline.SetNumFilterIncludedFiles(0);
+            Pipeline.SetTotalFilterIncludedBytes(0);
+            StatusBar.Selection.UpdateStats(0, 0, 0, 0, 0);
             return;
         }
 
         var root = DirectoryTree.RootNode;
         root.BuildStats();
 
-        int selected = root.NumSelectedFiles;
-        int filteredOut = root.NumFilterExcludedFiles;
-        long totalBytes = root.TotalSelectedBytes;
-
-        Pipeline.SetSelectedIncludedFileCount(selected);
-        Pipeline.SetSelectedBytes(totalBytes);
-        StatusBar.Selection.UpdateStats(selected, totalBytes, filteredOut);
+        Pipeline.SetSelectedIncludedFileCount(root.NumSelectedFiles);
+        Pipeline.SetSelectedBytes(root.TotalSelectedBytes);
+        Pipeline.SetNumFilterIncludedFiles(root.NumFilterIncludedFiles);
+        Pipeline.SetTotalFilterIncludedBytes(root.TotalFilterIncludedBytes);
+        StatusBar.Selection.UpdateStats(
+            root.NumSelectedFiles,
+            root.TotalSelectedBytes,
+            root.NumFilterIncludedFiles,
+            root.TotalFilterIncludedBytes,
+            root.NumFilterExcludedFiles);
     }
 
     private static string GetPreparationMessage(PreviewReason reason) => reason switch

@@ -18,9 +18,8 @@ public sealed class ClearSelectionStep : IPipelineStep
 
     public Task Validate(StepValidationContext context, CancellationToken ct = default)
     {
-        context.HasSelectedIncludedInputs = false;
-        context.ByteEstimateUnknown = false;
         context.SelectedBytes = 0;
+        context.SelectedFileCount = 0;
         return Task.CompletedTask;
     }
 

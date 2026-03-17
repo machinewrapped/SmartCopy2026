@@ -8,11 +8,13 @@ public sealed class PipelineValidator
         CancellationToken ct = default)
     {
         var validationContext = new StepValidationContext(
-            context.HasSelectedIncludedInputs,
-            selectedBytes:    context.SelectedBytes,
-            sourceProvider:   context.SourceProvider,
-            providerRegistry: context.ProviderRegistry,
-            cachedFreeSpace:  context.CachedFreeSpace);
+            selectedBytes:            context.SelectedBytes,
+            selectedFileCount:        context.SelectedFileCount,
+            numFilterIncludedFiles:   context.NumFilterIncludedFiles,
+            totalFilterIncludedBytes: context.TotalFilterIncludedBytes,
+            sourceProvider:           context.SourceProvider,
+            providerRegistry:         context.ProviderRegistry,
+            cachedFreeSpace:          context.CachedFreeSpace);
 
         if (steps.Count == 0)
         {

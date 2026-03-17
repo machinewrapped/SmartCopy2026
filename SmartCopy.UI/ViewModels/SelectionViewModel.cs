@@ -7,9 +7,9 @@ public partial class SelectionViewModel : ViewModelBase
     [ObservableProperty]
     private string _statusText = "No files selected";
 
-    public void UpdateStats(int fileCount, long totalBytes, int filteredOut)
+    public void UpdateStats(int selectedFiles, long selectedBytes, int totalIncluded, long totalIncludedBytes, int filteredOut)
     {
-        if (fileCount == 0)
+        if (selectedFiles == 0)
         {
             StatusText = filteredOut > 0
                 ? $"No files selected  ·  {filteredOut} files filtered out"
@@ -17,10 +17,17 @@ public partial class SelectionViewModel : ViewModelBase
             return;
         }
 
-        var sizeText = FileSizeFormatter.FormatBytes(totalBytes);
+        var filesText = selectedFiles == totalIncluded
+            ? $"{selectedFiles} files selected"
+            : $"{selectedFiles} of {totalIncluded} files selected";
+
+        var bytesText = selectedFiles == totalIncluded
+            ? FileSizeFormatter.FormatBytes(selectedBytes)
+            : $"{FileSizeFormatter.FormatBytes(selectedBytes)} of {FileSizeFormatter.FormatBytes(totalIncludedBytes)}";
+
         StatusText = filteredOut > 0
-            ? $"{fileCount} files selected  ·  {sizeText}  ·  {filteredOut} files filtered out"
-            : $"{fileCount} files selected  ·  {sizeText}";
+            ? $"{filesText}  ·  {bytesText}  ·  {filteredOut} files filtered out"
+            : $"{filesText}  ·  {bytesText}";
     }
 
 }
