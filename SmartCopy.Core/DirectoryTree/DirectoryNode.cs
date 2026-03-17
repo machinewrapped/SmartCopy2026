@@ -112,8 +112,7 @@ public sealed class DirectoryNode : DirectoryTreeNode
     // ── Stats ─────────────────────────────────────────────────────────────────
 
     public int NumSelectedFiles          { get; private set; }
-    private long _totalSelectedBytes;
-    public override long TotalSelectedBytes => _totalSelectedBytes;
+    public long TotalSelectedBytes       { get; private set; }
     public int TotalFiles                { get; private set; }
     public int NumFilterIncludedFiles    { get; private set; }
     public long TotalFilterIncludedBytes { get; private set; }
@@ -162,7 +161,7 @@ public sealed class DirectoryNode : DirectoryTreeNode
         }
 
         NumSelectedFiles         = files;
-        _totalSelectedBytes       = bytes;
+        TotalSelectedBytes       = bytes;
         TotalFiles               = total;
         NumFilterIncludedFiles   = included;
         TotalFilterIncludedBytes = includedBytes;

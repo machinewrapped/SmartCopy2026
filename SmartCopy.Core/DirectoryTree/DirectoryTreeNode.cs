@@ -61,8 +61,6 @@ public abstract class DirectoryTreeNode : INotifyPropertyChanged
     /// <summary>Selected directories in this subtree (0 for file nodes).</summary>
     public virtual int CountSelectedFolders() => 0;
 
-    /// <summary>Total size of selected files in this subtree.</summary>
-    public virtual long TotalSelectedBytes => IsSelected ? Size : 0;
 
     public bool IsDirty { get; private set; } = false;
 

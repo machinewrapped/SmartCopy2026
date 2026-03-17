@@ -138,7 +138,12 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
                 ? DestinationResult.Overwritten
                 : DestinationResult.Created;
 
-            var selectedBytes = node.TotalSelectedBytes;
+            var selectedBytes = node switch
+            {
+                DirectoryNode dn => dn.TotalSelectedBytes,
+                _ => node.Size
+            };
+
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: node,
