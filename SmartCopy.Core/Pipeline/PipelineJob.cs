@@ -14,7 +14,7 @@ namespace SmartCopy.Core.Pipeline;
 public sealed record PipelineJob
 {
     /// <summary>The root of the directory tree to process. Steps traverse it themselves.</summary>
-    public required DirectoryTreeNode RootNode { get; init; }
+    public required DirectoryNode RootNode { get; init; }
 
     /// <summary>Provider used to read source files.</summary>
     public required IFileSystemProvider SourceProvider { get; init; }

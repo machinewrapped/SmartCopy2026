@@ -13,7 +13,7 @@ public sealed class PipelineRunnerSelectionTests
     // Helpers
     // ─────────────────────────────────────────────────────────────────────────
 
-    private static async Task<(MemoryFileSystemProvider Provider, DirectoryTreeNode Root,
+    private static async Task<(MemoryFileSystemProvider Provider, DirectoryNode Root,
         DirectoryTreeNode A, DirectoryTreeNode B, DirectoryTreeNode C)>
         CreateThreeFileFixtureAsync(string name1, string name2, string name3)
     {
@@ -34,7 +34,7 @@ public sealed class PipelineRunnerSelectionTests
         return (provider, root, a, b, c);
     }
 
-    private static async Task<(MemoryFileSystemProvider Provider, DirectoryTreeNode Root,
+    private static async Task<(MemoryFileSystemProvider Provider, DirectoryNode Root,
         DirectoryTreeNode A, DirectoryTreeNode B, DirectoryTreeNode C,
         DirectoryTreeNode D, DirectoryTreeNode E)>
         CreateFiveFileFixtureAsync()

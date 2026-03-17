@@ -215,7 +215,7 @@ public sealed class PipelineRunner
         private readonly Dictionary<DirectoryTreeNode, PipelineContext> _contexts = new();
         private readonly HashSet<DirectoryTreeNode> _failedNodes = new();
 
-        public DirectoryTreeNode RootNode { get; }
+        public DirectoryNode RootNode { get; }
         public IFileSystemProvider SourceProvider { get; }
         public FileSystemProviderRegistry ProviderRegistry { get; }
         public bool ShowHiddenFiles { get; }

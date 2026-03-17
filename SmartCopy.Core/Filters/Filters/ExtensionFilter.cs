@@ -76,7 +76,7 @@ public sealed class ExtensionFilter : FilterBase
         IPathResolver context,
         CancellationToken ct = default)
     {
-        if (node.IsDirectory)
+        if (node is DirectoryNode)
         {
             return ValueTask.FromResult(false);
         }

@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
@@ -8,24 +7,19 @@ using SmartCopy.Core.Filters;
 namespace SmartCopy.Core.DirectoryTree;
 
 /// <summary>
-/// Represents a node in the directory tree.
-/// 
-/// The node is stateful and indicates whether it is user-selected, included or excluded by filters, 
-/// whether it is marked for removal, and whether it is expanded.
-/// 
-/// It also caches statistics about the node and its descendants, including the number of selected files, 
-/// the number of filter-excluded files, and the total size of selected files.
-/// 
-/// The node is dirty if any of its descendants are dirty.
+/// Abstract base for all nodes in the directory tree (files and directories).
+///
+/// The node is stateful and indicates whether it is user-selected, included or excluded by filters,
+/// whether it is marked for removal, and whether it is dirty.
 /// </summary>
-public sealed class DirectoryTreeNode : INotifyPropertyChanged
+public abstract class DirectoryTreeNode : INotifyPropertyChanged
 {
     private FileSystemNode _filesystemNode;
     private CheckState _checkState;
 
-    public DirectoryTreeNode(
+    protected DirectoryTreeNode(
         FileSystemNode filesystemNode,
-        DirectoryTreeNode? parent,
+        DirectoryNode? parent,
         CheckState checkState = CheckState.Unchecked)
     {
         _filesystemNode = filesystemNode;
@@ -33,19 +27,13 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
 
         Parent = parent;
         RelativePathSegments = parent is null ? Array.Empty<string>() : [.. parent.RelativePathSegments.Append(filesystemNode.Name)];
-
-        if (IsDirectory)
-        {
-            Children.CollectionChanged += (_, _) => MarkDirty();
-            Files.CollectionChanged    += (_, _) => MarkDirty();            
-        }
     }
 
-    public string Name => _filesystemNode.Name;
-    public string FullPath => _filesystemNode.FullPath;
-    public bool IsDirectory => _filesystemNode.IsDirectory;
-    public long Size => _filesystemNode.Size;
-    public DateTime CreatedAt => _filesystemNode.CreatedAt;
+    public string Name       => _filesystemNode.Name;
+    public string FullPath   => _filesystemNode.FullPath;
+    public bool IsDirectory  => _filesystemNode.IsDirectory;
+    public long Size         => _filesystemNode.Size;
+    public DateTime CreatedAt  => _filesystemNode.CreatedAt;
     public DateTime ModifiedAt => _filesystemNode.ModifiedAt;
     public FileAttributes Attributes => _filesystemNode.Attributes;
 
@@ -59,13 +47,24 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
     /// </summary>
     public string CanonicalRelativePath => string.Join("/", RelativePathSegments);
 
+    // ── Counts (virtual; overridden in DirectoryNode for recursive tree counts) ──────
+
+    /// <summary>Total files in this subtree (1 for a file node, recursive sum for directory).</summary>
+    public virtual int CountAllFiles() => 0;
+
+    /// <summary>Total directories in this subtree (0 for a file node, recursive sum for directory).</summary>
+    public virtual int CountAllFolders() => 0;
+
+    /// <summary>Selected files in this subtree (1 if this file is selected, 0 otherwise).</summary>
+    public virtual int CountSelectedFiles() => IsSelected ? 1 : 0;
+
+    /// <summary>Selected directories in this subtree (0 for file nodes).</summary>
+    public virtual int CountSelectedFolders() => 0;
+
+    /// <summary>Total size of selected files in this subtree.</summary>
+    public virtual long TotalSelectedBytes => IsSelected ? Size : 0;
+
     public bool IsDirty { get; private set; } = false;
-    public int NumSelectedFiles { get; private set; }
-    public long TotalSelectedBytes { get; private set; }
-    public int TotalFiles { get; private set; }
-    public int NumFilterIncludedFiles { get; private set; }
-    public long TotalFilterIncludedBytes { get; private set; }
-    public int NumFilterExcludedFiles => TotalFiles - NumFilterIncludedFiles;
 
     public override string ToString() => CanonicalRelativePath + (IsDirectory ? "/" : "");
 
@@ -80,15 +79,21 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
 
                 if (value == CheckState.Checked)
                 {
-                    IsExpanded = true;
+                    OnChecked();
                 }
                 else if (value == CheckState.Unchecked && Parent is not null)
                 {
-                    IsExpanded = false;
+                    OnUnchecked();
                 }
             }
         }
     }
+
+    /// <summary>Called when CheckState transitions to Checked. Override to expand the node.</summary>
+    protected virtual void OnChecked() { }
+
+    /// <summary>Called when CheckState transitions to Unchecked and Parent is non-null. Override to collapse.</summary>
+    protected virtual void OnUnchecked() { }
 
     private FilterResult _filterResult = FilterResult.Included;
     public FilterResult FilterResult
@@ -123,23 +128,9 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
         }
     }
 
-    private bool _isExpanded;
-    public bool IsExpanded
-    {
-        get => _isExpanded;
-        set
-        {
-            if (_isExpanded != value)
-            {
-                _isExpanded = value;
-                OnPropertyChanged();
-            }
-        }
-    }
-
-    public bool IsSelected => CheckState == CheckState.Checked && FilterResult == FilterResult.Included && !IsMarkedForRemoval;
-    public bool IsFilterIncluded => FilterResult != FilterResult.Excluded;
-    public bool IsAtomicIncluded => FilterResult == FilterResult.Included;
+    public bool IsSelected         => CheckState == CheckState.Checked && FilterResult == FilterResult.Included && !IsMarkedForRemoval;
+    public bool IsFilterIncluded   => FilterResult != FilterResult.Excluded;
+    public bool IsAtomicIncluded   => FilterResult == FilterResult.Included;
 
     private string _notes = string.Empty;
     public string Notes
@@ -155,9 +146,7 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
         }
     }
 
-    public DirectoryTreeNode? Parent { get; }
-    public ObservableCollection<DirectoryTreeNode> Children { get; } = [];
-    public ObservableCollection<DirectoryTreeNode> Files { get; } = [];
+    public DirectoryNode? Parent { get; }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -194,199 +183,24 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
         OnPropertyChanged(nameof(Attributes));
     }
 
-    public void BuildStats()
-    {
-        int files = 0;
-        long bytes = 0;
-        int total = 0;
-        int included = 0;
-        long includedBytes = 0;
+    public abstract void MarkForRemoval();
 
-        foreach (var file in Files)
-        {
-            total++;
-            if (file.IsFilterIncluded)
-            {
-                included++;
-                includedBytes += file.Size;
-            }
-            if (file.IsSelected)
-            {
-                files++;
-                bytes += file.Size;
-            }
-            file.ClearDirty();
-        }
-
-        foreach (var child in Children)
-        {
-            if (child.IsDirty)
-            {
-                child.BuildStats();
-            }
-
-            files    += child.NumSelectedFiles;
-            bytes    += child.TotalSelectedBytes;
-            total    += child.TotalFiles;
-            included += child.NumFilterIncludedFiles;
-            includedBytes += child.TotalFilterIncludedBytes;
-        }
-
-        NumSelectedFiles       = files;
-        TotalSelectedBytes     = bytes;
-        TotalFiles             = total;
-        NumFilterIncludedFiles = included;
-        TotalFilterIncludedBytes = includedBytes;
-        ClearDirty();
-    }
-
-    public void MarkForRemoval()
-    {
-        if (IsMarkedForRemoval) return;
-
-        IsMarkedForRemoval = true;
-
-        foreach (var child in Children)
-        {
-            child.MarkForRemoval();
-        }
-
-        foreach (var file in Files)
-        {
-            file.MarkForRemoval();
-        }
-    }
-
-    public IEnumerable<DirectoryTreeNode> GetSelectedDescendants()
-    {
-        foreach (var file in Files)
-            if (file.IsSelected)
-                yield return file;
-
-        foreach (var child in Children)
-        {
-            if (child.IsSelected)
-                yield return child;
-
-            foreach (var desc in child.GetSelectedDescendants())
-                yield return desc;
-        }
-    }
-
-    /// <summary>
-    /// Returns all non-excluded descendants (files and subdirectories) where
-    /// <see cref="FilterResult"/> != <see cref="FilterResult.Excluded"/>.
-    /// Used by selection steps to avoid touching filter-excluded nodes' CheckState.
-    /// </summary>
-    public IEnumerable<DirectoryTreeNode> GetFilterIncludedDescendants()
-    {
-        foreach (var file in Files)
-            if (file.IsFilterIncluded)
-                yield return file;
-
-        foreach (var child in Children)
-        {
-            if (child.IsFilterIncluded)
-                yield return child;
-
-            foreach (var desc in child.GetFilterIncludedDescendants())
-                yield return desc;
-        }
-    }
-
-    public DirectoryTreeNode? FindNodeByPathSegments(params string[] pathSegments)
-    {
-        var currentNode = this;
-        for (int i = 0; i < pathSegments.Length; i++)
-        {
-            var segment = pathSegments[i];
-            var nextNode = currentNode.Children.FirstOrDefault(c => string.Equals(c.Name, segment, StringComparison.Ordinal));
-
-            if (nextNode is null)
-            {
-                // If we can't find a directory, check for a file, but only if it's the last segment.
-                if (i == pathSegments.Length - 1)
-                {
-                    return currentNode.Files.FirstOrDefault(f => string.Equals(f.Name, segment, StringComparison.Ordinal));
-                }
-                // A directory segment in the middle of the path was not found.
-                return null;
-            }
-            currentNode = nextNode;
-        }
-        return currentNode;
-    }
-    
-    public void RemoveNodesMarkedForRemoval()
-    {
-        Debug.Assert(!IsMarkedForRemoval, "RemoveNodesMarkedForRemoval called on a node that's marked for removal - parent should have removed it.");
-
-        // Iterate backwards to safely remove items while iterating
-        for (var i = Files.Count - 1; i >= 0; i--)
-        {
-            var file = Files[i];
-            if (file.IsMarkedForRemoval)
-            {
-                Files.RemoveAt(i);
-            }
-        }
-
-        // Remove any children marked for removal, and recurse into unmarked children
-        bool removedAnyChildren = false;
-        for (var i = Children.Count - 1; i >= 0; i--)
-        {
-            if (Children[i].IsMarkedForRemoval)
-            {
-                Children.RemoveAt(i);
-                removedAnyChildren = true;
-            }
-            else
-            {
-                Children[i].RemoveNodesMarkedForRemoval();
-            }
-        }
-
-        if (removedAnyChildren)
-        {
-            MarkDirty();
-
-            // If we removed any children, we may need to recalculate our filter state
-            FilterChain.RecalculateParentExclusion(this);
-        }
-    }
-
-    internal int CountSelectedFiles() =>
-        (IsSelected && !IsDirectory ? 1 : 0) + (IsDirectory ? Children.Sum(c => c.CountSelectedFiles()) + Files.Count(f => f.IsSelected) : 0);
-
-    internal int CountSelectedFolders() =>
-        (IsSelected && IsDirectory ? 1 : 0) + (IsDirectory ? Children.Sum(c => c.CountSelectedFolders()) : 0);
-
-    internal int CountAllFiles() =>
-        IsDirectory ? Files.Count + Children.Sum(c => c.CountAllFiles()) : 1;
-
-    internal int CountAllFolders() =>
-        IsDirectory ? 1 + Children.Sum(c => c.CountAllFolders()) : 0;
-
-    void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
+
+    // ── CheckState propagation helpers ───────────────────────────────────────
 
     private void SetCheckStateWithPropagation(CheckState newState)
     {
         if (_checkState == newState)
             return;
 
-        // Change self
         _checkState = newState;
 
         MarkDirty();
-
-        // Downward propagation
-        if (newState != CheckState.Indeterminate && (Children.Count > 0 || Files.Count > 0))
-        {
-            PropagateDownward(newState);
-        }
+        PropagateCheckStateDownward(newState);
 
         OnPropertyChanged(nameof(CheckState));
         OnPropertyChanged(nameof(IsSelected));
@@ -395,77 +209,19 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
         Parent?.RecalculateCheckState();
     }
 
-    private void PropagateDownward(CheckState newState)
-    {
-        foreach (var child in Children)
-        {
-            if (child.CheckState != newState)
-            {
-                child.SetCheckState(newState);
-                if (child.Children.Count > 0 || child.Files.Count > 0)
-                {
-                    child.PropagateDownward(newState);
-                }
-            }
-        }
+    /// <summary>
+    /// Called during downward propagation. Subclasses override to fan out to typed children.
+    /// </summary>
+    protected virtual void PropagateCheckStateDownward(CheckState newState) { }
 
-        foreach (var file in Files)
-        {
-            if (file.CheckState != newState)
-            {
-                file.SetCheckState(newState);
-            }
-        }
-    }
-
-    private void SetCheckState(CheckState newState)
+    /// <summary>
+    /// Set only this node's check state field without recursion (used during propagation from parent).
+    /// </summary>
+    internal void SetCheckState(CheckState newState)
     {
         _checkState = newState;
         MarkDirty();
         OnPropertyChanged(nameof(CheckState));
         OnPropertyChanged(nameof(IsSelected));
-    }
-
-    private void RecalculateCheckState()
-    {
-        if (Children.Count == 0 && Files.Count == 0) return;
-
-        bool hasChecked = false;
-        bool hasUnchecked = false;
-        bool hasIndeterminate = false;
-
-        foreach (var child in Children)
-        {
-            if (child.CheckState == CheckState.Checked) hasChecked = true;
-            else if (child.CheckState == CheckState.Unchecked) hasUnchecked = true;
-            else hasIndeterminate = true;
-        }
-
-        foreach (var file in Files)
-        {
-            if (file.CheckState == CheckState.Checked) hasChecked = true;
-            else if (file.CheckState == CheckState.Unchecked) hasUnchecked = true;
-            else hasIndeterminate = true;
-        }
-
-        CheckState computedState;
-        if (hasIndeterminate || (hasChecked && hasUnchecked))
-        {
-            computedState = CheckState.Indeterminate;
-        }
-        else if (hasChecked)
-        {
-            computedState = CheckState.Checked;
-        }
-        else
-        {
-            computedState = CheckState.Unchecked;
-        }
-
-        if (CheckState != computedState)
-        {
-            SetCheckState(computedState);
-            Parent?.RecalculateCheckState();
-        }
     }
 }

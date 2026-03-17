@@ -25,7 +25,7 @@ public sealed class SizeRangeFilter : FilterBase
         IPathResolver context,
         CancellationToken ct = default)
     {
-        if (node.IsDirectory)
+        if (node is DirectoryNode)
         {
             return ValueTask.FromResult(false);
         }

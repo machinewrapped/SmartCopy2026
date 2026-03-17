@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline.Validation;
 
@@ -84,7 +85,7 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
             ct.ThrowIfCancellationRequested();
             if (context.IsNodeFailed(node)) continue;
 
-            if (node.IsDirectory)
+            if (node is DirectoryNode)
             {
                 yield return new TransformResult(
                     IsSuccess: true,

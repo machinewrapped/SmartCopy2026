@@ -18,12 +18,12 @@ public sealed class ErrorHandlingTests
     // Shared test context
     // ─────────────────────────────────────────────────────────────────────────
 
-    private sealed class TestContext(DirectoryTreeNode root, IFileSystemProvider source, IFileSystemProvider? target = null) : IStepContext
+    private sealed class TestContext(DirectoryNode root, IFileSystemProvider source, IFileSystemProvider? target = null) : IStepContext
     {
         private readonly Dictionary<DirectoryTreeNode, PipelineContext> _ctxCache = new();
         private readonly HashSet<DirectoryTreeNode> _failed = new();
 
-        public DirectoryTreeNode RootNode { get; } = root;
+        public DirectoryNode RootNode { get; } = root;
         public IFileSystemProvider SourceProvider { get; } = source;
         public bool ShowHiddenFiles { get; }
         public bool AllowDeleteReadOnly { get; }
@@ -258,7 +258,8 @@ public sealed class ErrorHandlingTests
             .WithFile("/src/subdir/b.txt", "bbb"u8), volumeId: "VOL");
 
         var root = await inner.BuildDirectoryTree("/src");
-        var subdir = root.Children.Single();
+        var subdir = root.Children.Single() as DirectoryNode;
+        Assert.NotNull(subdir);
         foreach (var f in subdir.Files)
             f.CheckState = CheckState.Checked;
 

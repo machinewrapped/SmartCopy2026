@@ -9,11 +9,11 @@ public class FileListViewModel : ViewModelBase
 {
     private CancellationTokenSource? _loadCts;
 
-    private DirectoryTreeNode? _currentDirectoryNode;
+    private DirectoryNode? _currentDirectoryNode;
 
     // The subset (or whole set) exposed to the DataGrid, respecting ShowFilteredFiles.
-    private IReadOnlyList<DirectoryTreeNode> _visibleFiles = [];
-    public IReadOnlyList<DirectoryTreeNode> VisibleFiles
+    private IReadOnlyList<FileNode> _visibleFiles = [];
+    public IReadOnlyList<FileNode> VisibleFiles
     {
         get => _visibleFiles;
         private set => SetProperty(ref _visibleFiles, value);
@@ -57,7 +57,7 @@ public class FileListViewModel : ViewModelBase
     /// Displays the files already scanned into <paramref name="directoryNode"/>,
     /// then applies the current filter chain.
     /// </summary>
-    public async Task LoadFilesForNodeAsync(DirectoryTreeNode directoryNode, FilterChain filterChain, IPathResolver pathResolver)
+    public async Task LoadFilesForNodeAsync(DirectoryNode directoryNode, FilterChain filterChain, IPathResolver pathResolver)
     {
         _loadCts?.Cancel();
         _loadCts?.Dispose();
@@ -69,7 +69,7 @@ public class FileListViewModel : ViewModelBase
         await ApplyChainToFilesAsync(filterChain, pathResolver, ct);
     }
 
-    public DirectoryTreeNode? FindFile(string fullPath)
+    public FileNode? FindFile(string fullPath)
     {
         return _currentDirectoryNode?.Files.FirstOrDefault(f =>
             string.Equals(f.FullPath, fullPath, StringComparison.Ordinal));
@@ -102,7 +102,7 @@ public class FileListViewModel : ViewModelBase
         RefreshVisibleFiles();
     }
 
-    public void ClearIfUnder(DirectoryTreeNode removedDirectory)
+    public void ClearIfUnder(DirectoryNode removedDirectory)
     {
         var node = _currentDirectoryNode;
         while (node is not null)
@@ -124,7 +124,7 @@ public class FileListViewModel : ViewModelBase
             : [.. files.Where(f => f.FilterResult == FilterResult.Included)];
     }
 
-    private void SetCurrentDirectoryNode(DirectoryTreeNode? directoryNode)
+    private void SetCurrentDirectoryNode(DirectoryNode? directoryNode)
     {
         if (ReferenceEquals(_currentDirectoryNode, directoryNode))
         {

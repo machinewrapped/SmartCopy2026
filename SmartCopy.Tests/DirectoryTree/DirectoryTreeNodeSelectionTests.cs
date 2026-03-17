@@ -17,7 +17,7 @@ public sealed class DirectoryTreeNodeSelectionTests
 
         root.CheckState = CheckState.Checked;
 
-        var childDirectory = root.FindNodeByPathSegments(["root", "albums"]);
+        var childDirectory = root.FindNodeByPathSegments(["root", "albums"]) as DirectoryNode;
         var nestedFile = root.FindNodeByPathSegments(["root", "albums", "track1.mp3"]);
         var rootFile = root.FindNodeByPathSegments(["root", "cover.jpg"]);
 
@@ -35,7 +35,7 @@ public sealed class DirectoryTreeNodeSelectionTests
             .WithFile("/root/a.mp3", "a"u8)
             .WithFile("/root/b.mp3", "b"u8));
             
-        var root = rootNode.FindNodeByPathSegments(["root"]);
+        var root = rootNode.FindNodeByPathSegments(["root"]) as DirectoryNode;
         var fileA = rootNode.FindNodeByPathSegments(["root", "a.mp3"]);
         var fileB = rootNode.FindNodeByPathSegments(["root", "b.mp3"]);
         Assert.NotNull(root);
@@ -101,14 +101,16 @@ public sealed class DirectoryTreeNodeSelectionTests
             .WithSimulatedFile("/root/a.mp3", 1000)
             .WithSimulatedFile("/root/b.mp3", 2000));
 
+        var root = rootNode.FindNodeByPathSegments(["root"]) as DirectoryNode;
         var fileA = rootNode.FindNodeByPathSegments(["root", "a.mp3"]);
+        Assert.NotNull(root);
         Assert.NotNull(fileA);
         fileA.CheckState = CheckState.Checked;
 
-        rootNode.BuildStats();
+        root.BuildStats();
 
-        Assert.Equal(1, rootNode.NumSelectedFiles);
-        Assert.Equal(1000, rootNode.TotalSelectedBytes);
+        Assert.Equal(1, root.NumSelectedFiles);
+        Assert.Equal(1000, root.TotalSelectedBytes);
     }
 
     [Fact]
@@ -119,7 +121,7 @@ public sealed class DirectoryTreeNodeSelectionTests
             .WithSimulatedFile("/root/a.mp3", 1000)
             .WithSimulatedFile("/root/b.mp3", 2000));
 
-        var dir   = rootNode.FindNodeByPathSegments(["root"]);
+        var dir   = rootNode.FindNodeByPathSegments(["root"]) as DirectoryNode;
         var fileA = rootNode.FindNodeByPathSegments(["root", "a.mp3"]);
         var fileB = rootNode.FindNodeByPathSegments(["root", "b.mp3"]);
         Assert.NotNull(dir);
@@ -128,7 +130,7 @@ public sealed class DirectoryTreeNodeSelectionTests
 
         // Selecting the directory marks all file nodes dirty via downward propagation
         dir.CheckState = CheckState.Checked;
-        rootNode.BuildStats();
+        dir.BuildStats();
 
         Assert.False(fileA.IsDirty, "BuildStats should clear IsDirty on file nodes");
         Assert.False(fileB.IsDirty, "BuildStats should clear IsDirty on file nodes");
@@ -143,7 +145,7 @@ public sealed class DirectoryTreeNodeSelectionTests
             .WithSimulatedFile("/root/b.mp3", 2000)
             .WithSimulatedFile("/root/c.mp3", 3000));
 
-        var dir   = rootNode.FindNodeByPathSegments(["root"]);
+        var dir   = rootNode.FindNodeByPathSegments(["root"]) as DirectoryNode;
         var fileA = rootNode.FindNodeByPathSegments(["root", "a.mp3"]);
         var fileB = rootNode.FindNodeByPathSegments(["root", "b.mp3"]);
         var fileC = rootNode.FindNodeByPathSegments(["root", "c.mp3"]);
@@ -154,19 +156,19 @@ public sealed class DirectoryTreeNodeSelectionTests
 
         // Select all, then simulate what RefreshIdleStats does
         dir.CheckState = CheckState.Checked;
-        rootNode.BuildStats();
+        dir.BuildStats();
 
-        // First deselection: parent transitions Checked → Indeterminate — root gets dirty
+        // First deselection: parent transitions Checked -> Indeterminate -- root gets dirty
         fileA.CheckState = CheckState.Unchecked;
         Assert.True(rootNode.IsDirty, "Root should be dirty after first deselection");
         rootNode.BuildStats();
 
-        // Second deselection: parent stays Indeterminate — root must still get dirty
+        // Second deselection: parent stays Indeterminate -- root must still get dirty
         fileB.CheckState = CheckState.Unchecked;
         Assert.True(rootNode.IsDirty, "Root should be dirty after second deselection");
         rootNode.BuildStats();
 
-        // Third deselection: parent transitions Indeterminate → Unchecked — root gets dirty
+        // Third deselection: parent transitions Indeterminate -> Unchecked -- root gets dirty
         fileC.CheckState = CheckState.Unchecked;
         Assert.True(rootNode.IsDirty, "Root should be dirty after third deselection");
     }

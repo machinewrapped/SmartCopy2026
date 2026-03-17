@@ -34,9 +34,9 @@ public sealed class InvertSelectionStep : IPipelineStep
         foreach (var node in context.RootNode.GetFilterIncludedDescendants())
         {
             ct.ThrowIfCancellationRequested();
-            if (!node.IsDirectory)
+            if (node is FileNode fileNode)
             {
-                var nodeCtx = context.GetNodeContext(node);
+                var nodeCtx = context.GetNodeContext(fileNode);
                 nodeCtx.VirtualCheckState = nodeCtx.VirtualCheckState == CheckState.Checked
                     ? CheckState.Unchecked
                     : CheckState.Checked;
@@ -55,7 +55,7 @@ public sealed class InvertSelectionStep : IPipelineStep
         foreach (var node in context.RootNode.GetFilterIncludedDescendants())
         {
             ct.ThrowIfCancellationRequested();
-            if (!node.IsDirectory)
+            if (node is FileNode)
                 node.CheckState = node.CheckState == CheckState.Checked
                     ? CheckState.Unchecked
                     : CheckState.Checked;

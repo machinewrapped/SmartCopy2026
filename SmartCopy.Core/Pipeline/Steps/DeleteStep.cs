@@ -207,10 +207,10 @@ public sealed class DeleteStep : IPipelineStep
             IsSuccess: isSuccess,
             SourceNode: node,
             SourceNodeResult: pathResult,
-            NumberOfFilesAffected: (node.IsDirectory || isSkipped) ? 0 : 1,
-            NumberOfFoldersAffected: (!node.IsDirectory || isSkipped) ? 0 : 1,
+            NumberOfFilesAffected: (node is DirectoryNode || isSkipped) ? 0 : 1,
+            NumberOfFoldersAffected: (node is not DirectoryNode || isSkipped) ? 0 : 1,
             InputBytes: node.Size,
-            NumberOfFilesSkipped: (node.IsDirectory || !isSkipped) ? 0 : 1,
-            NumberOfFoldersSkipped: (!node.IsDirectory || !isSkipped) ? 0 : 1);
+            NumberOfFilesSkipped: (node is DirectoryNode || !isSkipped) ? 0 : 1,
+            NumberOfFoldersSkipped: (node is not DirectoryNode || !isSkipped) ? 0 : 1);
     }
 }

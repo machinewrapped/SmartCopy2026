@@ -19,7 +19,7 @@ public static class StepContextExtensions
 
     /// <summary>
     /// Enumerates all nodes that are virtually selected in the current pipeline run,
-    /// mirroring <see cref="DirectoryTreeNode.GetSelectedDescendants"/> but reading
+    /// mirroring <see cref="DirectoryNode.GetSelectedDescendants"/> but reading
     /// virtual state so that selection-step <c>PreviewAsync</c> mutations are visible.
     /// </summary>
     public static IEnumerable<DirectoryTreeNode> GetPreviewSelectedDescendants(
@@ -27,7 +27,7 @@ public static class StepContextExtensions
         => GetPreviewSelectedDescendantsFrom(context, context.RootNode);
 
     private static IEnumerable<DirectoryTreeNode> GetPreviewSelectedDescendantsFrom(
-        IStepContext context, DirectoryTreeNode node)
+        IStepContext context, DirectoryNode node)
     {
         foreach (var file in node.Files)
             if (context.IsPreviewSelected(file))

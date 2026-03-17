@@ -22,14 +22,14 @@ public sealed class SelectionStepsTests
         private readonly Dictionary<DirectoryTreeNode, PipelineContext> _contexts = new();
         private readonly HashSet<DirectoryTreeNode> _failed = new();
 
-        public DirectoryTreeNode RootNode { get; }
+        public DirectoryNode RootNode { get; }
         public IFileSystemProvider SourceProvider { get; }
         public FileSystemProviderRegistry ProviderRegistry { get; } = new();
         public bool ShowHiddenFiles { get; }
         public bool AllowDeleteReadOnly { get; }
         public ITrashService TrashService { get; } = new NullTrashService();
 
-        public TestStepContext(DirectoryTreeNode root, IFileSystemProvider provider)
+        public TestStepContext(DirectoryNode root, IFileSystemProvider provider)
         {
             RootNode = root;
             SourceProvider = provider;
@@ -64,7 +64,7 @@ public sealed class SelectionStepsTests
     /// <summary>
     /// Builds a minimal tree rooted at /src with a single file.txt.
     /// </summary>
-    private static async Task<(DirectoryTreeNode Root, DirectoryTreeNode File, IFileSystemProvider Provider)>
+    private static async Task<(DirectoryNode Root, FileNode File, IFileSystemProvider Provider)>
         MakeTree(CheckState initialState = CheckState.Unchecked)
     {
         var provider = MemoryFileSystemFixtures.Create(f => f.WithFile("/src/file.txt", "content"u8));

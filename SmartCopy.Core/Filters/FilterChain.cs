@@ -41,13 +41,13 @@ public sealed class FilterChain
     }
 
     public async Task ApplyToTreeAsync(
-        DirectoryTreeNode root,
+        DirectoryNode root,
         IPathResolver? context = null,
         CancellationToken ct = default)
     {
         var resolvedContext = context ?? FileSystemProviderRegistry.Empty;
-        var stack = new Stack<DirectoryTreeNode>([root]);
-        var postOrderList = new List<DirectoryTreeNode>();
+        var stack = new Stack<DirectoryNode>([root]);
+        var postOrderList = new List<DirectoryNode>();
 
         while (stack.Count > 0)
         {
@@ -82,7 +82,7 @@ public sealed class FilterChain
         }
     }
 
-    public static void RecalculateParentExclusion(DirectoryTreeNode? node)
+    public static void RecalculateParentExclusion(DirectoryNode? node)
     {
         while (node != null)
         {
@@ -96,9 +96,9 @@ public sealed class FilterChain
     /// whether any child or file is still included. A directory is only excluded when ALL its
     /// content is excluded; individual filter evaluation on the directory itself is overridden.
     /// </summary>
-    private static void UpdateDirectoryExclusion(DirectoryTreeNode node)
+    private static void UpdateDirectoryExclusion(DirectoryNode node)
     {
-        if (!node.IsDirectory || (node.Children.Count == 0 && node.Files.Count == 0))
+        if (node.Children.Count == 0 && node.Files.Count == 0)
             return;
 
         bool allIncluded =
@@ -138,7 +138,7 @@ public sealed class FilterChain
 
         foreach (var filter in _filters.Where(f => f.IsEnabled))
         {
-            if (node.IsDirectory && !filter.AppliesToDirectories)
+            if (node is DirectoryNode && !filter.AppliesToDirectories)
                 continue;
 
             ct.ThrowIfCancellationRequested();

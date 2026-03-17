@@ -5,11 +5,11 @@ namespace SmartCopy.Core.Scanning;
 
 public static class DirectoryTreePatcher
 {
-    // Case sensitve sort for UI display only
+    // Case sensitive sort for UI display only
     private static readonly StringComparer SortComparer = StringComparer.OrdinalIgnoreCase;
 
     public static DirectoryTreePatchApplyResult Apply(
-        DirectoryTreeNode rootNode,
+        DirectoryNode rootNode,
         DirectoryWatcherBatch batch,
         DirectoryTreeNode? selectedNode)
     {
@@ -47,8 +47,24 @@ public static class DirectoryTreePatcher
                 continue;
             }
 
-            var insertedNode = MakeDirectoryNode(insert.Node, parentNode);
-            InsertNodeIfMissing(parentNode, insertedNode);
+            if (insert.Node.FileSystemNode.IsDirectory)
+            {
+                var insertedDirNode = MakeDirectoryNode(insert.Node, parentNode);
+                InsertDirAlphabetically(parentNode.Children, insertedDirNode);
+            }
+            else
+            {
+                var existingFile = parentNode.Files.FirstOrDefault(f =>
+                    !f.IsMarkedForRemoval && string.Equals(f.Name, insert.Node.FileSystemNode.Name, StringComparison.Ordinal));
+                if (existingFile is null)
+                {
+                    var initialCheckState = parentNode.CheckState == CheckState.Checked
+                        ? CheckState.Checked
+                        : CheckState.Unchecked;
+                    var fileNode = new FileNode(insert.Node.FileSystemNode, parentNode, initialCheckState);
+                    InsertFileAlphabetically(parentNode.Files, fileNode);
+                }
+            }
         }
 
         foreach (var refresh in batch.Refreshes)
@@ -66,7 +82,7 @@ public static class DirectoryTreePatcher
         return new DirectoryTreePatchApplyResult(nextSelectedNode);
     }
 
-    private static DirectoryTreeNode? FindExactNode(DirectoryTreeNode rootNode, IReadOnlyList<string> relativeSegments)
+    private static DirectoryTreeNode? FindExactNode(DirectoryNode rootNode, IReadOnlyList<string> relativeSegments)
     {
         if (relativeSegments.Count == 0)
         {
@@ -98,7 +114,7 @@ public static class DirectoryTreePatcher
         return currentNode;
     }
 
-    private static DirectoryTreeNode? FindNearestExistingParent(DirectoryTreeNode rootNode, IReadOnlyList<string> relativeSegments)
+    private static DirectoryNode? FindNearestExistingParent(DirectoryNode rootNode, IReadOnlyList<string> relativeSegments)
     {
         if (relativeSegments.Count == 0)
         {
@@ -123,31 +139,19 @@ public static class DirectoryTreePatcher
         return currentNode;
     }
 
-    private static bool InsertNodeIfMissing(DirectoryTreeNode parentNode, DirectoryTreeNode node)
+    private static void InsertDirAlphabetically(ObservableCollection<DirectoryNode> collection, DirectoryNode node)
     {
-        if (node.IsDirectory)
+        var insertIndex = 0;
+        while (insertIndex < collection.Count
+               && SortComparer.Compare(collection[insertIndex].Name, node.Name) <= 0)
         {
-            if (parentNode.Children.Any(child =>
-                    !child.IsMarkedForRemoval && string.Equals(child.Name, node.Name, StringComparison.Ordinal)))
-            {
-                return false;
-            }
-
-            InsertAlphabetically(parentNode.Children, node);
-            return true;
+            insertIndex++;
         }
 
-        if (parentNode.Files.Any(file =>
-                !file.IsMarkedForRemoval && string.Equals(file.Name, node.Name, StringComparison.Ordinal)))
-        {
-            return false;
-        }
-
-        InsertAlphabetically(parentNode.Files, node);
-        return true;
+        collection.Insert(insertIndex, node);
     }
 
-    private static void InsertAlphabetically(ObservableCollection<DirectoryTreeNode> collection, DirectoryTreeNode node)
+    private static void InsertFileAlphabetically(ObservableCollection<FileNode> collection, FileNode node)
     {
         var insertIndex = 0;
         while (insertIndex < collection.Count
@@ -161,31 +165,44 @@ public static class DirectoryTreePatcher
 
     private static bool IsDescendantOrSelf(DirectoryTreeNode node, DirectoryTreeNode ancestor)
     {
-        for (var current = node; current is not null; current = current.Parent)
+        // Walk via Parent (DirectoryNode?) for directories
+        if (node is DirectoryNode dirNode)
+        {
+            for (DirectoryTreeNode? current = dirNode; current is not null; current = current.Parent)
+            {
+                if (ReferenceEquals(current, ancestor))
+                    return true;
+            }
+            return false;
+        }
+
+        // For a FileNode: check the node itself, then its parent chain
+        if (ReferenceEquals(node, ancestor))
+            return true;
+
+        for (DirectoryNode? current = node.Parent; current is not null; current = current.Parent)
         {
             if (ReferenceEquals(current, ancestor))
-            {
                 return true;
-            }
         }
 
         return false;
     }
 
-    private static DirectoryTreeNode MakeDirectoryNode(ScannedNode snapshotNode, DirectoryTreeNode parentNode)
+    private static DirectoryNode MakeDirectoryNode(ScannedNode snapshotNode, DirectoryNode parentNode)
     {
         var initialCheckState = parentNode.CheckState == CheckState.Checked
             ? CheckState.Checked
             : CheckState.Unchecked;
 
-        var clone = new DirectoryTreeNode(snapshotNode.FileSystemNode, parentNode, initialCheckState);
+        var clone = new DirectoryNode(snapshotNode.FileSystemNode, parentNode, initialCheckState);
 
         foreach (var child in snapshotNode.Children)
         {
             if (child.FileSystemNode.IsDirectory)
                 clone.Children.Add(MakeDirectoryNode(child, clone));
             else
-                clone.Files.Add(new DirectoryTreeNode(child.FileSystemNode, clone, initialCheckState));
+                clone.Files.Add(new FileNode(child.FileSystemNode, clone, initialCheckState));
         }
 
         return clone;
