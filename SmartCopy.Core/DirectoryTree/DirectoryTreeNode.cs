@@ -47,21 +47,6 @@ public abstract class DirectoryTreeNode : INotifyPropertyChanged
     /// </summary>
     public string CanonicalRelativePath => string.Join("/", RelativePathSegments);
 
-    // ── Counts (virtual; overridden in DirectoryNode for recursive tree counts) ──────
-
-    /// <summary>Total files in this subtree (1 for a file node, recursive sum for directory).</summary>
-    public virtual int CountAllFiles() => 0;
-
-    /// <summary>Total directories in this subtree (0 for a file node, recursive sum for directory).</summary>
-    public virtual int CountAllFolders() => 0;
-
-    /// <summary>Selected files in this subtree (1 if this file is selected, 0 otherwise).</summary>
-    public virtual int CountSelectedFiles() => IsSelected ? 1 : 0;
-
-    /// <summary>Selected directories in this subtree (0 for file nodes).</summary>
-    public virtual int CountSelectedFolders() => 0;
-
-
     public bool IsDirty { get; private set; } = false;
 
     public override string ToString() => CanonicalRelativePath + (IsDirectory ? "/" : "");

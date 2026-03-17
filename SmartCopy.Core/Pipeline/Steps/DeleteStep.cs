@@ -96,8 +96,8 @@ public sealed class DeleteStep : IPipelineStep
                     IsSuccess: false,
                     SourceNode: context.RootNode,
                     SourceNodeResult: SourceResult.Skipped,
-                    NumberOfFilesSkipped: context.RootNode.CountAllFiles(),
-                    NumberOfFoldersSkipped: context.RootNode.CountAllFolders(),
+                    NumberOfFilesSkipped: PipelineHelpers.GetTotalFileCount(context.RootNode),
+                    NumberOfFoldersSkipped: PipelineHelpers.GetTotalFolderCount(context.RootNode),
                     InputBytes: context.RootNode.Size);
                 yield break;
             }
@@ -122,8 +122,8 @@ public sealed class DeleteStep : IPipelineStep
                     IsSuccess: true,
                     SourceNode: context.RootNode,
                     SourceNodeResult: rootActualResult!.Value,
-                    NumberOfFilesAffected: context.RootNode.CountAllFiles(),
-                    NumberOfFoldersAffected: context.RootNode.CountAllFolders(),
+                    NumberOfFilesAffected: PipelineHelpers.GetTotalFileCount(context.RootNode),
+                    NumberOfFoldersAffected: PipelineHelpers.GetTotalFolderCount(context.RootNode),
                     InputBytes: context.RootNode.Size);
                 yield break;
             }
@@ -145,8 +145,8 @@ public sealed class DeleteStep : IPipelineStep
                     IsSuccess: false,
                     SourceNode: node,
                     SourceNodeResult: SourceResult.Skipped,
-                    NumberOfFilesSkipped: node.CountAllFiles(),
-                    NumberOfFoldersSkipped: node.CountAllFolders(),
+                    NumberOfFilesSkipped: PipelineHelpers.GetTotalFileCount(node),
+                    NumberOfFoldersSkipped: PipelineHelpers.GetTotalFolderCount(node),
                     InputBytes: node.Size);
                 continue;
             }
@@ -169,8 +169,8 @@ public sealed class DeleteStep : IPipelineStep
                     IsSuccess: false,
                     SourceNode: node,
                     SourceNodeResult: SourceResult.Skipped,
-                    NumberOfFilesSkipped: node.CountAllFiles(),
-                    NumberOfFoldersSkipped: node.CountAllFolders(),
+                    NumberOfFilesSkipped: PipelineHelpers.GetTotalFileCount(node),
+                    NumberOfFoldersSkipped: PipelineHelpers.GetTotalFolderCount(node),
                     InputBytes: node.Size,
                     ErrorMessage: deleteError);
             }
@@ -180,8 +180,8 @@ public sealed class DeleteStep : IPipelineStep
                     IsSuccess: true,
                     SourceNode: node,
                     SourceNodeResult: actualResult!.Value,
-                    NumberOfFilesAffected: node.CountAllFiles(),
-                    NumberOfFoldersAffected: node.CountAllFolders(),
+                    NumberOfFilesAffected: PipelineHelpers.GetTotalFileCount(node),
+                    NumberOfFoldersAffected: PipelineHelpers.GetTotalFolderCount(node),
                     InputBytes: node.Size);
             }
         }

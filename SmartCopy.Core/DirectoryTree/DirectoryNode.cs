@@ -278,8 +278,10 @@ public sealed class DirectoryNode : DirectoryTreeNode
         return currentNode;
     }
 
-    public override int CountSelectedFiles()   => Files.Count(f => f.IsSelected) + Children.Sum(c => c.CountSelectedFiles());
-    public override int CountSelectedFolders() => (IsSelected ? 1 : 0) + Children.Sum(c => c.CountSelectedFolders());
-    public override int CountAllFiles()        => Files.Count + Children.Sum(c => c.CountAllFiles());
-    public override int CountAllFolders()      => 1 + Children.Sum(c => c.CountAllFolders());
+    public int CountSelectedFiles()   => Files.Count(f => f.IsSelected) + Children.Sum(c => c.CountSelectedFiles());
+    public int CountSelectedFolders() => (IsSelected ? 1 : 0) + Children.Sum(c => c.CountSelectedFolders());
+    public int CountAllFiles()        => Files.Count + Children.Sum(c => c.CountAllFiles());
+    public int CountAllFolders()      => 1 + Children.Sum(c => c.CountAllFolders());
+
+
 }

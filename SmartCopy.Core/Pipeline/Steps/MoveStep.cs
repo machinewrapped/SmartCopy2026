@@ -128,8 +128,8 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
                     SourceNode: node,
                     SourceNodeResult: SourceResult.Skipped,
                     DestinationPath: destination,
-                    NumberOfFilesSkipped: node.CountSelectedFiles(),
-                    NumberOfFoldersSkipped: node.CountSelectedFolders(),
+                    NumberOfFilesSkipped: PipelineHelpers.GetSelectedFileCount(node),
+                    NumberOfFoldersSkipped: PipelineHelpers.GetSelectedFolderCount(node),
                     InputBytes: node.Size);
                 continue;
             }
@@ -150,8 +150,8 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
                 SourceNodeResult: SourceResult.Moved,
                 DestinationPath: destination,
                 DestinationResult: destResult,
-                NumberOfFilesAffected: node.CountSelectedFiles(),
-                NumberOfFoldersAffected: node.CountSelectedFolders(),
+                NumberOfFilesAffected: PipelineHelpers.GetSelectedFileCount(node),
+                NumberOfFoldersAffected: PipelineHelpers.GetSelectedFolderCount(node),
                 InputBytes: selectedBytes,
                 OutputBytes: selectedBytes);
         }
