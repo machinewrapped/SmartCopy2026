@@ -58,16 +58,18 @@ public abstract class DirectoryTreeNode : INotifyPropertyChanged
         {
             if (_checkState != value)
             {
-                SetCheckStateWithPropagation(value);
+                SetCheckState(value);
 
                 if (value == CheckState.Checked)
                 {
                     OnChecked();
                 }
-                else if (value == CheckState.Unchecked && Parent is not null)
+                else if (value == CheckState.Unchecked)
                 {
                     OnUnchecked();
                 }
+
+                Parent?.RecalculateCheckState();
             }
         }
     }
@@ -75,7 +77,7 @@ public abstract class DirectoryTreeNode : INotifyPropertyChanged
     /// <summary>Called when CheckState transitions to Checked. Override to expand the node.</summary>
     protected virtual void OnChecked() { }
 
-    /// <summary>Called when CheckState transitions to Unchecked and Parent is non-null. Override to collapse.</summary>
+    /// <summary>Called when CheckState transitions to Unchecked.</summary>
     protected virtual void OnUnchecked() { }
 
     private FilterResult _filterResult = FilterResult.Included;
@@ -175,33 +177,14 @@ public abstract class DirectoryTreeNode : INotifyPropertyChanged
 
     // ── CheckState propagation helpers ───────────────────────────────────────
 
-    private void SetCheckStateWithPropagation(CheckState newState)
+    /// <summary>
+    /// Set this node only (no upward/downward recursion, no hooks).
+    /// </summary>
+    internal void SetCheckState(CheckState newState)
     {
         if (_checkState == newState)
             return;
 
-        _checkState = newState;
-
-        MarkDirty();
-        PropagateCheckStateDownward(newState);
-
-        OnPropertyChanged(nameof(CheckState));
-        OnPropertyChanged(nameof(IsSelected));
-
-        // Upward recalculation
-        Parent?.RecalculateCheckState();
-    }
-
-    /// <summary>
-    /// Called during downward propagation. Subclasses override to fan out to typed children.
-    /// </summary>
-    protected virtual void PropagateCheckStateDownward(CheckState newState) { }
-
-    /// <summary>
-    /// Set only this node's check state field without recursion (used during propagation from parent).
-    /// </summary>
-    internal void SetCheckState(CheckState newState)
-    {
         _checkState = newState;
         MarkDirty();
         OnPropertyChanged(nameof(CheckState));

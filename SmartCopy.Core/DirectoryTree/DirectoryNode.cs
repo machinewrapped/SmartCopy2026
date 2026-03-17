@@ -40,12 +40,23 @@ public sealed class DirectoryNode : DirectoryTreeNode
 
     // ── CheckState overrides ──────────────────────────────────────────────────
 
-    protected override void OnChecked()  => IsExpanded = true;
-    protected override void OnUnchecked() => IsExpanded = false;
-
-    protected override void PropagateCheckStateDownward(CheckState newState)
+    protected override void OnChecked()
     {
-        if (newState == CheckState.Indeterminate || (Children.Count == 0 && Files.Count == 0))
+        IsExpanded = true;
+        PropagateCheckStateDownward(CheckState.Checked);
+    }
+
+    protected override void OnUnchecked()
+    {
+        if (Parent is not null)
+            IsExpanded = false;
+
+        PropagateCheckStateDownward(CheckState.Unchecked);
+    }
+
+    private void PropagateCheckStateDownward(CheckState newState)
+    {
+        if (Children.Count == 0 && Files.Count == 0)
             return;
 
         foreach (var child in Children)
@@ -102,11 +113,7 @@ public sealed class DirectoryNode : DirectoryTreeNode
             computedState = CheckState.Unchecked;
         }
 
-        if (CheckState != computedState)
-        {
-            SetCheckState(computedState);
-            Parent?.RecalculateCheckState();
-        }
+        CheckState = computedState;
     }
 
     // ── Stats ─────────────────────────────────────────────────────────────────
