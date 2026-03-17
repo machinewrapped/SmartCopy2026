@@ -215,6 +215,7 @@ public sealed class DirectoryTreeNode : INotifyPropertyChanged
                 files++;
                 bytes += file.Size;
             }
+            file.ClearDirty();
         }
 
         foreach (var child in Children)
