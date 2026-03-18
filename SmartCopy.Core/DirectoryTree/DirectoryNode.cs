@@ -146,6 +146,7 @@ public sealed class DirectoryNode : DirectoryTreeNode
                 files++;
                 bytes += file.Size;
             }
+            file.ClearDirty();
         }
 
         foreach (var child in Children)
@@ -160,11 +161,6 @@ public sealed class DirectoryNode : DirectoryTreeNode
             total         += child.TotalFiles;
             included      += child.NumFilterIncludedFiles;
             includedBytes += child.TotalFilterIncludedBytes;
-        }
-
-        foreach (var file in Files)
-        {
-            file.ClearDirty();
         }
 
         NumSelectedFiles         = files;

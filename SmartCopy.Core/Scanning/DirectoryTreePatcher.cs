@@ -165,22 +165,7 @@ public static class DirectoryTreePatcher
 
     private static bool IsDescendantOrSelf(DirectoryTreeNode node, DirectoryTreeNode ancestor)
     {
-        // Walk via Parent (DirectoryNode?) for directories
-        if (node is DirectoryNode dirNode)
-        {
-            for (DirectoryTreeNode? current = dirNode; current is not null; current = current.Parent)
-            {
-                if (ReferenceEquals(current, ancestor))
-                    return true;
-            }
-            return false;
-        }
-
-        // For a FileNode: check the node itself, then its parent chain
-        if (ReferenceEquals(node, ancestor))
-            return true;
-
-        for (DirectoryNode? current = node.Parent; current is not null; current = current.Parent)
+        for (DirectoryTreeNode? current = node; current is not null; current = current.Parent)
         {
             if (ReferenceEquals(current, ancestor))
                 return true;

@@ -304,8 +304,6 @@ public sealed class PipelineRunnerTests
         Assert.True(await targetProviderA.ExistsAsync("/destA/source/b.txt", CancellationToken.None));
         Assert.True(await targetProviderB.ExistsAsync("/destB/source/a.txt", CancellationToken.None));
         Assert.True(await targetProviderB.ExistsAsync("/destB/source/b.txt", CancellationToken.None));
-        Assert.True(await targetProviderB.ExistsAsync("/destB/source/a.txt", CancellationToken.None));
-        Assert.True(await targetProviderB.ExistsAsync("/destB/source/b.txt", CancellationToken.None));
     }
 
     [Fact]
