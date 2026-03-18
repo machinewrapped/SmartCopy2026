@@ -58,3 +58,5 @@ nunit-*.xml
 kill-dotnet-processes.ps1
 git-cleanup-gone.ps1
 /.claude/worktrees
+*.zip
+/winget-manifests
