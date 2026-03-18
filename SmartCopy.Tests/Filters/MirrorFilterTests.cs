@@ -1,6 +1,7 @@
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Filters.Filters;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Tests.TestInfrastructure;
 
 namespace SmartCopy.Tests.Filters;
@@ -13,7 +14,7 @@ public sealed class MirrorFilterTests
 
     // -------------------------------------------------------------------------
     // NameOnly mode
-    // -------------------------------------------------------------------------
+    // ---
 
     [Fact]
     public async Task MatchesAsync_NameOnly_ReturnsTrueWhenFileExistsInMirror()
@@ -81,7 +82,7 @@ public sealed class MirrorFilterTests
 
     // -------------------------------------------------------------------------
     // NameAndSize mode
-    // -------------------------------------------------------------------------
+    // ---
 
     [Fact]
     public async Task MatchesAsync_NameAndSize_ReturnsTrueWhenNameAndSizeMatch()
@@ -132,7 +133,7 @@ public sealed class MirrorFilterTests
     }
 
     // -------------------------------------------------------------------------
-    // Directory matching — a directory is "mirrored" only if it exists in the
+    // Directory matching -- a directory is "mirrored" only if it exists in the
     // mirror AND every direct file inside it also exists (and matches) there.
     // -------------------------------------------------------------------------
 
@@ -149,7 +150,7 @@ public sealed class MirrorFilterTests
         var dir = root.FindNodeByPathSegments(["Alternative"]);
         Assert.NotNull(dir);
 
-        // No files inside → vacuously all files are mirrored
+        // No files inside -- vacuously all files are mirrored
         Assert.True(await filter.MatchesAsync(dir, TestAppContext.FromProvider(provider)));
     }
 
@@ -226,7 +227,7 @@ public sealed class MirrorFilterTests
 
     // -------------------------------------------------------------------------
     // FilterChain integration
-    // -------------------------------------------------------------------------
+    // ---
 
     [Fact]
     public async Task FilterChain_MirrorExclude_ExcludesFilesAlreadyInMirror()

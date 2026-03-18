@@ -22,14 +22,14 @@ public sealed class MoveStepFallbackTests
         private readonly Dictionary<DirectoryTreeNode, PipelineContext> _contexts = new();
         private readonly HashSet<DirectoryTreeNode> _failed = new();
 
-        public DirectoryTreeNode RootNode { get; }
+        public DirectoryNode RootNode { get; }
         public IFileSystemProvider SourceProvider { get; }
         public FileSystemProviderRegistry ProviderRegistry { get; }
         public bool ShowHiddenFiles { get; }
         public bool AllowDeleteReadOnly { get; }
         public ITrashService TrashService { get; } = new NullTrashService();
 
-        public MoveTestContext(DirectoryTreeNode root, IFileSystemProvider source, IFileSystemProvider? target = null)
+        public MoveTestContext(DirectoryNode root, IFileSystemProvider source, IFileSystemProvider? target = null)
         {
             RootNode = root;
             SourceProvider = source;
@@ -167,7 +167,8 @@ public sealed class MoveStepFallbackTests
         var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target", volumeId: "VOL2");
 
         var root = await sourceProvider.BuildDirectoryTree("/src");
-        var dir = root.Children.Single();
+        var dir = root.Children.Single() as DirectoryNode;
+        Assert.NotNull(dir);
         dir.CheckState = CheckState.Checked;
         foreach (var f in dir.Files) f.CheckState = CheckState.Checked;
 
@@ -201,7 +202,8 @@ public sealed class MoveStepFallbackTests
         var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target", volumeId: "VOL2");
 
         var root = await sourceProvider.BuildDirectoryTree("/src");
-        var dir = root.Children.Single();
+        var dir = root.Children.Single() as DirectoryNode;
+        Assert.NotNull(dir);
         dir.CheckState = CheckState.Indeterminate;
         dir.Files.Single(f => f.Name == "move.txt").CheckState = CheckState.Checked;
 
@@ -232,7 +234,8 @@ public sealed class MoveStepFallbackTests
             .WithFile("/src/dir/b.txt", "bbb"u8));
 
         var root = await provider.BuildDirectoryTree("/src");
-        var dir = root.Children.Single();
+        var dir = root.Children.Single() as DirectoryNode;
+        Assert.NotNull(dir);
         dir.CheckState = CheckState.Checked;
 
         var ctx = new MoveTestContext(root, provider, provider);
@@ -264,8 +267,10 @@ public sealed class MoveStepFallbackTests
         var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target", volumeId: "VOL2");
 
         var root = await sourceProvider.BuildDirectoryTree("/src");
-        var dir = root.Children.Single();
-        var sub = dir.Children.Single();
+        var dir = root.Children.Single() as DirectoryNode;
+        Assert.NotNull(dir);
+        var sub = dir.Children.Single() as DirectoryNode;
+        Assert.NotNull(sub);
         dir.CheckState = CheckState.Checked;
         sub.CheckState = CheckState.Checked;
         foreach (var f in dir.Files) f.CheckState = CheckState.Checked;
@@ -302,7 +307,8 @@ public sealed class MoveStepFallbackTests
             new ProviderCapabilities(CanSeek: true, CanAtomicMove: false, CanWatch: false, MaxPathLength: int.MaxValue));
 
         var root = await memory.BuildDirectoryTree("/src");
-        var dir = root.Children.Single();
+        var dir = root.Children.Single() as DirectoryNode;
+        Assert.NotNull(dir);
         dir.CheckState = CheckState.Checked;
         foreach (var f in dir.Files) f.CheckState = CheckState.Checked;
 

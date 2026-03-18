@@ -21,7 +21,7 @@ public sealed class FilterLiveWiringTests
     /// an .mp3 file and a .jpg file, plus returns the directory node needed by
     /// LoadFilesForNodeAsync.
     /// </summary>
-    private static async Task<DirectoryTreeNode> BuildMusicDirNode(IEnumerable<string> files)
+    private static async Task<DirectoryNode> BuildMusicDirNode(IEnumerable<string> files)
     {
         MemoryFileSystemProvider provider = MemoryFileSystemFixtures.Create(f => f
             .WithDirectory("/music"));
@@ -31,9 +31,11 @@ public sealed class FilterLiveWiringTests
             provider.SeedFile($"/music/{file}", content: new byte[100]);
         }
 
-        DirectoryTreeNode root = await provider.BuildDirectoryTree();
+        DirectoryNode root = await provider.BuildDirectoryTree();
 
-        return root.Children.Single(n => n.Name == "music");
+        var music = root.Children.Single(n => n.Name == "music") as DirectoryNode;
+        Assert.NotNull(music);
+        return music;
     }
 
     // -------------------------------------------------------------------------
@@ -66,9 +68,10 @@ public sealed class FilterLiveWiringTests
         fs.SeedSimulatedFile("/music/large.mp3", 10_000_000);
         fs.SeedSimulatedFile("/music/photo.jpg", 200);
 
-        DirectoryTreeNode root = await fs.BuildDirectoryTree();
+        DirectoryNode root = await fs.BuildDirectoryTree();
 
-        var dirNode = root.Children.Single(n => n.Name == "music");
+        var dirNode = root.Children.Single(n => n.Name == "music") as DirectoryNode;
+        Assert.NotNull(dirNode);
 
         var chain = new FilterChain(
         [
@@ -175,7 +178,7 @@ public sealed class FilterLiveWiringTests
              .WithSimulatedFile("/root/child2/track.mp3", 100));
 
         var vm = new DirectoryTreeViewModel(fs.CreateRegistry());
-        await vm.ChangeRootAsync(fs.RootPath, new ScanOptions {});
+        await vm.ChangeRootAsync(fs.RootPath, new ScanOptions());
         Assert.NotNull(vm.RootNode);
 
         var chain = new FilterChain([new ExtensionFilter(["mp3"], FilterMode.Only)]);
@@ -185,7 +188,7 @@ public sealed class FilterLiveWiringTests
         Assert.Equal(FilterResult.Mixed, vm.RootNode.FilterResult);
 
         // Removing the only branch that contains included files should cause the root to become Excluded
-        var nodeToRemove = vm.RootNode.FindNodeByPathSegments("root", "child2");
+        var nodeToRemove = vm.RootNode.FindNodeByPathSegments(["root", "child2"]) as DirectoryNode;
         Assert.NotNull(nodeToRemove);
 
         nodeToRemove.MarkForRemoval();

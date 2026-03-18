@@ -11,7 +11,7 @@ public sealed class FreeSpaceCheckTests
     // 100 bytes of content shared across test files
     private static readonly byte[] FileContent = new byte[100];
 
-    private static (MemoryFileSystemProvider provider, DirectoryTreeNode root, FileSystemProviderRegistry registry) MakeSource(
+    private static async Task<(MemoryFileSystemProvider provider, DirectoryNode root, FileSystemProviderRegistry registry)> MakeSource(
         string volumeId = "SRC")
     {
         var provider = MemoryFileSystemFixtures.Create(b => b
@@ -19,7 +19,7 @@ public sealed class FreeSpaceCheckTests
             .WithDirectory("/other"), // unselected sibling keeps root Indeterminate
             volumeId: volumeId);
 
-        var root = provider.BuildDirectoryTree().GetAwaiter().GetResult();
+        var root = await provider.BuildDirectoryTree();
 
         // Check only /src — root becomes Indeterminate, so MoveStep won't collapse /src.
         root.FindNodeByPathSegments(["src"])!.CheckState = CheckState.Checked;
@@ -41,7 +41,7 @@ public sealed class FreeSpaceCheckTests
     [Fact]
     public async Task Copy_SufficientSpace_NoError()
     {
-        var (source, root, registry) = MakeSource();
+        var (source, root, registry) = await MakeSource();
         var target = MakeTarget(capacity: 1_000_000, customRootPath: "/target");
         registry.Register(target);
 
@@ -59,7 +59,7 @@ public sealed class FreeSpaceCheckTests
     [Fact]
     public async Task Copy_InsufficientSpace_Warning()
     {
-        var (source, root, registry) = MakeSource();
+        var (source, root, registry) = await MakeSource();
         var target = MakeTarget(capacity: 10, customRootPath: "/target"); // only 10 bytes free
         registry.Register(target);
 
@@ -113,7 +113,7 @@ public sealed class FreeSpaceCheckTests
     [Fact]
     public async Task Copy_NoCapability_NoError()
     {
-        var (source, root, registry) = MakeSource();
+        var (source, root, registry) = await MakeSource();
         // Target has no capacity set → CanQueryFreeSpace = false
         var target = MakeTarget(capacity: null, customRootPath: "/target");
         registry.Register(target);
@@ -156,7 +156,7 @@ public sealed class FreeSpaceCheckTests
     [Fact]
     public async Task Move_CrossVolume_SufficientSpace_NoError()
     {
-        var (source, root, registry) = MakeSource(volumeId: "SRC");
+        var (source, root, registry) = await MakeSource(volumeId: "SRC");
         var target = MakeTarget(capacity: 1_000_000, customRootPath: "/target", volumeId: "DST");
         registry.Register(target);
 
@@ -174,7 +174,7 @@ public sealed class FreeSpaceCheckTests
     [Fact]
     public async Task Move_CrossVolume_InsufficientSpace_Warning()
     {
-        var (source, root, registry) = MakeSource(volumeId: "SRC");
+        var (source, root, registry) = await MakeSource(volumeId: "SRC");
         var target = MakeTarget(capacity: 10, customRootPath: "/target", volumeId: "DST"); // only 10 bytes
         registry.Register(target);
 

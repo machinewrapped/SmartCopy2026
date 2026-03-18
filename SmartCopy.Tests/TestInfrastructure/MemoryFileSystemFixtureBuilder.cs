@@ -50,7 +50,7 @@ public static class MemoryFileSystemFixtures
         return builder.Build();
     }
 
-    internal static async Task<DirectoryTreeNode> BuildDirectoryTree(Action<MemoryFileSystemFixtureBuilder> configure, string? customRootPath = null)
+    internal static async Task<DirectoryNode> BuildDirectoryTree(Action<MemoryFileSystemFixtureBuilder> configure, string? customRootPath = null)
     {
         var builder = new MemoryFileSystemFixtureBuilder(customRootPath);
         configure(builder);

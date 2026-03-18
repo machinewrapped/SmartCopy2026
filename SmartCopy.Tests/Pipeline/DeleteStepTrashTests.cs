@@ -30,7 +30,7 @@ public sealed class DeleteStepTrashTests
         private readonly Dictionary<DirectoryTreeNode, PipelineContext> _contexts = new();
         private readonly HashSet<DirectoryTreeNode> _failed = new();
 
-        public DirectoryTreeNode RootNode { get; }
+        public DirectoryNode RootNode { get; }
         public IFileSystemProvider SourceProvider { get; }
         public FileSystemProviderRegistry ProviderRegistry { get; }
         public bool ShowHiddenFiles { get; }
@@ -38,7 +38,7 @@ public sealed class DeleteStepTrashTests
         public ITrashService TrashService { get; }
 
         public TestStepContext(
-            DirectoryTreeNode root,
+            DirectoryNode root,
             IFileSystemProvider provider,
             ITrashService trashService)
         {
@@ -81,7 +81,7 @@ public sealed class DeleteStepTrashTests
             MaxPathLength: int.MaxValue,
             CanTrash: canTrash));
 
-    private static async Task<(DirectoryTreeNode Root, DirectoryTreeNode File, MemoryFileSystemProvider Provider)>
+    private static async Task<(DirectoryNode Root, FileNode File, MemoryFileSystemProvider Provider)>
         MakeTree()
     {
         // Two files so that selecting one does not make root.IsSelected=true.

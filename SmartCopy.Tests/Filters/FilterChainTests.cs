@@ -11,7 +11,7 @@ public sealed class FilterChainTests
     [Fact]
     public async Task Apply_WithOnlyAndExcludeFilters_ReturnsExpectedNodes()
     {
-        DirectoryTreeNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
+        DirectoryNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
             .WithSimulatedFile("/a.mp3", size: 100)
             .WithSimulatedFile("/b.flac", size: 150)
             .WithSimulatedFile("/c.jpg", size: 20));
@@ -22,7 +22,7 @@ public sealed class FilterChainTests
             new SizeRangeFilter(minBytes: 120, maxBytes: null, FilterMode.Exclude),
         ]);
 
-        var result = (await chain.ApplyAsync(root.Files)).ToList();
+        var result = (await chain.ApplyAsync(root.Files, new TestAppContext())).ToList();
 
         Assert.Single(result);
         Assert.Equal("a.mp3", result[0].Name);
@@ -31,15 +31,16 @@ public sealed class FilterChainTests
     [Fact]
     public async Task ApplyToTree_SetsFilterResult()
     {
-        DirectoryTreeNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
+        DirectoryNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
             .WithDirectory("/src/")
             .WithSimulatedFile("/src/track.wav", size: 500));
 
-        var dir = root.Children.Single(c => c.Name == "src");
+        var dir = root.Children.Single(c => c.Name == "src") as DirectoryNode;
+        Assert.NotNull(dir);
         var child = dir.Files.Single(f => f.Name == "track.wav");
 
         var chain = new FilterChain([new ExtensionFilter(["mp3"], FilterMode.Only)]);
-        await chain.ApplyToTreeAsync(root);
+        await chain.ApplyToTreeAsync(root, new TestAppContext());
 
         Assert.Equal(FilterResult.Excluded, child.FilterResult);
     }
@@ -47,7 +48,7 @@ public sealed class FilterChainTests
     [Fact]
     public async Task OnlyThenAdd_CombinesAsUnion()
     {
-        DirectoryTreeNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
+        DirectoryNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
             .WithSimulatedFile("/a.mp3", size: 100)
             .WithSimulatedFile("/b.jpg", size: 50)
             .WithSimulatedFile("/c.txt", size: 30));
@@ -60,7 +61,7 @@ public sealed class FilterChainTests
             new ExtensionFilter(["jpg"], FilterMode.Add),
         ]);
 
-        var result = (await chain.ApplyAsync(nodes)).ToList();
+        var result = (await chain.ApplyAsync(nodes, new TestAppContext())).ToList();
 
         Assert.Equal(2, result.Count);
         Assert.Contains(result, n => n.Name == "a.mp3");
@@ -70,7 +71,7 @@ public sealed class FilterChainTests
     [Fact]
     public async Task ExcludeThenAdd_CancelsOut()
     {
-        DirectoryTreeNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
+        DirectoryNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
             .WithSimulatedFile("/a.mp3", size: 100)
             .WithSimulatedFile("/b.jpg", size: 50));
         var nodes = root.Files;
@@ -81,7 +82,7 @@ public sealed class FilterChainTests
             new ExtensionFilter(["mp3"], FilterMode.Add),
         ]);
 
-        var result = (await chain.ApplyAsync(nodes)).ToList();
+        var result = (await chain.ApplyAsync(nodes, new TestAppContext())).ToList();
 
         Assert.Equal(2, result.Count);
     }
@@ -89,7 +90,7 @@ public sealed class FilterChainTests
     [Fact]
     public async Task TwoOnlyFilters_CombineAsIntersection()
     {
-        DirectoryTreeNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
+        DirectoryNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
             .WithSimulatedFile("/a.mp3", size: 100)
             .WithSimulatedFile("/b.jpg", size: 50)
             .WithSimulatedFile("/c.txt", size: 30));
@@ -101,7 +102,7 @@ public sealed class FilterChainTests
             new ExtensionFilter(["jpg"], FilterMode.Only),
         ]);
 
-        var result = (await chain.ApplyAsync(nodes)).ToList();
+        var result = (await chain.ApplyAsync(nodes, new TestAppContext())).ToList();
 
         Assert.Empty(result);
     }
@@ -109,17 +110,19 @@ public sealed class FilterChainTests
     [Fact]
     public async Task AddAlone_DoesNotRestrict()
     {
-        DirectoryTreeNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
+        DirectoryNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
             .WithSimulatedFile("/root/a.mp3", size: 100)
             .WithSimulatedFile("/root/b.jpg", size: 50));
-        var nodes = root.Children.First().Files;
+        var dir = root.Children.First() as DirectoryNode;
+        Assert.NotNull(dir);
+        var nodes = dir.Files;
 
         var chain = new FilterChain(
         [
             new ExtensionFilter(["mp3"], FilterMode.Add),
         ]);
 
-        var result = (await chain.ApplyAsync(nodes)).ToList();
+        var result = (await chain.ApplyAsync(nodes, new TestAppContext())).ToList();
 
         Assert.Equal(2, result.Count);
     }
@@ -127,10 +130,12 @@ public sealed class FilterChainTests
     [Fact]
     public async Task OrderMatters_ExcludeAfterAdd_RemovesFiles()
     {
-        DirectoryTreeNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
+        DirectoryNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
             .WithSimulatedFile("/root/a.mp3", size: 100)
             .WithSimulatedFile("/root/b.jpg", size: 50));
-        var nodes = root.Children.First().Files;
+        var dir = root.Children.First() as DirectoryNode;
+        Assert.NotNull(dir);
+        var nodes = dir.Files;
 
         // Add mp3 (no-op since already in set), then exclude mp3
         var chain = new FilterChain(
@@ -139,7 +144,7 @@ public sealed class FilterChainTests
             new ExtensionFilter(["mp3"], FilterMode.Exclude),
         ]);
 
-        var result = (await chain.ApplyAsync(nodes)).ToList();
+        var result = (await chain.ApplyAsync(nodes, new TestAppContext())).ToList();
 
         Assert.Single(result);
         Assert.Equal("b.jpg", result[0].Name);
@@ -148,15 +153,16 @@ public sealed class FilterChainTests
     [Fact]
     public async Task ApplyToTree_DirectoryNotExcludedByExtensionFilter()
     {
-        DirectoryTreeNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
+        DirectoryNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
             .WithDirectory("/root/Music")
             .WithSimulatedFile("/root/Music/track.mp3", size: 100)
             .WithSimulatedFile("/root/Music/readme.txt", size: 50));
 
-        var dir = root.Children.First().Children.Single(c => c.Name == "Music");
+        var dir = root.Children.First().Children.Single(c => c.Name == "Music") as DirectoryNode;
+        Assert.NotNull(dir);
 
         await new FilterChain([new ExtensionFilter(["mp3"], FilterMode.Only)])
-            .ApplyToTreeAsync(dir);
+            .ApplyToTreeAsync(dir, new TestAppContext());
 
         Assert.Equal(FilterResult.Mixed, dir.FilterResult);
 
@@ -170,16 +176,18 @@ public sealed class FilterChainTests
     [Fact]
     public async Task ApplyToTree_NestedDirectoriesNotExcludedByExtensionFilter()
     {
-        DirectoryTreeNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
+        DirectoryNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
             .WithDirectory("/root/Music")
             .WithDirectory("/root/Music/Alternative")
             .WithSimulatedFile("/root/Music/Alternative/track.flac", size: 1024));
-        var music = root.Children.Single(c => c.Name == "root").Children.Single(c => c.Name == "Music");
-        var alt = music.Children.Single(c => c.Name == "Alternative");
+        var music = root.Children.Single(c => c.Name == "root").Children.Single(c => c.Name == "Music") as DirectoryNode;
+        Assert.NotNull(music);
+        var alt = music.Children.Single(c => c.Name == "Alternative") as DirectoryNode;
+        Assert.NotNull(alt);
         var flac = alt.Files.Single(f => f.Name == "track.flac");
 
         await new FilterChain([new ExtensionFilter(["flac"], FilterMode.Only)])
-            .ApplyToTreeAsync(music);
+            .ApplyToTreeAsync(music, new TestAppContext());
 
         Assert.Equal(FilterResult.Included, music.FilterResult);
         Assert.Equal(FilterResult.Included, alt.FilterResult);
@@ -189,15 +197,16 @@ public sealed class FilterChainTests
     [Fact]
     public async Task ApplyToTree_MirrorFilter_ExcludesDirectoryWhenMirrorPathMissing()
     {
-        DirectoryTreeNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
+        DirectoryNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
             .WithDirectory("/source/Music")
             .WithSimulatedFile("/source/Music/song.mp3", size: 100));
 
         var dir = root
             .Children.Single(c => c.Name == "source")
-            .Children.Single(c => c.Name == "Music");
+            .Children.Single(c => c.Name == "Music") as DirectoryNode;
+        Assert.NotNull(dir);
         var chain = new FilterChain([new MirrorFilter("/mem/Mirror", MirrorCompareMode.NameOnly, FilterMode.Only)]);
-        await chain.ApplyToTreeAsync(dir);
+        await chain.ApplyToTreeAsync(dir, new TestAppContext());
 
         Assert.Equal(FilterResult.Excluded, dir.FilterResult);
     }
@@ -215,13 +224,14 @@ public sealed class FilterChainTests
             .WithSimulatedFile("/Mirror/Alternative/mirrored.flac", size: 1000));
 
         // "new.flac" is NOT in the mirror
-        DirectoryTreeNode source = await provider.BuildDirectoryTree("/source");
+        DirectoryNode source = await provider.BuildDirectoryTree("/source");
 
         var chain = new FilterChain([new MirrorFilter("/mem/Mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude)]);
         await chain.ApplyToTreeAsync(source, TestAppContext.FromProvider(provider));
 
         // Directory has a non-mirrored file → must stay visible (Mixed: some included, some excluded)
-        DirectoryTreeNode alt = source.Children.Single(c => c.Name == "Alternative");
+        var alt = source.Children.Single(c => c.Name == "Alternative") as DirectoryNode;
+        Assert.NotNull(alt);
         Assert.Equal(FilterResult.Mixed, alt.FilterResult);
 
         var mirrored = alt.Files.Single(f => f.Name == "mirrored.flac");
@@ -240,14 +250,15 @@ public sealed class FilterChainTests
             .WithDirectory("/Mirror/Alternative")
             .WithSimulatedFile("/Mirror/Alternative/song.flac", size: 1000));
 
-        DirectoryTreeNode source = await provider.BuildDirectoryTree("/source");
+        DirectoryNode source = await provider.BuildDirectoryTree("/source");
 
         var chain = new FilterChain([new MirrorFilter("/mem/Mirror", MirrorCompareMode.NameOnly, FilterMode.Exclude)]);
         await chain.ApplyToTreeAsync(source, TestAppContext.FromProvider(provider));
 
         // All content is mirrored → directory should be Excluded
         Assert.Equal(FilterResult.Excluded, source.FilterResult);
-        var alt = source.Children.Single(c => c.Name == "Alternative");
+        var alt = source.Children.Single(c => c.Name == "Alternative") as DirectoryNode;
+        Assert.NotNull(alt);
         Assert.Equal(FilterResult.Excluded, alt.FilterResult);
         Assert.Equal(FilterResult.Excluded, alt.Files.Single(f => f.Name == "song.flac").FilterResult);
     }

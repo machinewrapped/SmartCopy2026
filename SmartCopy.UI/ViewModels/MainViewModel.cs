@@ -7,6 +7,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Pipeline;
@@ -222,11 +223,11 @@ public partial class MainViewModel : ViewModelBase
             else if (e.PropertyName == nameof(DirectoryTreeViewModel.SelectedNode))
             {
                 var selectedNode = DirectoryTree.SelectedNode;
-                if (selectedNode?.IsDirectory == true)
+                if (selectedNode is DirectoryNode dirNode)
                 {
                     try
                     {
-                        await FileList.LoadFilesForNodeAsync(selectedNode, FilterChain.BuildLiveChain(), _appContext);
+                        await FileList.LoadFilesForNodeAsync(dirNode, FilterChain.BuildLiveChain(), _appContext);
                     }
                     catch (Exception ex)
                     {
@@ -549,7 +550,7 @@ public partial class MainViewModel : ViewModelBase
         if (DirectoryTree.RootNode == null)
             return;
 
-        _selectionManager.SelectAll([DirectoryTree.RootNode]);
+        _selectionManager.SelectAll(DirectoryTree.RootNode);
         RefreshIdleStats();
     }
 
@@ -559,7 +560,7 @@ public partial class MainViewModel : ViewModelBase
         if (DirectoryTree.RootNode == null)
             return;
 
-        _selectionManager.ClearAll([DirectoryTree.RootNode]);
+        _selectionManager.ClearAll(DirectoryTree.RootNode);
         RefreshIdleStats();
     }
 
@@ -569,7 +570,7 @@ public partial class MainViewModel : ViewModelBase
         if (DirectoryTree.RootNode == null)
             return;
 
-        _selectionManager.InvertAll([DirectoryTree.RootNode]);
+        _selectionManager.InvertAll(DirectoryTree.RootNode);
         RefreshIdleStats();
     }
 
@@ -595,7 +596,7 @@ public partial class MainViewModel : ViewModelBase
 
         if (file is null) return;
         var path = file.Path.LocalPath;
-        var snapshot = _selectionManager.Capture([DirectoryTree.RootNode], UseAbsolutePathsForSelection);
+        var snapshot = _selectionManager.Capture(DirectoryTree.RootNode!, UseAbsolutePathsForSelection);
         await _selectionSerializer.SaveAsync(path, snapshot);
     }
 
@@ -621,7 +622,7 @@ public partial class MainViewModel : ViewModelBase
 
         if (file is null) return;
         var path = file.Path.LocalPath;
-        var snapshot = _selectionManager.Capture([DirectoryTree.RootNode], UseAbsolutePathsForSelection);
+        var snapshot = _selectionManager.Capture(DirectoryTree.RootNode!, UseAbsolutePathsForSelection);
         await _selectionSerializer.SaveAsync(path, snapshot);
     }
 
@@ -647,7 +648,7 @@ public partial class MainViewModel : ViewModelBase
         if (files is not { Count: > 0 }) return;
         var path = files[0].Path.LocalPath;
         var snapshot = await _selectionSerializer.LoadAsync(path);
-        var result = _selectionManager.Restore([DirectoryTree.RootNode], snapshot);
+        var result = _selectionManager.Restore(DirectoryTree.RootNode, snapshot);
         RefreshIdleStats();
 
         if (result.HasUnmatched)
@@ -906,7 +907,7 @@ public partial class MainViewModel : ViewModelBase
     {
         var chain = FilterChain.BuildLiveChain();
 
-        if (DirectoryTree.SelectedNode is { IsDirectory: true } selectedDirectory)
+        if (DirectoryTree.SelectedNode is DirectoryNode selectedDirectory)
         {
             await FileList.LoadFilesForNodeAsync(selectedDirectory, chain, _appContext);
         }

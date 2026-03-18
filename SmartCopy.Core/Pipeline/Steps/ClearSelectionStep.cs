@@ -30,8 +30,8 @@ public sealed class ClearSelectionStep : IPipelineStep
         foreach (var node in context.RootNode.GetFilterIncludedDescendants())
         {
             ct.ThrowIfCancellationRequested();
-            if (!node.IsDirectory)
-                context.GetNodeContext(node).VirtualCheckState = CheckState.Unchecked;
+            if (node is FileNode fileNode)
+                context.GetNodeContext(fileNode).VirtualCheckState = CheckState.Unchecked;
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: node,
@@ -46,7 +46,7 @@ public sealed class ClearSelectionStep : IPipelineStep
         foreach (var node in context.RootNode.GetFilterIncludedDescendants())
         {
             ct.ThrowIfCancellationRequested();
-            if (!node.IsDirectory)
+            if (node is FileNode)
                 node.CheckState = CheckState.Unchecked;
             yield return new TransformResult(
                 IsSuccess: true,

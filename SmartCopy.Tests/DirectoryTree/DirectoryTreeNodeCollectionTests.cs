@@ -5,10 +5,10 @@ namespace SmartCopy.Tests.DirectoryTree;
 
 public sealed class DirectoryTreeNodeCollectionTests
 {
-    private static DirectoryTreeNode MakeDir(string name, DirectoryTreeNode? parent = null)
+    private static DirectoryNode MakeDir(string name, DirectoryNode? parent = null)
         => new(new FileSystemNode { Name = name, FullPath = name, IsDirectory = true }, parent);
 
-    private static DirectoryTreeNode MakeFile(string name, DirectoryTreeNode? parent = null)
+    private static FileNode MakeFile(string name, DirectoryNode? parent = null)
         => new(new FileSystemNode { Name = name, FullPath = name, IsDirectory = false }, parent);
 
     [Fact]

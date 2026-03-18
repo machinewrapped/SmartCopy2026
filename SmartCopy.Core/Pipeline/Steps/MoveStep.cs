@@ -115,7 +115,7 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
 
             // When a directory already exists at the destination we need to merge:
             // skip reporting it as a unit and let its children be previewed individually.
-            if (node.IsDirectory && destinationExists)
+            if (node is DirectoryNode && destinationExists)
             {
                 (mergeNodes ??= []).Add(node);
                 continue;
@@ -128,8 +128,8 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
                     SourceNode: node,
                     SourceNodeResult: SourceResult.Skipped,
                     DestinationPath: destination,
-                    NumberOfFilesSkipped: node.CountSelectedFiles(),
-                    NumberOfFoldersSkipped: node.CountSelectedFolders(),
+                    NumberOfFilesSkipped: PipelineHelpers.GetSelectedFileCount(node),
+                    NumberOfFoldersSkipped: PipelineHelpers.GetSelectedFolderCount(node),
                     InputBytes: node.Size);
                 continue;
             }
@@ -138,15 +138,20 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
                 ? DestinationResult.Overwritten
                 : DestinationResult.Created;
 
-            var selectedBytes = node.TotalSelectedBytes;
+            var selectedBytes = node switch
+            {
+                DirectoryNode dn => dn.TotalSelectedBytes,
+                _ => node.Size
+            };
+
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: node,
                 SourceNodeResult: SourceResult.Moved,
                 DestinationPath: destination,
                 DestinationResult: destResult,
-                NumberOfFilesAffected: node.CountSelectedFiles(),
-                NumberOfFoldersAffected: node.CountSelectedFolders(),
+                NumberOfFilesAffected: PipelineHelpers.GetSelectedFileCount(node),
+                NumberOfFoldersAffected: PipelineHelpers.GetSelectedFolderCount(node),
                 InputBytes: selectedBytes,
                 OutputBytes: selectedBytes);
         }
@@ -173,7 +178,7 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
     // Depth-first recursive move: child directories first, then files in the current node.
     // Atomically moves entire subtrees where possible; falls back to piecewise otherwise.
     private static async IAsyncEnumerable<TransformResult> WalkAndMoveAsync(
-        DirectoryTreeNode node, IStepContext context,
+        DirectoryNode node, IStepContext context,
         string destinationPath,
         IFileSystemProvider targetProvider, bool canAtomicMove,
         OverwriteMode overwriteMode,
@@ -337,10 +342,8 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
     /// Used to report accurate byte counts for directory-level move actions in preview,
     /// since <see cref="DirectoryTreeNode.Size"/> is always 0 for directory nodes.
     /// </summary>
-    private static long GetSelectedFileBytes(DirectoryTreeNode node)
+    private static long GetSelectedFileBytes(DirectoryNode node)
     {
-        if (!node.IsDirectory)
-            return node.IsSelected ? node.Size : 0;
         long total = 0;
         foreach (var file in node.Files)
             if (file.IsSelected) total += file.Size;
@@ -353,7 +356,7 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
     /// Returns true when an entire directory subtree is fully checked and all files
     /// are filter-included, making it safe to move atomically as a unit.
     /// </summary>
-    private static bool CanMoveEntireSubtree(DirectoryTreeNode node)
+    private static bool CanMoveEntireSubtree(DirectoryNode node)
     {
         if (node.CheckState != CheckState.Checked) return false;
         if (!node.Files.All(f => f.FilterResult == FilterResult.Included)) return false;

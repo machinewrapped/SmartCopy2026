@@ -1,5 +1,6 @@
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Filters.Filters;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Tests.TestInfrastructure;
 
 namespace SmartCopy.Tests.Filters;
@@ -7,7 +8,7 @@ namespace SmartCopy.Tests.Filters;
 public sealed class ExtensionFilterTests
 {
     // -------------------------------------------------------------------------
-    // ParseExtensions — input parsing
+    // ParseExtensions -- input parsing
     // -------------------------------------------------------------------------
 
     [Theory]
@@ -96,7 +97,7 @@ public sealed class ExtensionFilterTests
     }
 
     // -------------------------------------------------------------------------
-    // Constructor — still accepts plain extension strings unchanged
+    // Constructor -- still accepts plain extension strings unchanged
     // -------------------------------------------------------------------------
 
     [Fact]
@@ -107,7 +108,7 @@ public sealed class ExtensionFilterTests
     }
 
     // -------------------------------------------------------------------------
-    // MatchesAsync — glob-style round-trip through ParseExtensions
+    // MatchesAsync -- glob-style round-trip through ParseExtensions
     // -------------------------------------------------------------------------
 
     [Fact]

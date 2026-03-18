@@ -50,17 +50,17 @@ public sealed class MirrorFilter : FilterBase
             return false;
         }
 
-        if (CompareMode == MirrorCompareMode.NameOnly && !node.IsDirectory)
+        if (CompareMode == MirrorCompareMode.NameOnly && node is not DirectoryNode)
         {
             return true;
         }
 
-        if (node.IsDirectory)
+        if (node is DirectoryNode dirNode)
         {
             // A directory is only "mirrored" if every file directly inside it also exists
             // (and matches) in the mirror. Sub-directory contents are propagated bottom-up
             // by the filter chain infrastructure, so we only need to check direct files here.
-            foreach (var file in node.Files)
+            foreach (var file in dirNode.Files)
             {
                 var fileMirrorPath = comparisonProvider.JoinPath(ComparisonPath, file.RelativePathSegments);
                 if (!await comparisonProvider.ExistsAsync(fileMirrorPath, ct))

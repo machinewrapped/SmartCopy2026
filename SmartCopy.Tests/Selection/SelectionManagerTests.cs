@@ -9,9 +9,9 @@ public sealed class SelectionManagerTests
 {
     // ── helpers ────────────────────────────────────────────────────────────────
 
-    private static async Task<(DirectoryTreeNode root, DirectoryTreeNode fileA, DirectoryTreeNode fileB)> BuildTree()
+    private static async Task<(DirectoryNode root, DirectoryTreeNode fileA, DirectoryTreeNode fileB)> BuildTree()
     {
-        DirectoryTreeNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
+        DirectoryNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
             .WithDirectory("/root")
             .WithFile("/root/a.mp3", "x"u8)
             .WithFile("/root/b.mp3", "y"u8));
@@ -34,10 +34,10 @@ public sealed class SelectionManagerTests
         fileB.CheckState = CheckState.Unchecked;
 
         var manager = new SelectionManager();
-        var snapshot = manager.Capture([root]);
+        var snapshot = manager.Capture(root);
 
         fileA.CheckState = CheckState.Unchecked;
-        manager.Restore([root], snapshot);
+        manager.Restore(root, snapshot);
 
         Assert.Equal(CheckState.Checked, fileA.CheckState);
         Assert.Equal(CheckState.Unchecked, fileB.CheckState);
@@ -49,7 +49,7 @@ public sealed class SelectionManagerTests
         var (root, fileA, _) = await BuildTree();
         var snapshot = new SelectionSnapshot([fileA.CanonicalRelativePath]);
 
-        var result = new SelectionManager().Restore([root], snapshot);
+        var result = new SelectionManager().Restore(root, snapshot);
 
         Assert.Equal(1, result.MatchedCount);
         Assert.False(result.HasUnmatched);
@@ -61,7 +61,7 @@ public sealed class SelectionManagerTests
         var (root, _, _) = await BuildTree();
         var snapshot = new SelectionSnapshot(["does/not/exist.mp3", "also/missing.flac"]);
 
-        var result = new SelectionManager().Restore([root], snapshot);
+        var result = new SelectionManager().Restore(root, snapshot);
 
         Assert.Equal(0, result.MatchedCount);
         Assert.True(result.HasUnmatched);
@@ -74,7 +74,7 @@ public sealed class SelectionManagerTests
         var (root, fileA, _) = await BuildTree();
         fileA.CheckState = CheckState.Checked;
 
-        var snapshot = new SelectionManager().Capture([root], useAbsolutePaths: true);
+        var snapshot = new SelectionManager().Capture(root, useAbsolutePaths: true);
 
         Assert.True(snapshot.Contains(fileA.FullPath));
         Assert.False(snapshot.Contains(fileA.CanonicalRelativePath));
@@ -91,10 +91,10 @@ public sealed class SelectionManagerTests
         fileB.CheckState = CheckState.Unchecked;
 
         var manager = new SelectionManager();
-        var snapshot = manager.Capture([root], useAbsolutePaths: true);
+        var snapshot = manager.Capture(root, useAbsolutePaths: true);
 
         fileA.CheckState = CheckState.Unchecked;
-        var result = manager.Restore([root], snapshot);
+        var result = manager.Restore(root, snapshot);
 
         Assert.Equal(CheckState.Checked, fileA.CheckState);
         Assert.Equal(CheckState.Unchecked, fileB.CheckState);
@@ -109,7 +109,7 @@ public sealed class SelectionManagerTests
         fileA.CheckState = CheckState.Unchecked;
         fileB.CheckState = CheckState.Unchecked;
 
-        new SelectionManager().SelectAll([root]);
+        new SelectionManager().SelectAll(root);
 
         Assert.Equal(CheckState.Checked, fileA.CheckState);
         Assert.Equal(CheckState.Checked, fileB.CheckState);
@@ -122,7 +122,7 @@ public sealed class SelectionManagerTests
         fileA.CheckState = CheckState.Checked;
         fileB.CheckState = CheckState.Checked;
 
-        new SelectionManager().ClearAll([root]);
+        new SelectionManager().ClearAll(root);
 
         Assert.Equal(CheckState.Unchecked, fileA.CheckState);
         Assert.Equal(CheckState.Unchecked, fileB.CheckState);
@@ -135,7 +135,7 @@ public sealed class SelectionManagerTests
         fileA.CheckState = CheckState.Checked;
         fileB.CheckState = CheckState.Unchecked;
 
-        new SelectionManager().InvertAll([root]);
+        new SelectionManager().InvertAll(root);
 
         Assert.Equal(CheckState.Unchecked, fileA.CheckState);
         Assert.Equal(CheckState.Checked, fileB.CheckState);
