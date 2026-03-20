@@ -2,6 +2,9 @@ namespace SmartCopy.Core.FileSystem;
 
 public sealed class LocalFileSystemProvider : IFileSystemProvider
 {
+    private const int CopyBufferSize = 256 * 1024;
+    private const long SmallFileProgressThresholdBytes = 10L * 1024 * 1024;
+
     private readonly bool _isNetworkPath;
     private readonly ProviderCapabilities _capabilities;
 
@@ -89,7 +92,16 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                 throw new FileNotFoundException($"File does not exist: {fullPath}", fullPath);
             }
 
-            return File.Open(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            return new FileStream(
+                fullPath,
+                new FileStreamOptions
+                {
+                    Mode = FileMode.Open,
+                    Access = FileAccess.Read,
+                    Share = FileShare.Read,
+                    BufferSize = CopyBufferSize,
+                    Options = FileOptions.Asynchronous | FileOptions.SequentialScan
+                });
         }, ct);
     }
 
@@ -102,9 +114,30 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
             Directory.CreateDirectory(directory);
         }
 
-        const int chunkSize = 256 * 1024;
-        await using var output = File.Open(fullPath, FileMode.Create, FileAccess.Write, FileShare.None);
-        var buffer = new byte[chunkSize];
+        await using var output = new FileStream(
+            fullPath,
+            new FileStreamOptions
+            {
+                Mode = FileMode.Create,
+                Access = FileAccess.Write,
+                Share = FileShare.None,
+                BufferSize = CopyBufferSize,
+                Options = FileOptions.Asynchronous | FileOptions.SequentialScan
+            });
+
+        if (TryGetRemainingLength(data, out var remainingBytes) &&
+            remainingBytes <= SmallFileProgressThresholdBytes)
+        {
+            await data.CopyToAsync(output, CopyBufferSize, ct);
+            if (progress is not null && remainingBytes > 0)
+            {
+                progress.Report(remainingBytes);
+            }
+
+            return;
+        }
+
+        var buffer = new byte[CopyBufferSize];
 
         while (true)
         {
@@ -118,6 +151,18 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
             await output.WriteAsync(buffer.AsMemory(0, read), ct);
             progress?.Report(read);
         }
+    }
+
+    private static bool TryGetRemainingLength(Stream data, out long remainingBytes)
+    {
+        if (!data.CanSeek)
+        {
+            remainingBytes = 0;
+            return false;
+        }
+
+        remainingBytes = Math.Max(0, data.Length - data.Position);
+        return true;
     }
 
     public Task DeleteAsync(string path, CancellationToken ct)

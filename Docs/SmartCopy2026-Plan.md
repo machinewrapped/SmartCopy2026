@@ -653,6 +653,12 @@ Possible
 
 ## 6. Open Questions
 
+### Performance benchmarking workflow
+
+- [x] Added a dedicated `SmartCopy.Benchmarks` console runner for manual, real-disk copy benchmarking outside the unit-test suite.
+- [x] Runner writes a scenario template, append-only NDJSON timing results, a markdown task list, and per-run operation journals in the current working directory.
+- [x] Each execution performs at most one benchmark scenario so cache-sensitive runs can be spaced out over time and annotated with manual notes.
+
 | Topic | Default for v1 | Target date | Status |
 |---|---|---|---|
 | Packaging/distribution | Portable .NET Publish Profiles + MSBuild asset bundling | 2026-03-14 | Addressed |
