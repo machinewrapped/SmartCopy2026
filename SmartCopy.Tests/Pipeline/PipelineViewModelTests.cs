@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.UI.ViewModels;
@@ -8,11 +9,11 @@ namespace SmartCopy.Tests.Pipeline;
 public sealed class PipelineViewModelTests
 {
     [Fact]
-    public void BuildLivePipeline_ReturnsStepSequence()
+    public async Task BuildLivePipeline_ReturnsStepSequence()
     {
         var vm = new PipelineViewModel(new TestAppContext());
-        vm.AddStepFromResult(new FlattenStep());
-        vm.AddStepFromResult(new CopyStep("/mem/out"));
+        await vm.AddStepFromResult(new FlattenStep());
+        await vm.AddStepFromResult(new CopyStep("/mem/out"));
 
         var pipeline = vm.BuildLivePipeline();
 
@@ -22,47 +23,47 @@ public sealed class PipelineViewModelTests
     }
 
     [Fact]
-    public void AddRemoveStep_RaisesPipelineChanged()
+    public async Task AddRemoveStep_RaisesPipelineChanged()
     {
         var vm = new PipelineViewModel(new TestAppContext());
         var count = 0;
         vm.PipelineChanged += (_, _) => count++;
 
-        vm.AddStepFromResult(new CopyStep("/mem/out"));
+        await vm.AddStepFromResult(new CopyStep("/mem/out"));
         vm.RemoveStepCommand.Execute(vm.Steps[0]);
 
         Assert.True(count >= 2);
     }
 
     [Fact]
-    public void ReplaceStep_UpdatesViewModelStep()
+    public async Task ReplaceStep_UpdatesViewModelStep()
     {
         var vm = new PipelineViewModel(new TestAppContext());
-        vm.AddStepFromResult(new CopyStep("/mem/out"));
+        await vm.AddStepFromResult(new CopyStep("/mem/out"));
         var first = vm.Steps[0];
 
-        vm.ReplaceStep(first, new MoveStep("/mem/archive"));
+        await vm.ReplaceStep(first, new MoveStep("/mem/archive"));
 
         Assert.Equal(StepKind.Move, first.Kind);
         Assert.Equal("/mem/archive", first.DestinationPath);
     }
 
     [Fact]
-    public void FirstDestinationPath_TracksFirstCopyMove()
+    public async Task FirstDestinationPath_TracksFirstCopyMove()
     {
         var vm = new PipelineViewModel(new TestAppContext());
-        vm.AddStepFromResult(new FlattenStep());
-        vm.AddStepFromResult(new MoveStep("/mem/archive"));
-        vm.AddStepFromResult(new CopyStep("/mem/backup"));
+        await vm.AddStepFromResult(new FlattenStep());
+        await vm.AddStepFromResult(new MoveStep("/mem/archive"));
+        await vm.AddStepFromResult(new CopyStep("/mem/backup"));
 
         Assert.Equal("/mem/archive", vm.FirstDestinationPath);
     }
 
     [Fact]
-    public void InvalidStep_ShowsValidationMessageAndBlocksRun()
+    public async Task InvalidStep_ShowsValidationMessageAndBlocksRun()
     {
         var vm = new PipelineViewModel(new TestAppContext());
-        vm.AddStepFromResult(new CopyStep(""));
+        await vm.AddStepFromResult(new CopyStep(""));
 
         Assert.False(vm.CanRun);
         Assert.False(string.IsNullOrWhiteSpace(vm.BlockingValidationMessage));
@@ -71,10 +72,10 @@ public sealed class PipelineViewModelTests
     }
 
     [Fact]
-    public void ExecutablePipeline_RequiresSelectedIncludedFiles()
+    public async Task ExecutablePipeline_RequiresSelectedIncludedFiles()
     {
         var vm = new PipelineViewModel(new TestAppContext());
-        vm.AddStepFromResult(new CopyStep("/mem/out"));
+        await vm.AddStepFromResult(new CopyStep("/mem/out"));
 
         Assert.False(vm.CanRun);
         Assert.Equal("At least one file must be selected.", vm.BlockingValidationMessage);
@@ -86,18 +87,18 @@ public sealed class PipelineViewModelTests
     }
 
     [Fact]
-    public void AddStep_CustomName_OverridesAutoSummary()
+    public async Task AddStep_CustomName_OverridesAutoSummary()
     {
         var vm = new PipelineViewModel(new TestAppContext());
 
-        vm.AddStepFromResult(new CopyStep("/mem/out"), "Music Mirror");
+        await vm.AddStepFromResult(new CopyStep("/mem/out"), "Music Mirror");
 
         Assert.Equal("Music Mirror", vm.Steps[0].Label);
         Assert.Equal("Music Mirror", vm.Steps[0].CustomName);
     }
 
     [Fact]
-    public void LoadPreset_ReadsCustomNameMetadata()
+    public async Task LoadPreset_ReadsCustomNameMetadata()
     {
         var vm = new PipelineViewModel(new TestAppContext());
         var preset = new PipelinePreset
@@ -119,10 +120,67 @@ public sealed class PipelineViewModelTests
                 ]),
         };
 
-        vm.LoadPreset(preset);
+        await vm.LoadPreset(preset);
 
         Assert.Single(vm.Steps);
         Assert.Equal("Audio Backup", vm.Steps[0].Label);
         Assert.Equal("Audio Backup", vm.Steps[0].CustomName);
+    }
+
+    // ── Locking ───────────────────────────────────────────────────────────────
+
+    private static async Task<PipelineViewModel> MakeRunnableVm()
+    {
+        TestAppContext appContext = TestAppContext.FromProvider(new MemoryFileSystemProvider());
+        var vm = new PipelineViewModel(appContext);
+        await vm.AddStepFromResult(new CopyStep("/mem/out"));
+        vm.SetSelectedIncludedFileCount(1);
+        return vm;
+    }
+
+    [Fact]
+    public async Task IsScanning_BlocksCanRun()
+    {
+        var vm = await MakeRunnableVm();
+        Assert.True(vm.CanRun);
+
+        vm.IsScanning = true;
+
+        Assert.False(vm.CanRun);
+    }
+
+    [Fact]
+    public async Task IsRunning_BlocksRemoveStepCommand()
+    {
+        var vm = new PipelineViewModel(new TestAppContext());
+        await vm.AddStepFromResult(new CopyStep("/mem/out"));
+
+        vm.IsRunning = true;
+
+        Assert.False(vm.RemoveStepCommand.CanExecute(vm.Steps[0]));
+    }
+
+    [Fact]
+    public async Task IsRunning_BlocksRequestEditStepCommand()
+    {
+        var vm = new PipelineViewModel(new TestAppContext());
+        await vm.AddStepFromResult(new CopyStep("/mem/out"));
+
+        vm.IsRunning = true;
+
+        Assert.False(vm.RequestEditStepCommand.CanExecute(vm.Steps[0]));
+    }
+
+    [Fact]
+    public async Task IsNotRunning_UnblocksStepCommands()
+    {
+        var vm = new PipelineViewModel(new TestAppContext());
+        await vm.AddStepFromResult(new CopyStep("/mem/out"));
+        vm.IsRunning = true;
+
+        vm.IsRunning = false;
+
+        Assert.True(vm.RemoveStepCommand.CanExecute(vm.Steps[0]));
+        Assert.True(vm.RequestEditStepCommand.CanExecute(vm.Steps[0]));
     }
 }

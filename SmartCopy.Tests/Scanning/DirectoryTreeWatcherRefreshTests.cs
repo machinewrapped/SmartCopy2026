@@ -24,9 +24,12 @@ public sealed class DirectoryTreeWatcherRefreshTests
         var vm = new DirectoryTreeViewModel(registry);
         await vm.ChangeRootAsync(rootPath, new ScanOptions {});
 
-        var albums = vm.RootNode!.FindNodeByPathSegments("albums")!;
-        var beatles = vm.RootNode.FindNodeByPathSegments("albums", "beatles")!;
-        var song1 = vm.RootNode.FindNodeByPathSegments("albums", "beatles", "song1.mp3")!;
+        var albums = vm.RootNode!.FindNodeByPathSegments(["albums"]) as DirectoryNode;
+        var beatles = vm.RootNode.FindNodeByPathSegments(["albums", "beatles"]) as DirectoryNode;
+        var song1 = vm.RootNode.FindNodeByPathSegments(["albums", "beatles", "song1.mp3"])!;
+
+        Assert.NotNull(albums);
+        Assert.NotNull(beatles);
 
         albums.CheckState = CheckState.Checked;
         beatles.IsExpanded = true;
@@ -49,10 +52,11 @@ public sealed class DirectoryTreeWatcherRefreshTests
                 ],
                 refreshes: []));
 
-        var refreshedBeatles = vm.RootNode.FindNodeByPathSegments("albums", "beatles")!;
-        var refreshedSong1 = vm.RootNode.FindNodeByPathSegments("albums", "beatles", "song1.mp3")!;
-        var refreshedSong2 = vm.RootNode.FindNodeByPathSegments("albums", "beatles", "song2.mp3")!;
+        var refreshedBeatles = vm.RootNode.FindNodeByPathSegments(["albums", "beatles"]) as DirectoryNode;
+        var refreshedSong1 = vm.RootNode.FindNodeByPathSegments(["albums", "beatles", "song1.mp3"])!;
+        var refreshedSong2 = vm.RootNode.FindNodeByPathSegments(["albums", "beatles", "song2.mp3"])!;
 
+        Assert.NotNull(refreshedBeatles);
         Assert.Equal(CheckState.Checked, refreshedSong1.CheckState);
         Assert.True(refreshedBeatles.IsExpanded);
         Assert.Same(refreshedSong1, vm.SelectedNode);
@@ -76,7 +80,7 @@ public sealed class DirectoryTreeWatcherRefreshTests
         var vm = new DirectoryTreeViewModel(registry);
         await vm.ChangeRootAsync(rootPath, new ScanOptions {});
 
-        var song1 = vm.RootNode!.FindNodeByPathSegments("albums", "beatles", "song1.mp3")!;
+        var song1 = vm.RootNode!.FindNodeByPathSegments(["albums", "beatles", "song1.mp3"])!;
         vm.SelectedNode = song1;
 
         File.Delete(songPath);
@@ -88,9 +92,9 @@ public sealed class DirectoryTreeWatcherRefreshTests
                 inserts: [],
                 refreshes: []));
 
-        var refreshedBeatles = vm.RootNode.FindNodeByPathSegments("albums", "beatles")!;
+        var refreshedBeatles = vm.RootNode.FindNodeByPathSegments(["albums", "beatles"])!;
         Assert.Same(refreshedBeatles, vm.SelectedNode);
-        Assert.Null(vm.RootNode.FindNodeByPathSegments("albums", "beatles", "song1.mp3"));
+        Assert.Null(vm.RootNode.FindNodeByPathSegments(["albums", "beatles", "song1.mp3"]));
     }
 
     [Fact]
@@ -109,8 +113,8 @@ public sealed class DirectoryTreeWatcherRefreshTests
         var vm = new DirectoryTreeViewModel(registry);
         await vm.ChangeRootAsync(rootPath, new ScanOptions {});
 
-        var albums = vm.RootNode!.FindNodeByPathSegments("albums")!;
-        var beatles = vm.RootNode.FindNodeByPathSegments("albums", "beatles")!;
+        var albums = vm.RootNode!.FindNodeByPathSegments(["albums"])!;
+        var beatles = vm.RootNode.FindNodeByPathSegments(["albums", "beatles"])!;
         vm.SelectedNode = beatles;
 
         Directory.Delete(beatlesPath, recursive: true);
@@ -122,7 +126,7 @@ public sealed class DirectoryTreeWatcherRefreshTests
                 inserts: [],
                 refreshes: []));
 
-        Assert.Null(vm.RootNode.FindNodeByPathSegments("albums", "beatles"));
+        Assert.Null(vm.RootNode.FindNodeByPathSegments(["albums", "beatles"]));
         Assert.Same(albums, vm.SelectedNode);
     }
 
@@ -159,7 +163,8 @@ public sealed class DirectoryTreeWatcherRefreshTests
                 ],
                 refreshes: []));
 
-        var beatles = vm.RootNode!.FindNodeByPathSegments("albums", "beatles")!;
+        var beatles = vm.RootNode!.FindNodeByPathSegments(["albums", "beatles"]) as DirectoryNode;
+        Assert.NotNull(beatles);
         Assert.Equal(["song-a.mp3", "song-b.mp3"], beatles.Files.Select(file => file.Name));
     }
 }

@@ -20,9 +20,9 @@ public sealed class TransformPipeline
         (step is CopyStep copy && copy.OverwriteMode != OverwriteMode.Skip) ||
         (step is MoveStep move && move.OverwriteMode != OverwriteMode.Skip));
 
-    public void Validate(PipelineValidationContext? context = null)
+    public async Task ValidateAsync(PipelineValidationContext context)
     {
-        var result = PipelineValidator.Validate(_steps, context);
+        var result = await PipelineValidator.ValidateAsync(_steps, context);
         if (!result.CanRun)
         {
             var issue = result.FirstBlockingIssue;

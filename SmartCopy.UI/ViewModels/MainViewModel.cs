@@ -1,20 +1,28 @@
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using Avalonia;
+using Avalonia.Threading;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Pipeline;
+using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Progress;
 using SmartCopy.Core.Scanning;
 using SmartCopy.Core.Selection;
 using SmartCopy.Core.Settings;
 using SmartCopy.Core.Trash;
 using SmartCopy.Core.Workflows;
+using System.Diagnostics;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Console;
+using Microsoft.Extensions.Logging.Debug;
+using SmartCopy.Core.Logging;
 using SmartCopy.UI.Services;
 using SmartCopy.UI.ViewModels.Workflows;
 using SmartCopy.UI.Views;
@@ -34,6 +42,9 @@ public partial class MainViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _autoOpenLogOnRun = true;
+
+    [ObservableProperty]
+    private bool _verboseLogging;
 
     [ObservableProperty]
     private bool _showExcludedNodesByDefault = true;
@@ -66,9 +77,6 @@ public partial class MainViewModel : ViewModelBase
     private bool _followSymlinks;
 
     [ObservableProperty]
-    private bool _addArtificialDelay = false;
-
-    [ObservableProperty]
     private OverwriteMode _defaultOverwriteMode = OverwriteMode.Skip;
 
     [ObservableProperty]
@@ -79,6 +87,17 @@ public partial class MainViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _allowDeleteReadOnly;
+
+#if DEBUG
+    [ObservableProperty]
+    private bool _enableMemoryFileSystem = false;
+
+    [ObservableProperty]
+    private bool _addArtificialDelay = false;
+
+    [ObservableProperty]
+    private bool _limitMemoryFileSystemCapacity = false;
+#endif
 
     public string SourcePath
     {
@@ -92,19 +111,22 @@ public partial class MainViewModel : ViewModelBase
         set => SourcePathPicker.ValidationMessage = value;
     }
 
+    private readonly ILogger<MainViewModel> _logger;
     private readonly SmartCopyAppContext _appContext;
     private readonly ITrashService _trashService;
-    private readonly MemoryFileSystemProvider _memoryProvider;
     private readonly FileSystemProviderRegistry _providerRegistry = new();
     private readonly LocalDirectoryWatcherFactory _watcherFactory = new();
     private readonly AppSettings _settings;
     private readonly AppSettingsStore _settingsStore = new();
-    private readonly SessionStore _sessionStore = new();
+    private readonly SessionStore _sessionStore;
     private readonly OperationJournal _operationJournal;
     private readonly WorkflowPresetStore _workflowStore;
     private readonly SelectionManager _selectionManager = new();
     private readonly SelectionSerializer _selectionSerializer = new();
     private readonly SemaphoreSlim _watcherApplyGate = new(1, 1);
+#if DEBUG
+    private MemoryFileSystemProvider? _memoryProvider;
+#endif
     private IDirectoryWatcher? _directoryWatcher;
     private CancellationTokenSource? _filterCts;
     private CancellationTokenSource? _scanCts;
@@ -123,8 +145,17 @@ public partial class MainViewModel : ViewModelBase
     public WorkflowMenuViewModel WorkflowMenu { get; }
     public LogPanelViewModel LogPanel { get; } = new();
 
+    public ILogger Logger => _logger;
+
     public MainViewModel()
     {
+        var loggerFactory = LoggerFactory.Create(b => b
+            .AddProvider(new LogPanelLoggerProvider(LogPanel))
+            .AddFilter<DebugLoggerProvider>(null, LogLevel.Warning).AddDebug()
+            .AddFilter<ConsoleLoggerProvider>(null, LogLevel.Warning).AddConsole());
+        AppLog.Configure(loggerFactory);
+        _logger = AppLog.CreateLogger<MainViewModel>();
+
         var dataStore = LocalAppDataStore.ForCurrentUser();
         _settings = new AppSettings { SettingsFilePath = dataStore.GetFilePath("settings.json") };
         _appContext = new SmartCopyAppContext(_settings, dataStore, _providerRegistry);
@@ -132,12 +163,8 @@ public partial class MainViewModel : ViewModelBase
         _trashService = CreateTrashService();
 
         _operationJournal = new OperationJournal(dataStore.GetDirectoryPath("Logs"));
+        _sessionStore = new SessionStore();
         _workflowStore = new WorkflowPresetStore(dataStore.GetDirectoryPath("Workflows"));
-
-        // Create an in-memory virtual file system for testing.
-        // TODO: this should be a debug option, not exposed in release builds
-        _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: _settings.AddArtificialDelay);
-        _providerRegistry.Register(_memoryProvider);
 
         // Create the ViewModel for the filter chain
         FilterChain = new FilterChainViewModel(_appContext);
@@ -179,6 +206,7 @@ public partial class MainViewModel : ViewModelBase
         };
         Pipeline.RunRequested += async (_, _) => await RunPipelineAsync();
         Pipeline.PreviewRequested += async (_, _) => await PreviewPipelineAsync();
+        Pipeline.SwapSourceRequested += async (_, step) => await SwapSourceWithDestinationAsync(step);
         FilterChain.PipelineDestinationPath = Pipeline.FirstDestinationPath;
 
         // Subscribe to chain changes — re-evaluate filters within ~100 ms.
@@ -191,19 +219,20 @@ public partial class MainViewModel : ViewModelBase
             {
                 StatusBar.IsScanning = DirectoryTree.IsLoading;
                 StatusBar.ScanStatusText = DirectoryTree.IsLoading ? "Scanning..." : string.Empty;
+                Pipeline.IsScanning = DirectoryTree.IsLoading;
             }
             else if (e.PropertyName == nameof(DirectoryTreeViewModel.SelectedNode))
             {
                 var selectedNode = DirectoryTree.SelectedNode;
-                if (selectedNode?.IsDirectory == true)
+                if (selectedNode is DirectoryNode dirNode)
                 {
                     try
                     {
-                        await FileList.LoadFilesForNodeAsync(selectedNode, FilterChain.BuildLiveChain(), _appContext);
+                        await FileList.LoadFilesForNodeAsync(dirNode, FilterChain.BuildLiveChain(), _appContext);
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"Failed to load files for directory: {ex}");
+                        _logger.LogError(ex, "Failed to load files for directory");
                     }
                 }
             }
@@ -218,7 +247,16 @@ public partial class MainViewModel : ViewModelBase
             }
         };
 
-        SourcePathPicker.PathCommitted += async (s,p) => await ApplySourcePathCoreAsync(p);
+        SourcePathPicker.PathCommitted += async (s, p) =>
+        {
+            if (Pipeline.IsRunning)
+            {
+                var confirmed = await ConfirmCancelPipelineForSourceChangeAsync();
+                if (!confirmed) return;
+                StatusBar.Progress.CancelCommand.Execute(null);
+            }
+            await ApplySourcePathCoreAsync(p);
+        };
 
         StatusBar.CancelScanRequested += (_, _) => _scanCts?.Cancel();
 
@@ -233,7 +271,7 @@ public partial class MainViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"Initialization failed: {ex}");
+            _logger.LogError(ex, "Initialization failed");
         }
     }
 
@@ -245,6 +283,7 @@ public partial class MainViewModel : ViewModelBase
 
         UseAbsolutePathsForSelection = _settings.UseAbsolutePathsForSelectionSave;
         AutoOpenLogOnRun = _settings.AutoOpenLogOnRun;
+        VerboseLogging = _settings.VerboseLogging;
         ShowExcludedNodesByDefault = _settings.ShowFilteredNodesInTree;
         RestoreLastWorkflow = _settings.RestoreLastWorkflow;
         RestoreLastSourcePath = _settings.RestoreLastSourcePath;
@@ -258,6 +297,11 @@ public partial class MainViewModel : ViewModelBase
         DefaultDeleteMode = _settings.DefaultDeleteMode;
         ShowHiddenFiles = _settings.ShowHiddenFiles;
         AllowDeleteReadOnly = _settings.AllowDeleteReadOnly;
+#if DEBUG
+        EnableMemoryFileSystem = _settings.EnableMemoryFileSystem;
+        AddArtificialDelay = _settings.AddArtificialDelay;
+        LimitMemoryFileSystemCapacity = _settings.LimitMemoryFileSystemCapacity;
+#endif
 
         SourcePathPicker.RefreshSettings();
 
@@ -272,12 +316,12 @@ public partial class MainViewModel : ViewModelBase
                 var session = await _sessionStore.LoadAsync(GetSessionPath());
                 if (session is not null)
                 {
-                    ApplyWorkflowConfig(session);
+                    await ApplyWorkflowConfig(session);
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
             {
-                Debug.WriteLine($"Failed to restore session snapshot: {ex}");
+                _logger.LogError(ex, "Failed to restore session snapshot");
             }
         }
         else if (_settings.RestoreLastSourcePath && _settings.LastSourcePath is { Length: > 0 })
@@ -285,10 +329,12 @@ public partial class MainViewModel : ViewModelBase
             SourcePath = _settings.LastSourcePath;
         }
         else
-        {
+#if DEBUG
             // TEMP: set a safe default path
             SourcePath = MockMemoryFileSystemFactory.SourcePath;
-        }
+#else
+            SourcePath = string.Empty;
+#endif
 
         RefreshSourceBookmarks();
 
@@ -300,12 +346,12 @@ public partial class MainViewModel : ViewModelBase
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Failed to set initial source path to '{SourcePath}': {ex}");
+                _logger.LogError(ex, "Failed to set initial source path to '{Path}'", SourcePath);
                 RevertSourcePath();
             }
         }
 
-        LogPanel.AddEntry("SmartCopy 2026 ready");
+        LogPanel.AddEntry("SmartCopy 2[026] ready");
     }
 
     partial void OnSelectedSourceBookmarkChanged(SourceBookmarkItem? value)
@@ -327,6 +373,13 @@ public partial class MainViewModel : ViewModelBase
     partial void OnAutoOpenLogOnRunChanged(bool value)
     {
         _settings.AutoOpenLogOnRun = value;
+        _ = SaveSettingsAsync();
+    }
+
+    partial void OnVerboseLoggingChanged(bool value)
+    {
+        _settings.VerboseLogging = value;
+        LogPanel.VerboseLogging = value;
         _ = SaveSettingsAsync();
     }
 
@@ -392,14 +445,6 @@ public partial class MainViewModel : ViewModelBase
         FollowSymlinks = FollowSymlinks,
     };
 
-
-    partial void OnAddArtificialDelayChanged(bool value)
-    {
-        _memoryProvider.AddArtificialDelay = value;
-        _settings.AddArtificialDelay = value;
-        _ = SaveSettingsAsync();
-    }
-
     partial void OnDefaultOverwriteModeChanged(OverwriteMode value)
     {
         _settings.DefaultOverwriteMode = value;
@@ -430,6 +475,44 @@ public partial class MainViewModel : ViewModelBase
         _ = SaveSettingsAsync();
     }
 
+#if DEBUG
+    partial void OnEnableMemoryFileSystemChanged(bool value)
+    {
+        _settings.EnableMemoryFileSystem = value;
+        _ = SaveSettingsAsync();
+
+        if (value)
+        {
+            SetupMemoryFileSystem();
+        }
+        else if (_memoryProvider != null)
+        {
+            _providerRegistry.Unregister(_memoryProvider);
+            _memoryProvider = null;
+        }
+    }
+
+    partial void OnAddArtificialDelayChanged(bool value)
+    {
+        if (_memoryProvider != null)
+        {
+            _memoryProvider.AddArtificialDelay = value;            
+        }
+        _settings.AddArtificialDelay = value;
+        _ = SaveSettingsAsync();
+    }
+
+    partial void OnLimitMemoryFileSystemCapacityChanged(bool value)
+    {
+        if (_memoryProvider != null)
+        {
+            _memoryProvider.SimulatedCapacity = value ? 100_000_000_000 : null;
+        }
+        _settings.LimitMemoryFileSystemCapacity = value;
+        _ = SaveSettingsAsync();
+    }
+#endif
+
     private async Task SaveSettingsAsync()
     {
         try
@@ -438,7 +521,7 @@ public partial class MainViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[Settings] Failed to save settings: {ex.Message}");
+            _logger.LogError(ex, "Failed to save settings");
         }
     }
 
@@ -468,7 +551,7 @@ public partial class MainViewModel : ViewModelBase
         if (DirectoryTree.RootNode == null)
             return;
 
-        _selectionManager.SelectAll([DirectoryTree.RootNode]);
+        _selectionManager.SelectAll(DirectoryTree.RootNode);
         RefreshIdleStats();
     }
 
@@ -478,7 +561,7 @@ public partial class MainViewModel : ViewModelBase
         if (DirectoryTree.RootNode == null)
             return;
 
-        _selectionManager.ClearAll([DirectoryTree.RootNode]);
+        _selectionManager.ClearAll(DirectoryTree.RootNode);
         RefreshIdleStats();
     }
 
@@ -488,7 +571,7 @@ public partial class MainViewModel : ViewModelBase
         if (DirectoryTree.RootNode == null)
             return;
 
-        _selectionManager.InvertAll([DirectoryTree.RootNode]);
+        _selectionManager.InvertAll(DirectoryTree.RootNode);
         RefreshIdleStats();
     }
 
@@ -514,7 +597,7 @@ public partial class MainViewModel : ViewModelBase
 
         if (file is null) return;
         var path = file.Path.LocalPath;
-        var snapshot = _selectionManager.Capture([DirectoryTree.RootNode], UseAbsolutePathsForSelection);
+        var snapshot = _selectionManager.Capture(DirectoryTree.RootNode!, UseAbsolutePathsForSelection);
         await _selectionSerializer.SaveAsync(path, snapshot);
     }
 
@@ -540,7 +623,7 @@ public partial class MainViewModel : ViewModelBase
 
         if (file is null) return;
         var path = file.Path.LocalPath;
-        var snapshot = _selectionManager.Capture([DirectoryTree.RootNode], UseAbsolutePathsForSelection);
+        var snapshot = _selectionManager.Capture(DirectoryTree.RootNode!, UseAbsolutePathsForSelection);
         await _selectionSerializer.SaveAsync(path, snapshot);
     }
 
@@ -566,12 +649,13 @@ public partial class MainViewModel : ViewModelBase
         if (files is not { Count: > 0 }) return;
         var path = files[0].Path.LocalPath;
         var snapshot = await _selectionSerializer.LoadAsync(path);
-        var result = _selectionManager.Restore([DirectoryTree.RootNode], snapshot);
+        var result = _selectionManager.Restore(DirectoryTree.RootNode, snapshot);
         RefreshIdleStats();
 
         if (result.HasUnmatched)
-            Debug.WriteLine($"[Selection] Restored {result.MatchedCount} of {snapshot.Paths.Count}; "
-                + $"{result.UnmatchedPaths.Count} unmatched: {string.Join(", ", result.UnmatchedPaths)}");
+            _logger.LogWarning("Restored {Matched} of {Total}; {Unmatched} unmatched: {Paths}",
+                result.MatchedCount, snapshot.Paths.Count,
+                result.UnmatchedPaths.Count, string.Join(", ", result.UnmatchedPaths));
     }
 
     private static Window? GetMainWindow()
@@ -581,6 +665,44 @@ public partial class MainViewModel : ViewModelBase
     private void RevertSourcePath()
     {
         SourcePath = _lastCommittedSourcePath;
+    }
+
+    private static async Task<bool> ConfirmCancelPipelineForSourceChangeAsync()
+    {
+        var mainWindow = GetMainWindow();
+        if (mainWindow is null) return false;
+
+        var confirmVm = new ConfirmDialogViewModel
+        {
+            Title = "Pipeline Running",
+            Message = "Abort the current operation and change the source path?",
+            ConfirmText = "Abort & Change",
+            CancelText = "Keep Running",
+        };
+        var dialog = new ConfirmDialog { DataContext = confirmVm };
+        var result = await dialog.ShowDialog<bool?>(mainWindow);
+        return result == true;
+    }
+
+    private async Task SwapSourceWithDestinationAsync(PipelineStepViewModel step)
+    {
+        if (step.Step is not IHasDestinationPath dest || !dest.HasDestinationPath)
+            return;
+
+        var oldSource = SourcePath;
+        var oldDestination = dest.DestinationPath!;
+
+        IPipelineStep? replacement = step.Step switch
+        {
+            CopyStep copy => new CopyStep(oldSource, copy.OverwriteMode),
+            MoveStep move => new MoveStep(oldSource, move.OverwriteMode),
+            _ => null
+        };
+
+        if (replacement is null) return;
+
+        await Pipeline.ReplaceStep(step, replacement, step.CustomName);
+        await ApplySourcePathCoreAsync(oldDestination);
     }
 
     private async Task ApplySourcePathCoreAsync(string path)
@@ -613,6 +735,7 @@ public partial class MainViewModel : ViewModelBase
             await DirectoryTree.ChangeRootAsync(normalizedPath, BuildScanOptions(), ct);
 
             _lastCommittedSourcePath = normalizedPath;
+            SourcePathValidationMessage = string.Empty;
 
             RecordRecentSource(normalizedPath);
 
@@ -622,7 +745,7 @@ public partial class MainViewModel : ViewModelBase
             StartDirectoryWatcherIfSupported();
 
             if (DirectoryTree.SourceProvider is { } sp)
-                Pipeline.SetSourceCapabilities(sp.Capabilities);
+                await Pipeline.SetSourceContext(sp);
 
             _settings.LastSourcePath = normalizedPath;
             await _settingsStore.SaveAsync(_settings);
@@ -635,13 +758,10 @@ public partial class MainViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"Failed to change source path to '{normalizedPath}': {ex}");
+            _logger.LogError(ex, "Failed to change source path to '{Path}'", normalizedPath);
 
             SourcePathValidationMessage = BuildSourcePathValidationMessage(normalizedPath, ex);
             LogPanel.AddEntry(SourcePathValidationMessage, LogLevel.Error);
-
-            // Revert path display on failure; do not attempt to re-scan the previous path.
-            SourcePath = previousSourcePath ?? string.Empty;
         }
     }
 
@@ -694,6 +814,9 @@ public partial class MainViewModel : ViewModelBase
         {
             return;
         }
+
+        RemoveEquivalentPath(_settings.FavouritePaths, normalizedPath);
+        _settings.FavouritePaths.Insert(0, normalizedPath);
 
         RemoveEquivalentPath(_settings.RecentSources, normalizedPath);
         _settings.RecentSources.Insert(0, normalizedPath);
@@ -785,7 +908,7 @@ public partial class MainViewModel : ViewModelBase
     {
         var chain = FilterChain.BuildLiveChain();
 
-        if (DirectoryTree.SelectedNode is { IsDirectory: true } selectedDirectory)
+        if (DirectoryTree.SelectedNode is DirectoryNode selectedDirectory)
         {
             await FileList.LoadFilesForNodeAsync(selectedDirectory, chain, _appContext);
         }
@@ -804,22 +927,35 @@ public partial class MainViewModel : ViewModelBase
         if (DirectoryTree.RootNode == null)
         {
             Pipeline.SetSelectedIncludedFileCount(0);
-            StatusBar.Selection.UpdateStats(0,0,0);
+            Pipeline.SetNumFilterIncludedFiles(0);
+            Pipeline.SetTotalFilterIncludedBytes(0);
+            StatusBar.Selection.UpdateStats(0, 0, 0, 0, 0);
             return;
         }
 
         var root = DirectoryTree.RootNode;
         root.BuildStats();
 
-        int selected = root.NumSelectedFiles;
-        int filteredOut = root.NumFilterExcludedFiles;
-        long totalBytes = root.TotalSelectedBytes;
-
-        Pipeline.SetSelectedIncludedFileCount(selected);
-        StatusBar.Selection.UpdateStats(selected, totalBytes, filteredOut);
+        Pipeline.SetSelectedIncludedFileCount(root.NumSelectedFiles);
+        Pipeline.SetSelectedBytes(root.TotalSelectedBytes);
+        Pipeline.SetNumFilterIncludedFiles(root.NumFilterIncludedFiles);
+        Pipeline.SetTotalFilterIncludedBytes(root.TotalFilterIncludedBytes);
+        StatusBar.Selection.UpdateStats(
+            root.NumSelectedFiles,
+            root.TotalSelectedBytes,
+            root.NumFilterIncludedFiles,
+            root.TotalFilterIncludedBytes,
+            root.NumFilterExcludedFiles);
     }
 
-    private async Task PreviewPipelineAsync()
+    private static string GetPreparationMessage(PreviewReason reason) => reason switch
+    {
+        PreviewReason.DeleteConfirm  => "Checking for files to delete\u2026",
+        PreviewReason.OverwriteCheck => "Checking for overwrites\u2026",
+        _                            => "Preparing preview\u2026",
+    };
+
+    private async Task PreviewPipelineAsync(PreviewReason reason = PreviewReason.Manual)
     {
         var pipeline = Pipeline.BuildLivePipeline();
         if (DirectoryTree.IsLoaded == false)
@@ -834,6 +970,12 @@ public partial class MainViewModel : ViewModelBase
         var sourceProvider = DirectoryTree.SourceProvider
             ?? throw new ApplicationException("Directory tree is loaded but source provider is unknown");
 
+        if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop
+            || desktop.MainWindow is not { } mainWindow)
+        {
+            return;
+        }
+
         var runner = new PipelineRunner(pipeline);
         var job = new PipelineJob
         {
@@ -843,19 +985,52 @@ public partial class MainViewModel : ViewModelBase
             TrashService     = _trashService,
         };
 
-        var plan = await runner.PreviewAsync(job, CancellationToken.None);
+        // Put the view into "preparing" state and open the dialog immediately
+        // so the user sees a progress indicator rather than the app freezing.
+        Preview.BeginPreparation(GetPreparationMessage(reason));
+        var dialog = new PreviewView { DataContext = Preview };
+        var dialogTask = dialog.ShowDialog<bool?>(mainWindow);
 
-        Preview.LoadFrom(plan);
+        // Generate the plan concurrently, tied to dialog lifetime.
+        // If the user closes the dialog before the plan is ready, we cancel generation.
+        using var previewCts = new CancellationTokenSource();
 
-        if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
-            && desktop.MainWindow is { } mainWindow)
+        // Cancel plan generation the moment the dialog closes.
+        var _ = dialogTask.ContinueWith(
+            _ => previewCts.Cancel(),
+            TaskScheduler.Default);
+
+        OperationPlan? plan = null;
+        try
         {
-            var dialog = new PreviewView { DataContext = Preview };
-            var confirmRun = await dialog.ShowDialog<bool?>(mainWindow);
-            if (confirmRun == true)
+            plan = await runner.PreviewAsync(job, previewCts.Token);
+
+            // OverwriteCheck: if the plan shows no actual overwrites, skip confirmation
+            // and run directly — no need to bother the user with a benign preview.
+            if (reason == PreviewReason.OverwriteCheck &&
+                !plan.Actions.Any(a => a.DestinationResult == DestinationResult.Overwritten))
             {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => dialog.Close(false));
+                await dialogTask;
                 await ExecutePipelineAsync(runner, job);
+                return;
             }
+
+            // Plan is ready — populate the view on the UI thread.
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => Preview.LoadFrom(plan));
+        }
+        catch (OperationCanceledException)
+        {
+            // User closed the dialog before plan generation finished — nothing to do.
+            await dialogTask;
+            return;
+        }
+
+        // Wait for user's decision (Run or Close).
+        var confirmRun = await dialogTask;
+        if (confirmRun == true)
+        {
+            await ExecutePipelineAsync(runner, job);
         }
     }
 
@@ -866,11 +1041,15 @@ public partial class MainViewModel : ViewModelBase
         // Mandatory preview for destructive pipelines, unless the user has opted out.
         bool needsPreview = false;
         if (pipeline.HasDeleteStep && !_settings.AllowDeleteWithoutPreview) needsPreview = true;
-        if (pipeline.HasOverwriteStep && !_settings.AllowOverwriteWithoutPreview) needsPreview = true;
+        if (!needsPreview && !_settings.AllowOverwriteWithoutPreview)
+            needsPreview = await HasPotentialOverwriteAsync(pipeline);
 
         if (needsPreview)
         {
-            await PreviewPipelineAsync();
+            var reason = pipeline.HasDeleteStep
+                ? PreviewReason.DeleteConfirm
+                : PreviewReason.OverwriteCheck;
+            await PreviewPipelineAsync(reason);
             return;
         }
 
@@ -900,12 +1079,54 @@ public partial class MainViewModel : ViewModelBase
         await ExecutePipelineAsync(runner, job);
     }
 
+    /// <summary>
+    /// Returns true when the pipeline has at least one Copy or Move step with
+    /// <c>OverwriteMode != Skip</c> whose destination directory already exists.
+    /// If the destination doesn't exist yet, no files can be overwritten, so the
+    /// mandatory-preview guard is unnecessary.
+    /// </summary>
+    private async Task<bool> HasPotentialOverwriteAsync(TransformPipeline pipeline)
+    {
+        foreach (var step in pipeline.Steps)
+        {
+            string? destPath = step switch
+            {
+                CopyStep copy when copy.OverwriteMode != OverwriteMode.Skip => copy.DestinationPath,
+                MoveStep move when move.OverwriteMode != OverwriteMode.Skip => move.DestinationPath,
+                _ => null,
+            };
+
+            if (string.IsNullOrWhiteSpace(destPath))
+                continue;
+
+            var provider = _providerRegistry.ResolveProvider(destPath);
+            if (provider is null)
+                continue;
+
+            if (await provider.ExistsAsync(destPath, CancellationToken.None))
+                return true;
+        }
+
+        return false;
+    }
+
     private async Task ExecutePipelineAsync(PipelineRunner runner, PipelineJob job)
     {
-        var nodeProgress = new Progress<TransformResult>(OnNodeCompleted);
-        var executionJob = StatusBar.Progress.Begin(job with { NodeProgress = nodeProgress });
+        var resultQueue = new ConcurrentQueue<TransformResult>();
+        var logTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+        logTimer.Tick += (_, _) => DrainResultQueue(resultQueue);
+
+        var nodeProgress = new SynchronousProgress<TransformResult>(resultQueue.Enqueue);
+        var executionJob = StatusBar.Progress.Begin(job with
+        {
+            NodeProgress = nodeProgress,
+            StepStarted = index =>
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => Pipeline.SetActiveStep(index)),
+        });
 
         Pipeline.IsRunning = true;
+        FilterChain.IsLocked = true;
+        logTimer.Start();
 
         if (AutoOpenLogOnRun)
             LogPanel.IsExpanded = true;
@@ -913,61 +1134,65 @@ public partial class MainViewModel : ViewModelBase
         try
         {
             var results = await runner.ExecuteAsync(executionJob);
+            logTimer.Stop();
+            DrainResultQueue(resultQueue);
 
             await _operationJournal.WriteAsync(results.Where(r => r.SourceNodeResult != SourceResult.None));
-
-            foreach (var r in results)
-            {
-                if (!r.IsSuccess)
-                {
-                    LogPanel.AddEntry($"Failed: {r.SourceNode.Name}", LogLevel.Error);
-                }
-                else if (r.SourceNodeResult == SourceResult.Copied)
-                {
-                    LogPanel.AddEntry($"Copied {r.SourceNode.Name} → {r.DestinationPath} ({FileSizeFormatter.FormatBytes(r.OutputBytes)})");
-                }
-                else if (r.SourceNodeResult == SourceResult.Moved)
-                {
-                    LogPanel.AddEntry($"Moved {r.SourceNode.Name} → {r.DestinationPath} ({FileSizeFormatter.FormatBytes(r.OutputBytes)})");
-                }
-                else if (r.SourceNodeResult is SourceResult.Trashed or SourceResult.Deleted)
-                {
-                    LogPanel.AddEntry($"Deleted {r.SourceNode.Name} ({FileSizeFormatter.FormatBytes(r.InputBytes)})");
-                }
-
-                if (r.DestinationResult != DestinationResult.None)
-                {
-                    if (r.DestinationResult == DestinationResult.Overwritten)
-                    {
-                        LogPanel.AddEntry($"Overwrote {r.DestinationPath ?? "(unknown)"}");
-                    }
-                }
-            }
 
             StatusBar.Progress.Complete();
         }
         catch (OperationCanceledException)
         {
+            logTimer.Stop();
+            DrainResultQueue(resultQueue);
             StatusBar.Progress.Cancelled();
         }
         finally
         {
+            Pipeline.ClearActiveStep();
             Pipeline.IsRunning = false;
+            FilterChain.IsLocked = false;
             FileList.RemoveAllMarkedForRemoval();
             DirectoryTree.RemoveNodesMarkedForRemoval();
             await ApplyPendingWatcherBatchesAsync();
         }
     }
 
+    private void DrainResultQueue(ConcurrentQueue<TransformResult> queue)
+    {
+        while (queue.TryDequeue(out var result))
+            OnNodeCompleted(result);
+    }
+
     private void OnNodeCompleted(TransformResult result)
     {
         if (!result.IsSuccess)
+        {
+            var failMsg = result.ErrorMessage is { Length: > 0 } e
+                ? $"Failed: {result.SourceNode.Name} — {e}"
+                : $"Failed: {result.SourceNode.Name}";
+            LogPanel.AddEntry(failMsg, LogLevel.Error);
             return;
+        }
 
         if (result.SourceNodeResult is SourceResult.Moved or SourceResult.Trashed or SourceResult.Deleted)
-        {
             result.SourceNode.MarkForRemoval();
+
+        switch (result.SourceNodeResult)
+        {
+            case SourceResult.Copied:
+                LogPanel.AddEntry($"Copied {result.SourceNode.Name} → {result.DestinationPath} ({FileSizeFormatter.FormatBytes(result.OutputBytes)})");
+                break;
+            case SourceResult.Moved:
+                LogPanel.AddEntry($"Moved {result.SourceNode.Name} → {result.DestinationPath} ({FileSizeFormatter.FormatBytes(result.OutputBytes)})");
+                break;
+            case SourceResult.Trashed or SourceResult.Deleted:
+                LogPanel.AddEntry($"Deleted {result.SourceNode.Name} ({FileSizeFormatter.FormatBytes(result.InputBytes)})");
+                break;
         }
+
+        if (result.DestinationResult == DestinationResult.Overwritten)
+            LogPanel.AddEntry($"Overwrote {result.DestinationPath ?? "(unknown)"}");
     }
 
     private async Task SaveWorkflowAsync()
@@ -1012,11 +1237,11 @@ public partial class MainViewModel : ViewModelBase
 
         if (preset is null)
         {
-            Debug.WriteLine($"Failed to find workflow preset with name '{name}'.");
+            _logger.LogWarning("Failed to find workflow preset with name '{Name}'", name);
             return;
         }
 
-        ApplyWorkflowConfig(preset.Config);
+        await ApplyWorkflowConfig(preset.Config);
 
         await ApplySourcePathCoreAsync(SourcePath);
     }
@@ -1025,7 +1250,7 @@ public partial class MainViewModel : ViewModelBase
     /// Applies a <see cref="WorkflowConfig"/> to the current session without
     /// triggering a directory scan — just restores source, filters, and pipeline.
     /// </summary>
-    private void ApplyWorkflowConfig(WorkflowConfig config)
+    private async Task ApplyWorkflowConfig(WorkflowConfig config)
     {
         DisposeDirectoryWatcher();
         DirectoryTree.Reset();
@@ -1049,7 +1274,8 @@ public partial class MainViewModel : ViewModelBase
             IsBuiltIn = false,
             Config = config.Pipeline,
         };
-        Pipeline.LoadPreset(pipelinePreset);
+
+        await Pipeline.LoadPreset(pipelinePreset);
     }
 
     /// <summary>
@@ -1073,7 +1299,7 @@ public partial class MainViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"Failed to save session snapshot: {ex}");
+            _logger.LogError(ex, "Failed to save session snapshot");
         }
     }
 
@@ -1151,11 +1377,8 @@ public partial class MainViewModel : ViewModelBase
 
     private void OnDirectoryWatcherError(object? sender, Exception error)
     {
-        Debug.WriteLine($"[Watcher] {error}");
-        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-            LogPanel.AddEntry(
-                $"Filesystem watcher warning: {error.Message}. Live updates may be incomplete; use Rescan to refresh.",
-                LogLevel.Warning));
+        _logger.LogWarning(error,
+            "Filesystem watcher warning: live updates may be incomplete; use Rescan to refresh.");
     }
 
     private void OnDirectoryWatcherNodeWillBeRemoved(object? sender, string[] relativeSegments)
@@ -1220,5 +1443,20 @@ public partial class MainViewModel : ViewModelBase
         if (OperatingSystem.IsLinux())   return new FreedesktopTrashService();
         if (OperatingSystem.IsMacOS())   return new MacOsTrashService();
         return new NullTrashService();
+    }
+
+#if DEBUG
+    private void SetupMemoryFileSystem()
+    {
+        // Create an in-memory virtual file system for testing.
+        long? capacity = LimitMemoryFileSystemCapacity ? 100_000_000_000 : null;
+        _memoryProvider = MockMemoryFileSystemFactory.CreateSeeded(artificialDelay: AddArtificialDelay, capacity: capacity);
+        _providerRegistry.Register(_memoryProvider);
+    }
+#endif
+
+    private sealed class SynchronousProgress<T>(Action<T> callback) : IProgress<T>
+    {
+        public void Report(T value) => callback(value);
     }
 }

@@ -5,11 +5,11 @@
              xmlns:filters="clr-namespace:SmartCopy.Core.Filters;assembly=SmartCopy.Core"
              x:Class="SmartCopy.UI.Views.FilterChainView"
              x:DataType="vm:FilterChainViewModel">
-    <Border Background="#252526" BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="6" Padding="10">
+    <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="10">
         <DockPanel>
             <!-- Header pinned to the top -->
             <Grid DockPanel.Dock="Top" ColumnDefinitions="*, Auto" Margin="0,0,0,8">
-                <TextBlock Grid.Column="0" Text="FILTERS" FontWeight="SemiBold" Foreground="#4facfe" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="0" Text="FILTERS" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
                 <ToggleButton Grid.Column="1" Content="👁"
                               ToolTip.Tip="Toggle visibility of excluded nodes in the tree"
                               AutomationProperties.Name="Toggle excluded nodes visibility"
@@ -72,7 +72,7 @@
                             <!-- Subtle selection highlight -->
                             <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
                                 <Setter Property="Background" Value="Transparent" />
-                                <Setter Property="BorderBrush" Value="#4facfe" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                                 <Setter Property="BorderThickness" Value="1" />
                             </Style>
                             <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
@@ -80,25 +80,31 @@
                             </Style>
                             <!-- Subtle focus ring on the card border -->
                             <Style Selector="ListBoxItem:focus-visible > Border">
-                                <Setter Property="BorderBrush" Value="#4facfe" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                             </Style>
                         </ListBox.Styles>
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="vm:FilterViewModel">
-                                <Border BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="4"
-                                        Margin="0,0,0,0" Background="#333333"
+                                <Border BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="4"
+                                        Margin="0,0,0,0" Background="{DynamicResource ItemBackgroundBrush}"
                                         Tag="{Binding}">
-                                    <Grid ColumnDefinitions="Auto, *, Auto" Margin="8,7">
+                                    <Grid ColumnDefinitions="Auto, Auto, *, Auto" Margin="8,7">
+
+                                        <!-- Far Left: drag handle -->
+                                        <TextBlock Grid.Column="0" x:Name="DragHandle"
+                                                   Text="≡" Foreground="Gray"
+                                                   VerticalAlignment="Center"
+                                                   Cursor="Hand" Margin="0,0,6,0" />
 
                                         <!-- Left: enabled checkbox -->
-                                        <CheckBox Grid.Column="0"
+                                        <CheckBox Grid.Column="1"
                                                   IsChecked="{Binding IsEnabled}"
                                                   AutomationProperties.Name="Enable filter"
                                                   VerticalAlignment="Center"
                                                   Margin="0,0,8,0" />
 
                                         <!-- Centre: summary + technical description -->
-                                        <StackPanel Grid.Column="1" Orientation="Vertical" Spacing="2"
+                                        <StackPanel Grid.Column="2" Orientation="Vertical" Spacing="2"
                                                     VerticalAlignment="Center">
                                             <TextBlock Text="{Binding Summary}"
                                                        FontWeight="Medium"
@@ -108,22 +114,17 @@
                                                        TextWrapping="Wrap" />
                                         </StackPanel>
 
-                                        <!-- Right: drag handle · edit · delete -->
-                                        <StackPanel Grid.Column="2" Orientation="Horizontal"
+                                        <!-- Right: edit · delete -->
+                                        <StackPanel Grid.Column="3" Orientation="Horizontal"
                                                     Spacing="2" VerticalAlignment="Center"
                                                     Margin="8,0,0,0">
-                                            <!-- Drag handle: PointerPressed handler set in code-behind -->
-                                            <TextBlock x:Name="DragHandle"
-                                                       Text="≡" Foreground="Gray"
-                                                       VerticalAlignment="Center"
-                                                       Cursor="Hand" Margin="0,0,4,0" />
                                             <Button Content="✎"
                                                     Width="26" Height="26" CornerRadius="4"
                                                     Padding="0"
                                                     HorizontalContentAlignment="Center"
                                                     VerticalContentAlignment="Center"
                                                     Background="Transparent"
-                                                    Foreground="#a0a0a0"
+                                                     Foreground="{DynamicResource MutedForegroundBrush}"
                                                     FontSize="13"
                                                     AutomationProperties.Name="Edit filter"
                                                     Command="{Binding $parent[UserControl].((vm:FilterChainViewModel)DataContext).RequestEditFilterCommand}"
@@ -149,13 +150,14 @@
                     <!-- Inline Add button — opens the flyout popup -->
                     <Panel>
                         <Button x:Name="AddFilterButton"
-                                BorderBrush="#3e3e42" BorderThickness="1"
+                                BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1"
                                 CornerRadius="4" Padding="8,7" Background="Transparent"
                                 Cursor="Hand" Opacity="0.55"
                                 HorizontalAlignment="Stretch"
+                                IsVisible="{Binding IsNotLocked}"
                                 AutomationProperties.Name="Add filter"
                                 Click="OnAddFilterButtonClick">
-                            <TextBlock Text="+ Add filter" Foreground="#4facfe"
+                            <TextBlock Text="+ Add filter" Foreground="{DynamicResource AccentBrush}"
                                        FontStyle="Italic" HorizontalAlignment="Center" />
                         </Button>
 

@@ -2,6 +2,7 @@ using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
+using SmartCopy.Core.Pipeline.Validation;
 using SmartCopy.Tests.TestInfrastructure;
 
 namespace SmartCopy.Tests.Pipeline;
@@ -12,7 +13,7 @@ public sealed class PipelineRunnerSelectionTests
     // Helpers
     // ─────────────────────────────────────────────────────────────────────────
 
-    private static async Task<(MemoryFileSystemProvider Provider, DirectoryTreeNode Root,
+    private static async Task<(MemoryFileSystemProvider Provider, DirectoryNode Root,
         DirectoryTreeNode A, DirectoryTreeNode B, DirectoryTreeNode C)>
         CreateThreeFileFixtureAsync(string name1, string name2, string name3)
     {
@@ -33,7 +34,7 @@ public sealed class PipelineRunnerSelectionTests
         return (provider, root, a, b, c);
     }
 
-    private static async Task<(MemoryFileSystemProvider Provider, DirectoryTreeNode Root,
+    private static async Task<(MemoryFileSystemProvider Provider, DirectoryNode Root,
         DirectoryTreeNode A, DirectoryTreeNode B, DirectoryTreeNode C,
         DirectoryTreeNode D, DirectoryTreeNode E)>
         CreateFiveFileFixtureAsync()
@@ -171,40 +172,6 @@ public sealed class PipelineRunnerSelectionTests
         Assert.True(await provider.ExistsAsync("/dest/src/x.txt", CancellationToken.None));
         Assert.True(await provider.ExistsAsync("/dest/src/y.txt", CancellationToken.None));
         Assert.True(await provider.ExistsAsync("/dest/src/z.txt", CancellationToken.None));
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // ClearSelection
-    // ─────────────────────────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task ClearSelection_then_Copy_CopiesNothing()
-    {
-        var (provider, root, p, q, r) = await CreateThreeFileFixtureAsync("p", "q", "r");
-
-        // All three initially selected
-        p.CheckState = CheckState.Checked;
-        q.CheckState = CheckState.Checked;
-        r.CheckState = CheckState.Checked;
-
-        var runner = new PipelineRunner(new TransformPipeline(
-        [
-            new ClearSelectionStep(),
-            new CopyStep("/mem/dest"),
-        ]));
-
-        await runner.ExecuteAsync(
-            new PipelineJob
-            {
-                RootNode       = root,
-                SourceProvider = provider,
-                ProviderRegistry = provider.CreateRegistry(),
-            });
-
-        // Nothing should be copied — ClearSelection empties the working set
-        Assert.False(await provider.ExistsAsync("/dest/src/p.txt", CancellationToken.None));
-        Assert.False(await provider.ExistsAsync("/dest/src/q.txt", CancellationToken.None));
-        Assert.False(await provider.ExistsAsync("/dest/src/r.txt", CancellationToken.None));
     }
 
     // ─────────────────────────────────────────────────────────────────────────

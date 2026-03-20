@@ -11,7 +11,7 @@ namespace SmartCopy.Core.Pipeline;
 /// </summary>
 public interface IStepContext
 {
-    DirectoryTreeNode RootNode { get; }
+    DirectoryNode RootNode { get; }
     IFileSystemProvider SourceProvider { get; }
     FileSystemProviderRegistry ProviderRegistry { get; }
     ITrashService TrashService { get; }

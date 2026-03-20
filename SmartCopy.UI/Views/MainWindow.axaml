@@ -7,39 +7,34 @@
         mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="860"
         x:Class="SmartCopy.UI.Views.MainWindow"
         x:DataType="vm:MainViewModel"
-        Title="SmartCopy 2026"
+        Title="SmartCopy 2[026]"
         WindowStartupLocation="CenterScreen"
         Width="1400" Height="860"
-        Background="#1e1e1e"
-        Foreground="#e0e0e0">
+        Background="{DynamicResource AppBackgroundBrush}"
+        Foreground="{DynamicResource DefaultForegroundBrush}"
+        Icon="avares://SmartCopy.UI/Assets/icon.png">
 
-    <Window.KeyBindings>
-        <KeyBinding Gesture="Ctrl+A"       Command="{Binding SelectAllCommand}"/>
-        <KeyBinding Gesture="Ctrl+Shift+A" Command="{Binding ClearSelectionCommand}"/>
-        <KeyBinding Gesture="Ctrl+I"       Command="{Binding InvertSelectionCommand}"/>
-        <KeyBinding Gesture="F5"           Command="{Binding RescanCommand}"/>
-        <KeyBinding Gesture="Escape"       Command="{Binding CancelOperationCommand}"/>
-    </Window.KeyBindings>
 
     <Grid RowDefinitions="Auto, Auto, *, Auto, Auto, Auto">
         <!-- Menu Bar -->
-        <Border Grid.Row="0" Background="#2d2d30" BorderBrush="#3e3e42" BorderThickness="0,0,0,1">
+        <Border Grid.Row="0" Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="0,0,0,1">
             <Menu>
                 <MenuItem Header="_File">
-                    <MenuItem Header="_Quit" />
+                    <MenuItem Header="_Quit" x:Name="QuitMenuItem" InputGesture="Ctrl+Q" />
                 </MenuItem>
                 <MenuItem Header="_Options" x:Name="OptionsMenu" />
                 <MenuItem Header="_Selection" x:Name="SelectionMenu" />
                 <MenuItem Header="_Workflows" x:Name="WorkflowsMenu" />
-                <MenuItem Header="_Help" />
+                <MenuItem Header="_Help" x:Name="HelpMenu">
+                    <MenuItem Header="_About SmartCopy 2[026]" x:Name="AboutMenuItem" /></MenuItem>
             </Menu>
         </Border>
 
         <!-- Source Field -->
-        <Border Grid.Row="1" Background="#252526" BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="6" Margin="10,10,10,5" Padding="10">
+        <Border Grid.Row="1" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="6" Margin="10,10,10,5" Padding="10">
             <Grid ColumnDefinitions="Auto, *" ColumnSpacing="4">
                 <TextBlock Grid.Column="0" Text="Source" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold"/>
-                <views:PathPickerControl Grid.Column="1" 
+                <views:PathPickerControl Grid.Column="1"
                                         DataContext="{Binding SourcePathPicker}"
                                         BrowseDialogTitle="Select Source Path"
                                         BrowseButtonToolTip="Set the source path for the workflow" />
@@ -54,28 +49,28 @@
             <GridSplitter Grid.Column="1" Width="5" Background="Transparent" ResizeDirection="Columns" Margin="4,0" />
 
             <!-- Folders (directory tree) column -->
-            <Border Grid.Column="2" Background="#252526" BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="6" Padding="5">
+            <Border Grid.Column="2" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="5">
                 <views:DirectoryTreeView DataContext="{Binding DirectoryTree}" />
             </Border>
 
             <GridSplitter Grid.Column="3" Width="5" Background="Transparent" ResizeDirection="Columns" Margin="4,0" />
 
             <!-- Files (file list) column -->
-            <Border Grid.Column="4" Background="#252526" BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="6" Padding="5">
+            <Border Grid.Column="4" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="5">
                 <views:FileListView DataContext="{Binding FileList}" />
             </Border>
         </Grid>
 
-        <!-- Pipeline Area -->
-        <views:PipelineView Grid.Row="3" DataContext="{Binding Pipeline}" Margin="10,5,10,10" />
-
-        <!-- Log Panel (Row 4) -->
-        <Border Grid.Row="4" Background="#1e1e1e" BorderBrush="#3e3e42" BorderThickness="0,1,0,0">
+        <!-- Log Panel -->
+        <Border Grid.Row="3" Background="{DynamicResource AppBackgroundBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="0,1,0,0">
             <views:LogPanelView DataContext="{Binding LogPanel}" />
         </Border>
 
+        <!-- Pipeline Area -->
+        <views:PipelineView Grid.Row="4" DataContext="{Binding Pipeline}" Margin="10,5,10,10" />
+
         <!-- Status Bar -->
-        <Border Grid.Row="5" Background="#007acc" BorderBrush="#3e3e42" BorderThickness="0,1,0,0" Padding="12,6">
+        <Border Grid.Row="5" Background="{DynamicResource StatusBarBackgroundBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="0,1,0,0" Padding="12,6">
             <views:StatusBarView DataContext="{Binding StatusBar}" Foreground="White" />
         </Border>
     </Grid>

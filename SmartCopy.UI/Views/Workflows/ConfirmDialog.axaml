@@ -10,7 +10,7 @@
         ExtendClientAreaToDecorationsHint="True"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
-        Background="#1e1e1e">
+        Background="{DynamicResource AppBackgroundBrush}">
     <StackPanel Spacing="12" Margin="20">
 
         <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
@@ -18,11 +18,11 @@
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
             <Button Content="{Binding CancelText}"
                     Command="{Binding CancelCommand}"
-                    Width="80"
+                    MinWidth="80"
                     IsCancel="True" />
             <Button Content="{Binding ConfirmText}"
                     Command="{Binding ConfirmCommand}"
-                    Width="80"
+                    MinWidth="80"
                     IsDefault="True" />
         </StackPanel>
 

@@ -22,14 +22,14 @@ public sealed class SelectionStepsTests
         private readonly Dictionary<DirectoryTreeNode, PipelineContext> _contexts = new();
         private readonly HashSet<DirectoryTreeNode> _failed = new();
 
-        public DirectoryTreeNode RootNode { get; }
+        public DirectoryNode RootNode { get; }
         public IFileSystemProvider SourceProvider { get; }
         public FileSystemProviderRegistry ProviderRegistry { get; } = new();
         public bool ShowHiddenFiles { get; }
         public bool AllowDeleteReadOnly { get; }
         public ITrashService TrashService { get; } = new NullTrashService();
 
-        public TestStepContext(DirectoryTreeNode root, IFileSystemProvider provider)
+        public TestStepContext(DirectoryNode root, IFileSystemProvider provider)
         {
             RootNode = root;
             SourceProvider = provider;
@@ -64,7 +64,7 @@ public sealed class SelectionStepsTests
     /// <summary>
     /// Builds a minimal tree rooted at /src with a single file.txt.
     /// </summary>
-    private static async Task<(DirectoryTreeNode Root, DirectoryTreeNode File, IFileSystemProvider Provider)>
+    private static async Task<(DirectoryNode Root, FileNode File, IFileSystemProvider Provider)>
         MakeTree(CheckState initialState = CheckState.Unchecked)
     {
         var provider = MemoryFileSystemFixtures.Create(f => f.WithFile("/src/file.txt", "content"u8));
@@ -76,7 +76,7 @@ public sealed class SelectionStepsTests
     }
 
     private static StepValidationContext MakeValidationContext(bool sourceExists = true) =>
-        new(hasSelectedIncludedInputs: true, sourceExists: sourceExists);
+        new(sourceExists: sourceExists, selectedFileCount: 1, numFilterIncludedFiles: 5);
 
     // -------------------------------------------------------------------------
     // SelectAllStep
@@ -115,12 +115,12 @@ public sealed class SelectionStepsTests
     }
 
     [Fact]
-    public void SelectAllStep_Validate_NoIssues()
+    public async Task SelectAllStep_Validate_NoIssues()
     {
         var step = new SelectAllStep();
         var context = MakeValidationContext();
 
-        step.Validate(context);
+        await step.Validate(context);
 
         Assert.Empty(context.Issues);
     }
@@ -162,12 +162,12 @@ public sealed class SelectionStepsTests
     }
 
     [Fact]
-    public void ClearSelectionStep_Validate_NoIssues()
+    public async Task ClearSelectionStep_Validate_NoIssues()
     {
         var step = new ClearSelectionStep();
         var context = MakeValidationContext();
 
-        step.Validate(context);
+        await step.Validate(context);
 
         Assert.Empty(context.Issues);
     }
@@ -219,12 +219,12 @@ public sealed class SelectionStepsTests
     }
 
     [Fact]
-    public void InvertSelectionStep_Validate_SetsSourceExistsTrue()
+    public async Task InvertSelectionStep_Validate_SetsSourceExistsTrue()
     {
         var step = new InvertSelectionStep();
         var validationContext = MakeValidationContext(sourceExists: false);
 
-        step.Validate(validationContext);
+        await step.Validate(validationContext);
 
         Assert.True(validationContext.SourceExists);
         Assert.Empty(validationContext.Issues);

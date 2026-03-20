@@ -16,6 +16,9 @@ public interface IPipelineStep
     /// <summary>Whether this step has any configurable parameters.</summary>
     bool IsConfigurable => true;
 
+    /// <summary>Whether the placed step card exposes an edit button.</summary>
+    bool IsEditable => IsConfigurable;
+
     /// <summary>A short summary of the actions this step will perform.</summary>
     string AutoSummary { get; }
 
@@ -32,5 +35,5 @@ public interface IPipelineStep
     IAsyncEnumerable<TransformResult> ApplyAsync(IStepContext context, CancellationToken ct);
 
     /// <summary>Validates whether this step is logically valid within the pipeline.</summary>
-    void Validate(StepValidationContext context);
+    Task Validate(StepValidationContext context, CancellationToken ct = default);
 }

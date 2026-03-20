@@ -1,11 +1,12 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
-public sealed class CopyStep : IPipelineStep, IHasDestinationPath
+public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpaceCheck
 {
     public StepKind StepType => StepKind.Copy;
     public bool IsExecutable => true;
@@ -17,6 +18,10 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath
     }
 
     public OverwriteMode OverwriteMode { get; set; }
+
+    internal static CopyStep FromConfig(TransformStepConfig config) =>
+        new(config.GetRequired("destinationPath"),
+            config.ParseEnum("overwriteMode", OverwriteMode.Skip));
 
     public TransformStepConfig Config => new(StepType, new JsonObject 
     { 
@@ -36,14 +41,35 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath
 
     public bool HasDestinationPath => !string.IsNullOrWhiteSpace(DestinationPath);
 
-    public void Validate(StepValidationContext context)
+    public FreeSpaceValidationResult? ValidateFreeSpace(
+        long bytesNeeded,
+        IFileSystemProvider source,
+        IPathResolver registry,
+        FreeSpaceCache freeSpaceCache)
     {
+        if (bytesNeeded <= 0) return null;
+        if (DestinationPath is null) return null;
+
+        var target = registry.ResolveProvider(DestinationPath);
+        if (target is null) return null;
+
+        var cachedFreeSpace = freeSpaceCache.GetForProvider(target);
+        if (cachedFreeSpace is null) return null;
+
+        return new FreeSpaceValidationResult(bytesNeeded, cachedFreeSpace.Value, target.RootPath);
+    }
+
+    public Task Validate(StepValidationContext context, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
         context.ValidateHasSelectedInputs();
         context.ValidateSourceExists("Copy");
         if (string.IsNullOrWhiteSpace(DestinationPath))
         {
             context.AddBlockingIssue("Step.MissingDestination", "Copy requires a destination path.");
         }
+        context.AddFreeSpaceWarning(this);
+        return Task.CompletedTask;
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(
@@ -59,7 +85,7 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath
             ct.ThrowIfCancellationRequested();
             if (context.IsNodeFailed(node)) continue;
 
-            if (node.IsDirectory)
+            if (node is DirectoryNode)
             {
                 yield return new TransformResult(
                     IsSuccess: true,
@@ -144,8 +170,27 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath
                 continue;
             }
 
-            await using var sourceStream = await context.SourceProvider.OpenReadAsync(node.FullPath, ct);
-            await targetProvider.WriteAsync(destination, sourceStream, progress: null, ct);
+            string? copyError = null;
+            try
+            {
+                await using var sourceStream = await context.SourceProvider.OpenReadAsync(node.FullPath, ct);
+                await targetProvider.WriteAsync(destination, sourceStream, progress: null, ct);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                copyError = ex.Message;
+            }
+
+            if (copyError is not null)
+            {
+                context.MarkFailed(node);
+                yield return new TransformResult(
+                    IsSuccess: false,
+                    SourceNode: node,
+                    SourceNodeResult: SourceResult.Skipped,
+                    ErrorMessage: copyError);
+                continue;
+            }
 
             yield return new TransformResult(
                 IsSuccess: true,

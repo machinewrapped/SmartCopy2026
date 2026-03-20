@@ -43,14 +43,14 @@ public sealed class MemoryFileSystemFixtureBuilder(string? customRootPath = null
 
 public static class MemoryFileSystemFixtures
 {
-    public static MemoryFileSystemProvider Create(Action<MemoryFileSystemFixtureBuilder> configure, string? customRootPath = null, string? volumeId = "MEM")
+    public static MemoryFileSystemProvider Create(Action<MemoryFileSystemFixtureBuilder> configure, string? customRootPath = null, string? volumeId = null)
     {
         var builder = new MemoryFileSystemFixtureBuilder(customRootPath, volumeId);
         configure(builder);
         return builder.Build();
     }
 
-    internal static async Task<DirectoryTreeNode> BuildDirectoryTree(Action<MemoryFileSystemFixtureBuilder> configure, string? customRootPath = null)
+    internal static async Task<DirectoryNode> BuildDirectoryTree(Action<MemoryFileSystemFixtureBuilder> configure, string? customRootPath = null)
     {
         var builder = new MemoryFileSystemFixtureBuilder(customRootPath);
         configure(builder);

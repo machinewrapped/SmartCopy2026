@@ -1,6 +1,3 @@
-using System;
-using System.Linq;
-
 namespace SmartCopy.Core.FileSystem;
 
 /// <summary>

@@ -3,9 +3,12 @@ using System.ComponentModel;
 using System.Text.Json;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.VisualTree;
+using SmartCopy.Core.Pipeline;
+using Microsoft.Extensions.Logging;
 using SmartCopy.UI.ViewModels;
 using SmartCopy.UI.ViewModels.Workflows;
-using SmartCopy.Core.Pipeline;
 
 namespace SmartCopy.UI.Views;
 
@@ -33,6 +36,7 @@ public partial class MainWindow : Window
 
     private MainViewModel? _mainVm;
     private WorkflowMenuViewModel? _workflowMenu;
+    private bool _confirmingClose = false;
 
     // Selection menu
     private MenuItem? _absolutePathsMenuItem;
@@ -40,6 +44,7 @@ public partial class MainWindow : Window
     // Options menu — Display
     private MenuItem? _autoOpenLogMenuItem;
     private MenuItem? _showExcludedNodesMenuItem;
+    private MenuItem? _verboseLoggingMenuItem;
 
     // Options menu — Startup
     private MenuItem? _restoreLastWorkflowMenuItem;
@@ -59,14 +64,27 @@ public partial class MainWindow : Window
     private MenuItem? _followSymlinksMenuItem;
     private MenuItem? _showHiddenFilesMenuItem;
 
+#if DEBUG
     // Options menu — Debug
+    private MenuItem? _enableMemoryFileSystemMenuItem;
     private MenuItem? _artificialDelayMenuItem;
+    private MenuItem? _limitMemoryFileSystemCapacityMenuItem;
+#endif
 
     public MainWindow()
     {
         InitializeComponent();
 
+        AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
         DataContextChanged += OnMainDataContextChanged;
+        AboutMenuItem.Click += async (_, _) => await ShowAboutDialogAsync();
+        QuitMenuItem.Click += (_, _) => Close();
+    }
+
+    private async Task ShowAboutDialogAsync()
+    {
+        var dialog = new AboutDialog { DataContext = new AboutDialogViewModel() };
+        await dialog.ShowDialog(this);
     }
 
     private void OnMainDataContextChanged(object? sender, EventArgs e)
@@ -90,7 +108,9 @@ public partial class MainWindow : Window
         }
 
         if (_mainVm is not null)
+        {
             _mainVm.PropertyChanged += OnMainViewModelPropertyChanged;
+        }
 
         RebuildWorkflowsMenu();
         BuildSelectionMenu();
@@ -144,11 +164,11 @@ public partial class MainWindow : Window
     {
         SelectionMenu.Items.Clear();
 
-        Add(item("Select _All",       new KeyGesture(Key.A, KeyModifiers.Control)),
+        Add(item("Select _All",       new KeyGesture(Key.A, KeyModifiers.Control | KeyModifiers.Shift)),
             () => _mainVm?.SelectAllCommand.Execute(null));
-        Add(item("_Invert Selection", new KeyGesture(Key.I, KeyModifiers.Control)),
+        Add(item("_Invert Selection", new KeyGesture(Key.I, KeyModifiers.Control | KeyModifiers.Shift)),
             () => _mainVm?.InvertSelectionCommand.Execute(null));
-        Add(item("_Clear Selection",  new KeyGesture(Key.A, KeyModifiers.Control | KeyModifiers.Shift)),
+        Add(item("_Clear Selection",  new KeyGesture(Key.C, KeyModifiers.Control | KeyModifiers.Shift)),
             () => _mainVm?.ClearSelectionCommand.Execute(null));
 
         SelectionMenu.Items.Add(new Separator());
@@ -229,6 +249,12 @@ public partial class MainWindow : Window
             () => { if (_mainVm is not null) _mainVm.AutoOpenLogOnRun = !_mainVm.AutoOpenLogOnRun; });
         OptionsMenu.Items.Add(_autoOpenLogMenuItem);
 
+        _verboseLoggingMenuItem = Toggle(
+            "_Verbose Logging (for bug reports)",
+            _mainVm?.VerboseLogging ?? false,
+            () => { if (_mainVm is not null) _mainVm.VerboseLogging = !_mainVm.VerboseLogging; });
+        OptionsMenu.Items.Add(_verboseLoggingMenuItem);
+
         // ── Section: Pipeline ──────────────────────────────────────────────────
         OptionsMenu.Items.Add(new Separator());
         OptionsMenu.Items.Add(SectionHeader("Pipeline"));
@@ -267,17 +293,11 @@ public partial class MainWindow : Window
         OptionsMenu.Items.Add(new Separator());
         OptionsMenu.Items.Add(SectionHeader("Scan"));
 
-        _fullPreScanMenuItem = Toggle(
-            "_Full Pre-Scan",
-            _mainVm?.FullPreScan ?? false,
-            () => { if (_mainVm is not null) _mainVm.FullPreScan = !_mainVm.FullPreScan; });
-        OptionsMenu.Items.Add(_fullPreScanMenuItem);
-
-        _lazyExpandScanMenuItem = Toggle(
-            "_Lazy Scan (scan on demand)",
-            _mainVm?.LazyExpandScan ?? false,
-            () => { if (_mainVm is not null) _mainVm.LazyExpandScan = !_mainVm.LazyExpandScan; });
-        OptionsMenu.Items.Add(_lazyExpandScanMenuItem);
+        _showHiddenFilesMenuItem = Toggle(
+            "Show _Hidden Files",
+            _mainVm?.ShowHiddenFiles ?? false,
+            () => { if (_mainVm is not null) _mainVm.ShowHiddenFiles = !_mainVm.ShowHiddenFiles; });
+        OptionsMenu.Items.Add(_showHiddenFilesMenuItem);
 
         _followSymlinksMenuItem = Toggle(
             "_Follow Symlinks",
@@ -285,23 +305,45 @@ public partial class MainWindow : Window
             () => { if (_mainVm is not null) _mainVm.FollowSymlinks = !_mainVm.FollowSymlinks; });
         OptionsMenu.Items.Add(_followSymlinksMenuItem);
 
-        _showHiddenFilesMenuItem = Toggle(
-            "Show _Hidden Files",
-            _mainVm?.ShowHiddenFiles ?? false,
-            () => { if (_mainVm is not null) _mainVm.ShowHiddenFiles = !_mainVm.ShowHiddenFiles; });
-        OptionsMenu.Items.Add(_showHiddenFilesMenuItem);
+        _lazyExpandScanMenuItem = Toggle(
+            "_Lazy Scan (scan on demand)",
+            _mainVm?.LazyExpandScan ?? false,
+            () => { if (_mainVm is not null) _mainVm.LazyExpandScan = !_mainVm.LazyExpandScan; });
+        OptionsMenu.Items.Add(_lazyExpandScanMenuItem);
 
+        _fullPreScanMenuItem = Toggle(
+            "_Immediate Full Scan",
+            _mainVm?.FullPreScan ?? false,
+            () => { if (_mainVm is not null) _mainVm.FullPreScan = !_mainVm.FullPreScan; });
+        OptionsMenu.Items.Add(_fullPreScanMenuItem);
+
+#if DEBUG
         // ── Section: Debug  ───────────────────────────────────────────────────
         OptionsMenu.Items.Add(new Separator());
         OptionsMenu.Items.Add(SectionHeader("Debug"));
 
-        _artificialDelayMenuItem = new MenuItem
-        {
-            Header = "Add Artificial Delays to Mock Provider",
-            ToggleType = MenuItemToggleType.CheckBox,
-            IsChecked = _mainVm?.AddArtificialDelay ?? false,
-        };
+        _enableMemoryFileSystemMenuItem = Toggle(
+            "Enable Memory File System",
+            _mainVm?.EnableMemoryFileSystem ?? false,
+            () => { if (_mainVm is not null) _mainVm.EnableMemoryFileSystem = !_mainVm.EnableMemoryFileSystem; });
+        OptionsMenu.Items.Add(_enableMemoryFileSystemMenuItem);
+
+        _artificialDelayMenuItem = Toggle(
+            "Add Artificial Delays to Mock Provider",
+            _mainVm?.AddArtificialDelay ?? false,
+            () => { if (_mainVm is not null) _mainVm.AddArtificialDelay = !_mainVm.AddArtificialDelay; },
+            isEnabled: _mainVm?.EnableMemoryFileSystem ?? false
+            );
         OptionsMenu.Items.Add(_artificialDelayMenuItem);
+
+        _limitMemoryFileSystemCapacityMenuItem = Toggle(
+            "Limit Memory Filesystem Capacity",
+            _mainVm?.LimitMemoryFileSystemCapacity ?? false,
+            () => { if (_mainVm is not null) _mainVm.LimitMemoryFileSystemCapacity = !_mainVm.LimitMemoryFileSystemCapacity; },
+            isEnabled: _mainVm?.EnableMemoryFileSystem ?? false
+            );
+        OptionsMenu.Items.Add(_limitMemoryFileSystemCapacityMenuItem);
+#endif
 
         return;
 
@@ -317,13 +359,14 @@ public partial class MainWindow : Window
             return header;
         }
 
-        static MenuItem Toggle(string header, bool isChecked, Action onClick)
+        static MenuItem Toggle(string header, bool isChecked, Action onClick, bool isEnabled = true)
         {
             var item = new MenuItem
             {
                 Header = header,
                 ToggleType = MenuItemToggleType.CheckBox,
                 IsChecked = isChecked,
+                IsEnabled = isEnabled,
             };
             item.Click += (_, _) => onClick();
             return item;
@@ -370,6 +413,11 @@ public partial class MainWindow : Window
             case nameof(MainViewModel.AutoOpenLogOnRun):
                 if (_autoOpenLogMenuItem is not null)
                     _autoOpenLogMenuItem.IsChecked = _mainVm?.AutoOpenLogOnRun ?? true;
+                break;
+
+            case nameof(MainViewModel.VerboseLogging):
+                if (_verboseLoggingMenuItem is not null)
+                    _verboseLoggingMenuItem.IsChecked = _mainVm?.VerboseLogging ?? false;
                 break;
 
             case nameof(MainViewModel.ShowExcludedNodesByDefault):
@@ -454,6 +502,85 @@ public partial class MainWindow : Window
                     }
                 }
                 break;
+
+#if DEBUG
+            case nameof(MainViewModel.EnableMemoryFileSystem):
+                if (_enableMemoryFileSystemMenuItem is not null)
+                    _enableMemoryFileSystemMenuItem.IsChecked = _mainVm?.EnableMemoryFileSystem ?? false;
+
+                if (_artificialDelayMenuItem is not null)
+                    _artificialDelayMenuItem.IsEnabled = _mainVm?.EnableMemoryFileSystem ?? false;
+
+                if (_limitMemoryFileSystemCapacityMenuItem is not null)
+                    _limitMemoryFileSystemCapacityMenuItem.IsEnabled = _mainVm?.EnableMemoryFileSystem ?? false;
+
+                break;
+
+            case nameof(MainViewModel.AddArtificialDelay):
+                if (_artificialDelayMenuItem is not null)
+                    _artificialDelayMenuItem.IsChecked = _mainVm?.AddArtificialDelay ?? false;
+
+                break;
+
+            case nameof(MainViewModel.LimitMemoryFileSystemCapacity):
+                if (_limitMemoryFileSystemCapacityMenuItem is not null)
+                    _limitMemoryFileSystemCapacityMenuItem.IsChecked = _mainVm?.LimitMemoryFileSystemCapacity ?? false;
+
+                break;
+#endif
+
+        }
+    }
+
+    // ── Keyboard ────────────────────────────────────────────────────────────────
+
+    private async void OnWindowKeyDown(object? sender, KeyEventArgs e)
+    {
+        // All window-level key bindings are handled here via tunnel routing so that
+        // child controls (e.g. the log panel) can intercept specific chords first.
+        var mods = e.KeyModifiers;
+        var key  = e.Key;
+
+        if (mods == (KeyModifiers.Control | KeyModifiers.Shift))
+        {
+            // Skip selection chords when the log panel has focus — user may not expect them to apply to the directory tree.
+            // Check ancestor chain rather than element type to avoid false-positives from other SelectableTextBlocks.
+            if (FocusManager?.GetFocusedElement() is Control focused && focused.FindAncestorOfType<LogPanelView>() is not null) return;
+
+            switch (key)
+            {
+                case Key.A:
+                    _mainVm?.SelectAllCommand.Execute(null);
+                    e.Handled = true;
+                    break;
+
+                case Key.C:
+                    _mainVm?.ClearSelectionCommand.Execute(null);
+                    e.Handled = true;
+                    break;
+
+                case Key.I:
+                    _mainVm?.InvertSelectionCommand.Execute(null);
+                    e.Handled = true;
+                    break;
+            }
+        }
+        else if (key == Key.F5 && mods == KeyModifiers.None)
+        {
+            _mainVm?.RescanCommand.Execute(null);            
+            e.Handled = true;
+        }
+        else if (key == Key.Escape && mods == KeyModifiers.None)
+        {
+            e.Handled = true;
+            try
+            {
+                await HandleCancelOperationAsync();
+            }
+            catch (Exception ex)
+            {
+                _mainVm?.Logger.LogError(ex, $"Cancel operation failed: {ex.Message}", LogLevel.Error);
+            }
         }
     }
 
@@ -541,6 +668,14 @@ public partial class MainWindow : Window
     protected override void OnClosing(WindowClosingEventArgs e)
     {
         base.OnClosing(e);
+
+        if (_mainVm?.Pipeline.IsRunning == true && !_confirmingClose)
+        {
+            e.Cancel = true;
+            _ = ConfirmQuitAsync();
+            return;
+        }
+
         // Best-effort session snapshot — allows RestoreLastWorkflow to capture
         // the exact state at exit, even if the user never explicitly saved.
         if (_mainVm?.RestoreLastWorkflow == true)
@@ -548,6 +683,57 @@ public partial class MainWindow : Window
             _ = _mainVm.SaveSessionSnapshotAsync();
         }
         TrySaveWindowState();
+    }
+
+    private async Task ConfirmQuitAsync()
+    {
+        var confirmVm = new ConfirmDialogViewModel
+        {
+            Title = "Pipeline Running",
+            Message = "A pipeline operation is currently executing. Quit anyway?",
+            ConfirmText = "Quit",
+            CancelText = "Stay",
+        };
+        var dialog = new SmartCopy.UI.Views.Workflows.ConfirmDialog { DataContext = confirmVm };
+        var confirmed = await dialog.ShowDialog<bool?>(this);
+        if (confirmed == true)
+        {
+            _confirmingClose = true;
+            Close();
+        }
+    }
+
+    private async Task<bool> ConfirmCancelOperationAsync()
+    {
+        var confirmVm = new ConfirmDialogViewModel
+        {
+            Title = "Cancel Operation",
+            Message = "The operation is paused. Cancel it?",
+            ConfirmText = "Cancel",
+            CancelText = "Keep Running",
+        };
+        var dialog = new SmartCopy.UI.Views.Workflows.ConfirmDialog { DataContext = confirmVm };
+        var confirmed = await dialog.ShowDialog<bool?>(this);
+        return confirmed == true;
+    }
+
+    private async Task HandleCancelOperationAsync()
+    {
+        if (_mainVm is null) return;
+
+        var progress = _mainVm.StatusBar.Progress;
+        if (!progress.IsActive)
+        {
+            _mainVm.CancelOperationCommand.Execute(null);
+            return;
+        }
+
+        progress.PauseCommand.Execute(null);
+        var confirmed = await ConfirmCancelOperationAsync();
+        if (confirmed)
+            _mainVm.CancelOperationCommand.Execute(null);
+        else
+            progress.ResumeCommand.Execute(null);
     }
 
     private void TrySaveWindowState()

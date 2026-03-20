@@ -2,12 +2,19 @@ namespace SmartCopy.Core.Pipeline.Validation;
 
 public sealed class PipelineValidator
 {
-    public static PipelineValidationResult Validate(
+    public static async Task<PipelineValidationResult> ValidateAsync(
         IReadOnlyList<IPipelineStep> steps,
-        PipelineValidationContext? context = null)
+        PipelineValidationContext context,
+        CancellationToken ct = default)
     {
-        context ??= new PipelineValidationContext();
-        var validationContext = new StepValidationContext(context.HasSelectedIncludedInputs);
+        var validationContext = new StepValidationContext(
+            selectedBytes:            context.SelectedBytes,
+            selectedFileCount:        context.SelectedFileCount,
+            numFilterIncludedFiles:   context.NumFilterIncludedFiles,
+            totalFilterIncludedBytes: context.TotalFilterIncludedBytes,
+            sourceProvider:           context.SourceProvider,
+            providerRegistry:         context.ProviderRegistry,
+            cachedFreeSpace:          context.CachedFreeSpace);
 
         if (steps.Count == 0)
         {
@@ -24,7 +31,8 @@ public sealed class PipelineValidator
         for (var i = 0; i < steps.Count; i++)
         {
             validationContext.StepIndex = i;
-            steps[i].Validate(validationContext);
+
+            await steps[i].Validate(validationContext, ct);
 
             if (validationContext.HasBlockingIssue)
             {

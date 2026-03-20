@@ -14,12 +14,14 @@ public sealed class SelectAllStep : IPipelineStep
     public string AutoSummary => StepType.ForDisplay();
     public string Description => "Mark all files as selected";
 
-    public void Validate(StepValidationContext context)
+    public Task Validate(StepValidationContext context, CancellationToken ct = default)
     {
         // No preconditions. Post-condition: reset SourceExists so downstream steps
         // are not blocked by a prior destructive step.
         context.SourceExists = true;
-        context.HasSelectedIncludedInputs = true;
+        context.SelectedFileCount = context.NumFilterIncludedFiles;
+        context.SelectedBytes = context.TotalFilterIncludedBytes;
+        return Task.CompletedTask;
     }
 
     public TransformStepConfig Config => new(StepType, new JsonObject());
@@ -31,13 +33,18 @@ public sealed class SelectAllStep : IPipelineStep
         foreach (var node in context.RootNode.GetFilterIncludedDescendants())
         {
             ct.ThrowIfCancellationRequested();
-            if (!node.IsDirectory)
-                context.GetNodeContext(node).VirtualCheckState = CheckState.Checked;
+            if (node is FileNode fileNode)
+            {
+                context.GetNodeContext(fileNode).VirtualCheckState = CheckState.Checked;
+            }
+
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: node,
                 SourceNodeResult: SourceResult.None);
         }
+
+        context.RootNode.BuildStats();
     }
 
     public async IAsyncEnumerable<TransformResult> ApplyAsync(
@@ -47,7 +54,7 @@ public sealed class SelectAllStep : IPipelineStep
         foreach (var node in context.RootNode.GetFilterIncludedDescendants())
         {
             ct.ThrowIfCancellationRequested();
-            if (!node.IsDirectory)
+            if (node is FileNode)
                 node.CheckState = CheckState.Checked;
             yield return new TransformResult(
                 IsSuccess: true,

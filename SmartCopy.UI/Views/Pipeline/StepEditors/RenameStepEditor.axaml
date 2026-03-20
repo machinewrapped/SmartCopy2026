@@ -9,10 +9,10 @@
                  Watermark="{}{name}_{ext}" />
 
         <StackPanel Orientation="Horizontal" Spacing="6">
-            <Border BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="10" Padding="6,2">
+            <Border BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="6,2">
                 <TextBlock Text="{}{name}" FontSize="11" />
             </Border>
-            <Border BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="10" Padding="6,2">
+            <Border BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="6,2">
                 <TextBlock Text="{}{ext}" FontSize="11" />
             </Border>
         </StackPanel>

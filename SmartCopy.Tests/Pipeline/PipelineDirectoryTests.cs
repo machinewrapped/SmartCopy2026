@@ -17,13 +17,14 @@ public sealed class PipelineDirectoryTests
     [Fact]
     public async Task FilterResult_Mixed_WhenSomeChildrenExcluded()
     {
-        DirectoryTreeNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
+        DirectoryNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
             .WithDirectory("/music")
             .WithSimulatedFile("/music/a.mp3", 100)
             .WithSimulatedFile("/music/b.txt", 50));
 
-        var dir = root.Children.Single(n => n.Name == "music");
-        await new FilterChain([new ExtensionFilter(["mp3"], FilterMode.Only)]).ApplyToTreeAsync(root);
+        var dir = root.Children.Single(n => n.Name == "music") as DirectoryNode;
+        Assert.NotNull(dir);
+        await new FilterChain([new ExtensionFilter(["mp3"], FilterMode.Only)]).ApplyToTreeAsync(root, new TestAppContext());
 
         Assert.Equal(FilterResult.Mixed, dir.FilterResult);
         Assert.True(dir.IsFilterIncluded);   // Mixed → visible in tree (not Excluded)
@@ -33,14 +34,15 @@ public sealed class PipelineDirectoryTests
     [Fact]
     public async Task FilterResult_Included_WhenAllChildrenIncluded()
     {
-        DirectoryTreeNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
+        DirectoryNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
             .WithDirectory("/music")
             .WithSimulatedFile("/music/a.mp3", 100)
             .WithSimulatedFile("/music/b.mp3", 200));
 
-        await new FilterChain([]).ApplyToTreeAsync(root); // empty chain → all Included
+        await new FilterChain([]).ApplyToTreeAsync(root, new TestAppContext()); // empty chain → all Included
 
-        var dir = root.Children.Single(n => n.Name == "music");
+        var dir = root.Children.Single(n => n.Name == "music") as DirectoryNode;
+        Assert.NotNull(dir);
         Assert.Equal(FilterResult.Included, dir.FilterResult);
         Assert.True(dir.IsFilterIncluded);
         Assert.True(dir.IsAtomicIncluded);
@@ -49,10 +51,11 @@ public sealed class PipelineDirectoryTests
     [Fact]
     public async Task IsSelected_TrueForDirectoryWhenFullyCovered()
     {
-        DirectoryTreeNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
+        DirectoryNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
             .WithDirectory("/music"));
 
-        var dir = root.Children.Single(n => n.Name == "music");
+        var dir = root.Children.Single(n => n.Name == "music") as DirectoryNode;
+        Assert.NotNull(dir);
         dir.FilterResult = FilterResult.Included;
         dir.CheckState = CheckState.Checked;
 
@@ -74,7 +77,10 @@ public sealed class PipelineDirectoryTests
 
         var root = await provider.BuildDirectoryTree();
 
-        var dirNode = root.Children.Single(n => n.Name == "src").Children.Single(n => n.Name == "music");
+        var src = root.Children.Single(n => n.Name == "src") as DirectoryNode;
+        Assert.NotNull(src);
+        var dirNode = src.Children.Single(n => n.Name == "music") as DirectoryNode;
+        Assert.NotNull(dirNode);
         dirNode.FilterResult = FilterResult.Included;
         dirNode.CheckState = CheckState.Checked;
 
@@ -141,7 +147,7 @@ public sealed class PipelineDirectoryTests
             .WithFile("/src/music/readme.txt", "notes"u8)
             .WithDirectory("/dest"));
 
-        DirectoryTreeNode root = await provider.BuildDirectoryTree();
+        DirectoryNode root = await provider.BuildDirectoryTree();
 
         var ct = CancellationToken.None;
         // Only the mp3 is selected — readme.txt is left unchecked (partial coverage).
@@ -182,7 +188,8 @@ public sealed class PipelineDirectoryTests
 
         // Build from /src/music so "rock" is a direct child of the scan root.
         var musicRoot = await provider.BuildDirectoryTree("/src/music");
-        var dirNode = musicRoot.Children.Single(n => n.Name == "rock");
+        var dirNode = musicRoot.Children.Single(n => n.Name == "rock") as DirectoryNode;
+        Assert.NotNull(dirNode);
         dirNode.FilterResult = FilterResult.Included;
         dirNode.CheckState = CheckState.Checked;
 
@@ -212,38 +219,35 @@ public sealed class PipelineDirectoryTests
     }
 
     [Fact]
-    public async Task Move_DirectoryNodeRespectsRebasedPath()
+    public async Task Copy_FileRespectsLeadingStrip()
     {
         var provider = MemoryFileSystemFixtures.Create(f => f
-            .WithSimulatedFile("/src/music/a.flac", 1000)
+            .WithSimulatedFile("/src/level1/a.flac", 1000)
+            .WithSimulatedFile("/src/level1/b.flac", 1000)  // keeps level1 Indeterminate when only a is selected
             .WithDirectory("/dest"));
 
-        // Build from /src so "music" is a direct child of the scan root.
-        var srcRoot = await provider.BuildDirectoryTree("/src");
-        var dirNode = srcRoot.Children.Single(n => n.Name == "music");
-        dirNode.FilterResult = FilterResult.Included;
-        dirNode.CheckState = CheckState.Checked;
+        // Scan from /src: segments are relative to /src, so a.flac = ["level1", "a.flac"].
+        var root = await provider.BuildDirectoryTree("/src");
+        var aNode = root.FindNodeByPathSegments(["level1", "a.flac"]);
+        Assert.NotNull(aNode);
+        aNode.FilterResult = FilterResult.Included;
+        aNode.CheckState = CheckState.Checked;
 
-        var ct = CancellationToken.None;
         var runner = new PipelineRunner(new TransformPipeline(
         [
-            new RebaseStep(stripPrefix: "src", addPrefix: "archive"),
-            new MoveStep("/mem/dest"),
+            new FlattenStep(trimMode: FlattenTrimMode.StripLeading, levels: 1),
+            new CopyStep("/mem/dest"),
         ]));
-        var results = await runner.ExecuteAsync(
+        await runner.ExecuteAsync(
             new PipelineJob
             {
-                RootNode       = srcRoot,
+                RootNode       = root,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
             });
 
-        var moveResult = results.Single(r => r.SourceNodeResult == SourceResult.Moved);
-        Assert.True(moveResult.IsSuccess);
-        // music at scan root → segments ["music"] → add "archive" → ["archive","music"] → /dest/archive/music
-        Assert.True(await provider.ExistsAsync("/dest/archive/music", ct));
-        Assert.True(await provider.ExistsAsync("/dest/archive/music/a.flac", ct));
-        Assert.False(await provider.ExistsAsync("/src/music", ct));
+        // segments ["level1", "a.flac"] → strip 1 leading → ["a.flac"] → /dest/a.flac
+        Assert.True(await provider.ExistsAsync("/dest/a.flac", CancellationToken.None));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -259,7 +263,7 @@ public sealed class PipelineDirectoryTests
             .WithDirectory("/dest"));
 
         var root = await provider.BuildDirectoryTree();
-        var parentDir = root.FindNodeByPathSegments(["src", "music"]);
+        var parentDir = root.FindNodeByPathSegments(["src", "music"]) as DirectoryNode;
         Assert.NotNull(parentDir);
         parentDir.FilterResult = FilterResult.Included;
         parentDir.CheckState = CheckState.Checked;
@@ -295,7 +299,8 @@ public sealed class PipelineDirectoryTests
 
         // Build from /src/music — music has rock (selected) and excluded.txt (not selected).
         var musicRoot = await provider.BuildDirectoryTree("/src/music");
-        var rockDir = musicRoot.Children.Single(n => n.Name == "rock");
+        var rockDir = musicRoot.Children.Single(n => n.Name == "rock") as DirectoryNode;
+        Assert.NotNull(rockDir);
         rockDir.FilterResult = FilterResult.Included;
         rockDir.CheckState = CheckState.Checked;
 
@@ -330,7 +335,7 @@ public sealed class PipelineDirectoryTests
                 .WithSimulatedFile("/dest/src/music/a.flac", 1000)); // a.flac already exists at dest
 
         var root = await provider.BuildDirectoryTree();
-        var dirNode = root.FindNodeByPathSegments(["src", "music"]);
+        var dirNode = root.FindNodeByPathSegments(["src", "music"]) as DirectoryNode;
         Assert.NotNull(dirNode);
         dirNode.FilterResult = FilterResult.Included;
         dirNode.CheckState = CheckState.Checked;
@@ -369,7 +374,7 @@ public sealed class PipelineDirectoryTests
             .WithDirectory("/dest"));
 
         var root = await provider.BuildDirectoryTree();
-        var dirNode = root.FindNodeByPathSegments(["src", "music"]);
+        var dirNode = root.FindNodeByPathSegments(["src", "music"]) as DirectoryNode;
         Assert.NotNull(dirNode);
         dirNode.FilterResult = FilterResult.Included;
         dirNode.CheckState = CheckState.Checked;

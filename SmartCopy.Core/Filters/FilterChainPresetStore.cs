@@ -1,13 +1,13 @@
-using System;
-using System.Diagnostics;
-using System.Linq;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using SmartCopy.Core.Logging;
 
 namespace SmartCopy.Core.Filters;
 
 public sealed class FilterChainPresetStore
 {
     private readonly string _directory;
+    private readonly ILogger<FilterChainPresetStore> _logger = AppLog.CreateLogger<FilterChainPresetStore>();
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         WriteIndented = true,
@@ -50,9 +50,9 @@ public sealed class FilterChainPresetStore
                     Config = config,
                 });
             }
-            catch (JsonException ex)            { Debug.WriteLine($"[FilterChainPresetStore] Skipping preset '{file}': {ex.Message}"); }
-            catch (IOException ex)              { Debug.WriteLine($"[FilterChainPresetStore] Skipping preset '{file}': {ex.Message}"); }
-            catch (UnauthorizedAccessException ex) { Debug.WriteLine($"[FilterChainPresetStore] Skipping preset '{file}': {ex.Message}"); }
+            catch (JsonException ex)               { _logger.LogError(ex, "Skipping preset '{File}'", file); }
+            catch (IOException ex)                 { _logger.LogError(ex, "Skipping preset '{File}'", file); }
+            catch (UnauthorizedAccessException ex) { _logger.LogError(ex, "Skipping preset '{File}'", file); }
         }
 
         return [.. presets.OrderBy(preset => preset.Name, StringComparer.OrdinalIgnoreCase)];
@@ -92,7 +92,7 @@ public sealed class FilterChainPresetStore
         var directory = _directory;
         if (!Directory.Exists(directory))
         {
-            Debug.WriteLine($"[FilterChainPresetStore] Cannot delete preset '{name}': directory not found at '{directory}'");
+            _logger.LogWarning("Cannot delete preset '{Name}': directory not found at '{Directory}'", name, directory);
             return Task.CompletedTask;
         }
 
@@ -103,7 +103,7 @@ public sealed class FilterChainPresetStore
         }
         else
         {
-            Debug.WriteLine($"[FilterChainPresetStore] Cannot delete preset '{name}': file not found at '{directPath}'");
+            _logger.LogWarning("Cannot delete preset '{Name}': file not found at '{Path}'", name, directPath);
         }
 
         return Task.CompletedTask;

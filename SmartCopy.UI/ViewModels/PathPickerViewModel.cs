@@ -104,7 +104,7 @@ public partial class PathPickerViewModel : ViewModelBase
         if (item is null) return;
 
         var normalizedPath = PathHelper.NormalizeUserPath(item.Path);
-        bool removed = false;
+        bool removed;
 
         if (item.IsBookmark)
         {

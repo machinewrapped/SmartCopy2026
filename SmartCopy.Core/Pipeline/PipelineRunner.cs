@@ -11,34 +11,49 @@ namespace SmartCopy.Core.Pipeline;
 public sealed class PipelineRunner
 {
     private readonly TransformPipeline _pipeline;
+
     // Tracks that PreviewAsync was called before ExecuteAsync on delete pipelines.
     private bool _previewCompleted;
+
+    private FreeSpaceCache _freeSpaceCache = new();
 
     public PipelineRunner(TransformPipeline pipeline)
     {
         _pipeline = pipeline;
-        _pipeline.Validate();
     }
 
     public async Task<OperationPlan> PreviewAsync(
         PipelineJob job,
         CancellationToken ct = default)
     {
-        _pipeline.Validate(new PipelineValidationContext(
-            job.RootNode.GetSelectedDescendants().Any()));
+        job.RootNode.BuildStats();
+
+        _freeSpaceCache = await FreeSpaceCache.BuildForPipelineAsync(_pipeline.Steps, job.ProviderRegistry, ct);
+
+        await _pipeline.ValidateAsync(new PipelineValidationContext(
+            job.SourceProvider,
+            job.ProviderRegistry,
+            _freeSpaceCache,
+            job.RootNode.TotalSelectedBytes,
+            job.RootNode.NumSelectedFiles,
+            job.RootNode.NumFilterIncludedFiles,
+            job.RootNode.TotalFilterIncludedBytes));
 
         var context = new StepContext(job);
         var actions = new List<PlannedAction>();
+        var warnings = new List<string>();
+        var errors = new List<string>();
 
         foreach (var step in _pipeline.Steps)
         {
             ct.ThrowIfCancellationRequested();
+            var stepActions = new List<PlannedAction>();
 
             await foreach (var result in step.PreviewAsync(context, ct))
             {
                 if (result.IsSuccess && result.SourceNodeResult != SourceResult.None)
                 {
-                    actions.Add(new PlannedAction(
+                    stepActions.Add(new PlannedAction(
                         SourcePath: result.SourceNode.CanonicalRelativePath,
                         SourceResult: result.SourceNodeResult,
                         DestinationPath: result.DestinationPath,
@@ -51,26 +66,39 @@ public sealed class PipelineRunner
                         NumberOfFoldersSkipped: result.NumberOfFoldersSkipped));
                 }
             }
+
+            if (step is IHasDestinationPath destination)
+            {
+                await _freeSpaceCache.CacheForDestinationAsync(
+                    destination, 
+                    job.ProviderRegistry, 
+                    ct);
+            }
+
+            if (step is IHasFreeSpaceCheck fsCheck)
+            {
+                long needed = stepActions.Sum(a => a.OutputBytes);
+                var fsResult = fsCheck.ValidateFreeSpace(needed, job.SourceProvider, job.ProviderRegistry, _freeSpaceCache);
+                if (fsResult != null)
+                {
+                    if (fsResult.IsViolation)
+                        warnings.Add(fsResult.LongMessage);
+
+                    // Update free space cache
+                    _freeSpaceCache.ReduceForPath(job.ProviderRegistry, fsResult.TargetRootPath, fsResult.NeededBytes);
+                }
+            }
+
+            actions.AddRange(stepActions);
         }
 
         _previewCompleted = true;
 
-        var warnings = new List<string>();
         foreach (var step in _pipeline.Steps)
         {
             if (step is DeleteStep ds && ds.Mode == DeleteMode.Trash && !job.SourceProvider.Capabilities.CanTrash)
             {
                 warnings.Add("Trash not available for this path — files will be permanently deleted");
-            }
-
-            if (step is MoveStep ms && ms.HasDestinationPath)
-            {
-                var targetProvider = job.ProviderRegistry.ResolveProvider(ms.DestinationPath!);
-                var sameVolume = job.SourceProvider.VolumeId is { } vid && targetProvider?.VolumeId == vid;
-                if (!sameVolume)
-                {
-                    warnings.Add("Destination is on another drive, atomic move is not possible");
-                }
             }
         }
 
@@ -79,15 +107,30 @@ public sealed class PipelineRunner
             Actions = actions,
             TotalInputBytes = actions.Sum(a => a.InputBytes),
             TotalEstimatedOutputBytes = actions.Sum(a => a.OutputBytes),
-            Warnings = warnings,
+            Warnings = warnings
         };
     }
 
-    public async Task<IReadOnlyList<TransformResult>> ExecuteAsync(PipelineJob job)
+    public async Task<IReadOnlyList<TransformResult>> ExecuteAsync(PipelineJob job, CancellationToken ct = default)
     {
-        _pipeline.Validate(new PipelineValidationContext(
-            job.RootNode.GetSelectedDescendants().Any()));
+        // Make sure selection stats are up to date
+        job.RootNode.BuildStats();
 
+        _freeSpaceCache = await FreeSpaceCache.BuildForPipelineAsync(_pipeline.Steps, job.ProviderRegistry, ct);
+
+        // Check that the pipeline is still valid
+        await _pipeline.ValidateAsync(new PipelineValidationContext(
+            job.SourceProvider,
+            job.ProviderRegistry,
+            _freeSpaceCache,
+            job.RootNode.TotalSelectedBytes,
+            job.RootNode.NumSelectedFiles,
+            job.RootNode.NumFilterIncludedFiles,
+            job.RootNode.TotalFilterIncludedBytes));
+
+        // TODO: if there is a free space issue, fire off a preview
+
+        // TODO: this does not respect the user setting
         if (_pipeline.HasDeleteStep && !_previewCompleted)
         {
             throw new InvalidOperationException(
@@ -98,14 +141,25 @@ public sealed class PipelineRunner
         var results = new List<TransformResult>();
 
         var stopwatch = Stopwatch.StartNew();
-        long totalBytes = GetAllSelectedBytes(job.RootNode);
-        int totalFiles = job.RootNode.CountSelectedFiles();
+        long totalBytes = 0;
+        int totalFiles = 0;
         long completedBytes = 0;
         int filesCompleted = 0;
+        int stepIndex = 0;
 
         foreach (var step in _pipeline.Steps)
         {
             job.CancellationToken.ThrowIfCancellationRequested();
+            job.StepStarted?.Invoke(stepIndex);
+
+            if (step.IsExecutable)
+            {
+                totalBytes = job.RootNode.TotalSelectedBytes;
+                totalFiles = job.RootNode.NumSelectedFiles;
+                completedBytes = 0;
+                filesCompleted = 0;
+                stopwatch.Restart();
+            }
 
             await foreach (var result in step.ApplyAsync(context, job.CancellationToken))
             {
@@ -137,19 +191,11 @@ public sealed class PipelineRunner
                         EstimatedRemaining: remaining));
                 }
             }
+
+            stepIndex++;
         }
 
         return results;
-    }
-
-    private static long GetAllSelectedBytes(DirectoryTreeNode node)
-    {
-        long total = 0;
-        foreach (var file in node.Files)
-            if (file.IsSelected) total += file.Size;
-        foreach (var child in node.Children)
-            total += GetAllSelectedBytes(child);
-        return total;
     }
 
     private static TimeSpan EstimateRemaining(TimeSpan elapsed, long completed, long total)
@@ -169,7 +215,7 @@ public sealed class PipelineRunner
         private readonly Dictionary<DirectoryTreeNode, PipelineContext> _contexts = new();
         private readonly HashSet<DirectoryTreeNode> _failedNodes = new();
 
-        public DirectoryTreeNode RootNode { get; }
+        public DirectoryNode RootNode { get; }
         public IFileSystemProvider SourceProvider { get; }
         public FileSystemProviderRegistry ProviderRegistry { get; }
         public bool ShowHiddenFiles { get; }

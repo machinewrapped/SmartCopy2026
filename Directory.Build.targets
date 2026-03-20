@@ -3,4 +3,12 @@
     <!-- Avalonia telemetry writes to %LocalAppData%; disable in sandboxed/dev environments where that can be blocked. -->
     <UsedAvaloniaProducts></UsedAvaloniaProducts>
   </PropertyGroup>
+
+  <!-- Asset Bundling: Copy README and LICENSE to PublishDir -->
+  <Target Name="BundleReleaseAssets" AfterTargets="Publish" Condition="'$(ProjectName)' == 'SmartCopy.App'">
+    <ItemGroup>
+      <ReleaseAssets Include="$(MSBuildThisFileDirectory)README.md;$(MSBuildThisFileDirectory)LICENSE" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ReleaseAssets)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

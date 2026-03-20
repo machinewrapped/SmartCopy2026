@@ -1,14 +1,14 @@
-using System;
-using System.Diagnostics;
-using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.Logging;
+using SmartCopy.Core.Logging;
 
 namespace SmartCopy.Core.Pipeline;
 
 public sealed class PipelinePresetStore
 {
     private readonly string _directory;
+    private readonly ILogger<PipelinePresetStore> _logger = AppLog.CreateLogger<PipelinePresetStore>();
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         WriteIndented = true,
@@ -51,9 +51,9 @@ public sealed class PipelinePresetStore
                     Config = config,
                 });
             }
-            catch (JsonException ex)            { Debug.WriteLine($"[PipelinePresetStore] Skipping preset '{file}': {ex.Message}"); }
-            catch (IOException ex)              { Debug.WriteLine($"[PipelinePresetStore] Skipping preset '{file}': {ex.Message}"); }
-            catch (UnauthorizedAccessException ex) { Debug.WriteLine($"[PipelinePresetStore] Skipping preset '{file}': {ex.Message}"); }
+            catch (JsonException ex)               { _logger.LogError(ex, "Skipping preset '{File}'", file); }
+            catch (IOException ex)                 { _logger.LogError(ex, "Skipping preset '{File}'", file); }
+            catch (UnauthorizedAccessException ex) { _logger.LogError(ex, "Skipping preset '{File}'", file); }
         }
 
         return [.. presets.OrderBy(preset => preset.Name, StringComparer.OrdinalIgnoreCase)];

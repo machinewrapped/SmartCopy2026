@@ -14,19 +14,29 @@ public sealed class DeleteStep : IPipelineStep
 
     public DeleteMode Mode { get; set; }
 
+    internal static DeleteStep FromConfig(TransformStepConfig config) =>
+        new(config.ParseEnum("deleteMode", DeleteMode.Trash));
+
     public StepKind StepType => StepKind.Delete;
     public bool IsExecutable => true;
+    public bool IsConfigurable => false;
+    public bool IsEditable => true;
 
     public string AutoSummary => Mode == DeleteMode.Permanent ? "Delete" : "Trash";
     public string Description => Mode == DeleteMode.Permanent ? "Delete permanently" : "Delete to Trash";
 
     public TransformStepConfig Config => new(StepType, new JsonObject { ["deleteMode"] = Mode.ToString() });
 
-    public void Validate(StepValidationContext context)
+    public Task Validate(StepValidationContext context, CancellationToken ct = default)
     {
         context.ValidateHasSelectedInputs();
         context.ValidateSourceExists("Delete");
-        context.SourceExists = false;
+        context.NumFilterIncludedFiles   -= context.SelectedFileCount;
+        context.TotalFilterIncludedBytes -= context.SelectedBytes;
+        context.SelectedFileCount         = 0;
+        context.SelectedBytes             = 0;
+        context.SourceExists              = false;
+        return Task.CompletedTask;
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(
@@ -86,21 +96,38 @@ public sealed class DeleteStep : IPipelineStep
                     IsSuccess: false,
                     SourceNode: context.RootNode,
                     SourceNodeResult: SourceResult.Skipped,
-                    NumberOfFilesSkipped: context.RootNode.CountAllFiles(),
-                    NumberOfFoldersSkipped: context.RootNode.CountAllFolders(),
+                    NumberOfFilesSkipped: PipelineHelpers.GetTotalFileCount(context.RootNode),
+                    NumberOfFoldersSkipped: PipelineHelpers.GetTotalFolderCount(context.RootNode),
                     InputBytes: context.RootNode.Size);
                 yield break;
             }
 
-            var actualResult = await DeleteNodeAsync(context.RootNode.FullPath, useTrash, context, ct);
-            yield return new TransformResult(
-                IsSuccess: true,
-                SourceNode: context.RootNode,
-                SourceNodeResult: actualResult,
-                NumberOfFilesAffected: context.RootNode.CountAllFiles(),
-                NumberOfFoldersAffected: context.RootNode.CountAllFolders(),
-                InputBytes: context.RootNode.Size);
-            yield break;
+            SourceResult? rootActualResult = null;
+            bool rootDeleted = false;
+            try
+            {
+                rootActualResult = await DeleteNodeAsync(context.RootNode.FullPath, useTrash, context, ct);
+                rootDeleted = true;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Atomic delete failed; fall back to per-node deletion below.
+                context.MarkFailed(context.RootNode);
+                _ = ex;
+            }
+
+            if (rootDeleted)
+            {
+                yield return new TransformResult(
+                    IsSuccess: true,
+                    SourceNode: context.RootNode,
+                    SourceNodeResult: rootActualResult!.Value,
+                    NumberOfFilesAffected: PipelineHelpers.GetTotalFileCount(context.RootNode),
+                    NumberOfFoldersAffected: PipelineHelpers.GetTotalFolderCount(context.RootNode),
+                    InputBytes: context.RootNode.Size);
+                yield break;
+            }
+            // Atomic delete failed — fall through to per-node loop below.
         }
 
         foreach (var node in context.RootNode.GetSelectedDescendants())
@@ -108,7 +135,8 @@ public sealed class DeleteStep : IPipelineStep
             ct.ThrowIfCancellationRequested();
             if (context.IsNodeFailed(node)) continue;
             // Skip nodes whose parent is also selected — the parent delete covers them.
-            if (node.Parent?.IsSelected == true) continue;
+            // Exception: if the parent's atomic delete already failed, process children individually.
+            if (node.Parent?.IsSelected == true && !context.IsNodeFailed(node.Parent)) continue;
 
             if (!context.AllowDeleteReadOnly && (node.Attributes & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
             {
@@ -117,20 +145,45 @@ public sealed class DeleteStep : IPipelineStep
                     IsSuccess: false,
                     SourceNode: node,
                     SourceNodeResult: SourceResult.Skipped,
-                    NumberOfFilesSkipped: node.CountAllFiles(),
-                    NumberOfFoldersSkipped: node.CountAllFolders(),
+                    NumberOfFilesSkipped: PipelineHelpers.GetTotalFileCount(node),
+                    NumberOfFoldersSkipped: PipelineHelpers.GetTotalFolderCount(node),
                     InputBytes: node.Size);
                 continue;
             }
 
-            var actualResult = await DeleteNodeAsync(node.FullPath, useTrash, context, ct);
-            yield return new TransformResult(
-                IsSuccess: true,
-                SourceNode: node,
-                SourceNodeResult: actualResult,
-                NumberOfFilesAffected: node.CountAllFiles(),
-                NumberOfFoldersAffected: node.CountAllFolders(),
-                InputBytes: node.Size);
+            SourceResult? actualResult = null;
+            string? deleteError = null;
+            try
+            {
+                actualResult = await DeleteNodeAsync(node.FullPath, useTrash, context, ct);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                deleteError = ex.Message;
+            }
+
+            if (deleteError is not null)
+            {
+                context.MarkFailed(node);
+                yield return new TransformResult(
+                    IsSuccess: false,
+                    SourceNode: node,
+                    SourceNodeResult: SourceResult.Skipped,
+                    NumberOfFilesSkipped: PipelineHelpers.GetTotalFileCount(node),
+                    NumberOfFoldersSkipped: PipelineHelpers.GetTotalFolderCount(node),
+                    InputBytes: node.Size,
+                    ErrorMessage: deleteError);
+            }
+            else
+            {
+                yield return new TransformResult(
+                    IsSuccess: true,
+                    SourceNode: node,
+                    SourceNodeResult: actualResult!.Value,
+                    NumberOfFilesAffected: PipelineHelpers.GetTotalFileCount(node),
+                    NumberOfFoldersAffected: PipelineHelpers.GetTotalFolderCount(node),
+                    InputBytes: node.Size);
+            }
         }
     }
 
@@ -154,10 +207,10 @@ public sealed class DeleteStep : IPipelineStep
             IsSuccess: isSuccess,
             SourceNode: node,
             SourceNodeResult: pathResult,
-            NumberOfFilesAffected: (node.IsDirectory || isSkipped) ? 0 : 1,
-            NumberOfFoldersAffected: (!node.IsDirectory || isSkipped) ? 0 : 1,
+            NumberOfFilesAffected: (node is DirectoryNode || isSkipped) ? 0 : 1,
+            NumberOfFoldersAffected: (node is not DirectoryNode || isSkipped) ? 0 : 1,
             InputBytes: node.Size,
-            NumberOfFilesSkipped: (node.IsDirectory || !isSkipped) ? 0 : 1,
-            NumberOfFoldersSkipped: (!node.IsDirectory || !isSkipped) ? 0 : 1);
+            NumberOfFilesSkipped: (node is DirectoryNode || !isSkipped) ? 0 : 1,
+            NumberOfFoldersSkipped: (node is not DirectoryNode || !isSkipped) ? 0 : 1);
     }
 }

@@ -43,9 +43,10 @@ public sealed class DirectoryScannerTests
         Assert.True(jazzIndex < deepChildIndex, "Expected top-level nodes before deep descendants.");
 
         // File/directory separation: files land in Files, not Children.
-        var song = results.Single(n => n.Name == "song.mp3");
+        var song = results.Single(n => n.Name == "song.mp3") as FileNode;
+        Assert.NotNull(song);
         Assert.Contains(song, song.Parent!.Files);
-        Assert.DoesNotContain(song, song.Parent!.Children);
+        Assert.DoesNotContain(song, song.Parent!.Children.Cast<DirectoryTreeNode>());
     }
 
     [Fact]

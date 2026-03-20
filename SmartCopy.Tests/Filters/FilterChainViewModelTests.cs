@@ -112,4 +112,63 @@ public sealed class FilterChainViewModelTests
         Assert.Same(filterC, vm.Filters[1].BackingFilter);
         Assert.Same(filterA, vm.Filters[2].BackingFilter);
     }
+
+    // ── Locking ───────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void IsLocked_BlocksRemoveFilter()
+    {
+        var vm = new FilterChainViewModel(new TestAppContext());
+        vm.AddFilterFromResult(MakeExtensionFilter());
+        vm.IsLocked = true;
+
+        Assert.False(vm.RemoveFilterCommand.CanExecute(vm.Filters[0]));
+    }
+
+    [Fact]
+    public void IsLocked_BlocksRequestEditFilter()
+    {
+        var vm = new FilterChainViewModel(new TestAppContext());
+        vm.AddFilterFromResult(MakeExtensionFilter());
+        vm.IsLocked = true;
+
+        Assert.False(vm.RequestEditFilterCommand.CanExecute(vm.Filters[0]));
+    }
+
+    [Fact]
+    public void IsLocked_BlocksLoadChainPreset()
+    {
+        var vm = new FilterChainViewModel(new TestAppContext());
+        vm.IsLocked = true;
+
+        Assert.False(vm.LoadChainPresetCommand.CanExecute("any-preset"));
+    }
+
+    [Fact]
+    public void IsLocked_BlocksMoveFilter()
+    {
+        var vm = new FilterChainViewModel(new TestAppContext());
+        vm.AddFilterFromResult(MakeExtensionFilter("mp3"));
+        vm.AddFilterFromResult(MakeExtensionFilter("flac"));
+        var first = vm.Filters[0].BackingFilter;
+        vm.IsLocked = true;
+
+        vm.MoveFilter(0, 1);
+
+        Assert.Same(first, vm.Filters[0].BackingFilter);
+    }
+
+    [Fact]
+    public void IsNotLocked_UnblocksFilterCommands()
+    {
+        var vm = new FilterChainViewModel(new TestAppContext());
+        vm.AddFilterFromResult(MakeExtensionFilter());
+        vm.IsLocked = true;
+
+        vm.IsLocked = false;
+
+        Assert.True(vm.RemoveFilterCommand.CanExecute(vm.Filters[0]));
+        Assert.True(vm.RequestEditFilterCommand.CanExecute(vm.Filters[0]));
+        Assert.True(vm.LoadChainPresetCommand.CanExecute("any"));
+    }
 }

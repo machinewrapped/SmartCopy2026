@@ -30,7 +30,7 @@ public sealed class DeleteStepTrashTests
         private readonly Dictionary<DirectoryTreeNode, PipelineContext> _contexts = new();
         private readonly HashSet<DirectoryTreeNode> _failed = new();
 
-        public DirectoryTreeNode RootNode { get; }
+        public DirectoryNode RootNode { get; }
         public IFileSystemProvider SourceProvider { get; }
         public FileSystemProviderRegistry ProviderRegistry { get; }
         public bool ShowHiddenFiles { get; }
@@ -38,7 +38,7 @@ public sealed class DeleteStepTrashTests
         public ITrashService TrashService { get; }
 
         public TestStepContext(
-            DirectoryTreeNode root,
+            DirectoryNode root,
             IFileSystemProvider provider,
             ITrashService trashService)
         {
@@ -81,7 +81,7 @@ public sealed class DeleteStepTrashTests
             MaxPathLength: int.MaxValue,
             CanTrash: canTrash));
 
-    private static async Task<(DirectoryTreeNode Root, DirectoryTreeNode File, MemoryFileSystemProvider Provider)>
+    private static async Task<(DirectoryNode Root, FileNode File, MemoryFileSystemProvider Provider)>
         MakeTree()
     {
         // Two files so that selecting one does not make root.IsSelected=true.
@@ -110,7 +110,7 @@ public sealed class DeleteStepTrashTests
         var context = new TestStepContext(root, provider, trashSpy);
 
         var step = new DeleteStep(DeleteMode.Trash);
-        var results = await step.ApplyAsync(context, CancellationToken.None).ToListAsync();
+        var results = await step.ApplyAsync(context, CancellationToken.None).ToListAsync(CancellationToken.None);
 
         Assert.Single(results);
         Assert.True(results[0].IsSuccess);
@@ -130,7 +130,7 @@ public sealed class DeleteStepTrashTests
         var context = new TestStepContext(root, provider, trashSpy);
 
         var step = new DeleteStep(DeleteMode.Trash);
-        var results = await step.ApplyAsync(context, CancellationToken.None).ToListAsync();
+        var results = await step.ApplyAsync(context, CancellationToken.None).ToListAsync(CancellationToken.None);
 
         Assert.Single(results);
         Assert.True(results[0].IsSuccess);
@@ -150,7 +150,7 @@ public sealed class DeleteStepTrashTests
         var context = new TestStepContext(root, provider, trashSpy);
 
         var step = new DeleteStep(DeleteMode.Trash);
-        var results = await step.ApplyAsync(context, CancellationToken.None).ToListAsync();
+        var results = await step.ApplyAsync(context, CancellationToken.None).ToListAsync(CancellationToken.None);
 
         Assert.Single(results);
         Assert.True(results[0].IsSuccess);
@@ -170,7 +170,7 @@ public sealed class DeleteStepTrashTests
         var context = new TestStepContext(root, provider, trashSpy);
 
         var step = new DeleteStep(DeleteMode.Permanent);
-        var results = await step.ApplyAsync(context, CancellationToken.None).ToListAsync();
+        var results = await step.ApplyAsync(context, CancellationToken.None).ToListAsync(CancellationToken.None);
 
         Assert.Single(results);
         Assert.True(results[0].IsSuccess);
@@ -189,7 +189,7 @@ public sealed class DeleteStepTrashTests
         var context = new TestStepContext(root, provider, new NullTrashService());
 
         var step = new DeleteStep(DeleteMode.Trash);
-        var results = await step.PreviewAsync(context, CancellationToken.None).ToListAsync();
+        var results = await step.PreviewAsync(context, CancellationToken.None).ToListAsync(CancellationToken.None);
 
         Assert.Single(results);
         Assert.Equal(SourceResult.Trashed, results[0].SourceNodeResult);
@@ -206,20 +206,9 @@ public sealed class DeleteStepTrashTests
         var context = new TestStepContext(root, provider, new NullTrashService());
 
         var step = new DeleteStep(DeleteMode.Trash);
-        var results = await step.PreviewAsync(context, CancellationToken.None).ToListAsync();
+        var results = await step.PreviewAsync(context, CancellationToken.None).ToListAsync(CancellationToken.None);
 
         Assert.Single(results);
         Assert.Equal(SourceResult.Deleted, results[0].SourceNodeResult);
-    }
-}
-
-internal static class AsyncEnumerableExtensions
-{
-    public static async Task<List<T>> ToListAsync<T>(this IAsyncEnumerable<T> source)
-    {
-        var list = new List<T>();
-        await foreach (var item in source)
-            list.Add(item);
-        return list;
     }
 }

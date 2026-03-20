@@ -16,12 +16,15 @@ public sealed class InvertSelectionStep : IPipelineStep
 
     public TransformStepConfig Config => new(StepType, new JsonObject());
 
-    public void Validate(StepValidationContext context)
+    public Task Validate(StepValidationContext context, CancellationToken ct = default)
     {
         // No preconditions. Post-condition: reset SourceExists so downstream steps
         // are not blocked by a prior destructive step.
         context.SourceExists = true;
-        context.HasSelectedIncludedInputs = true;
+        var invertedCount = context.NumFilterIncludedFiles - context.SelectedFileCount;
+        context.SelectedBytes     = context.TotalFilterIncludedBytes - context.SelectedBytes;
+        context.SelectedFileCount = invertedCount;
+        return Task.CompletedTask;
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(
@@ -31,9 +34,9 @@ public sealed class InvertSelectionStep : IPipelineStep
         foreach (var node in context.RootNode.GetFilterIncludedDescendants())
         {
             ct.ThrowIfCancellationRequested();
-            if (!node.IsDirectory)
+            if (node is FileNode fileNode)
             {
-                var nodeCtx = context.GetNodeContext(node);
+                var nodeCtx = context.GetNodeContext(fileNode);
                 nodeCtx.VirtualCheckState = nodeCtx.VirtualCheckState == CheckState.Checked
                     ? CheckState.Unchecked
                     : CheckState.Checked;
@@ -52,7 +55,7 @@ public sealed class InvertSelectionStep : IPipelineStep
         foreach (var node in context.RootNode.GetFilterIncludedDescendants())
         {
             ct.ThrowIfCancellationRequested();
-            if (!node.IsDirectory)
+            if (node is FileNode)
                 node.CheckState = node.CheckState == CheckState.Checked
                     ? CheckState.Unchecked
                     : CheckState.Checked;
@@ -61,5 +64,7 @@ public sealed class InvertSelectionStep : IPipelineStep
                 SourceNode: node,
                 SourceNodeResult: SourceResult.None);
         }
-    }
+ 
+        context.RootNode.BuildStats();
+   }
 }

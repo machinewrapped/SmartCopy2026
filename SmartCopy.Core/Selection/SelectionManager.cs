@@ -4,10 +4,10 @@ namespace SmartCopy.Core.Selection;
 
 public sealed class SelectionManager
 {
-    public SelectionSnapshot Capture(IEnumerable<DirectoryTreeNode> roots, bool useAbsolutePaths = false)
+    public SelectionSnapshot Capture(DirectoryNode root, bool useAbsolutePaths = false)
     {
         var selected = new List<string>();
-        foreach (var node in Traverse(roots))
+        foreach (var node in Traverse(root))
         {
             if (node.IsSelected)
                 selected.Add(useAbsolutePaths ? node.FullPath : node.CanonicalRelativePath);
@@ -16,10 +16,10 @@ public sealed class SelectionManager
         return new SelectionSnapshot(selected);
     }
 
-    public SelectionRestoreResult Restore(IEnumerable<DirectoryTreeNode> roots, SelectionSnapshot snapshot)
+    public SelectionRestoreResult Restore(DirectoryNode root, SelectionSnapshot snapshot)
     {
         var matchedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var node in Traverse(roots))
+        foreach (var node in Traverse(root))
         {
             // Accept snapshots saved with either relative or absolute paths.
             // Track matched keys using whichever form the snapshot contains so that
@@ -44,30 +44,33 @@ public sealed class SelectionManager
         return new SelectionRestoreResult(matchedKeys.Count, unmatched);
     }
 
-    public void SelectAll(IEnumerable<DirectoryTreeNode> roots)
+    public void SelectAll(DirectoryNode root)
     {
-        foreach (var n in Traverse(roots))
-            n.CheckState = CheckState.Checked;
+        foreach (var n in Traverse(root))
+            if (n is FileNode fileNode)
+                fileNode.CheckState = CheckState.Checked;
     }
 
-    public void ClearAll(IEnumerable<DirectoryTreeNode> roots)
+    public void ClearAll(DirectoryNode root)
     {
-        foreach (var n in Traverse(roots))
-            n.CheckState = CheckState.Unchecked;
+        foreach (var n in Traverse(root))
+            if (n is FileNode fileNode)
+                fileNode.CheckState = CheckState.Unchecked;
     }
 
-    public void InvertAll(IEnumerable<DirectoryTreeNode> roots)
+    public void InvertAll(DirectoryNode root)
     {
-        // Only invert leaf nodes (no children, no files of their own) to avoid
-        // cascade-down overwriting individual file states when a parent is processed.
-        foreach (var n in Traverse(roots))
-            if (n.Children.Count == 0 && n.Files.Count == 0)
-                n.CheckState = n.CheckState == CheckState.Checked ? CheckState.Unchecked : CheckState.Checked;
+        // Only invert file nodes — directories derive their state from children.
+        foreach (var n in Traverse(root))
+            if (n is FileNode fileNode)
+                fileNode.CheckState = fileNode.CheckState == CheckState.Checked
+                    ? CheckState.Unchecked
+                    : CheckState.Checked;
     }
 
-    private static IEnumerable<DirectoryTreeNode> Traverse(IEnumerable<DirectoryTreeNode> roots)
+    private static IEnumerable<DirectoryTreeNode> Traverse(DirectoryNode root)
     {
-        var stack = new Stack<DirectoryTreeNode>(roots);
+        var stack = new Stack<DirectoryNode>([root]);
         while (stack.Count > 0)
         {
             var node = stack.Pop();

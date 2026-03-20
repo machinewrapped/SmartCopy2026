@@ -14,7 +14,7 @@ namespace SmartCopy.Core.Pipeline;
 public sealed record PipelineJob
 {
     /// <summary>The root of the directory tree to process. Steps traverse it themselves.</summary>
-    public required DirectoryTreeNode RootNode { get; init; }
+    public required DirectoryNode RootNode { get; init; }
 
     /// <summary>Provider used to read source files.</summary>
     public required IFileSystemProvider SourceProvider { get; init; }
@@ -36,6 +36,9 @@ public sealed record PipelineJob
 
     /// <summary>Progress reporter for individual node transformations.</summary>
     public IProgress<TransformResult>? NodeProgress { get; init; }
+
+    /// <summary>Callback invoked at the start of each pipeline step with the zero-based index of the step.</summary>
+    public Action<int>? StepStarted { get; init; }
 
     /// <summary>Token for pausing/resuming the pipeline.</summary>
     public PauseTokenSource? PauseToken { get; init; }

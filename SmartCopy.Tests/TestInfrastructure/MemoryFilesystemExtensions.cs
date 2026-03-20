@@ -12,37 +12,42 @@ internal static class MemoryFilesystemExtensions
         return registry;
     }
 
-    internal static async Task<DirectoryTreeNode> BuildDirectoryTree(this MemoryFileSystemProvider provider, string? path = null)
+    internal static async Task<DirectoryNode> BuildDirectoryTree(this MemoryFileSystemProvider provider, string? path = null)
     {
         path ??= provider.RootPath;
 
         FileSystemNode rootNode = await provider.GetNodeAsync(path, CancellationToken.None)
             ?? throw new InvalidOperationException($"Root path '{path}' does not exist in the file system fixture.");
 
-        return await BuildDirectoryTreeNode(provider, rootNode, parent: null);
+        if (!rootNode.IsDirectory)
+            throw new ArgumentException($"Path '{path}' is not a directory.");
+
+        return (DirectoryNode)await BuildDirectoryTreeNode(provider, rootNode, parent: null);
     }
 
-    private static async Task<DirectoryTreeNode> BuildDirectoryTreeNode(MemoryFileSystemProvider provider, FileSystemNode entry, DirectoryTreeNode? parent)
+    private static async Task<DirectoryTreeNode> BuildDirectoryTreeNode(MemoryFileSystemProvider provider, FileSystemNode entry, DirectoryNode? parent)
     {
-        var node = new DirectoryTreeNode(entry, parent);
-
-        if (!entry.IsDirectory)
-            return node;
-
-        var children = await provider.GetChildrenAsync(entry.FullPath, CancellationToken.None);
-        foreach (var child in children)
+        if (entry.IsDirectory)
         {
-            var childNode = await BuildDirectoryTreeNode(provider, child, parent: node);
-            if (child.IsDirectory)
+            var dirNode = new DirectoryNode(entry, parent);
+            var children = await provider.GetChildrenAsync(entry.FullPath, CancellationToken.None);
+            foreach (var child in children)
             {
-                node.Children.Add(childNode);
+                var childNode = await BuildDirectoryTreeNode(provider, child, parent: dirNode);
+                if (childNode is DirectoryNode subDir)
+                {
+                    dirNode.Children.Add(subDir);
+                }
+                else if (childNode is FileNode file)
+                {
+                    dirNode.Files.Add(file);
+                }
             }
-            else
-            {
-                node.Files.Add(childNode);
-            }
+            return dirNode;
         }
-
-        return node;
+        else
+        {
+            return new FileNode(entry, parent);
+        }
     }
 }

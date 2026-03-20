@@ -5,7 +5,7 @@
              xmlns:corePipeline="clr-namespace:SmartCopy.Core.Pipeline;assembly=SmartCopy.Core"
              x:Class="SmartCopy.UI.Views.PipelineView"
              x:DataType="vm:PipelineViewModel">
-    <Border Background="#252526" BorderBrush="#3e3e42" BorderThickness="1" CornerRadius="6" Padding="10">
+    <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="10">
         <DockPanel>
 
             <StackPanel DockPanel.Dock="Right"
@@ -18,7 +18,7 @@
                         Command="{Binding RunPipelineCommand}"
                         ToolTip.Tip="{Binding BlockingValidationMessage}"
                         AutomationProperties.Name="Run pipeline"
-                        Background="#4caf50" Foreground="White" FontWeight="Bold"
+                        Background="{DynamicResource RunButtonBackgroundBrush}" Foreground="White" FontWeight="Bold"
                         CornerRadius="4"
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Center" />
@@ -85,11 +85,11 @@
                         Margin="0,0,0,8">
                 <TextBlock Text="PIPELINE"
                            FontWeight="SemiBold"
-                           Foreground="#4facfe"
+                           Foreground="{DynamicResource AccentBrush}"
                            VerticalAlignment="Center" />
                 <TextBlock Text="{Binding BlockingValidationMessage}"
                            IsVisible="{Binding BlockingValidationMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                           Foreground="#f0ad4e"
+                           Foreground="{DynamicResource WarningForegroundBrush}"
                            FontSize="11"
                            Opacity="0.85"
                            VerticalAlignment="Center" />
@@ -99,7 +99,8 @@
                           HorizontalScrollBarVisibility="Auto"
                           VerticalScrollBarVisibility="Disabled">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="0">
-                    <ListBox ItemsSource="{Binding Steps}"
+                    <ListBox x:Name="StepsItemsControl"
+                             ItemsSource="{Binding Steps}"
                              SelectedItem="{Binding SelectedStep, Mode=TwoWay}"
                              Background="Transparent" BorderThickness="0"
                              KeyDown="OnStepListKeyDown">
@@ -113,7 +114,14 @@
                             </Style>
                             <!-- Focus ring on the step card border -->
                             <Style Selector="ListBoxItem:focus-visible > StackPanel > Border">
-                                <Setter Property="BorderBrush" Value="#4facfe" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            </Style>
+                            <!-- Active step highlight: shown while this step is executing -->
+                            <Style Selector="Border.activeStep">
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                <Setter Property="BorderThickness" Value="2" />
+                                <Setter Property="Background" Value="{DynamicResource AccentActiveBrush}" />
+                                <Setter Property="BoxShadow" Value="0 0 10 2 #4facfe" />
                             </Style>
                         </ListBox.Styles>
                         <ListBox.ItemsPanel>
@@ -123,26 +131,40 @@
                         </ListBox.ItemsPanel>
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="vm:PipelineStepViewModel">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Border BorderBrush="#3e3e42" BorderThickness="1"
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                            ContextRequested="OnStepContextRequested">
+                                    <StackPanel.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Swap destination with source path"
+                                                      Click="OnSwapWithSourceClick" />
+                                        </ContextMenu>
+                                    </StackPanel.ContextMenu>
+                                    <Border BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1"
                                             CornerRadius="4" Padding="10,6"
-                                            Background="#333333"
-                                            MinWidth="140">
+                                            Background="{DynamicResource ItemBackgroundBrush}"
+                                            MinWidth="140"
+                                            Classes.activeStep="{Binding IsActiveStep}">
                                         <Grid RowDefinitions="Auto, Auto, Auto">
-                                            <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto, Auto">
+                                            <Grid Grid.Row="0" ColumnDefinitions="Auto, Auto, *, Auto, Auto">
+                                                <!-- Drag handle -->
                                                 <TextBlock Grid.Column="0"
+                                                           x:Name="DragHandle"
+                                                           Text="≡" Foreground="Gray"
+                                                           VerticalAlignment="Center"
+                                                           Cursor="Hand" Margin="0,0,6,0" />
+                                                <TextBlock Grid.Column="1"
                                                            Text="{Binding Icon}"
                                                            FontSize="13"
                                                            VerticalAlignment="Center"
                                                            Margin="0,0,6,0" />
-                                                <TextBlock Grid.Column="1"
+                                                <TextBlock Grid.Column="2"
                                                            Text="{Binding Label}"
                                                            FontWeight="Medium"
                                                            TextWrapping="Wrap"
                                                            VerticalAlignment="Center" />
-                                                <Button Grid.Column="2"
+                                                <Button Grid.Column="3"
                                                         Content="✎"
-                                                        IsVisible="{Binding IsConfigurable}"
+                                                        IsVisible="{Binding IsEditable}"
                                                         Command="{Binding $parent[UserControl].((vm:PipelineViewModel)DataContext).RequestEditStepCommand}"
                                                         CommandParameter="{Binding}"
                                                         AutomationProperties.Name="Edit step"
@@ -155,7 +177,7 @@
                                                         FontSize="10"
                                                         VerticalAlignment="Top"
                                                         Margin="6,0,0,0" />
-                                                <Button Grid.Column="3"
+                                                <Button Grid.Column="4"
                                                         Content="✕"
                                                         Command="{Binding $parent[UserControl].((vm:PipelineViewModel)DataContext).RemoveStepCommand}"
                                                         CommandParameter="{Binding}"
@@ -182,18 +204,25 @@
 
                                             <StackPanel Grid.Row="2" Spacing="4" Margin="0,4,0,0">
                                                 <Border IsVisible="{Binding ShowDeleteBadge}"
-                                                        Background="#3b3b3b"
+                                                        Background="{DynamicResource ItemElevatedBackgroundBrush}"
                                                         CornerRadius="3"
                                                         Padding="4,2">
                                                     <TextBlock Text="{Binding DeleteBadge}"
-                                                               Foreground="#f0ad4e"
+                                                               Foreground="{DynamicResource WarningForegroundBrush}"
                                                                FontSize="10" />
                                                 </Border>
 
                                                 <TextBlock IsVisible="{Binding HasValidationError}"
                                                            Text="{Binding ValidationMessage}"
-                                                           Foreground="#f0ad4e"
+                                                           Foreground="{DynamicResource WarningForegroundBrush}"
                                                            FontSize="10"
+                                                           TextWrapping="Wrap" />
+
+                                                <TextBlock IsVisible="{Binding HasValidationWarning}"
+                                                           Text="{Binding ValidationMessage}"
+                                                           Foreground="{DynamicResource WarningForegroundBrush}"
+                                                           FontSize="10"
+                                                           Opacity="0.75"
                                                            TextWrapping="Wrap" />
                                             </StackPanel>
                                         </Grid>
@@ -213,15 +242,16 @@
 
                     <Panel>
                         <Button x:Name="AddStepButton"
-                                BorderBrush="#3e3e42" BorderThickness="1"
+                                BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1"
                                 CornerRadius="4" Padding="10,6"
                                 Background="Transparent"
                                 Cursor="Hand" Opacity="0.55"
                                 VerticalAlignment="Center"
+                                IsVisible="{Binding IsNotRunning}"
                                 AutomationProperties.Name="Add step"
                                 Click="OnAddStepButtonClick">
                             <TextBlock Text="+ Add step"
-                                       Foreground="#4facfe"
+                                       Foreground="{DynamicResource AccentBrush}"
                                        FontStyle="Italic" />
                         </Button>
 

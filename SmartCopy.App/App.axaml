@@ -8,14 +8,95 @@
     <Application.Styles>
         <FluentTheme />
         <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+        <Style Selector="Button">
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
     </Application.Styles>
 
     <Application.Resources>
         <ResourceDictionary>
             <converters:EnumToDisplayNameConverter x:Key="EnumToDisplayNameConverter" />
-            
-            <!-- Semantic token for destructive / delete actions -->
-            <SolidColorBrush x:Key="DangerForegroundBrush" Color="#f44736" />
+
+            <!-- ═══════════════════════════════════════════════════════════
+                 SURFACE / BACKGROUND TOKENS
+                 Dark-mode layer hierarchy (darkest → lightest):
+                   AppBackgroundBrush → SurfaceBrush → ItemBackgroundBrush
+            ════════════════════════════════════════════════════════════ -->
+            <!-- Main window background, dialog chrome, log panel -->
+            <SolidColorBrush x:Key="AppBackgroundBrush"             Color="#1e1e1e" />
+            <!-- Cards, panels, directory/file list panes -->
+            <SolidColorBrush x:Key="SurfaceBrush"                   Color="#252526" />
+            <!-- Menu bar, slightly elevated shell surfaces -->
+            <SolidColorBrush x:Key="SurfaceElevatedBrush"           Color="#2d2d30" />
+            <!-- Pipeline step cards, filter item cards -->
+            <SolidColorBrush x:Key="ItemBackgroundBrush"            Color="#333333" />
+            <!-- Badge / sub-item backgrounds inside cards -->
+            <SolidColorBrush x:Key="ItemElevatedBackgroundBrush"    Color="#3b3b3b" />
+
+            <!-- ═══════════════════════════════════════════════════════════
+                 BORDER TOKENS
+            ════════════════════════════════════════════════════════════ -->
+            <!-- Standard panel / card borders and separator lines -->
+            <SolidColorBrush x:Key="PanelBorderBrush"               Color="#3e3e42" />
+            <!-- Flyout / popup outer border (slightly lighter) -->
+            <SolidColorBrush x:Key="PopupBorderBrush"               Color="#555555" />
+
+            <!-- ═══════════════════════════════════════════════════════════
+                 ACCENT TOKENS
+            ════════════════════════════════════════════════════════════ -->
+            <!-- Section headers (FILTERS, PIPELINE), active borders, "add" links -->
+            <SolidColorBrush x:Key="AccentBrush"                    Color="#4facfe" />
+            <!-- Color resource used where a Color (not Brush) is needed, e.g. BoxShadow -->
+            <Color           x:Key="AccentColor"                    >#4facfe</Color>
+            <!-- Active/executing step card background tint -->
+            <SolidColorBrush x:Key="AccentActiveBrush"              Color="#1a2a3a" />
+
+            <!-- ═══════════════════════════════════════════════════════════
+                 FOREGROUND / TEXT TOKENS
+            ════════════════════════════════════════════════════════════ -->
+            <!-- Secondary, muted UI text and icon buttons (✕, ≡) -->
+            <SolidColorBrush x:Key="MutedForegroundBrush"           Color="#a0a0a0" />
+            <!-- Default body text on dark backgrounds -->
+            <SolidColorBrush x:Key="DefaultForegroundBrush"         Color="#e0e0e0" />
+            <!-- Bookmark star icon (gold) in path picker dropdown -->
+            <SolidColorBrush x:Key="BookmarkStarBrush"              Color="#EED202" />
+            <!-- Validation error messages below the path input -->
+            <SolidColorBrush x:Key="ValidationErrorForegroundBrush" Color="#f48771" />
+
+            <!-- ═══════════════════════════════════════════════════════════
+                 SEMANTIC STATUS TOKENS
+            ════════════════════════════════════════════════════════════ -->
+            <!-- Validation errors, delete badge text, step warnings -->
+            <SolidColorBrush x:Key="WarningForegroundBrush"         Color="#f0ad4e" />
+            <!-- Softer capability / informational warnings -->
+            <SolidColorBrush x:Key="WarningYellowForegroundBrush"   Color="#f0d060" />
+            <!-- Warning banner (yellow-tinted dark background) -->
+            <SolidColorBrush x:Key="WarningBannerBackgroundBrush"   Color="#2d2d1b" />
+            <!-- Danger / delete confirmation banner background -->
+            <SolidColorBrush x:Key="DangerBannerBackgroundBrush"    Color="#3a2f1b" />
+            <!-- Destructive action buttons and icons (✕ delete) -->
+            <SolidColorBrush x:Key="DangerForegroundBrush"          Color="#f44736" />
+            <!-- "Cancel scan" and similar in-progress abort buttons -->
+            <SolidColorBrush x:Key="CancelButtonBackgroundBrush"    Color="#c0392b" />
+
+            <!-- ═══════════════════════════════════════════════════════════
+                 LOG PANEL TEXT TOKENS
+            ════════════════════════════════════════════════════════════ -->
+            <!-- Timestamp column in log entries -->
+            <SolidColorBrush x:Key="LogTimestampBrush"               Color="#888888" />
+            <!-- Warning log entries and ⚠ badge -->
+            <SolidColorBrush x:Key="LogWarningBrush"                 Color="#ffa500" />
+            <!-- Error log entries and ✕ badge -->
+            <SolidColorBrush x:Key="LogErrorBrush"                   Color="#fa8072" />
+
+            <!-- ═══════════════════════════════════════════════════════════
+                 ACTION BUTTON TOKENS
+            ════════════════════════════════════════════════════════════ -->
+            <!-- "Run" pipeline button -->
+            <SolidColorBrush x:Key="RunButtonBackgroundBrush"       Color="#4caf50" />
+            <!-- Status bar VS-Code blue -->
+            <SolidColorBrush x:Key="StatusBarBackgroundBrush"       Color="#007acc" />
         </ResourceDictionary>
     </Application.Resources>
 

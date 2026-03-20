@@ -7,7 +7,7 @@
              x:DataType="vmPipeline:AddStepViewModel"
              Width="300"
              Focusable="True">
-    <Border Background="#1e1e1e" BorderBrush="#555" BorderThickness="1"
+    <Border Background="{DynamicResource AppBackgroundBrush}" BorderBrush="{DynamicResource PopupBorderBrush}" BorderThickness="1"
             CornerRadius="6" Padding="4">
         <Panel>
             <!-- Level 1: Category selection -->
@@ -16,7 +16,7 @@
                     <TextBlock Grid.Column="0"
                                Text="Add Step"
                                FontWeight="SemiBold"
-                               Foreground="#4facfe"
+                               Foreground="{DynamicResource AccentBrush}"
                                VerticalAlignment="Center"
                                Margin="0,2,0,2" />
                     <Button Grid.Column="1"
@@ -26,9 +26,9 @@
                             Padding="6,2"
                             CornerRadius="4"
                             FontSize="12"
-                            Foreground="#a0a0a0" />
+                            Foreground="{DynamicResource MutedForegroundBrush}" />
                 </Grid>
-                <Separator Height="1" Background="#3e3e42" Margin="4,0" />
+                <Separator Height="1" Background="{DynamicResource PanelBorderBrush}" Margin="4,0" />
 
                 <Button Content="Path steps"
                         Background="Transparent"
@@ -48,7 +48,7 @@
                         Command="{Binding NavigateToCategoryCommand}"
                         CommandParameter="{x:Static vm:StepCategory.Selection}" />
 
-                <Separator Height="1" Background="#3e3e42" Margin="4,4" />
+                <Separator Height="1" Background="{DynamicResource PanelBorderBrush}" Margin="4,4" />
 
                 <Button Background="Transparent"
                         HorizontalAlignment="Stretch"
@@ -63,7 +63,7 @@
                     </StackPanel>
                 </Button>
 
-                <Separator Height="1" Background="#3e3e42" Margin="4,4" />
+                <Separator Height="1" Background="{DynamicResource PanelBorderBrush}" Margin="4,4" />
 
                 <Button Background="Transparent"
                         HorizontalAlignment="Stretch"
@@ -113,9 +113,9 @@
                             Padding="6,2"
                             CornerRadius="4"
                             FontSize="12"
-                            Foreground="#a0a0a0" />
+                            Foreground="{DynamicResource MutedForegroundBrush}" />
                 </Grid>
-                <Separator Height="1" Background="#3e3e42" Margin="4,0" />
+                <Separator Height="1" Background="{DynamicResource PanelBorderBrush}" Margin="4,0" />
 
                 <ItemsControl ItemsSource="{Binding StepTypeItems}">
                     <ItemsControl.ItemTemplate>
@@ -158,20 +158,22 @@
                             Padding="6,2"
                             CornerRadius="4"
                             FontSize="12"
-                            Foreground="#a0a0a0" />
+                            Foreground="{DynamicResource MutedForegroundBrush}" />
                 </Grid>
-                <Separator Height="1" Background="#3e3e42" Margin="4,0" />
+                <Separator Height="1" Background="{DynamicResource PanelBorderBrush}" Margin="4,0" />
 
-                <!-- ＋ Configure... -->
-                <Button Background="Transparent"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Left"
-                        Padding="8,6"
-                        CornerRadius="4"
-                        Command="{Binding RequestNewStepCommand}">
-                    <TextBlock Text="＋ Configure..." Foreground="#4facfe" />
-                </Button>
-                <Separator Height="1" Background="#3e3e42" Margin="4,0" />
+                <!-- ＋ Configure... (hidden when the step type covers all options via presets) -->
+                <StackPanel IsVisible="{Binding SelectedStepIsConfigurable}">
+                    <Button Background="Transparent"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left"
+                            Padding="8,6"
+                            CornerRadius="4"
+                            Command="{Binding RequestNewStepCommand}">
+                        <TextBlock Text="＋ Configure..." Foreground="{DynamicResource AccentBrush}" />
+                    </Button>
+                    <Separator Height="1" Background="{DynamicResource PanelBorderBrush}" Margin="4,0" />
+                </StackPanel>
 
                 <!-- Recently used section -->
                 <StackPanel IsVisible="{Binding HasRecentPresets}">
@@ -195,7 +197,7 @@
                                             HorizontalContentAlignment="Center"
                                             VerticalContentAlignment="Center"
                                             CornerRadius="4" Background="Transparent"
-                                            Foreground="#f44736" FontSize="12"
+                                            Foreground="{DynamicResource DangerForegroundBrush}" FontSize="12"
                                             VerticalAlignment="Center"
                                             ToolTip.Tip="Delete preset"
                                             Click="OnDeletePresetClick" />
@@ -203,7 +205,7 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <Separator Height="1" Background="#3e3e42" Margin="4,0" />
+                    <Separator Height="1" Background="{DynamicResource PanelBorderBrush}" Margin="4,0" />
                 </StackPanel>
 
                 <!-- All presets (non-recent) -->
@@ -227,7 +229,7 @@
                                             HorizontalContentAlignment="Center"
                                             VerticalContentAlignment="Center"
                                             CornerRadius="4" Background="Transparent"
-                                            Foreground="#f44736" FontSize="12"
+                                            Foreground="{DynamicResource DangerForegroundBrush}" FontSize="12"
                                             VerticalAlignment="Center"
                                             ToolTip.Tip="Delete preset"
                                             Click="OnDeletePresetClick" />

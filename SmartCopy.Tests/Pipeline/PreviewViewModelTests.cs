@@ -336,4 +336,68 @@ public sealed class PreviewViewModelTests
         var copyGroup = vm.Groups.Single(g => g.Title.StartsWith("Will copy"));
         Assert.Equal(3, copyGroup.Count);
     }
+
+    // ─── BeginPreparation / IsPreparingPlan ──────────────────────────────────
+
+    [Fact]
+    public void IsPreparingPlan_FalseByDefault()
+    {
+        var vm = new PreviewViewModel();
+        Assert.False(vm.IsPreparingPlan);
+    }
+
+    [Fact]
+    public void BeginPreparation_SetsIsPreparingPlanTrue()
+    {
+        var vm = new PreviewViewModel();
+        vm.BeginPreparation();
+        Assert.True(vm.IsPreparingPlan);
+    }
+
+    [Fact]
+    public void BeginPreparation_ClearsExistingGroups()
+    {
+        var vm = new PreviewViewModel();
+        vm.LoadFrom(MakePlan(
+            MakeAction(SourceResult.Copied, DestinationResult.Created)));
+        Assert.NotEmpty(vm.Groups);
+
+        vm.BeginPreparation();
+
+        Assert.Empty(vm.Groups);
+    }
+
+    [Fact]
+    public void BeginPreparation_ResetsSummaryCounters()
+    {
+        var vm = new PreviewViewModel();
+        vm.LoadFrom(MakePlan(
+            MakeAction(SourceResult.Copied, DestinationResult.Created, files: 5)));
+
+        vm.BeginPreparation();
+
+        Assert.Equal(0, vm.TotalActionCount);
+        Assert.Equal(0, vm.TotalFilesAffected);
+        Assert.Equal(0, vm.TotalEstimatedInputBytes);
+    }
+
+    [Fact]
+    public void LoadFrom_ClearsIsPreparingPlan()
+    {
+        var vm = new PreviewViewModel();
+        vm.BeginPreparation();
+        Assert.True(vm.IsPreparingPlan);
+
+        vm.LoadFrom(MakePlan(MakeAction(SourceResult.Copied, DestinationResult.Created)));
+
+        Assert.False(vm.IsPreparingPlan);
+    }
+
+    [Fact]
+    public void BeginPreparation_SetsPreparationMessage()
+    {
+        var vm = new PreviewViewModel();
+        vm.BeginPreparation();
+        Assert.False(string.IsNullOrWhiteSpace(vm.PreparationMessage));
+    }
 }

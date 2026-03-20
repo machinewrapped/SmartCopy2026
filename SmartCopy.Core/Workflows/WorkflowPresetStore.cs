@@ -1,13 +1,13 @@
-using System;
-using System.Diagnostics;
-using System.Linq;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using SmartCopy.Core.Logging;
 
 namespace SmartCopy.Core.Workflows;
 
 public sealed class WorkflowPresetStore
 {
     private readonly string _directory;
+    private readonly ILogger<WorkflowPresetStore> _logger = AppLog.CreateLogger<WorkflowPresetStore>();
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         WriteIndented = true,
@@ -49,9 +49,9 @@ public sealed class WorkflowPresetStore
                     Config = config,
                 });
             }
-            catch (JsonException ex)                 { Debug.WriteLine($"[WorkflowPresetStore] Skipping preset '{file}': {ex.Message}"); }
-            catch (IOException ex)                   { Debug.WriteLine($"[WorkflowPresetStore] Skipping preset '{file}': {ex.Message}"); }
-            catch (UnauthorizedAccessException ex)   { Debug.WriteLine($"[WorkflowPresetStore] Skipping preset '{file}': {ex.Message}"); }
+            catch (JsonException ex)                 { _logger.LogError(ex, "Skipping preset '{File}'", file); }
+            catch (IOException ex)                   { _logger.LogError(ex, "Skipping preset '{File}'", file); }
+            catch (UnauthorizedAccessException ex)   { _logger.LogError(ex, "Skipping preset '{File}'", file); }
         }
 
         return [.. presets.OrderBy(preset => preset.Name, StringComparer.OrdinalIgnoreCase)];

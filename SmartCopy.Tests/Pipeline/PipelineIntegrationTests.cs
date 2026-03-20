@@ -198,7 +198,8 @@ public sealed class PipelineIntegrationTests
         var path = await journal.WriteAsync(results.Where(r => r.SourceNodeResult != SourceResult.None));
 
         Assert.True(File.Exists(path));
-        var line = Assert.Single(await File.ReadAllLinesAsync(path));
+        var lines = await File.ReadAllLinesAsync(path);
+        var line = Assert.Single(lines);
         var columns = line.Split('\t');
         Assert.Equal(6, columns.Length);
         Assert.Equal("ok", columns[1]);

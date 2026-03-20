@@ -1,5 +1,3 @@
-using System;
-
 namespace SmartCopy.Core.FileSystem;
 
 public sealed class LocalFileSystemProvider : IFileSystemProvider
@@ -7,16 +5,17 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     private readonly bool _isNetworkPath;
     private readonly ProviderCapabilities _capabilities;
 
-    public LocalFileSystemProvider(string rootPath)
+    public LocalFileSystemProvider(string rootPath, Func<string>? readLinuxMountInfo = null)
     {
         RootPath = NormalizePath(rootPath);
-        _isNetworkPath = Uri.TryCreate(RootPath, UriKind.Absolute, out var uri) && uri.IsUnc;
+        _isNetworkPath = LocalPathNetworkClassifier.IsNetworkPath(RootPath, readLinuxMountInfo);
         _capabilities = new ProviderCapabilities(
             CanSeek: true,
             CanAtomicMove: !_isNetworkPath,
             CanWatch: !_isNetworkPath,
             MaxPathLength: int.MaxValue,
-            CanTrash: !_isNetworkPath);
+            CanTrash: !_isNetworkPath,
+            CanQueryFreeSpace: !_isNetworkPath);
     }
 
     public string RootPath { get; }
@@ -204,19 +203,18 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         }, ct);
     }
 
-    private string CombinePath(string basePath, string relativePath)
+    public Task<long?> GetAvailableFreeSpaceAsync(CancellationToken ct)
     {
-        if (Path.IsPathFullyQualified(relativePath))
+        if (_isNetworkPath) return Task.FromResult<long?>(null);
+        try
         {
-            return NormalizePath(relativePath);
+            var drive = new DriveInfo(RootPath);
+            return Task.FromResult<long?>(drive.AvailableFreeSpace);
         }
-
-        if (string.IsNullOrWhiteSpace(basePath))
+        catch
         {
-            return NormalizePath(relativePath);
+            return Task.FromResult<long?>(null);
         }
-
-        return NormalizePath(Path.Combine(basePath, relativePath));
     }
 
     public string GetRelativePath(string basePath, string fullPath)
@@ -245,7 +243,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         return NormalizePath(Path.Combine(basePath, Path.Combine([.. segments])));
     }
 
-    public string NormalizePath(string path)
+    public static string NormalizePath(string path)
     {
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -253,7 +251,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         }
 
         var full = Path.GetFullPath(path);
-        return full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return PathHelper.RemoveTrailingSeparator(full);
     }
 
     private string Resolve(string path)
@@ -271,7 +269,22 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         return CombinePath(RootPath, path);
     }
 
-    private FileSystemNode CreateDirectoryNode(string directoryPath)
+    private static string CombinePath(string basePath, string relativePath)
+    {
+        if (Path.IsPathFullyQualified(relativePath))
+        {
+            return NormalizePath(relativePath);
+        }
+
+        if (string.IsNullOrWhiteSpace(basePath))
+        {
+            return NormalizePath(relativePath);
+        }
+
+        return NormalizePath(Path.Combine(basePath, relativePath));
+    }
+
+    private static FileSystemNode CreateDirectoryNode(string directoryPath)
     {
         var info = new DirectoryInfo(directoryPath);
         return new FileSystemNode
@@ -286,7 +299,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         };
     }
 
-    private FileSystemNode CreateFileNode(string filePath)
+    private static FileSystemNode CreateFileNode(string filePath)
     {
         var info = new FileInfo(filePath);
         return new FileSystemNode

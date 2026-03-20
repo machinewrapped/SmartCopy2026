@@ -14,7 +14,7 @@ public class DirectoryTreeViewModel : ViewModelBase
     private bool _isLoading;
 
     /// <summary>The root nodes of the directory tree.</summary>
-    public DirectoryTreeNode? RootNode => ItemsSource.Any() ? ItemsSource.First() : null;
+    public DirectoryNode? RootNode => ItemsSource.Count > 0 ? ItemsSource[0] : null;
 
     /// <summary>Indicates whether the directory tree is currently loading.</summary>
     public bool IsLoading
@@ -61,7 +61,7 @@ public class DirectoryTreeViewModel : ViewModelBase
     }
 
     /// <summary> Avalonia TreeView requires an enumerable root</summary>
-    private ObservableCollection<DirectoryTreeNode> ItemsSource { get; } = [];
+    private ObservableCollection<DirectoryNode> ItemsSource { get; } = [];
 
     /// <summary>
     /// Set the root path for the directory tree (may be underneath the filesystem root)
@@ -125,15 +125,17 @@ public class DirectoryTreeViewModel : ViewModelBase
             
             await foreach (var node in scanner.ScanAsync(rootPath, scanOptions, ct: ct))
             {
+                ct.ThrowIfCancellationRequested();
+                
                 // First node yielded is our root node
-                if (!ItemsSource.Any())
+                if (ItemsSource.Count == 0 && node is DirectoryNode dirNode)
                 {
-                    ItemsSource.Add(node);
+                    ItemsSource.Add(dirNode);
 
                     SourceProvider = sourceProvider;
 
-                    node.IsExpanded = true;
-                    node.PropertyChanged += OnRootNodePropertyChanged;
+                    dirNode.IsExpanded = true;
+                    dirNode.PropertyChanged += OnRootNodePropertyChanged;
                 }
 
                 // subsequent nodes are wired into the tree by the scanner

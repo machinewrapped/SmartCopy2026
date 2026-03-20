@@ -15,12 +15,20 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
     // Add artificial delay to simulate real I/O for testing progress reporting.
     public bool AddArtificialDelay { get; set; }
 
-    public MemoryFileSystemProvider(bool addArtificialDelay = false, string? customRootPath = null, string? volumeId = null)
+    /// <summary>Capacity of the filesystem to report on this filesystem.</summary>
+    public long? SimulatedCapacity { get; set; }
+
+    public MemoryFileSystemProvider(
+        bool addArtificialDelay = false,
+        string? customRootPath = null,
+        string? volumeId = null,
+        long? capacity = null)
     {
         AddArtificialDelay = addArtificialDelay;
+        SimulatedCapacity = capacity;
         RootPath = customRootPath ?? DefaultRoot;
-        VolumeId = volumeId;
-        Debug.Assert(RootPath.StartsWith("/"));
+        VolumeId = volumeId ?? "MEM";
+        Debug.Assert(RootPath.StartsWith('/'));
         _entries[RootPath] = MemoryEntry.CreateDirectory();
     }
 
@@ -33,25 +41,35 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         CanAtomicMove: true,
         CanWatch: false,
         MaxPathLength: int.MaxValue,
-        CanTrash: false);
+        CanTrash: false,
+        CanQueryFreeSpace: SimulatedCapacity.HasValue);
 
     public Task<IReadOnlyList<FileSystemNode>> GetChildrenAsync(string path, CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        var normalizedPath = Normalize(path);
-        EnsureDirectoryExists(normalizedPath);
+        return Task.Run(async () =>
+        {
+            ct.ThrowIfCancellationRequested();
+            var normalizedPath = Normalize(path);
+            EnsureDirectoryExists(normalizedPath);
 
-        // GetParentPath(kv.Key) == normalizedPath selects direct children.
-        // The extra inequality guard is only needed for root, where GetParentPath(RootPath) == RootPath.
-        var children = _entries
-            .Where(kv => GetParentPath(kv.Key).Equals(normalizedPath, StringComparison.OrdinalIgnoreCase)
-                         && !kv.Key.Equals(normalizedPath, StringComparison.OrdinalIgnoreCase))
-            .Select(kv => ToNode(kv.Key, kv.Value))
-            .OrderBy(node => node.IsDirectory ? 0 : 1)
-            .ThenBy(node => node.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+            // GetParentPath(kv.Key) == normalizedPath selects direct children.
+            // The extra inequality guard is only needed for root, where GetParentPath(RootPath) == RootPath.
+            IReadOnlyList<FileSystemNode> children = _entries
+                .Where(kv => GetParentPath(kv.Key).Equals(normalizedPath, StringComparison.OrdinalIgnoreCase)
+                            && !kv.Key.Equals(normalizedPath, StringComparison.OrdinalIgnoreCase))
+                .Select(kv => ToNode(kv.Key, kv.Value))
+                .OrderBy(node => node.IsDirectory ? 0 : 1)
+                .ThenBy(node => node.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
-        return Task.FromResult<IReadOnlyList<FileSystemNode>>(children);
+            if (AddArtificialDelay)
+            {
+                await Task.Delay(10);
+            }
+
+            return children;
+
+        }, ct);
     }
 
     public Task<FileSystemNode> GetNodeAsync(string path, CancellationToken ct)
@@ -109,11 +127,6 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
 
             await output.WriteAsync(buffer.AsMemory(0, read), ct);
 
-            if (AddArtificialDelay)
-            {
-                await Task.Delay(2, ct); // Simulate delay for testing progress reporting
-            }
-
             progress?.Report(read);
         }
 
@@ -126,6 +139,11 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
             EnsureParentDirectoryExists(normalizedPath);
             _entries[normalizedPath] = entry;
             TouchParentModifiedTime(normalizedPath, now);
+
+            if (AddArtificialDelay)
+            {
+                await Task.Delay(10, ct); // Simulate delay for testing progress reporting
+            }
         }
         finally
         {
@@ -242,6 +260,26 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         ct.ThrowIfCancellationRequested();
         var normalizedPath = Normalize(path);
         return Task.FromResult(_entries.ContainsKey(normalizedPath));
+    }
+
+    public Task<long?> GetAvailableFreeSpaceAsync(CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        if (SimulatedCapacity.HasValue == false)
+        {
+            return Task.FromResult<long?>(null);
+        }
+
+        long totalBytesUsed = _entries.Values.Sum(x => x.Size);
+        long totalBytesRemaining = SimulatedCapacity.Value - totalBytesUsed;
+
+        if (totalBytesRemaining < 0)
+        {
+            totalBytesRemaining = 0;
+        }
+
+        return Task.FromResult<long?>(totalBytesRemaining);
     }
 
     private string CombinePath(string basePath, string relativePath)

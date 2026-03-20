@@ -1,8 +1,7 @@
-using System;
-using System.Diagnostics;
-using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.Logging;
+using SmartCopy.Core.Logging;
 
 namespace SmartCopy.Core.Pipeline;
 
@@ -13,6 +12,7 @@ namespace SmartCopy.Core.Pipeline;
 public sealed class StepPresetStore
 {
     private readonly string _presetPath;
+    private readonly ILogger<StepPresetStore> _logger = AppLog.CreateLogger<StepPresetStore>();
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         WriteIndented = true,
@@ -148,9 +148,9 @@ public sealed class StepPresetStore
             var collection = JsonSerializer.Deserialize<StepPresetCollection>(json, _jsonOptions);
             return collection ?? new StepPresetCollection();
         }
-        catch (JsonException ex)            { Debug.WriteLine($"[StepPresetStore] Skipping preset file '{_presetPath}': {ex.Message}"); return new StepPresetCollection(); }
-        catch (IOException ex)              { Debug.WriteLine($"[StepPresetStore] Skipping preset file '{_presetPath}': {ex.Message}"); return new StepPresetCollection(); }
-        catch (UnauthorizedAccessException ex) { Debug.WriteLine($"[StepPresetStore] Skipping preset file '{_presetPath}': {ex.Message}"); return new StepPresetCollection(); }
+        catch (JsonException ex)               { _logger.LogError(ex, "Skipping preset file '{Path}'", _presetPath); return new StepPresetCollection(); }
+        catch (IOException ex)                 { _logger.LogError(ex, "Skipping preset file '{Path}'", _presetPath); return new StepPresetCollection(); }
+        catch (UnauthorizedAccessException ex) { _logger.LogError(ex, "Skipping preset file '{Path}'", _presetPath); return new StepPresetCollection(); }
     }
 
     private async Task SaveCollectionAsync(StepPresetCollection collection, CancellationToken ct)

@@ -4,6 +4,7 @@ using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Tests.TestInfrastructure;
+
 namespace SmartCopy.Tests.Pipeline;
 
 public sealed class PipelineRunnerTests
@@ -105,9 +106,9 @@ public sealed class PipelineRunnerTests
             .WithDirectory("/source/sub")
             .WithFile("/source/sub/f3.txt", "z"u8));
 
-        DirectoryTreeNode root = await provider.BuildDirectoryTree();
+        DirectoryNode root = await provider.BuildDirectoryTree();
 
-        var sourceNode = root.FindNodeByPathSegments(["source"]);
+        var sourceNode = root.FindNodeByPathSegments(["source"]) as DirectoryNode;
         Assert.NotNull(sourceNode);
         sourceNode.CheckState = CheckState.Checked;
 
@@ -215,7 +216,6 @@ public sealed class PipelineRunnerTests
                 RootNode       = sourceRoot,
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
-
             });
 
         Assert.Contains(results, r => r.SourceNodeResult == SourceResult.Skipped);
@@ -242,7 +242,6 @@ public sealed class PipelineRunnerTests
             RootNode       = root,
             SourceProvider = provider,
             ProviderRegistry = provider.CreateRegistry(),
-
         };
 
         var previewError = await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -295,7 +294,6 @@ public sealed class PipelineRunnerTests
             RootNode       = root,
             SourceProvider = sourceProvider,
             ProviderRegistry = registry,
-
         };
 
         var results = await runner.ExecuteAsync(job);
@@ -342,7 +340,6 @@ public sealed class PipelineRunnerTests
             RootNode       = root,
             SourceProvider = sourceProvider,
             ProviderRegistry = registry,
-
         };
 
         var plan = await runner.PreviewAsync(job, CancellationToken.None);

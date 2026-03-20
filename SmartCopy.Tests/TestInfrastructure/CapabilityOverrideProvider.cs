@@ -34,4 +34,6 @@ internal sealed class CapabilityOverrideProvider(IFileSystemProvider inner, Prov
         inner.SplitPath(path);
     public string JoinPath(string basePath, IReadOnlyList<string> segments) =>
         inner.JoinPath(basePath, segments);
+    public Task<long?> GetAvailableFreeSpaceAsync(CancellationToken ct) =>
+        inner.GetAvailableFreeSpaceAsync(ct);
 }

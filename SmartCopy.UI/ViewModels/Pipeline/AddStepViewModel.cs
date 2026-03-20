@@ -66,9 +66,13 @@ public partial class AddStepViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SelectedStepTypeName))]
+    [NotifyPropertyChangedFor(nameof(SelectedStepIsConfigurable))]
     private StepTypeItem? _selectedStepType;
 
     public string SelectedStepTypeName => SelectedStepType?.DisplayName ?? string.Empty;
+
+    public bool SelectedStepIsConfigurable => SelectedStepType is null
+        || StepEditorViewModelFactory.Create(SelectedStepType.Kind, _settings).BuildStep().IsConfigurable;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasPresets))]
@@ -272,8 +276,7 @@ public partial class AddStepViewModel : ObservableObject
         {
             StepCategory.Path =>
             [
-                new(StepKind.Flatten, "Flatten", "Strip directory structure"),
-                new(StepKind.Rebase, "Rebase", "Adjust path roots and prefixes"),
+                new(StepKind.Flatten, "Flatten", "Trim leading levels or flatten to filename"),
                 new(StepKind.Rename, "Rename", "Rename using a pattern"),
             ],
             StepCategory.Content =>

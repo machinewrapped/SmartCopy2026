@@ -7,16 +7,14 @@ This file provides guidance to AI agents when working with code in this reposito
 SmartCopy2026 is a cross-platform file manager (Windows/Linux/macOS) rewritten from SmartCopy 2015 (WinForms/.NET 4.8). It intelligently copies large directories via composable filters and transform pipelines. Stack: C#/.NET 10, Avalonia UI 11, CommunityToolkit.Mvvm.
 
 ## Project Status
-Current progress and outstanding tasks are recorded in `Docs/SmartCopy2026-Plan.md`. 
-
-Refer to this document when you need to get up to speed and update it when a deliverable is completed and validated.
+Current progress and outstanding tasks are recorded in `Docs/SmartCopy2026-Plan.md`. Refer to the plan document to get up to speed, update it when a deliverable is completed and validated.
 
 ## System Architecture
-Architectural overview and design principles: `Docs/Architecture.md` This document should be reviewed when designing a solution and updated after changes affect the application's architecture.
+Architectural overview and design principles are detailed in `Docs/Architecture.md`. Consult the architecture when designing a solution to ensure that it follows established principles, and update the document after refactoring or redesign changes the architecture.
 
 ## UI/UX Design Documentation
 
-Canonical UI and interaction designs can be found in `Docs/UI+UX.md`. Refer to this document for UI consistency, update it after UI/UX decisions are made.
+Canonical UI and interaction designs can be found in `Docs/UIUX.md`. Refer to this document for UI consistency, update it when UI/UX decisions are made.
 
 ## Commands
 
@@ -49,9 +47,9 @@ Four projects in `SmartCopy2026.slnx`:
 
 ## Key abstractions
 
-- **IFileSystemProvider** — unified interface for local disk, MTP devices, and in-memory (tests). Capabilities are declared via `ProviderCapabilities` flags.
-- **FilterChain** — composable `IFilter` chain for filesystem view (Wildcard, Mirror, DateRange, etc.)
-- **TransformPipeline** — ordered sequence of `IPipelineStep` to apply to the selected filesystem nodes.
+- **IFileSystemProvider** — unified interface for local and network drives, MTP devices and in-memory tests. `ProviderCapabilities` define the capabilities of each.
+- **FilterChain** — composable `IFilter` chain to filter the filesystem view
+- **TransformPipeline** — ordered sequence of `IPipelineStep` to apply to selected filesystem nodes.
 
 ## C# Coding Conventions
 

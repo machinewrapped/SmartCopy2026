@@ -117,14 +117,12 @@ public sealed class FileSystemProviderRegistry : IPathResolver
             return null;
 
         var fullPath = Path.GetFullPath(path);
-        var root = Path.GetPathRoot(fullPath);
-        var providerRoot = string.IsNullOrWhiteSpace(root) ? fullPath : root;
 
         lock (LocalSync)
         {
-            if (!LocalProviders.TryGetValue(providerRoot, out var provider))
+            if (!LocalProviders.TryGetValue(fullPath, out var provider))
             {
-                LocalProviders[providerRoot] = provider = new LocalFileSystemProvider(providerRoot);
+                LocalProviders[fullPath] = provider = new LocalFileSystemProvider(fullPath);
             }
 
             return provider;

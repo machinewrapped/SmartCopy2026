@@ -40,5 +40,12 @@ public interface IFileSystemProvider
     /// using this provider's path conventions.
     /// </summary>
     string JoinPath(string basePath, IReadOnlyList<string> segments);
+
+    /// <summary>
+    /// Returns the available free bytes on the volume hosting this provider,
+    /// or <see langword="null"/> if the provider does not support querying free space
+    /// (see <see cref="ProviderCapabilities.CanQueryFreeSpace"/>).
+    /// </summary>
+    Task<long?> GetAvailableFreeSpaceAsync(CancellationToken ct);
 }
 

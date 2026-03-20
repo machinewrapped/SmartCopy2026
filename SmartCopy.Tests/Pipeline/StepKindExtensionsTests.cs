@@ -8,8 +8,7 @@ public sealed class StepKindExtensionsTests
 {
     [Theory]
     [InlineData(StepKind.Flatten, "⊞")]
-    [InlineData(StepKind.Rebase, "⤢")]
-    [InlineData(StepKind.Rename, "✏")]
+[InlineData(StepKind.Rename, "✏")]
     [InlineData(StepKind.Convert, "⚙")]
     [InlineData(StepKind.Copy, "→")]
     [InlineData(StepKind.Move, "⇒")]

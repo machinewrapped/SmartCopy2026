@@ -16,9 +16,11 @@ public sealed class ClearSelectionStep : IPipelineStep
 
     public TransformStepConfig Config => new(StepType, new JsonObject());
 
-    public void Validate(StepValidationContext context)
+    public Task Validate(StepValidationContext context, CancellationToken ct = default)
     {
-        // No preconditions or postconditions.
+        context.SelectedBytes = 0;
+        context.SelectedFileCount = 0;
+        return Task.CompletedTask;
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(
@@ -28,8 +30,8 @@ public sealed class ClearSelectionStep : IPipelineStep
         foreach (var node in context.RootNode.GetFilterIncludedDescendants())
         {
             ct.ThrowIfCancellationRequested();
-            if (!node.IsDirectory)
-                context.GetNodeContext(node).VirtualCheckState = CheckState.Unchecked;
+            if (node is FileNode fileNode)
+                context.GetNodeContext(fileNode).VirtualCheckState = CheckState.Unchecked;
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: node,
@@ -44,12 +46,14 @@ public sealed class ClearSelectionStep : IPipelineStep
         foreach (var node in context.RootNode.GetFilterIncludedDescendants())
         {
             ct.ThrowIfCancellationRequested();
-            if (!node.IsDirectory)
+            if (node is FileNode)
                 node.CheckState = CheckState.Unchecked;
             yield return new TransformResult(
                 IsSuccess: true,
                 SourceNode: node,
                 SourceNodeResult: SourceResult.None);
         }
+
+        context.RootNode.BuildStats();
     }
 }

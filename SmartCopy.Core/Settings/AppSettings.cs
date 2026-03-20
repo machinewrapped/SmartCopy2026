@@ -41,11 +41,14 @@ public sealed class AppSettings
     /// Lets each portable copy of the app remember its own last-used session.</summary>
     public bool SaveSessionLocally { get; set; } = false;
 
-    /// <summary>
-    /// When enabled, the app will add artificial delay to the MemoryFileSystemProvider to simulate real I/O.
-    /// Disabled for tests so that they run fast.
-    /// </summary>
+    /// <summary>Enable the in-memory file system provider for debug/testing.</summary>
+    public bool EnableMemoryFileSystem { get; set; } = false;
+
+    /// <summary>When enabled, the app will add artificial delay to the MemoryFileSystemProvider to simulate I/O.</summary>
     public bool AddArtificialDelay { get; set; } = false;
+
+    /// <summary>When enabled, the MemoryFileSystemProvider will have limited capacity.</summary>
+    public bool LimitMemoryFileSystemCapacity { get; set; } = false;
 
     public int LogRetentionDays { get; set; } = 30;
     public List<string> RecentSources { get; set; } = [];
@@ -68,6 +71,10 @@ public sealed class AppSettings
 
     public bool UseAbsolutePathsForSelectionSave { get; set; }
     public bool AutoOpenLogOnRun { get; set; } = true;
+
+    /// <summary>Show full diagnostic output (exception stack traces, etc.) in the log panel.
+    /// Useful for capturing details when reporting bugs.
+    public bool VerboseLogging { get; set; } = false;
 
     /// <summary>
     /// Copies all persisted properties from <paramref name="saved"/> into this instance,
@@ -94,7 +101,9 @@ public sealed class AppSettings
         AllowDeleteWithoutPreview = saved.AllowDeleteWithoutPreview;
         AllowOverwriteWithoutPreview = saved.AllowOverwriteWithoutPreview;
         SaveSessionLocally = saved.SaveSessionLocally;
+        EnableMemoryFileSystem = saved.EnableMemoryFileSystem;
         AddArtificialDelay = saved.AddArtificialDelay;
+        LimitMemoryFileSystemCapacity = saved.LimitMemoryFileSystemCapacity;
         LogRetentionDays = saved.LogRetentionDays;
         RecentSources = saved.RecentSources;
         RecentTargets = saved.RecentTargets;
@@ -105,6 +114,7 @@ public sealed class AppSettings
         StepTypeMruPresetIds = saved.StepTypeMruPresetIds;
         UseAbsolutePathsForSelectionSave = saved.UseAbsolutePathsForSelectionSave;
         AutoOpenLogOnRun = saved.AutoOpenLogOnRun;
+        VerboseLogging = saved.VerboseLogging;
     }
 }
 

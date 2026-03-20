@@ -16,8 +16,8 @@ public sealed class DirectoryScanner
         IProgress<ScanProgress>? progress = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        var rootNode = new DirectoryTreeNode(
-            await _provider.GetNodeAsync(rootPath, ct), parent: null);
+        var rootFsNode = await _provider.GetNodeAsync(rootPath, ct);
+        var rootNode = new DirectoryNode(rootFsNode, parent: null);
 
         yield return rootNode;
 
@@ -25,7 +25,7 @@ public sealed class DirectoryScanner
 
         // visited guards against circular symbolic links re-enqueueing an already-processed path.
         var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { rootNode.FullPath };
-        var queue = new Queue<(DirectoryTreeNode Node, int Depth)>();
+        var queue = new Queue<(DirectoryNode Node, int Depth)>();
         queue.Enqueue((rootNode, 0));
 
         var directoriesScanned = 0;
@@ -56,19 +56,24 @@ public sealed class DirectoryScanner
                 // User may select parent whilst scan is in progress... propagate the check state to new additions
                 CheckState initialCheckstate = currentDirectory.CheckState == CheckState.Checked ? CheckState.Checked : CheckState.Unchecked;
 
-                var node = new DirectoryTreeNode(child, currentDirectory, initialCheckstate);
-                if (node.IsDirectory)
+                DirectoryTreeNode node;
+                if (child.IsDirectory)
                 {
-                    currentDirectory.Children.Add(node);
+                    var dirNode = new DirectoryNode(child, currentDirectory, initialCheckstate);
+                    currentDirectory.Children.Add(dirNode);
 
-                    if (!options.LazyExpand && ShouldTraverse(options, child) && visited.Add(node.FullPath))
+                    if (!options.LazyExpand && ShouldTraverse(options, child) && visited.Add(dirNode.FullPath))
                     {
-                        queue.Enqueue((node, depth + 1));
+                        queue.Enqueue((dirNode, depth + 1));
                     }
+
+                    node = dirNode;
                 }
                 else
                 {
-                    currentDirectory.Files.Add(node);
+                    var fileNode = new FileNode(child, currentDirectory, initialCheckstate);
+                    currentDirectory.Files.Add(fileNode);
+                    node = fileNode;
                 }
 
                 nodesDiscovered++;

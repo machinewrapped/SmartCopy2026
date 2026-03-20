@@ -3,7 +3,9 @@ using System.Collections.Specialized;
 using System.Text.Json.Nodes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Logging;
 using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.Logging;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Pipeline.Validation;
@@ -24,11 +26,18 @@ public partial class PipelineViewModel : ViewModelBase
 {
     private const string CustomNameParameter = "customName";
     private const int MaxRecentTargets = 10;
+    private readonly ILogger<PipelineViewModel> _logger = AppLog.CreateLogger<PipelineViewModel>();
     private readonly IAppContext _appContext;
     private readonly PipelinePresetStore _presetStore;
     private readonly StepPresetStore _stepPresetStore;
     private readonly AppSettings _appSettings;
     private int _selectedIncludedFileCount;
+    private long _selectedBytes;
+    private int _numFilterIncludedFiles;
+    private long _totalFilterIncludedBytes;
+    private IFileSystemProvider? _sourceProvider;
+    private FreeSpaceCache _cachedFreeSpace = new();
+    private CancellationTokenSource _revalidateCts = new();
 
     public ObservableCollection<PipelineStepViewModel> Steps { get; } = [];
 
@@ -40,27 +49,6 @@ public partial class PipelineViewModel : ViewModelBase
     public bool HasSteps => Steps.Count > 0;
 
     public StepPresetStore StepPresetStore => _stepPresetStore;
-
-    internal AppSettings AppSettings => _appSettings;
-    internal IAppContext AppContext => _appContext;
-
-    // Default to full capabilities so editors show no false-positive warning before source is set.
-    internal ProviderCapabilities SourceCapabilities { get; private set; } =
-        new(CanSeek: true, CanAtomicMove: true, CanWatch: true, MaxPathLength: int.MaxValue, CanTrash: true);
-
-    internal void SetSourceCapabilities(ProviderCapabilities capabilities) =>
-        SourceCapabilities = capabilities;
-
-    internal void RecordRecentTarget(string path)
-    {
-        if (string.IsNullOrWhiteSpace(path)) return;
-
-        _appSettings.RecentTargets.Remove(path);
-        _appSettings.RecentTargets.Insert(0, path);
-
-        if (_appSettings.RecentTargets.Count > MaxRecentTargets)
-            _appSettings.RecentTargets.RemoveAt(MaxRecentTargets);
-    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanRun))]
@@ -78,11 +66,27 @@ public partial class PipelineViewModel : ViewModelBase
         set 
         {
             SetProperty(ref _isRunning, value);
+            OnPropertyChanged(nameof(IsNotRunning));
+            OnPropertyChanged(nameof(CanRun));
             UpdateButtonStates();
         }
     }
 
-    public bool CanRun => ValidationResult.CanRun && !_capabilityBlocked && !IsRunning;
+    private bool _isScanning;
+    public bool IsScanning
+    {
+        get => _isScanning;
+        set 
+        { 
+            SetProperty(ref _isScanning, value); 
+            OnPropertyChanged(nameof(CanRun));
+            UpdateButtonStates(); 
+        }
+    }
+
+    public bool IsNotRunning => !IsRunning;
+
+    public bool CanRun => ValidationResult.CanRun && !_capabilityBlocked && !IsRunning && !IsScanning;
 
     public bool HasDeleteStep => Steps.Any(step => step.Step is DeleteStep);
 
@@ -105,6 +109,7 @@ public partial class PipelineViewModel : ViewModelBase
     public event EventHandler? RunRequested;
     public event EventHandler? PreviewRequested;
     public event EventHandler<PipelineStepViewModel>? EditStepRequested;
+    public event EventHandler<PipelineStepViewModel>? SwapSourceRequested;
     public event EventHandler? SavePipelineRequested;
 
     public PipelineViewModel(IAppContext appContext)
@@ -135,10 +140,17 @@ public partial class PipelineViewModel : ViewModelBase
         Revalidate();
     }
 
-    private void OnStepPresetPicked(StepPreset preset)
+    private async void OnStepPresetPicked(StepPreset preset)
     {
-        var step = PipelineStepFactory.FromConfig(preset.Config);
-        AddStepFromResult(step, preset.Name);
+        try
+        {
+            var step = PipelineStepFactory.FromConfig(preset.Config);
+            await AddStepFromResult(step, preset.Name);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "OnStepPresetPicked failed");
+        }
     }
 
     public async Task DeletePipelinePresetAsync(string name)
@@ -150,7 +162,7 @@ public partial class PipelineViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ERROR] Failed to delete pipeline preset '{name}': {ex.Message}");
+            _logger.LogError(ex, "Failed to delete pipeline preset '{Name}'", name);
         }
     }
 
@@ -159,27 +171,29 @@ public partial class PipelineViewModel : ViewModelBase
         return new TransformPipeline(Steps.Select(step => step.Step));
     }
 
-    public bool TryAddStepWithoutConfiguration(StepKind kind)
+    public async Task<bool> TryAddStepWithoutConfiguration(StepKind kind)
     {
         var step = StepEditorViewModelFactory.Create(kind, _appContext).BuildStep();
         if (step.IsConfigurable) return false;
-        AddStepFromResult(step);
+        await AddStepFromResult(step);
         return true;
     }
 
-    public void AddStepFromResult(IPipelineStep step, string? customName = null)
+    public async Task AddStepFromResult(IPipelineStep step, string? customName = null)
     {
         Steps.Add(new PipelineStepViewModel(step, customName));
+        await RefreshFreeSpaceCacheAsync();
         Revalidate();
     }
 
-    public void ReplaceStep(PipelineStepViewModel existing, IPipelineStep replacement, string? customName = null)
+    public async Task ReplaceStep(PipelineStepViewModel existing, IPipelineStep replacement, string? customName = null)
     {
         existing.ReplaceStep(replacement, customName);
+        await RefreshFreeSpaceCacheAsync();
         Revalidate();
     }
 
-    public void LoadPreset(PipelinePreset preset)
+    public async Task LoadPreset(PipelinePreset preset)
     {
         Steps.Clear();
         foreach (var configStep in preset.Config.Steps)
@@ -188,11 +202,12 @@ public partial class PipelineViewModel : ViewModelBase
             Steps.Add(new PipelineStepViewModel(PipelineStepFactory.FromConfig(configStep), customName));
         }
 
+        await RefreshFreeSpaceCacheAsync();
         Revalidate();
     }
 
-    [RelayCommand]
-    private void RemoveStep(PipelineStepViewModel step)
+    [RelayCommand(CanExecute = nameof(IsNotRunning))]
+    private async Task RemoveStep(PipelineStepViewModel step)
     {
         if (step is null)
         {
@@ -200,6 +215,20 @@ public partial class PipelineViewModel : ViewModelBase
         }
 
         Steps.Remove(step);
+
+        await RefreshFreeSpaceCacheAsync();
+        Revalidate();
+    }
+
+    public void MoveStep(int oldIndex, int newIndex)
+    {
+        if (oldIndex < 0 || oldIndex >= Steps.Count || newIndex < 0 || newIndex >= Steps.Count || oldIndex == newIndex)
+        {
+            return;
+        }
+
+        Steps.Move(oldIndex, newIndex);
+        _ = RefreshFreeSpaceCacheAsync();
         Revalidate();
     }
 
@@ -214,7 +243,7 @@ public partial class PipelineViewModel : ViewModelBase
             return;
         }
 
-        LoadPreset(preset);
+        await LoadPreset(preset);
     }
 
     [RelayCommand]
@@ -259,7 +288,13 @@ public partial class PipelineViewModel : ViewModelBase
         PreviewRequested?.Invoke(this, EventArgs.Empty);
     }
 
-    [RelayCommand]
+    public void RequestSwapWithSource(PipelineStepViewModel step)
+    {
+        if (IsRunning || !step.HasDestination) return;
+        SwapSourceRequested?.Invoke(this, step);
+    }
+
+    [RelayCommand(CanExecute = nameof(IsNotRunning))]
     private void RequestEditStep(PipelineStepViewModel step)
     {
         if (step is null)
@@ -268,6 +303,59 @@ public partial class PipelineViewModel : ViewModelBase
         }
 
         EditStepRequested?.Invoke(this, step);
+    }
+
+    internal AppSettings AppSettings => _appSettings;
+
+    // Default to full capabilities so editors show no false-positive warning before source is set.
+    internal ProviderCapabilities SourceCapabilities { get; private set; } = ProviderCapabilities.Full;
+
+    internal async Task SetSourceCapabilities(ProviderCapabilities capabilities)
+    {
+        SourceCapabilities = capabilities;
+        await RefreshFreeSpaceCacheAsync();
+        Revalidate();
+    }
+
+    internal async Task SetSourceContext(IFileSystemProvider provider)
+    {
+        _sourceProvider = provider;
+        await SetSourceCapabilities(provider.Capabilities);
+    }
+
+    internal void SetSelectedBytes(long bytes)
+    {
+        var normalized = Math.Max(0, bytes);
+        if (_selectedBytes == normalized) return;
+        _selectedBytes = normalized;
+        Revalidate();
+    }
+
+    internal void SetNumFilterIncludedFiles(int count)
+    {
+        var normalized = Math.Max(0, count);
+        if (_numFilterIncludedFiles == normalized) return;
+        _numFilterIncludedFiles = normalized;
+        Revalidate();
+    }
+
+    internal void SetTotalFilterIncludedBytes(long bytes)
+    {
+        var normalized = Math.Max(0, bytes);
+        if (_totalFilterIncludedBytes == normalized) return;
+        _totalFilterIncludedBytes = normalized;
+        Revalidate();
+    }
+
+    internal void RecordRecentTarget(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+
+        _appSettings.RecentTargets.Remove(path);
+        _appSettings.RecentTargets.Insert(0, path);
+
+        if (_appSettings.RecentTargets.Count > MaxRecentTargets)
+            _appSettings.RecentTargets.RemoveAt(MaxRecentTargets);
     }
 
     private void OnStepsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -291,11 +379,19 @@ public partial class PipelineViewModel : ViewModelBase
         Revalidate();
     }
 
-    private void OnStepChanged(object? sender, EventArgs e)
+    private async void OnStepChanged(object? sender, EventArgs e)
     {
         _ = sender;
         _ = e;
-        Revalidate();
+        try
+        {
+            await RefreshFreeSpaceCacheAsync();
+            Revalidate();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "OnStepChanged failed");
+        }
     }
 
     private async void InitializePresetsInBackground()
@@ -320,64 +416,127 @@ public partial class PipelineViewModel : ViewModelBase
         }
     }
 
-    private void Revalidate()
+    /// <summary>
+    /// Marks the step at <paramref name="index"/> as the currently-executing step
+    /// and clears the flag on any previously active step. Safe to call from any thread.
+    /// </summary>
+    public void SetActiveStep(int index)
     {
+        for (int i = 0; i < Steps.Count; i++)
+        {
+            Steps[i].IsActiveStep = (i == index);
+        }
+    }
+
+    /// <summary>
+    /// Clears the active-step highlight from all steps.
+    /// Called after execution completes or is cancelled.
+    /// </summary>
+    public void ClearActiveStep()
+    {
+        foreach (var step in Steps)
+            step.IsActiveStep = false;
+    }
+
+    private async void Revalidate()
+    {
+        _revalidateCts.Cancel();
+        _revalidateCts = new CancellationTokenSource();
+        var ct = _revalidateCts.Token;
+
         foreach (var step in Steps)
         {
             step.ValidationMessage = null;
             step.HasValidationError = false;
+            step.HasValidationWarning = false;
             step.TrashUnavailable = false;
         }
+
         _capabilityBlocked = false;
 
-        var result = PipelineValidator.Validate(
-            [.. Steps.Select(step => step.Step)],
-            new PipelineValidationContext(_selectedIncludedFileCount > 0));
-
-        ValidationResult = result;
-        BlockingValidationMessage = result.FirstBlockingIssue?.Message;
-
-        foreach (var issue in result.Issues.Where(i => i.StepIndex.HasValue))
+        try
         {
-            var index = issue.StepIndex!.Value;
-            if (index < 0 || index >= Steps.Count)
-            {
-                continue;
-            }
+            var result = await PipelineValidator.ValidateAsync(
+                [.. Steps.Select(step => step.Step)],
+                new PipelineValidationContext(
+                    SourceProvider:           _sourceProvider,
+                    ProviderRegistry:         _appContext,
+                    CachedFreeSpace:          _cachedFreeSpace,
+                    SelectedBytes:            _selectedBytes,
+                    SelectedFileCount:        _selectedIncludedFileCount,
+                    NumFilterIncludedFiles:   _numFilterIncludedFiles,
+                    TotalFilterIncludedBytes: _totalFilterIncludedBytes),
+                ct);
 
-            var step = Steps[index];
-            if (string.IsNullOrWhiteSpace(step.ValidationMessage))
-            {
-                step.ValidationMessage = issue.Message;
-                step.HasValidationError = issue.Severity == PipelineValidationSeverity.Blocking;
-            }
-        }
+            ct.ThrowIfCancellationRequested();
 
-        // Capability-derived blocking: Trash mode is unavailable for this source path.
-        if (!SourceCapabilities.CanTrash)
-        {
-            foreach (var step in Steps)
+            ValidationResult = result;
+            BlockingValidationMessage = result.FirstBlockingIssue?.Message;
+
+            foreach (var issue in result.Issues.Where(i => i.StepIndex.HasValue))
             {
-                if (step.Step is DeleteStep ds && ds.Mode == DeleteMode.Trash)
+                var index = issue.StepIndex!.Value;
+                if (index < 0 || index >= Steps.Count)
                 {
-                    step.TrashUnavailable = true;
-                    _capabilityBlocked = true;
+                    continue;
+                }
+
+                var step = Steps[index];
+                if (string.IsNullOrWhiteSpace(step.ValidationMessage))
+                {
+                    step.ValidationMessage = issue.Message;
+                    step.HasValidationError = issue.Severity == PipelineValidationSeverity.Blocking;
+                    step.HasValidationWarning = issue.Severity == PipelineValidationSeverity.Warning;
                 }
             }
+
+            // Capability-derived blocking: Trash mode is unavailable for this source path.
+            if (!SourceCapabilities.CanTrash)
+            {
+                foreach (var step in Steps)
+                {
+                    if (step.Step is DeleteStep ds && ds.Mode == DeleteMode.Trash)
+                    {
+                        step.TrashUnavailable = true;
+                        _capabilityBlocked = true;
+                    }
+                }
+            }
+
+            if (_capabilityBlocked && BlockingValidationMessage is null)
+                BlockingValidationMessage = "Trash is not available for this path";
+
+            OnPropertyChanged(nameof(FirstDestinationPath));
+            OnPropertyChanged(nameof(HasDeleteStep));
+            OnPropertyChanged(nameof(HasOverwriteStep));
+            OnPropertyChanged(nameof(RunButtonLabel));
+            OnPropertyChanged(nameof(HasSteps));
+            UpdateButtonStates();
+
+            PipelineChanged?.Invoke(this, EventArgs.Empty);
         }
-
-        if (_capabilityBlocked && BlockingValidationMessage is null)
-            BlockingValidationMessage = "Trash is not available for this path";
-
-        OnPropertyChanged(nameof(FirstDestinationPath));
-        OnPropertyChanged(nameof(HasDeleteStep));
-        OnPropertyChanged(nameof(HasOverwriteStep));
-        OnPropertyChanged(nameof(RunButtonLabel));
-        OnPropertyChanged(nameof(HasSteps));
-        UpdateButtonStates();
-
-        PipelineChanged?.Invoke(this, EventArgs.Empty);
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer validation; discard this result.
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Revalidate failed");
+        }
     }
+
+    private async Task RefreshFreeSpaceCacheAsync(CancellationToken ct = default)
+    {
+        var cache = new FreeSpaceCache();
+        foreach (var stepVm in Steps)
+        {
+            if (stepVm.Step is IHasDestinationPath destination)
+            {
+                await cache.CacheForDestinationAsync(destination, _appContext, ct);
+            }
+        }
+        _cachedFreeSpace = cache;
+    }    
 
     internal PipelineConfig ToConfig(string name)
     {
@@ -391,6 +550,8 @@ public partial class PipelineViewModel : ViewModelBase
     {
         RunPipelineCommand.NotifyCanExecuteChanged();
         PreviewPipelineCommand.NotifyCanExecuteChanged();
+        RemoveStepCommand.NotifyCanExecuteChanged();
+        RequestEditStepCommand.NotifyCanExecuteChanged();
     }
 
     private static TransformStepConfig BuildConfigWithUiMetadata(PipelineStepViewModel stepViewModel)

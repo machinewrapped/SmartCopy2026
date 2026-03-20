@@ -9,11 +9,11 @@ public sealed class SmartCopyAppContext : IAppContext, IPathResolver
     public AppSettings Settings { get; }
     public IAppDataStore DataStore { get; }
 
-    public SmartCopyAppContext(AppSettings settings, IAppDataStore dataStore, FileSystemProviderRegistry? providerRegistry = null)
+    public SmartCopyAppContext(AppSettings settings, IAppDataStore dataStore, FileSystemProviderRegistry providerRegistry)
     {
         Settings = settings;
         DataStore = dataStore;
-        _providerRegistry = providerRegistry ?? new FileSystemProviderRegistry();
+        _providerRegistry = providerRegistry;
     }
 
     public void Register(IFileSystemProvider provider)

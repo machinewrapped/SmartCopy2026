@@ -11,7 +11,11 @@
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],
-            "problemMatcher": "$msCompile"
+            "problemMatcher": "$msCompile",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         },
         {
             "label": "publish",
@@ -20,8 +24,7 @@
             "args": [
                 "publish",
                 "${workspaceFolder}/SmartCopy.App/SmartCopy.App.csproj",
-                "/property:GenerateFullPaths=true",
-                "/consoleloggerparameters:NoSummary"
+                "-p:PublishProfile=${input:publishProfile}"
             ],
             "problemMatcher": "$msCompile"
         },
@@ -36,6 +39,33 @@
                 "${workspaceFolder}/SmartCopy.App/SmartCopy.App.csproj"
             ],
             "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-release",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "-c",
+                "Release",
+                "${workspaceFolder}/SmartCopy.App/SmartCopy.App.csproj",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary"
+            ],
+            "problemMatcher": "$msCompile"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "publishProfile",
+            "type": "pickString",
+            "description": "Select the target platform publish profile",
+            "options": [
+                "win-x64",
+                "linux-x64",
+                "osx-arm64"
+            ],
+            "default": "win-x64"
         }
     ]
 }
