@@ -54,7 +54,7 @@ public sealed class StepEditorViewModelTests
     [Fact]
     public void IsValid_GatesCopyAndFlattenEditors()
     {
-        var copy = new CopyStepEditorViewModel(new AppSettings()) { DestinationPath = "" };
+        var copy = new CopyStepEditorViewModel(new TestAppContext()) { DestinationPath = "" };
         var flatten = new FlattenStepEditorViewModel { Levels = null };
 
         Assert.False(copy.IsValid);

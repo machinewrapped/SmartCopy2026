@@ -29,10 +29,12 @@ public sealed record StepPresetItem(StepPreset Preset, bool IsRecent)
 public partial class AddStepViewModel : ObservableObject
 {
     private readonly StepPresetStore _presetStore;
+    private readonly IAppContext _appContext;
     private readonly AppSettings _settings;
 
     public AddStepViewModel(IAppContext appContext)
     {
+        _appContext = appContext;
         _presetStore = new StepPresetStore(appContext.DataStore.GetFilePath("step-presets.json"));
         _settings = appContext.Settings;
     }
@@ -72,7 +74,7 @@ public partial class AddStepViewModel : ObservableObject
     public string SelectedStepTypeName => SelectedStepType?.DisplayName ?? string.Empty;
 
     public bool SelectedStepIsConfigurable => SelectedStepType is null
-        || StepEditorViewModelFactory.Create(SelectedStepType.Kind, _settings).BuildStep().IsConfigurable;
+        || StepEditorViewModelFactory.Create(SelectedStepType.Kind, _appContext).BuildStep().IsConfigurable;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasPresets))]

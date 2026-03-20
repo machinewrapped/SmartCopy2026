@@ -45,6 +45,7 @@ public partial class PipelineViewModel : ViewModelBase
     private PipelineStepViewModel? _selectedStep;
     public ObservableCollection<PipelinePreset> UserPresets { get; } = [];
     public AddStepViewModel AddStep { get; }
+    public IAppContext AppContext => _appContext;
 
     public bool HasSteps => Steps.Count > 0;
 

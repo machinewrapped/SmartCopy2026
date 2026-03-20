@@ -104,6 +104,9 @@ public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
     public Task CreateDirectoryAsync(string path, CancellationToken ct)
         => Task.Run(() => _device.CreateDirectory(DevicePath(path)), ct);
 
+    public Task<long?> GetAvailableFreeSpaceAsync(CancellationToken ct)
+        => Task.FromResult<long?>(null);
+
     public Task<bool> ExistsAsync(string path, CancellationToken ct)
     {
         return Task.Run(() =>
