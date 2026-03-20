@@ -1,9 +1,9 @@
-using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using SmartCopy.Core.FileSystem;
 using SmartCopy.UI.ViewModels;
 
 namespace SmartCopy.UI.Views;
@@ -152,18 +152,19 @@ public partial class PathPickerControl : UserControl
         e.Handled = true;
     }
 
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     private async void OnMtpPickerClick(object? sender, RoutedEventArgs e)
     {
         if (!OperatingSystem.IsWindows()) return;
-        if (DataContext is not SmartCopy.UI.ViewModels.PathPickerViewModel vm) return;
+        if (DataContext is not PathPickerViewModel vm) return;
         if (TopLevel.GetTopLevel(this) is not Window window) return;
 
-        var pickerVm = new SmartCopy.UI.ViewModels.Dialogs.MtpDevicePickerViewModel();
-        var dialog = new SmartCopy.UI.Views.Dialogs.MtpDevicePickerDialog { DataContext = pickerVm };
+        var pickerVm = new ViewModels.Dialogs.MtpDevicePickerViewModel();
+        var dialog = new Dialogs.MtpDevicePickerDialog { DataContext = pickerVm };
         var device = await dialog.ShowDialog<MediaDevices.MediaDevice?>(window);
         if (device is null) return;
 
-        var provider = new SmartCopy.Core.FileSystem.MtpFileSystemProvider(device);
+        var provider = new MtpFileSystemProvider(device);
         vm.RegisterProvider?.Invoke(provider);
         vm.Path = provider.RootPath;
         vm.ApplyPathCommand.Execute(null);

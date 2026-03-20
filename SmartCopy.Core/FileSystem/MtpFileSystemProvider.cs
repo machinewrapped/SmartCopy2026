@@ -1,7 +1,9 @@
 using MediaDevices;
+using System.Runtime.Versioning;
 
 namespace SmartCopy.Core.FileSystem;
 
+[SupportedOSPlatform("windows")]
 public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
 {
     private readonly MediaDevice _device;

@@ -1,10 +1,12 @@
 using System.Collections.ObjectModel;
+using System.Runtime.Versioning;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MediaDevices;
 
 namespace SmartCopy.UI.ViewModels.Dialogs;
 
+[SupportedOSPlatform("windows")]
 public partial class MtpDevicePickerViewModel : ObservableObject
 {
     private readonly List<MediaDevice> _devices;
