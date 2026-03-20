@@ -1,4 +1,3 @@
-#if WINDOWS
 using MediaDevices;
 
 namespace SmartCopy.Core.FileSystem;
@@ -134,7 +133,7 @@ public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
 
     public void Dispose() => _device.Disconnect();
 
-    /// <summary>Strips "mtp://DeviceName/" prefix to get the device-native path.</summary>
+    /// <summary>Strips the "mtp://DeviceName/" prefix to get the device-native path.</summary>
     private string DevicePath(string mtpPath)
     {
         if (mtpPath.StartsWith(RootPath, StringComparison.OrdinalIgnoreCase))
@@ -145,4 +144,3 @@ public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
     private static string JoinMtp(string parent, string child)
         => parent.TrimEnd('/') + "/" + child;
 }
-#endif

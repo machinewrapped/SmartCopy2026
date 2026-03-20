@@ -3,12 +3,7 @@
 **Goal:** Users can select a connected MTP device as source; SmartCopy scans and copies from it via the existing pipeline.
 
 **Status:** On Hold — 2026-03-07
-Work commenced on the mpt-support branch and good progress was made, but it proved more complicated than anticipated, so it has been deferred to a post-launch feature update.
-
-**TODO** verify the belief that MediaDevices is a Windows-only module. Neither the NuGet page nor the Github page mention any platform restrictions, this assumption may have been out-dated.
-
-https://www.nuget.org/packages/MediaDevices/#supportedframeworks-body-tab
-https://github.com/Bassman2/MediaDevices
+Work commenced on the mtp-support branch and good progress was made, but it proved more complicated than anticipated, so it has been deferred to a post-launch feature update.
 
 **Manual validation gate:** connect Android device, select via MTP picker, copy files to local destination — round-trip completes without error.
 
@@ -17,15 +12,15 @@ https://github.com/Bassman2/MediaDevices
 ## Completed Work (mtp-support branch)
 
 ### NuGet dependency
-`MediaDevices` v1.10.0 added to `SmartCopy.Core.csproj` (Windows WPD API wrapper, Windows TFM only).
+`MediaDevices` v1.10.0 added to `SmartCopy.Core.csproj` unconditionally. The package ships standard .NET assemblies (net5.0 through net7.0) that compile and load on all platforms — the WPD COM calls only fail at runtime on non-Windows. No multi-targeting is needed.
 
-### Build strategy (revised from plan)
-Multi-target Core, UI, and App: `net10.0;net10.0-windows10.0.17763.0` so Linux/macOS builds remain possible (MTP button hidden via `OnPlatform`, `#if WINDOWS` code compiled out). Tests remain `net10.0` only.
+### Build strategy
+All projects target `net10.0` only. `MediaDevices` is referenced without a TFM condition. Platform gating is done at runtime via `OperatingSystem.IsWindows()` at the call site (`PathPickerControl.OnMtpPickerClick`) rather than with `#if WINDOWS` conditional compilation. The MTP button is hidden on non-Windows via `IsVisible="{OnPlatform Windows=True, Default=False}"` in AXAML.
 
 ### What was built
 - `SmartCopy.Core/FileSystem/MtpFileSystemProvider.cs` — full `IFileSystemProvider` impl (`#if WINDOWS`); `RootPath = "mtp://{device.FriendlyName}/"` with `device.Model` fallback; correct 1.10.0 API: `EnumerateDirectories()`/`EnumerateFiles()`, `fileInfo.OpenRead()`, `UploadFile(Stream, path)`, `Length` cast from `ulong`
-- `SmartCopy.UI/ViewModels/Dialogs/MtpDevicePickerViewModel.cs` — lists `MediaDevice.GetDevices()` (`#if WINDOWS`, excluded from net10.0 build)
-- `SmartCopy.UI/Views/Dialogs/MtpDevicePickerDialog.axaml` + `.axaml.cs` — simple device list; no `x:DataType` (avoids Avalonia name-generator failure on net10.0 slice); code-behind always compiles, `#if WINDOWS` inside handler only
+- `SmartCopy.UI/ViewModels/Dialogs/MtpDevicePickerViewModel.cs` — lists `MediaDevice.GetDevices()`
+- `SmartCopy.UI/Views/Dialogs/MtpDevicePickerDialog.axaml` + `.axaml.cs` — simple device list; no `x:DataType` (avoids Avalonia name-generator issues with source-generated bindings)
 - `SmartCopy.Core/Settings/IAppContext` + `SmartCopyAppContext` — `Register(IFileSystemProvider)` method; `MainViewModel` now passes shared `_providerRegistry` to `_appContext` so both resolve the same set of providers
 - `PathPickerViewModel.RegisterProvider` callback wired in `MainViewModel` (source), `CopyStepEditorViewModel`, and `MoveStepEditorViewModel` (destinations) — MTP available in every path picker
 - `EditStepDialogViewModel.ForNew/ForEdit`, `StepEditorViewModelFactory.Create`, `CopyStepEditorViewModel`, `MoveStepEditorViewModel` — all changed from `AppSettings` to `IAppContext`

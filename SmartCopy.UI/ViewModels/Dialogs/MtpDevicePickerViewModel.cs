@@ -1,4 +1,3 @@
-#if WINDOWS
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -37,4 +36,3 @@ public partial class MtpDevicePickerViewModel : ObservableObject
 
     private bool CanConfirm() => SelectedDevice is not null;
 }
-#endif

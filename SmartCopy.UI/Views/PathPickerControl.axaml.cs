@@ -154,7 +154,7 @@ public partial class PathPickerControl : UserControl
 
     private async void OnMtpPickerClick(object? sender, RoutedEventArgs e)
     {
-#if WINDOWS
+        if (!OperatingSystem.IsWindows()) return;
         if (DataContext is not SmartCopy.UI.ViewModels.PathPickerViewModel vm) return;
         if (TopLevel.GetTopLevel(this) is not Window window) return;
 
@@ -167,9 +167,6 @@ public partial class PathPickerControl : UserControl
         vm.RegisterProvider?.Invoke(provider);
         vm.Path = provider.RootPath;
         vm.ApplyPathCommand.Execute(null);
-#else
-        await System.Threading.Tasks.Task.CompletedTask;
-#endif
     }
 
     private async void OnBrowseClick(object? sender, RoutedEventArgs e)
