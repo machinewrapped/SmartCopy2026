@@ -13,6 +13,34 @@ The principles that drive the design of SmartCopy 2 are:
 - User control and configuration
 - Safety and preview
 
+## Installation
+
+Pre-built binaries are available on the [Releases](https://github.com/machinewrapped/SmartCopy2026/releases) page for Windows, Linux, and macOS. Unzip anywhere and run, there is no installer.
+
+Alternatively, you can install it via a package manager:
+
+### macOS / Linux / WSL
+```
+brew tap machinewrapped/smartcopy
+brew install smartcopy
+```
+
+> **Note:** The macOS binary is not code-signed. On first launch, right-click → Open to bypass Gatekeeper.
+
+### Linux (AppImage)
+Or download the `x86_64.AppImage` from the [Releases](https://github.com/machinewrapped/SmartCopy2026/releases) page — no installation required:
+```bash
+chmod +x SmartCopy-*-x86_64.AppImage
+./SmartCopy-*-x86_64.AppImage
+```
+
+---
+
+### Windows
+```
+winget install machinewrapped.SmartCopy
+```
+
 ## Features
 
 **Directory tree view**
@@ -52,34 +80,6 @@ The UI is organized as a left-to-right data flow:
 | MTP devices (phones, cameras) | Yes | — | — |
 | Filesystem watcher | Yes | Yes | Yes |
 | Trash / recycle bin | Yes | Yes | Yes |
-
-## Installation
-
-Pre-built binaries are available on the [Releases](https://github.com/machinewrapped/SmartCopy2026/releases) page for Windows, Linux, and macOS.
-
-Alternatively, you can install it via a package manager:
-
-### macOS / Linux / WSL
-```
-brew tap machinewrapped/smartcopy
-brew install smartcopy
-```
-
-> **Note:** The macOS binary is not code-signed. On first launch, right-click → Open to bypass Gatekeeper.
-
-### Linux (AppImage)
-Or download the `x86_64.AppImage` from the [Releases](https://github.com/machinewrapped/SmartCopy2026/releases) page — no installation required:
-```bash
-chmod +x SmartCopy-*-x86_64.AppImage
-./SmartCopy-*-x86_64.AppImage
-```
-
----
-
-### Windows
-```
-(coming soon) winget install machinewrapped.SmartCopy
-```
 
 ## Building and running from source
 
