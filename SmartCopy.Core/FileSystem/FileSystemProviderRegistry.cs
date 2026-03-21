@@ -1,6 +1,6 @@
 namespace SmartCopy.Core.FileSystem;
 
-public sealed class FileSystemProviderRegistry : IPathResolver
+public sealed class FileSystemProviderRegistry : IPathResolver, IDisposable
 {
     // Instance state — per-registry registered providers
     private readonly System.Threading.Lock _lock = new();
@@ -153,6 +153,18 @@ public sealed class FileSystemProviderRegistry : IPathResolver
 
             return provider;
         }
+    }
+
+    public void Dispose()
+    {
+        KeyValuePair<string, IFileSystemProvider>[] snapshot;
+        lock (_lock)
+        {
+            snapshot = [.. _registered];
+            _registered.Clear();
+        }
+        foreach (var entry in snapshot)
+            (entry.Value as IDisposable)?.Dispose();
     }
 
     internal static bool IsPrefixMatch(string path, string prefix)

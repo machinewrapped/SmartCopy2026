@@ -30,7 +30,7 @@ using SmartCopy.UI.Views.Workflows;
 
 namespace SmartCopy.UI.ViewModels;
 
-public partial class MainViewModel : ViewModelBase
+public partial class MainViewModel : ViewModelBase, IDisposable
 {
     private const int MaxRecentSources = 10;    // TODO: make this configurable
 
@@ -1356,6 +1356,15 @@ public partial class MainViewModel : ViewModelBase
         _directoryWatcher.WatcherError += OnDirectoryWatcherError;
         _directoryWatcher.NotifyNodeWillBeRemoved += OnDirectoryWatcherNodeWillBeRemoved;
         _directoryWatcher.Start();
+    }
+
+    public void Dispose()
+    {
+        DisposeDirectoryWatcher();
+        _scanCts?.Dispose();
+        _filterCts?.Dispose();
+        _providerRegistry.Dispose();
+        GC.SuppressFinalize(this);
     }
 
     private void DisposeDirectoryWatcher()

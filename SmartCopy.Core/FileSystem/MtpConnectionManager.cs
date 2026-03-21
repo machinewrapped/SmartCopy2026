@@ -17,7 +17,7 @@ public static class MtpConnectionManager
         public List<MtpFileSystemProvider> Providers { get; } = [];
     }
 
-    private static readonly Lock Sync = new();
+    private static readonly System.Threading.Lock Sync = new();
     private static readonly Dictionary<string, Connection> Connections = new();
 
     /// <summary>
