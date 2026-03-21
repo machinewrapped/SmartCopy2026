@@ -50,6 +50,15 @@
 
         <Separator Background="{DynamicResource PanelBorderBrush}" Height="1" Margin="0,4" />
 
+        <!-- Dependencies -->
+        <TextBlock Text="Built with Avalonia, CommunityToolkit.Mvvm, and MediaDevices"
+                   TextWrapping="Wrap"
+                   TextAlignment="Center"
+                   FontSize="12"
+                   Opacity="0.5" />
+
+        <Separator Background="{DynamicResource PanelBorderBrush}" Height="1" Margin="0,4" />
+
         <!-- License -->
         <TextBlock Text="Released under the MIT License"
                    FontSize="12"
