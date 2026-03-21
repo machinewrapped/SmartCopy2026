@@ -53,7 +53,7 @@ public sealed class PipelineValidatorTests
     public async Task ExecutablePipelineWithoutSelectedInputs_ReturnsBlockingIssue()
     {
         var result = await PipelineValidator.ValidateAsync(
-            [new CopyStep("/mem/out")],
+            [new CopyStep("mem://out")],
             MakeContext(selectedFileCount: 0));
 
         Assert.False(result.CanRun);
@@ -65,8 +65,8 @@ public sealed class PipelineValidatorTests
     {
         var result = await PipelineValidator.ValidateAsync(
         [
-            new CopyStep("/mem/backup"),
-            new MoveStep("/mem/archive"),
+            new CopyStep("mem://backup"),
+            new MoveStep("mem://archive"),
         ],
         MakeContext());
 
@@ -90,7 +90,7 @@ public sealed class PipelineValidatorTests
         var result = await PipelineValidator.ValidateAsync(
         [
             new DeleteStep(),
-            new CopyStep("/mem/out"),
+            new CopyStep("mem://out"),
         ],
         MakeContext());
 
@@ -103,7 +103,7 @@ public sealed class PipelineValidatorTests
     {
         var result = await PipelineValidator.ValidateAsync(
         [
-            new MoveStep("/mem/out"),
+            new MoveStep("mem://out"),
             new DeleteStep(),
         ],
         MakeContext());
@@ -120,7 +120,7 @@ public sealed class PipelineValidatorTests
         [
             new DeleteStep(),
             new InvertSelectionStep(),
-            new CopyStep("/mem/out"),
+            new CopyStep("mem://out"),
         ],
         MakeContext());
 
@@ -138,7 +138,7 @@ public sealed class PipelineValidatorTests
         var pipeline = new TransformPipeline(
         [
             new ClearSelectionStep(),
-            new CopyStep("/mem/dest"),
+            new CopyStep("mem://dest"),
         ]);
 
         var result = await PipelineValidator.ValidateAsync(pipeline.Steps, MakeContext());

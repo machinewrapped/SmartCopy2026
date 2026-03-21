@@ -84,7 +84,7 @@ public sealed class PipelineDirectoryTests
         dirNode.FilterResult = FilterResult.Included;
         dirNode.CheckState = CheckState.Checked;
 
-        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("/mem/dest")]));
+        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("mem://dest")]));
         var results = await runner.ExecuteAsync(
             new PipelineJob
             {
@@ -156,7 +156,7 @@ public sealed class PipelineDirectoryTests
         mp3Node.FilterResult = FilterResult.Included;
         mp3Node.CheckState = CheckState.Checked;
 
-        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("/mem/dest")]));
+        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("mem://dest")]));
         var results = await runner.ExecuteAsync(
             new PipelineJob
             {
@@ -198,7 +198,7 @@ public sealed class PipelineDirectoryTests
         var runner = new PipelineRunner(new TransformPipeline(
         [
             new FlattenStep(),
-            new MoveStep("/mem/dest"),
+            new MoveStep("mem://dest"),
         ]));
 
         var results = await runner.ExecuteAsync(
@@ -236,7 +236,7 @@ public sealed class PipelineDirectoryTests
         var runner = new PipelineRunner(new TransformPipeline(
         [
             new FlattenStep(trimMode: FlattenTrimMode.StripLeading, levels: 1),
-            new CopyStep("/mem/dest"),
+            new CopyStep("mem://dest"),
         ]));
         await runner.ExecuteAsync(
             new PipelineJob
@@ -269,7 +269,7 @@ public sealed class PipelineDirectoryTests
         parentDir.CheckState = CheckState.Checked;
 
         var ct = CancellationToken.None;
-        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("/mem/dest")]));
+        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("mem://dest")]));
         var results = await runner.ExecuteAsync(
             new PipelineJob
             {
@@ -341,7 +341,7 @@ public sealed class PipelineDirectoryTests
         dirNode.CheckState = CheckState.Checked;
 
         var ct = CancellationToken.None;
-        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/mem/dest", overwriteMode: OverwriteMode.Always)]));
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("mem://dest", overwriteMode: OverwriteMode.Always)]));
         var plan = await runner.PreviewAsync(
             new PipelineJob
             {
@@ -382,7 +382,7 @@ public sealed class PipelineDirectoryTests
         // With dirNode (src/music) selected, the pipeline should see 1 atomic move result,
         // not 2 individual file results.
         var ct = CancellationToken.None;
-        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("/mem/dest")]));
+        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("mem://dest")]));
         var results = await runner.ExecuteAsync(
             new PipelineJob
             {

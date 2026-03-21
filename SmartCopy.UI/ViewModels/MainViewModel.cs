@@ -160,6 +160,9 @@ public partial class MainViewModel : ViewModelBase
         _settings = new AppSettings { SettingsFilePath = dataStore.GetFilePath("settings.json") };
         _appContext = new SmartCopyAppContext(_settings, dataStore, _providerRegistry);
 
+        if (OperatingSystem.IsWindows())
+            _providerRegistry.RegisterSchemeFactory("mtp", MtpProviderFactory.Create);
+
         _trashService = CreateTrashService();
 
         _operationJournal = new OperationJournal(dataStore.GetDirectoryPath("Logs"));

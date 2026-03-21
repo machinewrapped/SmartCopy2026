@@ -56,11 +56,16 @@ public static class PathHelper
 
         var trimmed = path.Trim();
 
-        // URI-scheme paths (e.g. "mtp://device/", "mem://...") are opaque to the host
-        // filesystem — return as-is so Path.GetFullPath cannot mangle them.
-        if (trimmed.Contains("://", StringComparison.Ordinal))
+        // URI-scheme paths (e.g. "mtp://device/", "mem://...") need lightweight
+        // normalization: collapse extra slashes after "://" and trim trailing slash.
+        var schemeEnd = trimmed.IndexOf("://", StringComparison.Ordinal);
+        if (schemeEnd >= 0)
         {
-            return trimmed;
+            var uriPrefix = trimmed[..(schemeEnd + 3)];
+            var rest = trimmed[(schemeEnd + 3)..].TrimStart('/');
+            while (rest.Contains("//", StringComparison.Ordinal))
+                rest = rest.Replace("//", "/", StringComparison.Ordinal);
+            return uriPrefix + rest.TrimEnd('/');
         }
 
         // If the path looks like a posix path but the OS does not use forward slashes,

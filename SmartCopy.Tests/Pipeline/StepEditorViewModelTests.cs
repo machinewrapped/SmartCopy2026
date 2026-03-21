@@ -12,20 +12,20 @@ public sealed class StepEditorViewModelTests
     public void CopyEditor_LoadFromBuildStep_RoundTripsDestination()
     {
         var editor = new CopyStepEditorViewModel(new TestAppContext());
-        editor.LoadFrom(new PipelineStepViewModel(new CopyStep("/mem/out")));
+        editor.LoadFrom(new PipelineStepViewModel(new CopyStep("mem://out")));
 
         var step = Assert.IsType<CopyStep>(editor.BuildStep());
-        Assert.Equal("/mem/out", step.DestinationPath);
+        Assert.Equal("mem://out", step.DestinationPath);
     }
 
     [Fact]
     public void MoveEditor_LoadFromBuildStep_RoundTripsDestination()
     {
         var editor = new MoveStepEditorViewModel(new TestAppContext());
-        editor.LoadFrom(new PipelineStepViewModel(new MoveStep("/mem/archive")));
+        editor.LoadFrom(new PipelineStepViewModel(new MoveStep("mem://archive")));
 
         var step = Assert.IsType<MoveStep>(editor.BuildStep());
-        Assert.Equal("/mem/archive", step.DestinationPath);
+        Assert.Equal("mem://archive", step.DestinationPath);
     }
 
     [Fact]
@@ -60,7 +60,7 @@ public sealed class StepEditorViewModelTests
         Assert.False(copy.IsValid);
         Assert.False(flatten.IsValid);
 
-        copy.DestinationPath = "/mem/out";
+        copy.DestinationPath = "mem://out";
         flatten.Levels = 1;
 
         Assert.True(copy.IsValid);

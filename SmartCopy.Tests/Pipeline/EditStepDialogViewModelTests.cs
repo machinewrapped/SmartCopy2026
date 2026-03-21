@@ -19,12 +19,12 @@ public sealed class EditStepDialogViewModelTests
     [Fact]
     public void ForEdit_CopyStep_PrePopulatesDestination()
     {
-        var existing = new PipelineStepViewModel(new CopyStep("/mem/out"));
+        var existing = new PipelineStepViewModel(new CopyStep("mem://out"));
 
         var vm = EditStepDialogViewModel.ForEdit(existing, new TestAppContext());
         var editor = Assert.IsType<CopyStepEditorViewModel>(vm.Editor);
 
-        Assert.Equal("/mem/out", editor.DestinationPath);
+        Assert.Equal("mem://out", editor.DestinationPath);
     }
 
     [Fact]
@@ -36,7 +36,7 @@ public sealed class EditStepDialogViewModelTests
         Assert.False(vm.IsValid);
         Assert.False(vm.OkCommand.CanExecute(null));
 
-        editor.DestinationPath = "/mem/out";
+        editor.DestinationPath = "mem://out";
 
         Assert.True(vm.IsValid);
         Assert.True(vm.OkCommand.CanExecute(null));
@@ -73,7 +73,7 @@ public sealed class EditStepDialogViewModelTests
     {
         var vm = EditStepDialogViewModel.ForNew(StepKind.Copy, new TestAppContext());
         var editor = (CopyStepEditorViewModel)vm.Editor;
-        editor.DestinationPath = "/mem/out";
+        editor.DestinationPath = "mem://out";
         var autoName = vm.StepName;
 
         vm.OkCommand.Execute(null);
@@ -87,7 +87,7 @@ public sealed class EditStepDialogViewModelTests
     {
         var vm = EditStepDialogViewModel.ForNew(StepKind.Copy, new TestAppContext());
         var editor = (CopyStepEditorViewModel)vm.Editor;
-        editor.DestinationPath = "/mem/out";
+        editor.DestinationPath = "mem://out";
         vm.StepName = "Backup Music";
 
         vm.OkCommand.Execute(null);

@@ -77,13 +77,13 @@ public sealed class MoveStepFallbackTests
     public async Task CrossProvider_File_UsesCopyDeleteFallback()
     {
         var sourceProvider = MemoryFileSystemFixtures.Create(s => s.WithFile("/src/file.txt", "content"u8), volumeId: "VOL1");
-        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target", volumeId: "VOL2");
+        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "mem://target", volumeId: "VOL2");
 
         var root = await sourceProvider.BuildDirectoryTree("/src");
         root.Files[0].CheckState = CheckState.Checked;
 
         var ctx = new MoveTestContext(root, sourceProvider, targetProvider);
-        var step = new MoveStep("/target/dest");
+        var step = new MoveStep("mem://target/dest");
 
         var results = new List<TransformResult>();
         await foreach (var r in step.ApplyAsync(ctx, CancellationToken.None))
@@ -110,7 +110,7 @@ public sealed class MoveStepFallbackTests
 
         // Same provider instance for both source and target → sameProvider = true.
         var ctx = new MoveTestContext(root, provider, provider);
-        var step = new MoveStep("/mem/dest");
+        var step = new MoveStep("mem://dest");
 
         var results = new List<TransformResult>();
         await foreach (var r in step.ApplyAsync(ctx, CancellationToken.None))
@@ -139,7 +139,7 @@ public sealed class MoveStepFallbackTests
 
         // Same wrapped instance, VolumeId="MEM" → sameVolume=true, canAtomicMove=false → fallback.
         var ctx = new MoveTestContext(root, noAtomicMove);
-        var step = new MoveStep("/mem/dest");
+        var step = new MoveStep("mem://dest");
 
         var results = new List<TransformResult>();
         await foreach (var r in step.ApplyAsync(ctx, CancellationToken.None))
@@ -164,7 +164,7 @@ public sealed class MoveStepFallbackTests
             .WithFile("/src/dir/a.txt", "aaa"u8)
             .WithFile("/src/dir/b.txt", "bbb"u8)
             , volumeId: "VOL1");
-        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target", volumeId: "VOL2");
+        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "mem://target", volumeId: "VOL2");
 
         var root = await sourceProvider.BuildDirectoryTree("/src");
         var dir = root.Children.Single() as DirectoryNode;
@@ -173,7 +173,7 @@ public sealed class MoveStepFallbackTests
         foreach (var f in dir.Files) f.CheckState = CheckState.Checked;
 
         var ctx = new MoveTestContext(root, sourceProvider, targetProvider);
-        var step = new MoveStep("/target/dest");
+        var step = new MoveStep("mem://target/dest");
 
         var results = new List<TransformResult>();
         await foreach (var r in step.ApplyAsync(ctx, CancellationToken.None))
@@ -199,7 +199,7 @@ public sealed class MoveStepFallbackTests
             .WithFile("/src/dir/keep.txt", "keep"u8)
             .WithFile("/src/dir/move.txt", "move"u8)
             , volumeId: "VOL1");
-        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target", volumeId: "VOL2");
+        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "mem://target", volumeId: "VOL2");
 
         var root = await sourceProvider.BuildDirectoryTree("/src");
         var dir = root.Children.Single() as DirectoryNode;
@@ -208,7 +208,7 @@ public sealed class MoveStepFallbackTests
         dir.Files.Single(f => f.Name == "move.txt").CheckState = CheckState.Checked;
 
         var ctx = new MoveTestContext(root, sourceProvider, targetProvider);
-        var step = new MoveStep("/target/dest");
+        var step = new MoveStep("mem://target/dest");
 
         var results = new List<TransformResult>();
         await foreach (var r in step.ApplyAsync(ctx, CancellationToken.None))
@@ -239,7 +239,7 @@ public sealed class MoveStepFallbackTests
         dir.CheckState = CheckState.Checked;
 
         var ctx = new MoveTestContext(root, provider, provider);
-        var step = new MoveStep("/mem/dest");
+        var step = new MoveStep("mem://dest");
 
         var results = new List<TransformResult>();
         await foreach (var r in step.ApplyAsync(ctx, CancellationToken.None))
@@ -264,7 +264,7 @@ public sealed class MoveStepFallbackTests
             .WithFile("/src/dir/top.txt", "top"u8)
             .WithFile("/src/dir/sub/nested.txt", "nested"u8)
             , volumeId: "VOL1");
-        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target", volumeId: "VOL2");
+        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "mem://target", volumeId: "VOL2");
 
         var root = await sourceProvider.BuildDirectoryTree("/src");
         var dir = root.Children.Single() as DirectoryNode;
@@ -277,7 +277,7 @@ public sealed class MoveStepFallbackTests
         foreach (var f in sub.Files) f.CheckState = CheckState.Checked;
 
         var ctx = new MoveTestContext(root, sourceProvider, targetProvider);
-        var step = new MoveStep("/target/dest");
+        var step = new MoveStep("mem://target/dest");
 
         var results = new List<TransformResult>();
         await foreach (var r in step.ApplyAsync(ctx, CancellationToken.None))
@@ -313,7 +313,7 @@ public sealed class MoveStepFallbackTests
         foreach (var f in dir.Files) f.CheckState = CheckState.Checked;
 
         var ctx = new MoveTestContext(root, noAtomicMove, noAtomicMove);
-        var step = new MoveStep("/mem/dest");
+        var step = new MoveStep("mem://dest");
 
         var results = new List<TransformResult>();
         await foreach (var r in step.ApplyAsync(ctx, CancellationToken.None))
@@ -335,13 +335,13 @@ public sealed class MoveStepFallbackTests
     public async Task DifferentVolumeIds_UsesCopyDeleteFallback()
     {
         var sourceProvider = MemoryFileSystemFixtures.Create(s => s.WithFile("/src/file.txt", "content"u8), volumeId: "C:\\");
-        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "/target", volumeId: "D:\\");
+        var targetProvider = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"), customRootPath: "mem://target", volumeId: "D:\\");
 
         var root = await sourceProvider.BuildDirectoryTree("/src");
         root.Files[0].CheckState = CheckState.Checked;
 
         var ctx = new MoveTestContext(root, sourceProvider, targetProvider);
-        var step = new MoveStep("/target/dest");
+        var step = new MoveStep("mem://target/dest");
 
         var results = new List<TransformResult>();
         await foreach (var r in step.ApplyAsync(ctx, CancellationToken.None))
@@ -369,7 +369,7 @@ public sealed class MoveStepFallbackTests
 
         // Same instance for source and target — copy+delete still moves the file correctly.
         var ctx = new MoveTestContext(root, provider, provider);
-        var step = new MoveStep("/mem/dest");
+        var step = new MoveStep("mem://dest");
 
         var results = new List<TransformResult>();
         await foreach (var r in step.ApplyAsync(ctx, CancellationToken.None))
