@@ -9,13 +9,13 @@ public sealed class PathHelperTests
     {
         var normalized = PathHelper.NormalizeDistinctUserPaths(
         [
-            "/mem/Music/",
-            "/mem/Music",
-            "/mem//Music/",
+            "mem://Music/",
+            "mem://Music",
+            "mem:///Music/",
         ]);
 
         Assert.Single(normalized);
-        Assert.Equal("/mem/Music", normalized[0]);
+        Assert.Equal("mem://Music", normalized[0]);
     }
 
     [Fact]
@@ -37,6 +37,16 @@ public sealed class PathHelperTests
         var expectedRoot = Path.GetPathRoot(input);
 
         Assert.Equal(expectedRoot, PathHelper.RemoveTrailingSeparator(input));
+    }
+
+    [Fact]
+    public void NormalizeUserPath_UriSchemePath_NormalizesSlashes()
+    {
+        // Trailing slash stripped, extra slashes collapsed, scheme prefix preserved
+        Assert.Equal("mtp://Motorola Edge 60 Fusion", PathHelper.NormalizeUserPath("mtp://Motorola Edge 60 Fusion/"));
+        Assert.Equal("mtp://device/DCIM/Photos", PathHelper.NormalizeUserPath("mtp://device/DCIM/Photos"));
+        Assert.Equal("mem://Music", PathHelper.NormalizeUserPath("mem://Music/"));
+        Assert.Equal("mem://Music", PathHelper.NormalizeUserPath("mem:///Music/"));
     }
 
     [Fact]

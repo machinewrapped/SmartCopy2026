@@ -26,7 +26,7 @@ public sealed class StepKindExtensionsTests
     public void ViewModel_IconDelegatesToExtensionMethod()
     {
         // use a real step to cover the simple forwarding logic
-        var step = new CopyStep("/mem/target");
+        var step = new CopyStep("mem://target");
         var vm = new PipelineStepViewModel(step);
         Assert.Equal(step.StepType.GetIcon(), vm.Icon);
     }

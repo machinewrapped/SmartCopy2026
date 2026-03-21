@@ -685,6 +685,12 @@ public partial class MainWindow : Window
         TrySaveWindowState();
     }
 
+    protected override void OnClosed(EventArgs e)
+    {
+        base.OnClosed(e);
+        _mainVm?.Dispose();
+    }
+
     private async Task ConfirmQuitAsync()
     {
         var confirmVm = new ConfirmDialogViewModel

@@ -11,13 +11,13 @@ public sealed class WorkflowPresetStoreTests
     private static WorkflowConfig MakeConfig(string name) => new(
         Name: name,
         Description: null,
-        SourcePath: "/mem/Source",
+        SourcePath: "mem://Source",
         FilterChain: new FilterChainConfig(name, null, []),
         Pipeline: new PipelineConfig(
             Name: name,
             Description: null,
             Steps: [new TransformStepConfig(StepKind.Copy, 
-                new System.Text.Json.Nodes.JsonObject { ["destinationPath"] = "/mem/Target" })]));
+                new System.Text.Json.Nodes.JsonObject { ["destinationPath"] = "mem://Target" })]));
 
     [Fact]
     public async Task GetUserPresets_EmptyForMissingDirectory()
@@ -41,7 +41,7 @@ public sealed class WorkflowPresetStoreTests
         var loaded = await store.GetUserPresetsAsync();
         Assert.Single(loaded);
         Assert.Equal("My Workflow", loaded[0].Name);
-        Assert.Equal("/mem/Source", loaded[0].Config.SourcePath);
+        Assert.Equal("mem://Source", loaded[0].Config.SourcePath);
     }
 
     [Fact]
@@ -64,12 +64,12 @@ public sealed class WorkflowPresetStoreTests
         using var tmp = new TempDirectory();
         var store = new WorkflowPresetStore(tmp.Path);
 
-        await store.SaveUserPresetAsync("Workflow", MakeConfig("Workflow") with { SourcePath = "/mem/A" });
-        await store.SaveUserPresetAsync("Workflow", MakeConfig("Workflow") with { SourcePath = "/mem/B" });
+        await store.SaveUserPresetAsync("Workflow", MakeConfig("Workflow") with { SourcePath = "mem://A" });
+        await store.SaveUserPresetAsync("Workflow", MakeConfig("Workflow") with { SourcePath = "mem://B" });
 
         var loaded = await store.GetUserPresetsAsync();
         Assert.Single(loaded);
-        Assert.Equal("/mem/B", loaded[0].Config.SourcePath);
+        Assert.Equal("mem://B", loaded[0].Config.SourcePath);
     }
 
     [Fact]

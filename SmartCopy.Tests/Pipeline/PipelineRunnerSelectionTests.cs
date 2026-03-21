@@ -80,7 +80,7 @@ public sealed class PipelineRunnerSelectionTests
         var runner = new PipelineRunner(new TransformPipeline(
         [
             new InvertSelectionStep(),
-            new CopyStep("/mem/dest"),
+            new CopyStep("mem://dest"),
         ]));
 
         await runner.ExecuteAsync(
@@ -123,7 +123,7 @@ public sealed class PipelineRunnerSelectionTests
         var runner = new PipelineRunner(new TransformPipeline(
         [
             new InvertSelectionStep(),
-            new CopyStep("/mem/dest"),
+            new CopyStep("mem://dest"),
         ]));
 
         // Preview first — this must NOT flip real CheckState
@@ -157,7 +157,7 @@ public sealed class PipelineRunnerSelectionTests
         var runner = new PipelineRunner(new TransformPipeline(
         [
             new SelectAllStep(),
-            new CopyStep("/mem/dest"),
+            new CopyStep("mem://dest"),
         ]));
 
         await runner.ExecuteAsync(
@@ -200,7 +200,7 @@ public sealed class PipelineRunnerSelectionTests
         var runner = new PipelineRunner(new TransformPipeline(
         [
             new SelectAllStep(),
-            new CopyStep("/mem/dest"),
+            new CopyStep("mem://dest"),
         ]));
 
         var plan = await runner.PreviewAsync(

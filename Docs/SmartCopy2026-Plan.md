@@ -63,7 +63,7 @@ Before redesigning, preserve these patterns:
 | MVVM | **CommunityToolkit.Mvvm** | Source-generator based; no runtime reflection overhead |
 | DI | **Microsoft.Extensions.DependencyInjection** | Standard; lightweight |
 | Config | **System.Text.Json** | Built-in; fast; no extra dependency |
-| MTP (Windows) | **MediaDevices** | Wraps Windows WPD API; Windows only; abstracted behind `IFileSystemProvider` |
+| MTP (Windows) | **MediaDevices** | Wraps Windows WPD API; runtime Windows-only (WPD is a Win32 COM API); ships cross-platform .NET assemblies so no multi-targeting needed — gated by `OperatingSystem.IsWindows()` at call sites |
 | Plugins | **AssemblyLoadContext** | Built-in isolation; exactly suited for per-plugin loading |
 | Testing | **xUnit + NSubstitute** | Standard .NET test stack; NSubstitute mocks `IFileSystemProvider` cleanly |
 | Logging | **Serilog** | Structured rolling-file logs; makes operation journal parsing trivial; no need to reinvent |

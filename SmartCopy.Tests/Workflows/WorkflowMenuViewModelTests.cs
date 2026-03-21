@@ -12,13 +12,13 @@ public sealed class WorkflowMenuViewModelTests
     private static WorkflowConfig MakeConfig(string name) => new(
         Name: name,
         Description: null,
-        SourcePath: "/mem/Source",
+        SourcePath: "mem://Source",
         FilterChain: new FilterChainConfig(name, null, []),
         Pipeline: new PipelineConfig(
             Name: name,
             Description: null,
             Steps: [new TransformStepConfig(StepKind.Copy, 
-                new System.Text.Json.Nodes.JsonObject { ["destinationPath"] = "/mem/Target" })]));
+                new System.Text.Json.Nodes.JsonObject { ["destinationPath"] = "mem://Target" })]));
 
     [Fact]
     public async Task RefreshAsync_PopulatesSavedWorkflows()

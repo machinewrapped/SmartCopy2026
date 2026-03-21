@@ -1,9 +1,10 @@
-using System;
+using System.Runtime.Versioning;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using SmartCopy.Core.FileSystem;
 using SmartCopy.UI.ViewModels;
 
 namespace SmartCopy.UI.Views;
@@ -150,6 +151,25 @@ public partial class PathPickerControl : UserControl
         }
         
         e.Handled = true;
+    }
+
+    [SupportedOSPlatform("windows")]
+    private async void OnMtpPickerClick(object? sender, RoutedEventArgs e)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        if (DataContext is not PathPickerViewModel vm) return;
+        if (TopLevel.GetTopLevel(this) is not Window window) return;
+
+        var pickerVm = new ViewModels.Dialogs.MtpDevicePickerViewModel();
+        var dialog = new Dialogs.MtpDevicePickerDialog { DataContext = pickerVm };
+        var result = await dialog.ShowDialog<ViewModels.Dialogs.MtpPickerResult?>(window);
+        if (result is null) return;
+
+        var provider = new MtpFileSystemProvider(result.Device, result.Path);
+        try { vm.RegisterProvider?.Invoke(provider); }
+        catch (InvalidOperationException) { provider.Dispose(); }  // same path already registered — reuse existing
+        vm.Path = result.Path;
+        vm.ApplyPathCommand.Execute(null);
     }
 
     private async void OnBrowseClick(object? sender, RoutedEventArgs e)

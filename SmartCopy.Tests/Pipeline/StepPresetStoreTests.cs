@@ -17,7 +17,7 @@ public sealed class StepPresetStoreTests
             IsBuiltIn = false,
             Config = new TransformStepConfig(
                 StepType: stepType,
-                Parameters: new JsonObject { ["destinationPath"] = "/mem/out" }),
+                Parameters: new JsonObject { ["destinationPath"] = "mem://out" }),
         };
 
     // -------------------------------------------------------------------------

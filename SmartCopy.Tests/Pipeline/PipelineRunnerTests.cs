@@ -22,7 +22,7 @@ public sealed class PipelineRunnerTests
         Assert.NotNull(sourceNode);
 
         sourceNode.CheckState = CheckState.Checked;
-        var pipeline = new TransformPipeline([new CopyStep("/mem/Mirror")]);
+        var pipeline = new TransformPipeline([new CopyStep("mem://Mirror")]);
         var runner = new PipelineRunner(pipeline);
 
         var job = new PipelineJob
@@ -150,7 +150,7 @@ public sealed class PipelineRunnerTests
         var runner = new PipelineRunner(new TransformPipeline(
         [
             new FlattenStep(),
-            new CopyStep("/mem/out"),
+            new CopyStep("mem://out"),
         ]));
 
         await runner.ExecuteAsync(
@@ -179,7 +179,7 @@ public sealed class PipelineRunnerTests
         var runner = new PipelineRunner(new TransformPipeline(
         [
             new FlattenStep(),
-            new CopyStep("/mem/out"),
+            new CopyStep("mem://out"),
         ]));
 
         var plan = await runner.PreviewAsync(
@@ -192,7 +192,7 @@ public sealed class PipelineRunnerTests
             CancellationToken.None);
 
         var copyAction = plan.Actions.Single(a => a.SourceResult == SourceResult.Copied);
-        Assert.Equal("/mem/out/track.mp3", copyAction.DestinationPath);
+        Assert.Equal("mem://out/track.mp3", copyAction.DestinationPath);
     }
 
     [Fact]
@@ -208,7 +208,7 @@ public sealed class PipelineRunnerTests
         var node = sourceRoot.FindNodeByPathSegments(["source", "song.mp3"]);
         Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
-        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("/mem/dest")]));
+        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("mem://dest")]));
 
         var results = await runner.ExecuteAsync(
             new PipelineJob
@@ -235,7 +235,7 @@ public sealed class PipelineRunnerTests
             .WithDirectory("/source")
             .WithDirectory("/dest"));
         var root = await provider.BuildDirectoryTree();
-        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/mem/dest")]));
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("mem://dest")]));
 
         var emptyJob = new PipelineJob
         {
@@ -264,10 +264,10 @@ public sealed class PipelineRunnerTests
             .WithFile("/source/b.txt", "b"u8));
 
         var targetProviderA = MemoryFileSystemFixtures.Create(f => f
-            .WithDirectory("/destA"), customRootPath: "/targetA");
+            .WithDirectory("/destA"), customRootPath: "mem://targetA");
 
         var targetProviderB = MemoryFileSystemFixtures.Create(f => f
-            .WithDirectory("/destB"), customRootPath: "/targetB");
+            .WithDirectory("/destB"), customRootPath: "mem://targetB");
 
         var root = await sourceProvider.BuildDirectoryTree();
         var nodeA = root.FindNodeByPathSegments(["source", "a.txt"]);
@@ -284,8 +284,8 @@ public sealed class PipelineRunnerTests
         registry.Register(targetProviderB);
 
         var pipeline = new TransformPipeline([
-            new CopyStep("/targetA/destA"),
-            new CopyStep("/targetB/destB")
+            new CopyStep("mem://targetA/destA"),
+            new CopyStep("mem://targetB/destB")
         ]);
 
         var runner = new PipelineRunner(pipeline);
@@ -314,10 +314,10 @@ public sealed class PipelineRunnerTests
             .WithFile("/source/a.txt", "x"u8));
 
         var targetProviderA = MemoryFileSystemFixtures.Create(f => f
-            .WithDirectory("/destA"), customRootPath: "/targetA");
+            .WithDirectory("/destA"), customRootPath: "mem://targetA");
 
         var targetProviderB = MemoryFileSystemFixtures.Create(f => f
-            .WithDirectory("/destB"), customRootPath: "/targetB");
+            .WithDirectory("/destB"), customRootPath: "mem://targetB");
 
         var root = await sourceProvider.BuildDirectoryTree();
         var node = root.FindNodeByPathSegments(["source", "a.txt"]);
@@ -330,8 +330,8 @@ public sealed class PipelineRunnerTests
         registry.Register(targetProviderB);
 
         var pipeline = new TransformPipeline([
-            new CopyStep("/targetA/destA"),
-            new CopyStep("/targetB/destB")
+            new CopyStep("mem://targetA/destA"),
+            new CopyStep("mem://targetB/destB")
         ]);
 
         var runner = new PipelineRunner(pipeline);
@@ -348,10 +348,10 @@ public sealed class PipelineRunnerTests
         
         var actionA = plan.Actions[0];
         Assert.Equal(SourceResult.Copied, actionA.SourceResult);
-        Assert.Equal("/targetA/destA/source/a.txt", actionA.DestinationPath);
+        Assert.Equal("mem://targetA/destA/source/a.txt", actionA.DestinationPath);
 
         var actionB = plan.Actions[1];
         Assert.Equal(SourceResult.Copied, actionB.SourceResult);
-        Assert.Equal("/targetB/destB/source/a.txt", actionB.DestinationPath);
+        Assert.Equal("mem://targetB/destB/source/a.txt", actionB.DestinationPath);
     }
 }

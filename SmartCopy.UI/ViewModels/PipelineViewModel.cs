@@ -45,6 +45,7 @@ public partial class PipelineViewModel : ViewModelBase
     private PipelineStepViewModel? _selectedStep;
     public ObservableCollection<PipelinePreset> UserPresets { get; } = [];
     public AddStepViewModel AddStep { get; }
+    public IAppContext AppContext => _appContext;
 
     public bool HasSteps => Steps.Count > 0;
 
@@ -173,7 +174,7 @@ public partial class PipelineViewModel : ViewModelBase
 
     public async Task<bool> TryAddStepWithoutConfiguration(StepKind kind)
     {
-        var step = StepEditorViewModelFactory.Create(kind, _appSettings).BuildStep();
+        var step = StepEditorViewModelFactory.Create(kind, _appContext).BuildStep();
         if (step.IsConfigurable) return false;
         await AddStepFromResult(step);
         return true;

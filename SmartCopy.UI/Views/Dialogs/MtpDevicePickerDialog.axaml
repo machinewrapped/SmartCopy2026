@@ -1,0 +1,49 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="SmartCopy.UI.Views.Dialogs.MtpDevicePickerDialog"
+        Title="Browse MTP Device"
+        Width="400" Height="450"
+        CanResize="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#1e1e1e">
+    <StackPanel Spacing="10" Margin="20">
+
+        <TextBlock Text="{Binding LocationHeader}"
+                   FontSize="13" FontWeight="SemiBold" />
+
+        <ListBox x:Name="ItemsList"
+                 ItemsSource="{Binding Items}"
+                 SelectionChanged="OnItemSelectionChanged"
+                 Height="300">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding DisplayName}" />
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <ProgressBar IsIndeterminate="True"
+                     IsVisible="{Binding IsLoading}"
+                     Height="4" />
+
+        <TextBlock Text="{Binding ErrorMessage}"
+                   IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                   Foreground="#e8a200"
+                   FontSize="11"
+                   TextWrapping="Wrap" />
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button Content="Cancel"
+                    Command="{Binding CancelCommand}"
+                    Width="80"
+                    IsCancel="True" />
+            <Button Content="OK"
+                    Command="{Binding ConfirmCommand}"
+                    Width="80"
+                    IsDefault="True" />
+        </StackPanel>
+
+    </StackPanel>
+</Window>

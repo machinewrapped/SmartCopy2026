@@ -1,17 +1,15 @@
-using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Linq;
 
 namespace SmartCopy.Core.FileSystem;
 
 public sealed class MemoryFileSystemProvider : IFileSystemProvider
 {
-    private const string DefaultRoot = "/mem";
+    private const string DefaultRoot = "mem://";
     private readonly ConcurrentDictionary<string, MemoryEntry> _entries = new(StringComparer.OrdinalIgnoreCase);
     // SemaphoreSlim(1,1) provides async-compatible exclusive locking for all mutation operations.
     private readonly SemaphoreSlim _mutationSemaphore = new(1, 1);
-    
+
     // Add artificial delay to simulate real I/O for testing progress reporting.
     public bool AddArtificialDelay { get; set; }
 
@@ -27,8 +25,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         AddArtificialDelay = addArtificialDelay;
         SimulatedCapacity = capacity;
         RootPath = customRootPath ?? DefaultRoot;
-        VolumeId = volumeId ?? "MEM";
-        Debug.Assert(RootPath.StartsWith('/'));
+        VolumeId = volumeId ?? RootPath;
         _entries[RootPath] = MemoryEntry.CreateDirectory();
     }
 
@@ -286,7 +283,8 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
     {
         if (string.IsNullOrEmpty(relativePath))
             return Normalize(basePath);
-        return Normalize(basePath.TrimEnd('/') + "/" + relativePath.Replace('\\', '/'));
+        var sep = basePath.EndsWith('/') ? "" : "/";
+        return Normalize(basePath + sep + relativePath.Replace('\\', '/').TrimStart('/'));
     }
 
     public string GetRelativePath(string basePath, string fullPath)
@@ -410,57 +408,61 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
     private string Normalize(string path)
     {
         if (string.IsNullOrWhiteSpace(path))
-        {
             return RootPath;
-        }
 
-        var normalized = path.Replace('\\', '/').Trim();
-        if (!normalized.StartsWith('/'))
+        var s = path.Replace('\\', '/').Trim();
+
+        // Split at "://" to preserve the URI scheme while collapsing slashes in the rest.
+        string uriPrefix;
+        string rest;
+        var schemeEnd = s.IndexOf("://", StringComparison.Ordinal);
+        if (schemeEnd >= 0)
         {
-            normalized = "/" + normalized;
+            uriPrefix = s[..(schemeEnd + 3)];  // e.g. "mem://"
+            rest = s[(schemeEnd + 3)..].TrimStart('/');
+        }
+        else
+        {
+            uriPrefix = "";
+            rest = s.TrimStart('/');
         }
 
+        // Collapse consecutive slashes in the path portion only.
         int iterations = 0;
-        while (normalized.Contains("//", StringComparison.Ordinal))
+        while (rest.Contains("//", StringComparison.Ordinal))
         {
-            normalized = normalized.Replace("//", "/", StringComparison.Ordinal);
-            Debug.Assert(iterations < 3);
+            rest = rest.Replace("//", "/", StringComparison.Ordinal);
+            Debug.Assert(++iterations < 3);
         }
 
-        if (normalized.Length > 1)
-        {
-            normalized = normalized.TrimEnd('/');
-        }
+        rest = rest.TrimEnd('/');
 
-        if (normalized.Equals("/", StringComparison.Ordinal))
-        {
+        var full = uriPrefix + rest;
+
+        // If full path is exactly RootPath or directly beneath it, return as-is.
+        var rootPrefix = RootPath.EndsWith('/') ? RootPath : RootPath + "/";
+        if (full.Equals(RootPath, StringComparison.OrdinalIgnoreCase) ||
+            full.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
+            return string.IsNullOrEmpty(rest) ? RootPath : full;
+
+        // Treat rest as a relative segment under RootPath.
+        if (string.IsNullOrEmpty(rest))
             return RootPath;
-        }
-
-        if (normalized.Equals(RootPath, StringComparison.OrdinalIgnoreCase) ||
-            normalized.StartsWith(RootPath + "/", StringComparison.OrdinalIgnoreCase))
-        {
-            return normalized;
-        }
-
-        return RootPath + normalized;
+        return rootPrefix + rest;
     }
 
     private string GetParentPath(string path)
     {
         path = Normalize(path);
         if (path.Equals(RootPath, StringComparison.OrdinalIgnoreCase))
-        {
             return RootPath;
-        }
 
-        var lastSeparator = path.LastIndexOf('/');
-        if (lastSeparator <= 0)
-        {
-            return RootPath;
-        }
+        // Skip past "://" so we only search for path separators after the scheme.
+        var schemeEnd = path.IndexOf("://", StringComparison.Ordinal);
+        var searchFrom = schemeEnd >= 0 ? schemeEnd + 3 : 0;
 
-        return path[..lastSeparator];
+        var lastSep = path.LastIndexOf('/');
+        return lastSep >= searchFrom ? path[..lastSep] : RootPath;
     }
 
     private string Combine(string basePath, string relativePath)

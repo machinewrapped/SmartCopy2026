@@ -21,7 +21,7 @@ public sealed class PipelineIntegrationTests
         Assert.NotNull(node);
 
         node.CheckState = CheckState.Checked;
-        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/mem/dest")]));
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("mem://dest")]));
 
         await runner.ExecuteAsync(
             new PipelineJob
@@ -49,7 +49,7 @@ public sealed class PipelineIntegrationTests
         var runner = new PipelineRunner(new TransformPipeline(
         [
             new FlattenStep(),
-            new CopyStep("/mem/dest"),
+            new CopyStep("mem://dest"),
         ]));
 
         await runner.ExecuteAsync(
@@ -99,7 +99,7 @@ public sealed class PipelineIntegrationTests
         var node = root.FindNodeByPathSegments(["src", "song.mp3"]);
         Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
-        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/mem/dest", overwriteMode: OverwriteMode.Skip)]));
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("mem://dest", overwriteMode: OverwriteMode.Skip)]));
 
         var skipResults = await runner.ExecuteAsync(
             new PipelineJob
@@ -125,7 +125,7 @@ public sealed class PipelineIntegrationTests
         var node = root.FindNodeByPathSegments(["src", "song.mp3"]);
         Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
-        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/mem/dest", overwriteMode: OverwriteMode.Always)]));
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("mem://dest", overwriteMode: OverwriteMode.Always)]));
 
         var alwaysResults = await runner.ExecuteAsync(
             new PipelineJob
@@ -153,8 +153,8 @@ public sealed class PipelineIntegrationTests
         node.CheckState = CheckState.Checked;
         var runner = new PipelineRunner(new TransformPipeline(
         [
-            new CopyStep("/mem/backup"),
-            new MoveStep("/mem/archive"),
+            new CopyStep("mem://backup"),
+            new MoveStep("mem://archive"),
         ]));
 
         await runner.ExecuteAsync(
@@ -183,7 +183,7 @@ public sealed class PipelineIntegrationTests
         Assert.NotNull(node);
         node.CheckState = CheckState.Checked;
 
-        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/mem/dest")]));
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("mem://dest")]));
 
         var results = await runner.ExecuteAsync(
             new PipelineJob
@@ -205,7 +205,7 @@ public sealed class PipelineIntegrationTests
         Assert.Equal("ok", columns[1]);
         Assert.Equal("copy", columns[2]);
         Assert.Equal("src/song.mp3", columns[3]);
-        Assert.Equal("/mem/dest/src/song.mp3", columns[4]);
+        Assert.Equal("mem://dest/src/song.mp3", columns[4]);
         Assert.Equal("256.0KB", columns[5]);
     }
 }

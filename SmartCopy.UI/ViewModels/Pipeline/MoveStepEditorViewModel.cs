@@ -14,16 +14,17 @@ public partial class MoveStepEditorViewModel : StepEditorViewModelBase, IDestina
 
     public static OverwriteMode[] OverwriteModes => Enum.GetValues<OverwriteMode>();
 
-    public string DestinationPath 
+    public string DestinationPath
     {
         get => DestinationPathPicker.Path;
         set => DestinationPathPicker.Path = value;
     }
 
-    public MoveStepEditorViewModel(AppSettings settings)
+    public MoveStepEditorViewModel(IAppContext ctx)
     {
-        DestinationPathPicker = new PathPickerViewModel(settings, PathPickerMode.Target);
-        DestinationPathPicker.PropertyChanged += (s, e) => 
+        DestinationPathPicker = new PathPickerViewModel(ctx.Settings, PathPickerMode.Target);
+        DestinationPathPicker.RegisterProvider = ctx.Register;
+        DestinationPathPicker.PropertyChanged += (s, e) =>
         {
             if (e.PropertyName == nameof(PathPickerViewModel.Path))
             {
@@ -32,7 +33,7 @@ public partial class MoveStepEditorViewModel : StepEditorViewModelBase, IDestina
             }
         };
 
-        SelectedOverwriteMode = settings.DefaultOverwriteMode;
+        SelectedOverwriteMode = ctx.Settings.DefaultOverwriteMode;
     }
 
     public override bool IsValid => !string.IsNullOrWhiteSpace(DestinationPath);

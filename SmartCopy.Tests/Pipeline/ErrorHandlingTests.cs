@@ -84,7 +84,7 @@ public sealed class ErrorHandlingTests
         foreach (var f in root.Files) f.CheckState = CheckState.Checked;
 
         var ctx = new TestContext(root, source);
-        var step = new CopyStep("/mem/dest");
+        var step = new CopyStep("mem://dest");
 
         var results = new List<TransformResult>();
         await foreach (var r in step.ApplyAsync(ctx, CancellationToken.None))
@@ -127,7 +127,7 @@ public sealed class ErrorHandlingTests
         foreach (var f in root.Files) f.CheckState = CheckState.Checked;
 
         var ctx = new TestContext(root, source);
-        var step = new MoveStep("/mem/dest");
+        var step = new MoveStep("mem://dest");
 
         var results = new List<TransformResult>();
         await foreach (var r in step.ApplyAsync(ctx, CancellationToken.None))
@@ -168,13 +168,13 @@ public sealed class ErrorHandlingTests
         var faultingSource = new FaultingProvider(innerSource) { FaultOnDelete = _ => true };
 
         var target = MemoryFileSystemFixtures.Create(t => t.WithDirectory("dest"),
-            customRootPath: "/target", volumeId: "VOL2");
+            customRootPath: "mem://target", volumeId: "VOL2");
 
         var root = await innerSource.BuildDirectoryTree("/src");
         root.Files[0].CheckState = CheckState.Checked;
 
         var ctx = new TestContext(root, faultingSource, target);
-        var step = new MoveStep("/target/dest");
+        var step = new MoveStep("mem://target/dest");
 
         var results = new List<TransformResult>();
         await foreach (var r in step.ApplyAsync(ctx, CancellationToken.None))
@@ -267,7 +267,7 @@ public sealed class ErrorHandlingTests
         var source = new FaultingProvider(inner) { FaultOnMove = path => path == subdir.FullPath };
 
         var ctx = new TestContext(root, source);
-        var step = new MoveStep("/mem/dest");
+        var step = new MoveStep("mem://dest");
 
         var results = new List<TransformResult>();
         await foreach (var r in step.ApplyAsync(ctx, CancellationToken.None))
@@ -277,8 +277,8 @@ public sealed class ErrorHandlingTests
         Assert.Equal(2, results.Count);
         Assert.All(results, r => Assert.True(r.IsSuccess));
         Assert.All(results, r => Assert.Equal(SourceResult.Moved, r.SourceNodeResult));
-        Assert.True(await inner.ExistsAsync("/mem/dest/subdir/a.txt", CancellationToken.None));
-        Assert.True(await inner.ExistsAsync("/mem/dest/subdir/b.txt", CancellationToken.None));
+        Assert.True(await inner.ExistsAsync("mem://dest/subdir/a.txt", CancellationToken.None));
+        Assert.True(await inner.ExistsAsync("mem://dest/subdir/b.txt", CancellationToken.None));
         Assert.False(await inner.ExistsAsync("/src/subdir/a.txt", CancellationToken.None));
         Assert.False(await inner.ExistsAsync("/src/subdir/b.txt", CancellationToken.None));
     }
