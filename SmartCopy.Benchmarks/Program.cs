@@ -219,10 +219,17 @@ static async Task<List<BenchmarkRunRecord>> ReadExistingRunsAsync(string results
             continue;
         }
 
-        var run = JsonSerializer.Deserialize<BenchmarkRunRecord>(line, JsonOptions.Default);
-        if (run is not null)
+        try
         {
-            runs.Add(run);
+            var run = JsonSerializer.Deserialize<BenchmarkRunRecord>(line, JsonOptions.Default);
+            if (run is not null)
+            {
+                runs.Add(run);
+            }
+        }
+        catch (JsonException ex)
+        {
+            Console.Error.WriteLine($"Warning: Skipping malformed line in results file: {ex.Message}");
         }
     }
 
@@ -464,35 +471,7 @@ file sealed class BenchmarkRunRecord
         string destinationPath,
         DateTime runStartedUtc,
         BenchmarkState state,
-        string? notes)
-    {
-        return new BenchmarkRunRecord
-        {
-            ScenarioName = scenario.Name,
-            SourcePath = sourcePath,
-            DestinationPath = destinationPath,
-            RunStartedUtc = runStartedUtc,
-            HostName = Environment.MachineName,
-            OsDescription = RuntimeInformation.OSDescription,
-            FrameworkDescription = RuntimeInformation.FrameworkDescription,
-            Notes = notes,
-            ScanDuration = state.ScanStopwatch.Elapsed,
-            PreviewDuration = state.PreviewStopwatch.Elapsed,
-            ExecuteDuration = state.ExecuteStopwatch.Elapsed,
-            SelectedFiles = state.Root?.NumSelectedFiles ?? 0,
-            SelectedBytes = state.Root?.TotalSelectedBytes ?? 0,
-            PreviewWarnings = state.Preview?.Warnings.Count ?? 0,
-            CopiedFiles = state.Results.Sum(r => r.NumberOfFilesAffected),
-            SkippedFiles = state.Results.Sum(r => r.NumberOfFilesSkipped),
-            FailedFiles = state.Results.Count(r => !r.IsSuccess),
-            OutputBytes = state.Results.Sum(r => r.OutputBytes),
-            DestinationFreeSpaceBeforeBytes = state.FreeSpaceBefore,
-            DestinationFreeSpaceAfterBytes = state.FreeSpaceAfter,
-            JournalPath = state.JournalPath is null ? string.Empty : Path.GetFullPath(state.JournalPath),
-            ExceptionType = null,
-            ExceptionMessage = null,
-        };
-    }
+        string? notes) => Create(scenario, sourcePath, destinationPath, runStartedUtc, state, notes, ex: null);
 
     public static BenchmarkRunRecord CreateFailure(
         BenchmarkScenario scenario,
@@ -501,7 +480,16 @@ file sealed class BenchmarkRunRecord
         DateTime runStartedUtc,
         BenchmarkState state,
         string? notes,
-        Exception ex)
+        Exception ex) => Create(scenario, sourcePath, destinationPath, runStartedUtc, state, notes, ex);
+
+    private static BenchmarkRunRecord Create(
+        BenchmarkScenario scenario,
+        string sourcePath,
+        string destinationPath,
+        DateTime runStartedUtc,
+        BenchmarkState state,
+        string? notes,
+        Exception? ex)
     {
         return new BenchmarkRunRecord
         {
@@ -526,8 +514,8 @@ file sealed class BenchmarkRunRecord
             DestinationFreeSpaceBeforeBytes = state.FreeSpaceBefore,
             DestinationFreeSpaceAfterBytes = state.FreeSpaceAfter,
             JournalPath = state.JournalPath is null ? string.Empty : Path.GetFullPath(state.JournalPath),
-            ExceptionType = ex.GetType().FullName,
-            ExceptionMessage = ex.Message,
+            ExceptionType = ex?.GetType().FullName,
+            ExceptionMessage = ex?.Message,
         };
     }
 }
