@@ -78,6 +78,7 @@ The UI is organized as a left-to-right data flow:
 |---|---|---|---|
 | Local filesystem | Yes | Yes | Yes |
 | Network filesyste (SMB) | Yes | Yes | Yes |
+| MTP device (Phone/Camera) | Yes | No | No |
 | Filesystem watcher | Yes | Yes | Yes |
 | Trash / recycle bin | Yes | Yes | Yes |
 
