@@ -14,9 +14,18 @@ public partial class MtpDevicePickerDialog : Window
         {
             if (DataContext is ViewModels.Dialogs.MtpDevicePickerViewModel vm)
             {
-                vm.OkRequested += () => Close(vm.SelectedDevice);
+                vm.OkRequested += () => Close(vm.Result);
                 vm.CancelRequested += () => Close(null);
             }
         };
+    }
+
+    [SupportedOSPlatform("windows")]
+    private async void OnItemSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender is not ListBox lb || lb.SelectedItem is not ViewModels.Dialogs.MtpPickerItem item) return;
+        lb.SelectedItem = null;
+        if (DataContext is ViewModels.Dialogs.MtpDevicePickerViewModel vm)
+            await vm.NavigateIntoAsync(item);
     }
 }

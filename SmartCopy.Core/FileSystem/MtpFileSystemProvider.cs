@@ -9,16 +9,24 @@ public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
     private readonly MediaDevice _device;
     private static readonly char[] Separators = ['/', '\\'];
 
-    public MtpFileSystemProvider(MediaDevice device)
+    /// <param name="rootPath">
+    /// The scan root for this provider instance — typically the folder the user selected
+    /// (e.g. "mtp://Samsung/DCIM/Camera/") rather than always the device root.
+    /// This allows two providers on the same device with different roots to coexist in the registry.
+    /// </param>
+    public MtpFileSystemProvider(MediaDevice device, string rootPath)
     {
         _device = device;
         _device.Connect();
         var name = string.IsNullOrEmpty(device.FriendlyName) ? device.Model : device.FriendlyName;
-        RootPath = $"mtp://{name}/";
+        VolumeId = $"mtp://{name}";
+        RootPath = rootPath;
     }
 
+    public MediaDevice Device => _device;
     public string RootPath { get; }
-    public string? VolumeId => null;
+    /// <summary>Identifies the MTP device (acts as the volume identifier).</summary>
+    public string? VolumeId { get; }
     public ProviderCapabilities Capabilities => new(
         CanSeek: false, CanAtomicMove: false, CanWatch: false,
         MaxPathLength: 260, CanTrash: false);
@@ -85,7 +93,16 @@ public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
         => Task.Run<Stream>(() => _device.GetFileInfo(DevicePath(path)).OpenRead(), ct);
 
     public Task WriteAsync(string path, Stream data, IProgress<long>? progress, CancellationToken ct)
-        => Task.Run(() => _device.UploadFile(data, DevicePath(path)), ct);
+        => Task.Run(() =>
+        {
+            var devicePath = DevicePath(path);
+            // segments: ["mtp:", DeviceName, dir1, dir2, ..., filename]
+            // parent dirs are segments[2..^1]; skip if file is directly under device root
+            var segments = SplitPath(path);
+            if (segments.Length > 2)
+                EnsureDeviceDirectoryExists(DevicePath(JoinPath(VolumeId + "/", segments[2..^1])));
+            _device.UploadFile(data, devicePath);
+        }, ct);
 
     public Task DeleteAsync(string path, CancellationToken ct)
     {
@@ -103,7 +120,7 @@ public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
         => throw new NotSupportedException("MTP does not support atomic moves.");
 
     public Task CreateDirectoryAsync(string path, CancellationToken ct)
-        => Task.Run(() => _device.CreateDirectory(DevicePath(path)), ct);
+        => Task.Run(() => EnsureDeviceDirectoryExists(DevicePath(path)), ct);
 
     public Task<long?> GetAvailableFreeSpaceAsync(CancellationToken ct)
         => Task.FromResult<long?>(null);
@@ -135,11 +152,34 @@ public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
 
     public void Dispose() => _device.Disconnect();
 
-    /// <summary>Strips the "mtp://DeviceName/" prefix to get the device-native path.</summary>
+    /// <summary>
+    /// Ensures every segment of <paramref name="devicePath"/> exists on the device,
+    /// creating missing directories one level at a time.
+    /// </summary>
+    private void EnsureDeviceDirectoryExists(string devicePath)
+    {
+        var segments = devicePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var current = "";
+        foreach (var segment in segments)
+        {
+            current += "/" + segment;
+            if (!_device.DirectoryExists(current))
+                _device.CreateDirectory(current);
+        }
+    }
+
+    /// <summary>
+    /// Strips the "mtp://DeviceName" prefix to get the device-native absolute path.
+    /// Uses <c>_devicePrefix</c> (not <c>RootPath</c>) so this works correctly even when
+    /// <c>RootPath</c> is a subfolder like "mtp://Samsung/DCIM/Camera/".
+    /// </summary>
     private string DevicePath(string mtpPath)
     {
-        if (mtpPath.StartsWith(RootPath, StringComparison.OrdinalIgnoreCase))
-            return "/" + mtpPath[RootPath.Length..];
+        if (mtpPath.StartsWith(VolumeId!, StringComparison.OrdinalIgnoreCase))
+        {
+            var rest = mtpPath[VolumeId!.Length..];
+            return rest.Length > 0 ? rest : "/";
+        }
         return mtpPath;
     }
 

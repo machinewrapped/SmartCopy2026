@@ -162,12 +162,13 @@ public partial class PathPickerControl : UserControl
 
         var pickerVm = new ViewModels.Dialogs.MtpDevicePickerViewModel();
         var dialog = new Dialogs.MtpDevicePickerDialog { DataContext = pickerVm };
-        var device = await dialog.ShowDialog<MediaDevices.MediaDevice?>(window);
-        if (device is null) return;
+        var result = await dialog.ShowDialog<ViewModels.Dialogs.MtpPickerResult?>(window);
+        if (result is null) return;
 
-        var provider = new MtpFileSystemProvider(device);
-        vm.RegisterProvider?.Invoke(provider);
-        vm.Path = provider.RootPath;
+        var provider = new MtpFileSystemProvider(result.Device, result.Path);
+        try { vm.RegisterProvider?.Invoke(provider); }
+        catch (InvalidOperationException) { provider.Dispose(); }  // same path already registered — reuse existing
+        vm.Path = result.Path;
         vm.ApplyPathCommand.Execute(null);
     }
 
