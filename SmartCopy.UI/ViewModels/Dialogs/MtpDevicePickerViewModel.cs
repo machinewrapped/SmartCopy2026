@@ -51,9 +51,15 @@ public partial class MtpDevicePickerViewModel : ObservableObject
     public event Action? OkRequested;
     public event Action? CancelRequested;
 
+    private static bool IsMtpDevice(MediaDevice d)
+    {
+        try { return d.Protocol?.StartsWith("MTP:", StringComparison.OrdinalIgnoreCase) == true; }
+        catch { return false; }
+    }
+
     public MtpDevicePickerViewModel()
     {
-        _allDevices = [.. MediaDevice.GetDevices()];
+        _allDevices = [.. MediaDevice.GetDevices().Where(IsMtpDevice)];
         ShowDeviceList();
     }
 

@@ -16,9 +16,8 @@ public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
     /// </param>
     public MtpFileSystemProvider(MediaDevice device, string rootPath)
     {
-        _device = device;
-        _device.Connect();
-        var name = string.IsNullOrEmpty(device.FriendlyName) ? device.Model : device.FriendlyName;
+        _device = MtpConnectionManager.Acquire(device, this);
+        var name = string.IsNullOrEmpty(_device.FriendlyName) ? _device.Model : _device.FriendlyName;
         VolumeId = $"mtp://{name}";
         RootPath = rootPath;
     }
@@ -150,7 +149,7 @@ public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
         return basePath.TrimEnd('/') + "/" + string.Join("/", segments);
     }
 
-    public void Dispose() => _device.Disconnect();
+    public void Dispose() => MtpConnectionManager.Release(this);
 
     /// <summary>
     /// Ensures every segment of <paramref name="devicePath"/> exists on the device,
