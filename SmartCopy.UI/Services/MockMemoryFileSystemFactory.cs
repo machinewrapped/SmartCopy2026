@@ -4,8 +4,8 @@ namespace SmartCopy.UI.Services;
 
 internal static class MockMemoryFileSystemFactory
 {
-    public const string SourcePath = "/mem/Music";
-    public const string TargetPath = "/mem/Mirror";
+    public const string SourcePath = "mem://Music";
+    public const string TargetPath = "mem://Mirror";
 
     public static MemoryFileSystemProvider CreateSeeded(
         bool artificialDelay = false,

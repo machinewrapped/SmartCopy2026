@@ -59,7 +59,7 @@ public sealed class PathHandlingTests : IDisposable
     public void Memory_JoinPath_ProducesCanonicalPath()
     {
         var result = _memory.JoinPath("/music", ["rock", "song.mp3"]);
-        Assert.Equal("/mem/music/rock/song.mp3", result);
+        Assert.Equal("mem://music/rock/song.mp3", result);
     }
 
     [Fact]

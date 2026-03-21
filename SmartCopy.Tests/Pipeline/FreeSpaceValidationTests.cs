@@ -52,10 +52,10 @@ public sealed class FreeSpaceValidationTests
     public async Task CopyStep_InsufficientSpace_EmitsStepScopedWarning()
     {
         var (source, registry) = MakeSource();
-        var target = MakeTarget(capacity: 100, rootPath: "/target");
+        var target = MakeTarget(capacity: 100, rootPath: "mem://target");
         registry.Register(target);
 
-        IReadOnlyList<IPipelineStep> steps = [new CopyStep("/target/dst")];
+        IReadOnlyList<IPipelineStep> steps = [new CopyStep("mem://target/dst")];
         var result = await PipelineValidator.ValidateAsync(steps,
             await MakeContext(source, registry, steps, selectedBytes: 500));
 
@@ -71,10 +71,10 @@ public sealed class FreeSpaceValidationTests
     public async Task CopyStep_SufficientSpace_NoWarning()
     {
         var (source, registry) = MakeSource();
-        var target = MakeTarget(capacity: 1_000_000, rootPath: "/target");
+        var target = MakeTarget(capacity: 1_000_000, rootPath: "mem://target");
         registry.Register(target);
 
-        IReadOnlyList<IPipelineStep> steps = [new CopyStep("/target/dst")];
+        IReadOnlyList<IPipelineStep> steps = [new CopyStep("mem://target/dst")];
         var result = await PipelineValidator.ValidateAsync(steps,
             await MakeContext(source, registry, steps, selectedBytes: 500));
 
@@ -87,10 +87,10 @@ public sealed class FreeSpaceValidationTests
     {
         var (source, registry) = MakeSource();
         // No SimulatedCapacity → CanQueryFreeSpace = false → check skipped
-        var target = MakeTarget(capacity: null, rootPath: "/target");
+        var target = MakeTarget(capacity: null, rootPath: "mem://target");
         registry.Register(target);
 
-        IReadOnlyList<IPipelineStep> steps = [new CopyStep("/target/dst")];
+        IReadOnlyList<IPipelineStep> steps = [new CopyStep("mem://target/dst")];
         var result = await PipelineValidator.ValidateAsync(
             steps,
             await MakeContext(source, registry, steps, selectedBytes: 500));
@@ -105,7 +105,7 @@ public sealed class FreeSpaceValidationTests
         var (source, registry) = MakeSource();
         // No target registered at all
 
-        IReadOnlyList<IPipelineStep> steps = [new CopyStep("/target/dst")];
+        IReadOnlyList<IPipelineStep> steps = [new CopyStep("mem://target/dst")];
         var result = await PipelineValidator.ValidateAsync(
             steps,
             await MakeContext(source, registry, steps, selectedBytes: 500));
@@ -125,7 +125,7 @@ public sealed class FreeSpaceValidationTests
         source.SimulatedCapacity = 1; // only 1 byte free, but same-volume should not trigger
         var registry = source.CreateRegistry();
 
-        IReadOnlyList<IPipelineStep> steps = [new MoveStep("/mem/dst")];
+        IReadOnlyList<IPipelineStep> steps = [new MoveStep("mem://dst")];
         var result = await PipelineValidator.ValidateAsync(
             steps,
             await MakeContext(source, registry, steps, selectedBytes: 500));
@@ -138,10 +138,10 @@ public sealed class FreeSpaceValidationTests
     public async Task MoveStep_CrossVolume_InsufficientSpace_EmitsWarning()
     {
         var (source, registry) = MakeSource(volumeId: "SRC");
-        var target = MakeTarget(capacity: 10, rootPath: "/target", volumeId: "DST");
+        var target = MakeTarget(capacity: 10, rootPath: "mem://target", volumeId: "DST");
         registry.Register(target);
 
-        IReadOnlyList<IPipelineStep> steps = [new MoveStep("/target/dst")];
+        IReadOnlyList<IPipelineStep> steps = [new MoveStep("mem://target/dst")];
         var result = await PipelineValidator.ValidateAsync(
             steps,
             await MakeContext(source, registry, steps, selectedBytes: 500));
@@ -157,10 +157,10 @@ public sealed class FreeSpaceValidationTests
     {
         var (source, registry) = MakeSource();
         // Target has 600 bytes free. Selected = 500 of 1000 total → inverted = 500 bytes → fits.
-        var target = MakeTarget(capacity: 600, rootPath: "/target");
+        var target = MakeTarget(capacity: 600, rootPath: "mem://target");
         registry.Register(target);
 
-        IReadOnlyList<IPipelineStep> steps = [new InvertSelectionStep(), new CopyStep("/target/dst")];
+        IReadOnlyList<IPipelineStep> steps = [new InvertSelectionStep(), new CopyStep("mem://target/dst")];
         var result = await PipelineValidator.ValidateAsync(
             steps,
             await MakeContext(source, registry, steps,
@@ -178,10 +178,10 @@ public sealed class FreeSpaceValidationTests
     {
         // 600 bytes free, two Copy steps each needing 400 bytes → second step should warn
         var (source, registry) = MakeSource();
-        var target = MakeTarget(capacity: 600, rootPath: "/target");
+        var target = MakeTarget(capacity: 600, rootPath: "mem://target");
         registry.Register(target);
 
-        IReadOnlyList<IPipelineStep> steps = [new CopyStep("/target/dst1"), new CopyStep("/target/dst2")];
+        IReadOnlyList<IPipelineStep> steps = [new CopyStep("mem://target/dst1"), new CopyStep("mem://target/dst2")];
         var result = await PipelineValidator.ValidateAsync(
             steps,
             await MakeContext(source, registry, steps, selectedBytes: 400));
@@ -197,10 +197,10 @@ public sealed class FreeSpaceValidationTests
     public async Task TwoCopySteps_SameVolume_BothFit_NoWarning()
     {
         var (source, registry) = MakeSource();
-        var target = MakeTarget(capacity: 1_000_000, rootPath: "/target");
+        var target = MakeTarget(capacity: 1_000_000, rootPath: "mem://target");
         registry.Register(target);
 
-        IReadOnlyList<IPipelineStep> steps = [new CopyStep("/target/dst1"), new CopyStep("/target/dst2")];
+        IReadOnlyList<IPipelineStep> steps = [new CopyStep("mem://target/dst1"), new CopyStep("mem://target/dst2")];
         var result = await PipelineValidator.ValidateAsync(
             steps,
             await MakeContext(source, registry, steps, selectedBytes: 400));
@@ -214,7 +214,7 @@ public sealed class FreeSpaceValidationTests
     {
         // CopyStep with no destination → blocking issue; destination is null so no space check
         var (source, registry) = MakeSource();
-        var target = MakeTarget(capacity: 1, rootPath: "/target");
+        var target = MakeTarget(capacity: 1, rootPath: "mem://target");
         registry.Register(target);
 
         IReadOnlyList<IPipelineStep> steps = [new CopyStep("")];

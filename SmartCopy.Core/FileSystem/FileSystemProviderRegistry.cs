@@ -1,10 +1,12 @@
 namespace SmartCopy.Core.FileSystem;
 
-public sealed class FileSystemProviderRegistry : IPathResolver
+public sealed class FileSystemProviderRegistry : IPathResolver, IDisposable
 {
     // Instance state — per-registry registered providers
     private readonly System.Threading.Lock _lock = new();
     private readonly Dictionary<string, IFileSystemProvider> _registered
+        = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Func<string, IFileSystemProvider?>> _schemeFactories
         = new(StringComparer.OrdinalIgnoreCase);
 
     // Static state — safe: LocalFileSystemProvider is stateless, shared across all registries
@@ -29,6 +31,13 @@ public sealed class FileSystemProviderRegistry : IPathResolver
 
             _registered[rootPath] = provider;
         }
+    }
+
+    /// <summary>Register a factory that lazily creates a provider for a URI scheme (e.g. "mtp", "mem").</summary>
+    public void RegisterSchemeFactory(string scheme, Func<string, IFileSystemProvider?> factory)
+    {
+        lock (_lock)
+            _schemeFactories[scheme] = factory;
     }
 
     /// <summary>Unregister a file system provider.</summary>
@@ -100,8 +109,25 @@ public sealed class FileSystemProviderRegistry : IPathResolver
         }
 
         if (best is not null)
-        {
             return best;
+
+        // URI-scheme paths (mtp://, mem://, etc.) must never fall through to the local filesystem.
+        // Try a registered scheme factory, or return null if none is registered for this scheme.
+        var schemeEnd = path.IndexOf("://", StringComparison.Ordinal);
+        if (schemeEnd >= 0)
+        {
+            var scheme = path[..schemeEnd];
+            Func<string, IFileSystemProvider?>? factory;
+            lock (_lock)
+                _schemeFactories.TryGetValue(scheme, out factory);
+
+            if (factory is null)
+                return null;
+
+            var created = factory(path);
+            if (created is not null)
+                Register(created);
+            return created;
         }
 
         return GetOrCreateLocalProvider(path);
@@ -127,6 +153,18 @@ public sealed class FileSystemProviderRegistry : IPathResolver
 
             return provider;
         }
+    }
+
+    public void Dispose()
+    {
+        KeyValuePair<string, IFileSystemProvider>[] snapshot;
+        lock (_lock)
+        {
+            snapshot = [.. _registered];
+            _registered.Clear();
+        }
+        foreach (var entry in snapshot)
+            (entry.Value as IDisposable)?.Dispose();
     }
 
     internal static bool IsPrefixMatch(string path, string prefix)

@@ -112,7 +112,7 @@ public sealed class PauseTokenSourceTests
         foreach (var seg in new[] { "a.txt", "b.txt", "c.txt" })
             root.FindNodeByPathSegments(["src", seg])!.CheckState = CheckState.Checked;
 
-        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/mem/dst")]));
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("mem://dst")]));
         var job = new PipelineJob
         {
             RootNode = root,
@@ -151,7 +151,7 @@ public sealed class PauseTokenSourceTests
         root.FindNodeByPathSegments(["src", "a.txt"])!.CheckState = CheckState.Checked;
         root.FindNodeByPathSegments(["src", "b.txt"])!.CheckState = CheckState.Checked;
 
-        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/mem/dst")]));
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("mem://dst")]));
         var job = new PipelineJob
         {
             RootNode = root,

@@ -78,6 +78,7 @@ The UI is organized as a left-to-right data flow:
 |---|---|---|---|
 | Local filesystem | Yes | Yes | Yes |
 | Network filesyste (SMB) | Yes | Yes | Yes |
+| MTP device (Phone/Camera) | Yes | No | No |
 | Filesystem watcher | Yes | Yes | Yes |
 | Trash / recycle bin | Yes | Yes | Yes |
 
@@ -99,5 +100,12 @@ dotnet test
 dotnet publish SmartCopy.App/SmartCopy.App.csproj -p:PublishProfile=win-x64
 ```
 
+## Dependencies
+
+- [Avalonia](https://github.com/AvaloniaUI/Avalonia) — cross-platform UI framework
+- [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) — MVVM source generators
+- [MediaDevices](https://github.com/Bassman2/MediaDevices) — MTP/WPD device access (Windows only)
+
 ## License
+
 MIT

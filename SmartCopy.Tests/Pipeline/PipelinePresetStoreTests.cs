@@ -26,7 +26,7 @@ public sealed class PipelinePresetStoreTests
             Description: "copy music",
             Steps:
             [
-                new TransformStepConfig(StepKind.Copy, new JsonObject { ["destinationPath"] = "/mem/Mirror" }),
+                new TransformStepConfig(StepKind.Copy, new JsonObject { ["destinationPath"] = "mem://Mirror" }),
             ]);
 
         await store.SaveUserPresetAsync("Music Copy", config);
@@ -75,8 +75,8 @@ public sealed class PipelinePresetStoreTests
     {
         var input = new IPipelineStep[]
         {
-            new CopyStep("/mem/copy"),
-            new MoveStep("/mem/move"),
+            new CopyStep("mem://copy"),
+            new MoveStep("mem://move"),
             new DeleteStep(),
             new FlattenStep(FlattenConflictStrategy.Skip),
             new RenameStep("{name}_new"),

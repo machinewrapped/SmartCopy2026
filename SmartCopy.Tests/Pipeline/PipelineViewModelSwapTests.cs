@@ -9,7 +9,7 @@ public sealed class PipelineViewModelSwapTests
     public async Task RequestSwapWithSource_RaisesEvent_ForCopyStep()
     {
         var vm = new PipelineViewModel(new TestAppContext());
-        await vm.AddStepFromResult(new CopyStep("/mem/dest"));
+        await vm.AddStepFromResult(new CopyStep("mem://dest"));
         var step = vm.Steps[0];
 
         PipelineStepViewModel? raised = null;
@@ -24,7 +24,7 @@ public sealed class PipelineViewModelSwapTests
     public async Task RequestSwapWithSource_RaisesEvent_ForMoveStep()
     {
         var vm = new PipelineViewModel(new TestAppContext());
-        await vm.AddStepFromResult(new MoveStep("/mem/dest"));
+        await vm.AddStepFromResult(new MoveStep("mem://dest"));
         var step = vm.Steps[0];
 
         PipelineStepViewModel? raised = null;
@@ -39,7 +39,7 @@ public sealed class PipelineViewModelSwapTests
     public async Task RequestSwapWithSource_DoesNotRaise_WhenPipelineIsRunning()
     {
         var vm = new PipelineViewModel(new TestAppContext());
-        await vm.AddStepFromResult(new CopyStep("/mem/dest"));
+        await vm.AddStepFromResult(new CopyStep("mem://dest"));
         var step = vm.Steps[0];
 
         vm.IsRunning = true;

@@ -30,7 +30,7 @@ using SmartCopy.UI.Views.Workflows;
 
 namespace SmartCopy.UI.ViewModels;
 
-public partial class MainViewModel : ViewModelBase
+public partial class MainViewModel : ViewModelBase, IDisposable
 {
     private const int MaxRecentSources = 10;    // TODO: make this configurable
 
@@ -160,6 +160,9 @@ public partial class MainViewModel : ViewModelBase
         _settings = new AppSettings { SettingsFilePath = dataStore.GetFilePath("settings.json") };
         _appContext = new SmartCopyAppContext(_settings, dataStore, _providerRegistry);
 
+        if (OperatingSystem.IsWindows())
+            _providerRegistry.RegisterSchemeFactory("mtp", MtpProviderFactory.Create);
+
         _trashService = CreateTrashService();
 
         _operationJournal = new OperationJournal(dataStore.GetDirectoryPath("Logs"));
@@ -174,6 +177,7 @@ public partial class MainViewModel : ViewModelBase
 
         // Create the source path picker
         SourcePathPicker = new PathPickerViewModel(_settings, PathPickerMode.Source);
+        SourcePathPicker.RegisterProvider = _appContext.Register;
 
         // TODO: we will need to be able to init the viewmodel without a provider
         DirectoryTree = new DirectoryTreeViewModel(_providerRegistry)
@@ -1352,6 +1356,15 @@ public partial class MainViewModel : ViewModelBase
         _directoryWatcher.WatcherError += OnDirectoryWatcherError;
         _directoryWatcher.NotifyNodeWillBeRemoved += OnDirectoryWatcherNodeWillBeRemoved;
         _directoryWatcher.Start();
+    }
+
+    public void Dispose()
+    {
+        DisposeDirectoryWatcher();
+        _scanCts?.Dispose();
+        _filterCts?.Dispose();
+        _providerRegistry.Dispose();
+        GC.SuppressFinalize(this);
     }
 
     private void DisposeDirectoryWatcher()

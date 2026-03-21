@@ -10,7 +10,7 @@ public sealed class MirrorFilterTests
 {
     private const string SourceRoot = "/source";
     private const string MirrorRoot = "/mirror";
-    private const string MirrorProviderPath = "/mem/mirror";
+    private const string MirrorProviderPath = "mem://mirror";
 
     // -------------------------------------------------------------------------
     // NameOnly mode

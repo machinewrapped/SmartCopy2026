@@ -42,10 +42,10 @@ public sealed class FreeSpaceCheckTests
     public async Task Copy_SufficientSpace_NoError()
     {
         var (source, root, registry) = await MakeSource();
-        var target = MakeTarget(capacity: 1_000_000, customRootPath: "/target");
+        var target = MakeTarget(capacity: 1_000_000, customRootPath: "mem://target");
         registry.Register(target);
 
-        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/target/dst")]));
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("mem://target/dst")]));
         var plan = await runner.PreviewAsync(new PipelineJob
         {
             RootNode = root,
@@ -60,10 +60,10 @@ public sealed class FreeSpaceCheckTests
     public async Task Copy_InsufficientSpace_Warning()
     {
         var (source, root, registry) = await MakeSource();
-        var target = MakeTarget(capacity: 10, customRootPath: "/target"); // only 10 bytes free
+        var target = MakeTarget(capacity: 10, customRootPath: "mem://target"); // only 10 bytes free
         registry.Register(target);
 
-        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/target/dst")]));
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("mem://target/dst")]));
         var plan = await runner.PreviewAsync(new PipelineJob
         {
             RootNode = root,
@@ -90,12 +90,12 @@ public sealed class FreeSpaceCheckTests
 
         var registry = provider.CreateRegistry();
 
-        var target = MakeTarget(capacity: 600, customRootPath: "/target");
+        var target = MakeTarget(capacity: 600, customRootPath: "mem://target");
         registry.Register(target);
 
         var runner = new PipelineRunner(new TransformPipeline([
-            new CopyStep("/target/dst1"),
-            new CopyStep("/target/dst2"),
+            new CopyStep("mem://target/dst1"),
+            new CopyStep("mem://target/dst2"),
         ]));
         var plan = await runner.PreviewAsync(new PipelineJob
         {
@@ -115,10 +115,10 @@ public sealed class FreeSpaceCheckTests
     {
         var (source, root, registry) = await MakeSource();
         // Target has no capacity set → CanQueryFreeSpace = false
-        var target = MakeTarget(capacity: null, customRootPath: "/target");
+        var target = MakeTarget(capacity: null, customRootPath: "mem://target");
         registry.Register(target);
 
-        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("/target/dst")]));
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("mem://target/dst")]));
         var plan = await runner.PreviewAsync(new PipelineJob
         {
             RootNode = root,
@@ -142,7 +142,7 @@ public sealed class FreeSpaceCheckTests
         var root = await provider.BuildDirectoryTree();
         root.FindNodeByPathSegments(["src"])!.CheckState = CheckState.Checked;
 
-        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("/mem/dst")]));
+        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("mem://dst")]));
         var plan = await runner.PreviewAsync(new PipelineJob
         {
             RootNode = root,
@@ -157,10 +157,10 @@ public sealed class FreeSpaceCheckTests
     public async Task Move_CrossVolume_SufficientSpace_NoError()
     {
         var (source, root, registry) = await MakeSource(volumeId: "SRC");
-        var target = MakeTarget(capacity: 1_000_000, customRootPath: "/target", volumeId: "DST");
+        var target = MakeTarget(capacity: 1_000_000, customRootPath: "mem://target", volumeId: "DST");
         registry.Register(target);
 
-        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("/target/dst")]));
+        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("mem://target/dst")]));
         var plan = await runner.PreviewAsync(new PipelineJob
         {
             RootNode = root,
@@ -175,10 +175,10 @@ public sealed class FreeSpaceCheckTests
     public async Task Move_CrossVolume_InsufficientSpace_Warning()
     {
         var (source, root, registry) = await MakeSource(volumeId: "SRC");
-        var target = MakeTarget(capacity: 10, customRootPath: "/target", volumeId: "DST"); // only 10 bytes
+        var target = MakeTarget(capacity: 10, customRootPath: "mem://target", volumeId: "DST"); // only 10 bytes
         registry.Register(target);
 
-        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("/target/dst")]));
+        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("mem://target/dst")]));
         var plan = await runner.PreviewAsync(new PipelineJob
         {
             RootNode = root,

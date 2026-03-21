@@ -16,6 +16,11 @@ public class TestAppContext : IAppContext
         ProviderRegistry = providerRegistry ?? new FileSystemProviderRegistry();
     }
 
+    public void Register(IFileSystemProvider provider)
+    {
+        ProviderRegistry.Register(provider);
+    }
+
     public IFileSystemProvider? ResolveProvider(string path)
     {
         return ProviderRegistry.ResolveProvider(path);

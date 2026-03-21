@@ -13,7 +13,7 @@ public sealed class PipelineViewModelTests
     {
         var vm = new PipelineViewModel(new TestAppContext());
         await vm.AddStepFromResult(new FlattenStep());
-        await vm.AddStepFromResult(new CopyStep("/mem/out"));
+        await vm.AddStepFromResult(new CopyStep("mem://out"));
 
         var pipeline = vm.BuildLivePipeline();
 
@@ -29,7 +29,7 @@ public sealed class PipelineViewModelTests
         var count = 0;
         vm.PipelineChanged += (_, _) => count++;
 
-        await vm.AddStepFromResult(new CopyStep("/mem/out"));
+        await vm.AddStepFromResult(new CopyStep("mem://out"));
         vm.RemoveStepCommand.Execute(vm.Steps[0]);
 
         Assert.True(count >= 2);
@@ -39,13 +39,13 @@ public sealed class PipelineViewModelTests
     public async Task ReplaceStep_UpdatesViewModelStep()
     {
         var vm = new PipelineViewModel(new TestAppContext());
-        await vm.AddStepFromResult(new CopyStep("/mem/out"));
+        await vm.AddStepFromResult(new CopyStep("mem://out"));
         var first = vm.Steps[0];
 
-        await vm.ReplaceStep(first, new MoveStep("/mem/archive"));
+        await vm.ReplaceStep(first, new MoveStep("mem://archive"));
 
         Assert.Equal(StepKind.Move, first.Kind);
-        Assert.Equal("/mem/archive", first.DestinationPath);
+        Assert.Equal("mem://archive", first.DestinationPath);
     }
 
     [Fact]
@@ -53,10 +53,10 @@ public sealed class PipelineViewModelTests
     {
         var vm = new PipelineViewModel(new TestAppContext());
         await vm.AddStepFromResult(new FlattenStep());
-        await vm.AddStepFromResult(new MoveStep("/mem/archive"));
-        await vm.AddStepFromResult(new CopyStep("/mem/backup"));
+        await vm.AddStepFromResult(new MoveStep("mem://archive"));
+        await vm.AddStepFromResult(new CopyStep("mem://backup"));
 
-        Assert.Equal("/mem/archive", vm.FirstDestinationPath);
+        Assert.Equal("mem://archive", vm.FirstDestinationPath);
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public sealed class PipelineViewModelTests
     public async Task ExecutablePipeline_RequiresSelectedIncludedFiles()
     {
         var vm = new PipelineViewModel(new TestAppContext());
-        await vm.AddStepFromResult(new CopyStep("/mem/out"));
+        await vm.AddStepFromResult(new CopyStep("mem://out"));
 
         Assert.False(vm.CanRun);
         Assert.Equal("At least one file must be selected.", vm.BlockingValidationMessage);
@@ -91,7 +91,7 @@ public sealed class PipelineViewModelTests
     {
         var vm = new PipelineViewModel(new TestAppContext());
 
-        await vm.AddStepFromResult(new CopyStep("/mem/out"), "Music Mirror");
+        await vm.AddStepFromResult(new CopyStep("mem://out"), "Music Mirror");
 
         Assert.Equal("Music Mirror", vm.Steps[0].Label);
         Assert.Equal("Music Mirror", vm.Steps[0].CustomName);
@@ -114,7 +114,7 @@ public sealed class PipelineViewModelTests
                         StepKind.Copy,
                         new JsonObject
                         {
-                            ["destinationPath"] = "/mem/out",
+                            ["destinationPath"] = "mem://out",
                             ["customName"] = "Audio Backup",
                         }),
                 ]),
@@ -133,7 +133,7 @@ public sealed class PipelineViewModelTests
     {
         TestAppContext appContext = TestAppContext.FromProvider(new MemoryFileSystemProvider());
         var vm = new PipelineViewModel(appContext);
-        await vm.AddStepFromResult(new CopyStep("/mem/out"));
+        await vm.AddStepFromResult(new CopyStep("mem://out"));
         vm.SetSelectedIncludedFileCount(1);
         return vm;
     }
@@ -153,7 +153,7 @@ public sealed class PipelineViewModelTests
     public async Task IsRunning_BlocksRemoveStepCommand()
     {
         var vm = new PipelineViewModel(new TestAppContext());
-        await vm.AddStepFromResult(new CopyStep("/mem/out"));
+        await vm.AddStepFromResult(new CopyStep("mem://out"));
 
         vm.IsRunning = true;
 
@@ -164,7 +164,7 @@ public sealed class PipelineViewModelTests
     public async Task IsRunning_BlocksRequestEditStepCommand()
     {
         var vm = new PipelineViewModel(new TestAppContext());
-        await vm.AddStepFromResult(new CopyStep("/mem/out"));
+        await vm.AddStepFromResult(new CopyStep("mem://out"));
 
         vm.IsRunning = true;
 
@@ -175,7 +175,7 @@ public sealed class PipelineViewModelTests
     public async Task IsNotRunning_UnblocksStepCommands()
     {
         var vm = new PipelineViewModel(new TestAppContext());
-        await vm.AddStepFromResult(new CopyStep("/mem/out"));
+        await vm.AddStepFromResult(new CopyStep("mem://out"));
         vm.IsRunning = true;
 
         vm.IsRunning = false;
