@@ -86,6 +86,15 @@ public static class PathHelper
         }
     }
 
+    /// <summary>
+    /// Returns the filename portion of <paramref name="path"/> using the registered provider's path conventions.
+    /// </summary>
+    public static string GetFileName(this IPathResolver resolver, string path)
+    {
+        var provider = resolver.ResolveProvider(path);
+        return provider is not null ? provider.GetFileName(path) : string.Empty;
+    }
+
     public static bool AreEquivalentUserPaths(string? left, string? right)
     {
         var normalizedLeft = NormalizeUserPath(left);

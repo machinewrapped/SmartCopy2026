@@ -1,0 +1,18 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vmPipeline="clr-namespace:SmartCopy.UI.ViewModels.Pipeline"
+             xmlns:views="clr-namespace:SmartCopy.UI.Views"
+             x:Class="SmartCopy.UI.Views.Pipeline.StepEditors.SaveSelectionToFileStepEditor"
+             x:DataType="vmPipeline:SaveSelectionToFileStepEditorViewModel">
+    <StackPanel Spacing="8">
+        <TextBlock Text="Output file path" FontSize="12" Opacity="0.7" />
+        <views:FilePathPickerControl x:Name="FilePathPicker"
+                                     DataContext="{Binding FilePathPicker}"
+                                     IsFileSave="True"
+                                     BrowseDialogTitle="Save Selection As"
+                                     BrowseButtonToolTip="Browse for output file" />
+
+        <CheckBox Content="Save with absolute paths"
+                  IsChecked="{Binding UseAbsolutePaths, Mode=TwoWay}" />
+    </StackPanel>
+</UserControl>

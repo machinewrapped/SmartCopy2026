@@ -39,6 +39,15 @@
                     <DataTemplate DataType="vmPipeline:RenameStepEditorViewModel">
                         <editorViews:RenameStepEditor />
                     </DataTemplate>
+                    <DataTemplate DataType="vmPipeline:SaveSelectionToFileStepEditorViewModel">
+                        <editorViews:SaveSelectionToFileStepEditor />
+                    </DataTemplate>
+                    <DataTemplate DataType="vmPipeline:AddSelectionFromFileStepEditorViewModel">
+                        <editorViews:SelectionFromFileStepEditor />
+                    </DataTemplate>
+                    <DataTemplate DataType="vmPipeline:RemoveSelectionFromFileStepEditorViewModel">
+                        <editorViews:SelectionFromFileStepEditor />
+                    </DataTemplate>
                 </ContentControl.DataTemplates>
             </ContentControl>
         </Border>

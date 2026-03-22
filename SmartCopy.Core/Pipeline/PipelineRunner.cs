@@ -42,6 +42,7 @@ public sealed class PipelineRunner
         var context = new StepContext(job);
         var actions = new List<PlannedAction>();
         var warnings = new List<string>();
+        var infoMessages = new List<string>();
         var errors = new List<string>();
 
         foreach (var step in _pipeline.Steps)
@@ -65,6 +66,9 @@ public sealed class PipelineRunner
                         NumberOfFilesSkipped: result.NumberOfFilesSkipped,
                         NumberOfFoldersSkipped: result.NumberOfFoldersSkipped));
                 }
+
+                if (result.ActionSummary is not null)
+                    infoMessages.Add(result.ActionSummary);
             }
 
             if (step is IHasDestinationPath destination)
@@ -107,7 +111,8 @@ public sealed class PipelineRunner
             Actions = actions,
             TotalInputBytes = actions.Sum(a => a.InputBytes),
             TotalEstimatedOutputBytes = actions.Sum(a => a.OutputBytes),
-            Warnings = warnings
+            Warnings = warnings,
+            InfoMessages = infoMessages,
         };
     }
 

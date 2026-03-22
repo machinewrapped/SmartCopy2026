@@ -42,6 +42,16 @@ public interface IFileSystemProvider
     string JoinPath(string basePath, IReadOnlyList<string> segments);
 
     /// <summary>
+    /// Returns the last non-empty segment of <paramref name="path"/> (i.e. the filename),
+    /// using this provider's path conventions.
+    /// </summary>
+    string GetFileName(string path)
+    {
+        var segments = SplitPath(path);
+        return segments.LastOrDefault(s => !string.IsNullOrEmpty(s)) ?? string.Empty;
+    }
+
+    /// <summary>
     /// Returns the available free bytes on the volume hosting this provider,
     /// or <see langword="null"/> if the provider does not support querying free space
     /// (see <see cref="ProviderCapabilities.CanQueryFreeSpace"/>).

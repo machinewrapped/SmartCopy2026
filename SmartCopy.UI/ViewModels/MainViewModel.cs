@@ -662,6 +662,37 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     }
 
     [RelayCommand]
+    private async Task AddSelectionFromFile()
+    {
+        if (DirectoryTree.RootNode == null) return;
+
+        var mainWindow = GetMainWindow();
+        if (mainWindow is null) return;
+
+        var files = await mainWindow.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Add Selection from File",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("Selection Files") { Patterns = ["*.sc2sel", "*.txt", "*.m3u", "*.m3u8"] },
+                new FilePickerFileType("All Files")       { Patterns = ["*.*"] },
+            ],
+        });
+
+        if (files is not { Count: > 0 }) return;
+        var path = files[0].Path.LocalPath;
+        var snapshot = await _selectionSerializer.LoadAsync(path);
+        var result = _selectionManager.AddFromSnapshot(DirectoryTree.RootNode, snapshot);
+        RefreshIdleStats();
+
+        if (result.HasUnmatched)
+            _logger.LogWarning("Added {Matched} of {Total}; {Unmatched} unmatched: {Paths}",
+                result.MatchedCount, snapshot.Paths.Count,
+                result.UnmatchedPaths.Count, string.Join(", ", result.UnmatchedPaths));
+    }
+
+    [RelayCommand]
     private async Task RemoveSelectionFromFile()
     {
         if (DirectoryTree.RootNode == null) return;
@@ -1223,6 +1254,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             LogPanel.AddEntry(failMsg, LogLevel.Error);
             return;
         }
+
+        if (result.ActionSummary is { Length: > 0 } summary)
+            LogPanel.AddEntry(summary);
 
         if (result.SourceNodeResult is SourceResult.Moved or SourceResult.Trashed or SourceResult.Deleted)
             result.SourceNode.MarkForRemoval();

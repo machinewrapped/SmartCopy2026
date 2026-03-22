@@ -1,0 +1,12 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:SmartCopy.UI.Views"
+             x:Class="SmartCopy.UI.Views.Pipeline.StepEditors.SelectionFromFileStepEditor">
+    <StackPanel Spacing="8">
+        <TextBlock Text="Selection file path" FontSize="12" Opacity="0.7" />
+        <views:FilePathPickerControl x:Name="FilePathPicker"
+                                     DataContext="{Binding FilePathPicker}"
+                                     BrowseDialogTitle="Select Selection File"
+                                     BrowseButtonToolTip="Browse for selection file" />
+    </StackPanel>
+</UserControl>

@@ -53,7 +53,9 @@ public sealed class AppSettings
     public int LogRetentionDays { get; set; } = 30;
     public List<string> RecentSources { get; set; } = [];
     public List<string> RecentTargets { get; set; } = [];
+    public List<string> RecentSelectionFiles { get; set; } = [];
     public List<string> FavouritePaths { get; set; } = [];
+    public List<string> FavouriteSelectionFiles { get; set; } = [];
     public List<string> RecentFilterChains { get; set; } = [];
     public List<string> RecentPipelines { get; set; } = [];
 
@@ -107,7 +109,9 @@ public sealed class AppSettings
         LogRetentionDays = saved.LogRetentionDays;
         RecentSources = saved.RecentSources;
         RecentTargets = saved.RecentTargets;
+        RecentSelectionFiles = saved.RecentSelectionFiles;
         FavouritePaths = saved.FavouritePaths;
+        FavouriteSelectionFiles = saved.FavouriteSelectionFiles;
         RecentFilterChains = saved.RecentFilterChains;
         RecentPipelines = saved.RecentPipelines;
         FilterTypeMruPresetIds = saved.FilterTypeMruPresetIds;

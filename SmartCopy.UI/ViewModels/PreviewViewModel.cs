@@ -85,6 +85,12 @@ public partial class PreviewViewModel : ViewModelBase
     public bool HasWarnings => Warnings.Count > 0;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasInfoMessages))]
+    private IReadOnlyList<string> _infoMessages = [];
+
+    public bool HasInfoMessages => InfoMessages.Count > 0;
+
+    [ObservableProperty]
     private bool _isPreparingPlan;
 
     [ObservableProperty]
@@ -143,6 +149,7 @@ public partial class PreviewViewModel : ViewModelBase
         TotalEstimatedInputBytes = 0;
         TotalEstimatedOutputBytes = 0;
         Warnings = [];
+        InfoMessages = [];
         Groups.Clear();
         OnPropertyChanged(nameof(ConfirmButtonText));
     }
@@ -157,6 +164,7 @@ public partial class PreviewViewModel : ViewModelBase
         TotalEstimatedInputBytes = plan.TotalInputBytes;
         TotalEstimatedOutputBytes = plan.TotalEstimatedOutputBytes;
         Warnings = plan.Warnings;
+        InfoMessages = plan.InfoMessages;
 
         Groups.Clear();
 

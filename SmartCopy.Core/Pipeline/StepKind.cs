@@ -45,4 +45,16 @@ public enum StepKind
     [Display(Name = "Clear selection")]
     [StepIcon("✖")]
     ClearSelection,
+
+    [Display(Name = "Save selection to file")]
+    [StepIcon("💾")]
+    SaveSelectionToFile,
+
+    [Display(Name = "Add selection from file")]
+    [StepIcon("☑")]
+    AddSelectionFromFile,
+
+    [Display(Name = "Remove selection from file")]
+    [StepIcon("✖")]
+    RemoveSelectionFromFile,
 }
