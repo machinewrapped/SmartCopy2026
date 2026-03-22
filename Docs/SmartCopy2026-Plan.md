@@ -660,6 +660,7 @@ Possible
 - [x] Each execution performs at most one benchmark scenario so cache-sensitive runs can be spaced out over time and annotated with manual notes.
 - [x] First baseline captured across four destination scenarios and documented in `Docs/Benchmark-Baseline-2026-03.md`.
 - [x] Runner now isolates artifacts from the source dataset by default and supports per-scenario `LocalFileSystemProvider` tuning for write-path experiments.
+- [x] Runner now supports incremental dataset preparation with size buckets and a durable manifest so benchmark datasets can be assembled across multiple source paths.
 
 | Topic | Default for v1 | Target date | Status |
 |---|---|---|---|

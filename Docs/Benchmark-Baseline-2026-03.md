@@ -100,6 +100,19 @@ After this baseline was captured, the benchmark runner was updated so that:
 
 - Benchmark artifacts default to a separate artifact directory when the working directory overlaps the source dataset.
 - Each scenario can now override `LocalFileSystemProvider` copy buffer size and small-file threshold, making controlled chunk-size experiments possible without editing production constants.
+- The runner now also supports `--mode dataset-prep`, which incrementally builds a benchmark dataset from one source path at a time using a durable manifest and size buckets.
+
+### Dataset prep workflow
+
+The dataset-prep mode is meant for building a more representative benchmark corpus before running copy scenarios.
+
+- It crawls one configured source path per run.
+- It assigns files into configured size buckets.
+- It copies randomized selections into a shared dataset destination while preserving source-relative layout.
+- It never clears the dataset destination automatically.
+- It writes a manifest in the artifact directory so later runs from different source paths can continue filling the same dataset without re-importing the same source files.
+
+This makes it possible to assemble a mixed benchmark dataset over time when no single source tree has enough variability to fill every bucket.
 
 ## Artifact Locations
 
