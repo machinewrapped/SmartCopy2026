@@ -1,6 +1,3 @@
-using System;
-using System.Diagnostics;
-using System.Linq;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 
