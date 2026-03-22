@@ -11,6 +11,7 @@ public partial class EditStepDialogViewModel : ObservableObject
 {
     private bool _userHasEditedStepName;
     private bool _isAutoUpdatingStepName;
+    private readonly IPathResolver _pathResolver;
 
     public StepEditorViewModelBase Editor { get; }
 
@@ -38,10 +39,12 @@ public partial class EditStepDialogViewModel : ObservableObject
     private EditStepDialogViewModel(
         StepKind kind,
         StepEditorViewModelBase editor,
+        IPathResolver pathResolver,
         string? initialCustomName = null)
     {
         Kind = kind;
         Editor = editor;
+        _pathResolver = pathResolver;
         Editor.PropertyChanged += (_, e) =>
         {
             if (!_userHasEditedStepName)
@@ -75,7 +78,7 @@ public partial class EditStepDialogViewModel : ObservableObject
         var editor = StepEditorViewModelFactory.Create(kind, ctx);
         if (sourceCapabilities.HasValue && editor is DeleteStepEditorViewModel deleteEditor)
             deleteEditor.SetSourceCapabilities(sourceCapabilities.Value);
-        return new EditStepDialogViewModel(kind, editor);
+        return new EditStepDialogViewModel(kind, editor, ctx);
     }
 
     public static EditStepDialogViewModel ForEdit(PipelineStepViewModel existing, IAppContext ctx, ProviderCapabilities? sourceCapabilities = null)
@@ -84,7 +87,7 @@ public partial class EditStepDialogViewModel : ObservableObject
         editor.LoadFrom(existing);
         if (sourceCapabilities.HasValue && editor is DeleteStepEditorViewModel deleteEditor)
             deleteEditor.SetSourceCapabilities(sourceCapabilities.Value);
-        return new EditStepDialogViewModel(existing.Kind, editor, existing.CustomName);
+        return new EditStepDialogViewModel(existing.Kind, editor, ctx, existing.CustomName);
     }
 
     partial void OnStepNameChanged(string value)
@@ -119,7 +122,7 @@ public partial class EditStepDialogViewModel : ObservableObject
         _isAutoUpdatingStepName = true;
         try
         {
-            StepName = Editor.BuildStep().AutoSummary;
+            StepName = Editor.GetAutoName(_pathResolver);
         }
         finally
         {

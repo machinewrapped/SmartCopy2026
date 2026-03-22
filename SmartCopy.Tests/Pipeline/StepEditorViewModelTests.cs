@@ -1,3 +1,4 @@
+using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Settings;
@@ -105,5 +106,117 @@ public sealed class StepEditorViewModelTests
         Assert.Contains("sample_track", editor.LivePreviewName);
         Assert.Contains("flac", editor.LivePreviewName);
         Assert.True(editor.IsValid);
+    }
+
+    // --- Selection-file editor default path tests ---
+
+    private static TestAppContext MakeCtxWithSource(string sourcePath)
+    {
+        var provider = new MemoryFileSystemProvider(customRootPath: sourcePath);
+        var settings = new AppSettings { LastSourcePath = sourcePath };
+        var ctx = new TestAppContext(settings);
+        ctx.Register(provider);
+        return ctx;
+    }
+
+    [Fact]
+    public void SaveSelectionToFileEditor_DefaultsToLastSourcePath_WhenProviderFound()
+    {
+        var ctx = MakeCtxWithSource("mem://Music");
+        var editor = new SaveSelectionToFileStepEditorViewModel(ctx);
+        Assert.Equal("mem://Music/selection.sc2sel", editor.FilePath);
+        Assert.True(editor.IsValid);
+    }
+
+    [Fact]
+    public void SaveSelectionToFileEditor_NoDefault_WhenLastSourcePathAbsent()
+    {
+        var editor = new SaveSelectionToFileStepEditorViewModel(new TestAppContext());
+        Assert.True(string.IsNullOrWhiteSpace(editor.FilePath));
+        Assert.False(editor.IsValid);
+    }
+
+    [Fact]
+    public void SaveSelectionToFileEditor_GetAutoName_ShowsFileName_WhenPathSet()
+    {
+        var ctx = MakeCtxWithSource("mem://Music");
+        var editor = new SaveSelectionToFileStepEditorViewModel(ctx);
+        Assert.Equal("Save to selection.sc2sel", editor.GetAutoName(ctx));
+    }
+
+    [Fact]
+    public void SaveSelectionToFileEditor_GetAutoName_FallsBackToStaticSummary_WhenPathEmpty()
+    {
+        var ctx = new TestAppContext();
+        var editor = new SaveSelectionToFileStepEditorViewModel(ctx);
+        Assert.Equal(StepKind.SaveSelectionToFile.ForDisplay(), editor.GetAutoName(ctx));
+    }
+
+    [Fact]
+    public void AddSelectionFromFileEditor_DefaultsToLastSourcePath_WhenProviderFound()
+    {
+        var ctx = MakeCtxWithSource("mem://Music");
+        var editor = new AddSelectionFromFileStepEditorViewModel(ctx);
+        Assert.Equal("mem://Music/selection.sc2sel", editor.FilePath);
+        Assert.True(editor.IsValid);
+    }
+
+    [Fact]
+    public void AddSelectionFromFileEditor_NoDefault_WhenLastSourcePathAbsent()
+    {
+        var editor = new AddSelectionFromFileStepEditorViewModel(new TestAppContext());
+        Assert.True(string.IsNullOrWhiteSpace(editor.FilePath));
+        Assert.False(editor.IsValid);
+    }
+
+    [Fact]
+    public void AddSelectionFromFileEditor_GetAutoName_ShowsFileName_WhenPathSet()
+    {
+        var ctx = MakeCtxWithSource("mem://Music");
+        var editor = new AddSelectionFromFileStepEditorViewModel(ctx);
+        Assert.Equal("Add from selection.sc2sel", editor.GetAutoName(ctx));
+    }
+
+    [Fact]
+    public void RemoveSelectionFromFileEditor_DefaultsToLastSourcePath_WhenProviderFound()
+    {
+        var ctx = MakeCtxWithSource("mem://Music");
+        var editor = new RemoveSelectionFromFileStepEditorViewModel(ctx);
+        Assert.Equal("mem://Music/selection.sc2sel", editor.FilePath);
+        Assert.True(editor.IsValid);
+    }
+
+    [Fact]
+    public void RemoveSelectionFromFileEditor_NoDefault_WhenLastSourcePathAbsent()
+    {
+        var editor = new RemoveSelectionFromFileStepEditorViewModel(new TestAppContext());
+        Assert.True(string.IsNullOrWhiteSpace(editor.FilePath));
+        Assert.False(editor.IsValid);
+    }
+
+    [Fact]
+    public void RemoveSelectionFromFileEditor_GetAutoName_ShowsFileName_WhenPathSet()
+    {
+        var ctx = MakeCtxWithSource("mem://Music");
+        var editor = new RemoveSelectionFromFileStepEditorViewModel(ctx);
+        Assert.Equal("Remove from selection.sc2sel", editor.GetAutoName(ctx));
+    }
+
+    [Fact]
+    public void MemoryProvider_GetFileName_ReturnsLastSegment()
+    {
+        IFileSystemProvider provider = new MemoryFileSystemProvider();
+        Assert.Equal("selection.sc2sel", provider.GetFileName("mem://Music/selection.sc2sel"));
+        Assert.Equal("Music", provider.GetFileName("mem://Music"));
+    }
+
+    [Fact]
+    public void SelectionFileEditor_LoadFrom_OverridesDefault()
+    {
+        var ctx = MakeCtxWithSource("mem://Music");
+        var editor = new SaveSelectionToFileStepEditorViewModel(ctx);
+        // Default is set; LoadFrom should override it
+        editor.LoadFrom(new PipelineStepViewModel(new SaveSelectionToFileStep("mem://Other/my.sc2sel")));
+        Assert.Equal("mem://Other/my.sc2sel", editor.FilePath);
     }
 }
