@@ -1,6 +1,5 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
-using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.Pipeline.Validation;
 using SmartCopy.Core.Selection;
 
@@ -48,25 +47,11 @@ public sealed class RemoveSelectionFromFileStep : IPipelineStep
         IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
         await Task.Yield();
-        SelectionSnapshot? snapshot = null;
-        try { snapshot = await new SelectionSerializer().LoadAsync(FilePath, ct); }
-        catch { /* file not accessible during preview — skip matching */ }
-
-        foreach (var node in context.RootNode.GetFilterIncludedDescendants())
-        {
-            ct.ThrowIfCancellationRequested();
-            if (snapshot is not null && node is FileNode fileNode)
-            {
-                var nodeCtx = context.GetNodeContext(fileNode);
-                if (snapshot.Contains(fileNode.CanonicalRelativePath) || snapshot.Contains(fileNode.FullPath))
-                    nodeCtx.VirtualCheckState = CheckState.Unchecked;
-            }
-
-            yield return new TransformResult(
-                IsSuccess: true,
-                SourceNode: node,
-                SourceNodeResult: SourceResult.None);
-        }
+        yield return new TransformResult(
+            IsSuccess: true,
+            SourceNode: context.RootNode,
+            SourceNodeResult: SourceResult.None,
+            ActionSummary: $"Will remove files matching {FilePath} from selection");
     }
 
     public async IAsyncEnumerable<TransformResult> ApplyAsync(
@@ -75,14 +60,10 @@ public sealed class RemoveSelectionFromFileStep : IPipelineStep
         var snapshot = await new SelectionSerializer().LoadAsync(FilePath, ct);
         new SelectionManager().RemoveFromSnapshot(context.RootNode, snapshot);
         context.RootNode.BuildStats();
-
-        foreach (var node in context.RootNode.GetFilterIncludedDescendants())
-        {
-            ct.ThrowIfCancellationRequested();
-            yield return new TransformResult(
-                IsSuccess: true,
-                SourceNode: node,
-                SourceNodeResult: SourceResult.None);
-        }
+        yield return new TransformResult(
+            IsSuccess: true,
+            SourceNode: context.RootNode,
+            SourceNodeResult: SourceResult.None,
+            ActionSummary: $"Removed files matching {FilePath} from selection");
     }
 }

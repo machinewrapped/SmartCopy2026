@@ -51,14 +51,11 @@ public sealed class SaveSelectionToFileStep : IPipelineStep
         IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
         await Task.Yield();
-        foreach (var node in context.RootNode.GetFilterIncludedDescendants())
-        {
-            ct.ThrowIfCancellationRequested();
-            yield return new TransformResult(
-                IsSuccess: true,
-                SourceNode: node,
-                SourceNodeResult: SourceResult.None);
-        }
+        yield return new TransformResult(
+            IsSuccess: true,
+            SourceNode: context.RootNode,
+            SourceNodeResult: SourceResult.None,
+            ActionSummary: $"Will save current selection to {FilePath}");
     }
 
     public async IAsyncEnumerable<TransformResult> ApplyAsync(
@@ -66,14 +63,10 @@ public sealed class SaveSelectionToFileStep : IPipelineStep
     {
         var snapshot = new SelectionManager().Capture(context.RootNode, UseAbsolutePaths);
         await new SelectionSerializer().SaveAsync(FilePath, snapshot, ct);
-
-        foreach (var node in context.RootNode.GetFilterIncludedDescendants())
-        {
-            ct.ThrowIfCancellationRequested();
-            yield return new TransformResult(
-                IsSuccess: true,
-                SourceNode: node,
-                SourceNodeResult: SourceResult.None);
-        }
+        yield return new TransformResult(
+            IsSuccess: true,
+            SourceNode: context.RootNode,
+            SourceNodeResult: SourceResult.None,
+            ActionSummary: $"Saved current selection to {FilePath}");
     }
 }

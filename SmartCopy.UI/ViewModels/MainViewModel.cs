@@ -1255,6 +1255,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        if (result.ActionSummary is { Length: > 0 } summary)
+            LogPanel.AddEntry(summary);
+
         if (result.SourceNodeResult is SourceResult.Moved or SourceResult.Trashed or SourceResult.Deleted)
             result.SourceNode.MarkForRemoval();
 

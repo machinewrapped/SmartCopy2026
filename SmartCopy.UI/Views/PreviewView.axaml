@@ -93,6 +93,18 @@
                             <TextBlock Text="Delete confirmation is required before running."
                                        Foreground="{DynamicResource WarningForegroundBrush}" />
                         </Border>
+                        <Border IsVisible="{Binding HasInfoMessages}"
+                                Background="{DynamicResource AccentActiveBrush}"
+                                CornerRadius="4"
+                                Padding="8">
+                            <ItemsControl ItemsSource="{Binding InfoMessages}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" Foreground="{DynamicResource AccentBrush}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
                     </StackPanel>
 
                     <ScrollViewer Grid.Row="1"
