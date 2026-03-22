@@ -17,15 +17,11 @@ const string JournalDirectoryName = "benchmark-journals";
 var ct = CancellationToken.None;
 var workingDirectory = Directory.GetCurrentDirectory();
 var configPath = Path.Combine(workingDirectory, ConfigFileName);
-var resultsPath = Path.Combine(workingDirectory, ResultsFileName);
-var taskListPath = Path.Combine(workingDirectory, TaskListFileName);
-var journalDirectory = Path.Combine(workingDirectory, JournalDirectoryName);
 
 if (!File.Exists(configPath))
 {
     var template = BenchmarkConfig.CreateTemplate();
     await WriteJsonAsync(configPath, template, ct);
-    await UpdateTaskListAsync(taskListPath, template, [], ct);
     Console.WriteLine($"Created {ConfigFileName} in {workingDirectory}.");
     Console.WriteLine("Edit the scenario file if needed, then run the benchmark app again.");
     return;
@@ -34,6 +30,13 @@ if (!File.Exists(configPath))
 var config = await ReadJsonAsync<BenchmarkConfig>(configPath, ct)
     ?? throw new InvalidOperationException($"Could not read {configPath}.");
 config.Normalize();
+
+var artifactDirectory = ResolveArtifactDirectory(workingDirectory, config.SourcePath, config.ArtifactPath);
+var resultsPath = Path.Combine(artifactDirectory, ResultsFileName);
+var taskListPath = Path.Combine(artifactDirectory, TaskListFileName);
+var journalDirectory = Path.Combine(artifactDirectory, JournalDirectoryName);
+
+Directory.CreateDirectory(artifactDirectory);
 
 var historicalRuns = await ReadExistingRunsAsync(resultsPath, ct);
 await UpdateTaskListAsync(taskListPath, config, historicalRuns, ct);
@@ -53,9 +56,13 @@ var destinationPath = Path.GetFullPath(scenario.DestinationPath);
 
 ValidatePaths(sourcePath, destinationPath);
 
+var providerOptions = scenario.CreateProviderOptions();
+
 Console.WriteLine($"Scenario: {scenario.Name}");
 Console.WriteLine($"Source:   {sourcePath}");
 Console.WriteLine($"Target:   {destinationPath}");
+Console.WriteLine($"Artifacts: {artifactDirectory}");
+Console.WriteLine($"Provider: buffer={providerOptions.CopyBufferSizeBytes} bytes, small-file-threshold={providerOptions.SmallFileProgressThresholdBytes} bytes");
 
 var state = new BenchmarkState();
 
@@ -67,12 +74,13 @@ try
         ClearDirectoryContents(destinationPath);
     }
 
-    Directory.CreateDirectory(Path.GetDirectoryName(taskListPath) ?? workingDirectory);
     Directory.CreateDirectory(journalDirectory);
 
-    var sourceProvider = new LocalFileSystemProvider(sourcePath);
+    var sourceProvider = new LocalFileSystemProvider(sourcePath, options: providerOptions);
+    var destinationProvider = new LocalFileSystemProvider(destinationPath, options: providerOptions);
     var registry = new FileSystemProviderRegistry();
     registry.Register(sourceProvider);
+    registry.Register(destinationProvider);
 
     var scanOptions = new ScanOptions
     {
@@ -100,10 +108,10 @@ try
     }, ct);
     state.PreviewStopwatch.Stop();
 
-    var destinationProvider = registry.ResolveProvider(destinationPath)
+    var resolvedDestinationProvider = registry.ResolveProvider(destinationPath)
         ?? throw new InvalidOperationException($"No destination provider for {destinationPath}.");
 
-    state.FreeSpaceBefore = await destinationProvider.GetAvailableFreeSpaceAsync(ct);
+    state.FreeSpaceBefore = await resolvedDestinationProvider.GetAvailableFreeSpaceAsync(ct);
 
     var runner = new PipelineRunner(new TransformPipeline([new CopyStep(destinationPath, scenario.OverwriteMode)]));
     state.ExecuteStopwatch.Start();
@@ -116,7 +124,7 @@ try
     }, ct);
     state.ExecuteStopwatch.Stop();
 
-    state.FreeSpaceAfter = await destinationProvider.GetAvailableFreeSpaceAsync(ct);
+    state.FreeSpaceAfter = await resolvedDestinationProvider.GetAvailableFreeSpaceAsync(ct);
 
     var journal = new OperationJournal(journalDirectory);
     state.JournalPath = await journal.WriteAsync(
@@ -127,6 +135,7 @@ try
         scenario,
         sourcePath,
         destinationPath,
+        artifactDirectory,
         runStartedUtc,
         state,
         selection.Notes);
@@ -147,6 +156,7 @@ catch (Exception ex)
         scenario,
         sourcePath,
         destinationPath,
+        artifactDirectory,
         runStartedUtc,
         state,
         selection.Notes,
@@ -271,6 +281,25 @@ static string EnsureTrailingSeparator(string path)
     return path + Path.DirectorySeparatorChar;
 }
 
+static string ResolveArtifactDirectory(string workingDirectory, string sourcePath, string? configuredArtifactPath)
+{
+    if (!string.IsNullOrWhiteSpace(configuredArtifactPath))
+    {
+        return Path.GetFullPath(configuredArtifactPath, workingDirectory);
+    }
+
+    var fullWorkingDirectory = Path.GetFullPath(workingDirectory);
+    var fullSourcePath = Path.GetFullPath(sourcePath);
+    if (IsSameOrNestedPath(fullSourcePath, fullWorkingDirectory) || IsSameOrNestedPath(fullWorkingDirectory, fullSourcePath))
+    {
+        var sourceParent = Path.GetDirectoryName(fullSourcePath) ?? fullWorkingDirectory;
+        var sourceLeaf = Path.GetFileName(fullSourcePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        return Path.Combine(sourceParent, $"{sourceLeaf}-benchmark-artifacts");
+    }
+
+    return fullWorkingDirectory;
+}
+
 static void ClearDirectoryContents(string destinationPath)
 {
     var fullDestinationPath = Path.GetFullPath(destinationPath);
@@ -391,6 +420,7 @@ file sealed class BenchmarkCliOptions
 file sealed class BenchmarkConfig
 {
     public string SourcePath { get; set; } = @"R:\TestData\MP3";
+    public string? ArtifactPath { get; set; }
     public bool IncludeHidden { get; set; }
     public List<BenchmarkScenario> Scenarios { get; set; } = [];
 
@@ -409,6 +439,9 @@ file sealed class BenchmarkConfig
     public void Normalize()
     {
         SourcePath = Path.GetFullPath(SourcePath);
+        ArtifactPath = string.IsNullOrWhiteSpace(ArtifactPath)
+            ? null
+            : Path.GetFullPath(ArtifactPath);
         foreach (var scenario in Scenarios)
         {
             scenario.Name = scenario.Name.Trim();
@@ -424,6 +457,18 @@ file sealed class BenchmarkScenario
     public bool Enabled { get; set; } = true;
     public bool ClearDestinationBeforeRun { get; set; } = true;
     public OverwriteMode OverwriteMode { get; set; } = OverwriteMode.Always;
+    public int? ProviderCopyBufferSizeBytes { get; set; }
+    public long? ProviderSmallFileProgressThresholdBytes { get; set; }
+
+    public LocalFileSystemProviderOptions CreateProviderOptions()
+    {
+        return new LocalFileSystemProviderOptions
+        {
+            CopyBufferSizeBytes = ProviderCopyBufferSizeBytes ?? LocalFileSystemProviderOptions.Default.CopyBufferSizeBytes,
+            SmallFileProgressThresholdBytes = ProviderSmallFileProgressThresholdBytes
+                ?? LocalFileSystemProviderOptions.Default.SmallFileProgressThresholdBytes,
+        }.Normalize();
+    }
 }
 
 file sealed class BenchmarkState
@@ -444,11 +489,14 @@ file sealed class BenchmarkRunRecord
     public required string ScenarioName { get; init; }
     public required string SourcePath { get; init; }
     public required string DestinationPath { get; init; }
+    public string? ArtifactPath { get; init; }
     public required DateTime RunStartedUtc { get; init; }
     public required string HostName { get; init; }
     public required string OsDescription { get; init; }
     public required string FrameworkDescription { get; init; }
     public required string? Notes { get; init; }
+    public int? ProviderCopyBufferSizeBytes { get; init; }
+    public long? ProviderSmallFileProgressThresholdBytes { get; init; }
     public required TimeSpan ScanDuration { get; init; }
     public required TimeSpan PreviewDuration { get; init; }
     public required TimeSpan ExecuteDuration { get; init; }
@@ -469,38 +517,45 @@ file sealed class BenchmarkRunRecord
         BenchmarkScenario scenario,
         string sourcePath,
         string destinationPath,
+        string artifactPath,
         DateTime runStartedUtc,
         BenchmarkState state,
-        string? notes) => Create(scenario, sourcePath, destinationPath, runStartedUtc, state, notes, ex: null);
+        string? notes) => Create(scenario, sourcePath, destinationPath, artifactPath, runStartedUtc, state, notes, ex: null);
 
     public static BenchmarkRunRecord CreateFailure(
         BenchmarkScenario scenario,
         string sourcePath,
         string destinationPath,
+        string artifactPath,
         DateTime runStartedUtc,
         BenchmarkState state,
         string? notes,
-        Exception ex) => Create(scenario, sourcePath, destinationPath, runStartedUtc, state, notes, ex);
+        Exception ex) => Create(scenario, sourcePath, destinationPath, artifactPath, runStartedUtc, state, notes, ex);
 
     private static BenchmarkRunRecord Create(
         BenchmarkScenario scenario,
         string sourcePath,
         string destinationPath,
+        string artifactPath,
         DateTime runStartedUtc,
         BenchmarkState state,
         string? notes,
         Exception? ex)
     {
+        var providerOptions = scenario.CreateProviderOptions();
         return new BenchmarkRunRecord
         {
             ScenarioName = scenario.Name,
             SourcePath = sourcePath,
             DestinationPath = destinationPath,
+            ArtifactPath = artifactPath,
             RunStartedUtc = runStartedUtc,
             HostName = Environment.MachineName,
             OsDescription = RuntimeInformation.OSDescription,
             FrameworkDescription = RuntimeInformation.FrameworkDescription,
             Notes = notes,
+            ProviderCopyBufferSizeBytes = providerOptions.CopyBufferSizeBytes,
+            ProviderSmallFileProgressThresholdBytes = providerOptions.SmallFileProgressThresholdBytes,
             ScanDuration = state.ScanStopwatch.Elapsed,
             PreviewDuration = state.PreviewStopwatch.Elapsed,
             ExecuteDuration = state.ExecuteStopwatch.Elapsed,

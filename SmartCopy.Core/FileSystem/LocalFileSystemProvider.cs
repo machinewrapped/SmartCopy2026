@@ -2,15 +2,17 @@ namespace SmartCopy.Core.FileSystem;
 
 public sealed class LocalFileSystemProvider : IFileSystemProvider
 {
-    private const int CopyBufferSize = 256 * 1024;
-    private const long SmallFileProgressThresholdBytes = 10L * 1024 * 1024;
-
     private readonly bool _isNetworkPath;
     private readonly ProviderCapabilities _capabilities;
+    private readonly LocalFileSystemProviderOptions _options;
 
-    public LocalFileSystemProvider(string rootPath, Func<string>? readLinuxMountInfo = null)
+    public LocalFileSystemProvider(
+        string rootPath,
+        Func<string>? readLinuxMountInfo = null,
+        LocalFileSystemProviderOptions? options = null)
     {
         RootPath = NormalizePath(rootPath);
+        _options = (options ?? LocalFileSystemProviderOptions.Default).Normalize();
         _isNetworkPath = LocalPathNetworkClassifier.IsNetworkPath(RootPath, readLinuxMountInfo);
         _capabilities = new ProviderCapabilities(
             CanSeek: true,
@@ -99,7 +101,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                     Mode = FileMode.Open,
                     Access = FileAccess.Read,
                     Share = FileShare.Read,
-                    BufferSize = CopyBufferSize,
+                    BufferSize = _options.CopyBufferSizeBytes,
                     Options = FileOptions.Asynchronous | FileOptions.SequentialScan
                 });
         }, ct);
@@ -121,14 +123,14 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                 Mode = FileMode.Create,
                 Access = FileAccess.Write,
                 Share = FileShare.None,
-                BufferSize = CopyBufferSize,
+                BufferSize = _options.CopyBufferSizeBytes,
                 Options = FileOptions.Asynchronous | FileOptions.SequentialScan
             });
 
         if (TryGetRemainingLength(data, out var remainingBytes) &&
-            remainingBytes <= SmallFileProgressThresholdBytes)
+            remainingBytes <= _options.SmallFileProgressThresholdBytes)
         {
-            await data.CopyToAsync(output, CopyBufferSize, ct);
+            await data.CopyToAsync(output, _options.CopyBufferSizeBytes, ct);
             if (progress is not null && remainingBytes > 0)
             {
                 progress.Report(remainingBytes);
@@ -137,7 +139,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
             return;
         }
 
-        var buffer = new byte[CopyBufferSize];
+        var buffer = new byte[_options.CopyBufferSizeBytes];
 
         while (true)
         {

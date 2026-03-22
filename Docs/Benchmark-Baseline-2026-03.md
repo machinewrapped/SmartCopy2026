@@ -65,6 +65,7 @@ This baseline is useful, but it is not yet a controlled A/B performance comparis
 - The source dataset changed between runs: file count increased from 2049 to 2054 and total bytes changed slightly between 2026-03-19 and 2026-03-22.
 - Runs were performed across multiple days and two runtime patch versions (`.NET 10.0.4` and `.NET 10.0.5`).
 - No explicit warm-cache versus cold-cache protocol was recorded.
+- The benchmark runner originally wrote journals under the benchmark working directory. When the working directory was the source dataset, each run added a small amount of extra source data for later runs.
 
 Because of those factors, the numbers should be treated as a baseline for future comparisons, not as proof that one implementation strategy is better than another.
 
@@ -92,6 +93,13 @@ Candidate experiments:
 4. Test file preallocation when the remaining source length is known, to see whether fragmentation/allocation overhead drops on HDD or flash targets.
 5. Measure whether the small-file threshold should move up, down, or be removed entirely.
 6. Capture repeated runs per scenario with stable source contents so variance can be separated from genuine implementation changes.
+
+## Runner Follow-Up
+
+After this baseline was captured, the benchmark runner was updated so that:
+
+- Benchmark artifacts default to a separate artifact directory when the working directory overlaps the source dataset.
+- Each scenario can now override `LocalFileSystemProvider` copy buffer size and small-file threshold, making controlled chunk-size experiments possible without editing production constants.
 
 ## Artifact Locations
 
