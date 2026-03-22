@@ -16,6 +16,9 @@ public static class PipelineStepFactory
             StepKind.SelectAll => new SelectAllStep(),
             StepKind.InvertSelection => new InvertSelectionStep(),
             StepKind.ClearSelection => new ClearSelectionStep(),
+            StepKind.SaveSelectionToFile => SaveSelectionToFileStep.FromConfig(config),
+            StepKind.AddSelectionFromFile => AddSelectionFromFileStep.FromConfig(config),
+            StepKind.RemoveSelectionFromFile => RemoveSelectionFromFileStep.FromConfig(config),
             _ => throw new UnknownStepTypeException(config.StepType),
         };
     }

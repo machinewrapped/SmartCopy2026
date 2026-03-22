@@ -88,12 +88,12 @@ public partial class PathPickerViewModel : ViewModelBase
             return;
         }
 
-        if (_settings.FavouritePaths.Any(existing => PathHelper.AreEquivalentUserPaths(existing, normalized)))
+        if (GetFavouritesList().Any(existing => PathHelper.AreEquivalentUserPaths(existing, normalized)))
         {
             return;
         }
 
-        _settings.FavouritePaths.Insert(0, normalized);
+        GetFavouritesList().Insert(0, normalized);
         RefreshBookmarks();
         await SaveSettingsAsync();
     }
@@ -108,11 +108,11 @@ public partial class PathPickerViewModel : ViewModelBase
 
         if (item.IsBookmark)
         {
-            removed = RemoveEquivalentPath(_settings.FavouritePaths, normalizedPath);
+            removed = RemoveEquivalentPath(GetFavouritesList(), normalizedPath);
         }
         else
         {
-            var recentList = _mode == PathPickerMode.Source ? _settings.RecentSources : _settings.RecentTargets;
+            var recentList = GetRecentList();
             removed = RemoveEquivalentPath(recentList, normalizedPath);
         }
 
@@ -131,7 +131,7 @@ public partial class PathPickerViewModel : ViewModelBase
             return;
         }
 
-        var recentList = _mode == PathPickerMode.Source ? _settings.RecentSources : _settings.RecentTargets;
+        var recentList = GetRecentList();
 
         RemoveEquivalentPath(recentList, normalizedPath);
         recentList.Insert(0, normalizedPath);
@@ -155,23 +155,16 @@ public partial class PathPickerViewModel : ViewModelBase
 
         var addedPaths = new HashSet<string>(PathHelper.PathComparer);
 
-        var recentList = _mode == PathPickerMode.Source ? _settings.RecentSources : _settings.RecentTargets;
+        var recentList = GetRecentList();
 
-        var normalizedFavourites = PathHelper.NormalizeDistinctUserPaths(_settings.FavouritePaths);
+        var normalizedFavourites = PathHelper.NormalizeDistinctUserPaths(GetFavouritesList());
         var normalizedRecent = PathHelper.NormalizeDistinctUserPaths(recentList);
 
         // Save normalized lists back
-        _settings.FavouritePaths = normalizedFavourites;
-        if (_mode == PathPickerMode.Source)
-        {
-             _settings.RecentSources = normalizedRecent;
-        }
-        else
-        {
-            _settings.RecentTargets = normalizedRecent;
-        }
+        SetFavouritesList(normalizedFavourites);
+        SetRecentList(normalizedRecent);
 
-        foreach (var p in _settings.FavouritePaths)
+        foreach (var p in normalizedFavourites)
         {
             if (addedPaths.Add(p))
                 Bookmarks.Add(new SourceBookmarkItem(p, true));
@@ -184,6 +177,35 @@ public partial class PathPickerViewModel : ViewModelBase
         }
 
         Path = currentPath;
+    }
+
+    private List<string> GetFavouritesList() => _mode == PathPickerMode.SelectionFile
+        ? _settings.FavouriteSelectionFiles
+        : _settings.FavouritePaths;
+
+    private void SetFavouritesList(List<string> normalized)
+    {
+        if (_mode == PathPickerMode.SelectionFile)
+            _settings.FavouriteSelectionFiles = normalized;
+        else
+            _settings.FavouritePaths = normalized;
+    }
+
+    private List<string> GetRecentList() => _mode switch
+    {
+        PathPickerMode.Source        => _settings.RecentSources,
+        PathPickerMode.SelectionFile => _settings.RecentSelectionFiles,
+        _                            => _settings.RecentTargets,
+    };
+
+    private void SetRecentList(List<string> normalized)
+    {
+        switch (_mode)
+        {
+            case PathPickerMode.Source:        _settings.RecentSources        = normalized; break;
+            case PathPickerMode.SelectionFile: _settings.RecentSelectionFiles = normalized; break;
+            default:                           _settings.RecentTargets        = normalized; break;
+        }
     }
 
     private static bool RemoveEquivalentPath(List<string> list, string path)

@@ -296,6 +296,9 @@ public partial class AddStepViewModel : ObservableObject
                 new(StepKind.SelectAll, "Select All", "Mark all files as selected"),
                 new(StepKind.InvertSelection, "Invert Selection", "Toggle selection on each file"),
                 new(StepKind.ClearSelection, "Clear Selection", "Unmark all files"),
+                new(StepKind.SaveSelectionToFile, "Save Selection to File", "Save current selection to a file"),
+                new(StepKind.AddSelectionFromFile, "Add Selection from File", "Check file paths listed in a selection file"),
+                new(StepKind.RemoveSelectionFromFile, "Remove Selection from File", "Uncheck file paths listed in a selection file"),
             ],
             _ => [],
         };

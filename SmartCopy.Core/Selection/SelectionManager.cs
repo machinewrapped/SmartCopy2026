@@ -61,6 +61,27 @@ public sealed class SelectionManager
                     : CheckState.Checked;
     }
 
+    public SelectionRestoreResult AddFromSnapshot(DirectoryNode root, SelectionSnapshot snapshot)
+    {
+        var matchedKeys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var node in Traverse(root))
+        {
+            var matchedPath = snapshot.Contains(node.CanonicalRelativePath) ? node.CanonicalRelativePath
+                            : snapshot.Contains(node.FullPath)              ? node.FullPath
+                            : null;
+
+            if (matchedPath is not null)
+            {
+                node.CheckState = CheckState.Checked;
+                matchedKeys.Add(matchedPath);
+            }
+            // else: leave current CheckState untouched
+        }
+
+        var unmatched = snapshot.Paths.Where(p => !matchedKeys.Contains(p)).ToList();
+        return new SelectionRestoreResult(matchedKeys.Count, unmatched);
+    }
+
     public SelectionRestoreResult RemoveFromSnapshot(DirectoryNode root, SelectionSnapshot snapshot)
     {
         var matchedKeys = new HashSet<string>(StringComparer.Ordinal);

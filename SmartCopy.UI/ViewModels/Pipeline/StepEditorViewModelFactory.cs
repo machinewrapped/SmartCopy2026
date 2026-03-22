@@ -17,6 +17,9 @@ public static class StepEditorViewModelFactory
 StepKind.SelectAll => new SelectAllStepEditorViewModel(),
             StepKind.InvertSelection => new InvertSelectionStepEditorViewModel(),
             StepKind.ClearSelection => new ClearSelectionStepEditorViewModel(),
+            StepKind.SaveSelectionToFile => new SaveSelectionToFileStepEditorViewModel(ctx.Settings),
+            StepKind.AddSelectionFromFile => new AddSelectionFromFileStepEditorViewModel(ctx.Settings),
+            StepKind.RemoveSelectionFromFile => new RemoveSelectionFromFileStepEditorViewModel(ctx.Settings),
             _ => throw new InvalidOperationException($"Unsupported step kind: {kind}"),
         };
     }

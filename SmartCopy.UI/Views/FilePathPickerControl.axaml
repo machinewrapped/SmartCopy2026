@@ -1,0 +1,68 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
+             x:Class="SmartCopy.UI.Views.FilePathPickerControl"
+             x:DataType="vm:PathPickerViewModel">
+
+    <Grid RowDefinitions="Auto, Auto" ColumnDefinitions="*, Auto, Auto" DragDrop.AllowDrop="True">
+        <!-- Input Row -->
+        <ComboBox x:Name="PathComboBox"
+                  Grid.Row="0"
+                  Grid.Column="0"
+                  IsEditable="True"
+                  ItemsSource="{Binding Bookmarks}"
+                  SelectedItem="{Binding SelectedBookmark, Mode=TwoWay}"
+                  Text="{Binding Path, Mode=TwoWay}"
+                  Margin="0,0,5,0"
+                  HorizontalAlignment="Stretch"
+                  CornerRadius="4"
+                  AutomationProperties.Name="File path">
+            <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:SourceBookmarkItem">
+                    <Grid ColumnDefinitions="20, *, Auto">
+                        <TextBlock Grid.Column="0" Text="★" IsVisible="{Binding IsBookmark}" Foreground="{DynamicResource BookmarkStarBrush}" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Text="{Binding Path}" VerticalAlignment="Center" Margin="4,0,0,0" />
+                        <Button Grid.Column="2"
+                                Content="🗑"
+                                Width="28" Height="28" Padding="0"
+                                HorizontalContentAlignment="Center"
+                                VerticalContentAlignment="Center"
+                                CornerRadius="4" Background="Transparent"
+                                Foreground="{DynamicResource DangerForegroundBrush}" FontSize="12"
+                                VerticalAlignment="Center"
+                                ToolTip.Tip="Delete item"
+                                Command="{ReflectionBinding $parent[UserControl].DataContext.RemoveBookmarkCommand}"
+                                CommandParameter="{Binding}" />
+                    </Grid>
+                </DataTemplate>
+            </ComboBox.ItemTemplate>
+        </ComboBox>
+
+        <Button Grid.Row="0"
+                Grid.Column="1"
+                Content="★"
+                Command="{Binding BookmarkCurrentPathCommand}"
+                ToolTip.Tip="Bookmark this path"
+                AutomationProperties.Name="Bookmark this path"
+                CornerRadius="4"
+                Margin="0,0,5,0"/>
+
+        <Button Grid.Row="0"
+                Grid.Column="2"
+                Content="📁"
+                Click="OnBrowseClick"
+                CornerRadius="4"
+                ToolTip.Tip="{Binding $parent[UserControl].BrowseButtonToolTip}"
+                AutomationProperties.Name="{Binding $parent[UserControl].BrowseButtonToolTip}"/>
+
+        <!-- Validation Row -->
+        <TextBlock Grid.Row="1"
+                   Grid.Column="0"
+                   Grid.ColumnSpan="3"
+                   Text="{Binding ValidationMessage}"
+                   IsVisible="{Binding ValidationMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                   Foreground="{DynamicResource ValidationErrorForegroundBrush}"
+                   Margin="0,6,0,0"
+                   TextWrapping="Wrap" />
+    </Grid>
+</UserControl>
