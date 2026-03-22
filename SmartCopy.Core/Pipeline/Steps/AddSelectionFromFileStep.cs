@@ -25,22 +25,21 @@ public sealed class AddSelectionFromFileStep : IPipelineStep
     internal static AddSelectionFromFileStep FromConfig(TransformStepConfig config)
         => new(config.GetOptional("filePath"));
 
-    public Task Validate(StepValidationContext context, CancellationToken ct = default)
+    public async Task Validate(StepValidationContext context, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(FilePath))
         {
             context.AddBlockingIssue("Step.MissingFilePath", "Add Selection from File requires a file path.");
-            return Task.CompletedTask;
+            return;
         }
 
-        if (!File.Exists(FilePath))
+        if (context.ProviderRegistry?.ResolveProvider(FilePath) is not { } provider || !await provider.ExistsAsync(FilePath, ct))
             context.AddBlockingIssue("Step.FileNotFound", $"Selection file not found: {FilePath}");
 
         // Post-condition: conservative — assume all files could now be selected
         context.SourceExists = true;
         context.SelectedFileCount = context.NumFilterIncludedFiles;
         context.SelectedBytes = context.TotalFilterIncludedBytes;
-        return Task.CompletedTask;
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(

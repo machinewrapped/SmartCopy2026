@@ -281,7 +281,8 @@ public sealed class SelectionFileStepTests : IDisposable
         var step = new AddSelectionFromFileStep(selFile);
         var context = new StepValidationContext(
             selectedFileCount: 1, selectedBytes: 50,
-            numFilterIncludedFiles: 5, totalFilterIncludedBytes: 500);
+            numFilterIncludedFiles: 5, totalFilterIncludedBytes: 500,
+            providerRegistry: new FileSystemProviderRegistry());
 
         await step.Validate(context);
 
@@ -370,7 +371,8 @@ public sealed class SelectionFileStepTests : IDisposable
         var step = new RemoveSelectionFromFileStep(selFile);
         var context = new StepValidationContext(
             selectedFileCount: 3, selectedBytes: 300,
-            numFilterIncludedFiles: 5, totalFilterIncludedBytes: 500);
+            numFilterIncludedFiles: 5, totalFilterIncludedBytes: 500,
+            providerRegistry: new FileSystemProviderRegistry());
 
         await step.Validate(context);
 

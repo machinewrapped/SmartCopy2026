@@ -25,22 +25,21 @@ public sealed class RemoveSelectionFromFileStep : IPipelineStep
     internal static RemoveSelectionFromFileStep FromConfig(TransformStepConfig config)
         => new(config.GetOptional("filePath"));
 
-    public Task Validate(StepValidationContext context, CancellationToken ct = default)
+    public async Task Validate(StepValidationContext context, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(FilePath))
         {
             context.AddBlockingIssue("Step.MissingFilePath", "Remove Selection from File requires a file path.");
-            return Task.CompletedTask;
+            return;
         }
 
-        if (!File.Exists(FilePath))
+        if (context.ProviderRegistry?.ResolveProvider(FilePath) is not { } provider || !await provider.ExistsAsync(FilePath, ct))
             context.AddBlockingIssue("Step.FileNotFound", $"Selection file not found: {FilePath}");
 
         // Post-condition: conservative — assume all matching files are now deselected
         context.SourceExists = true;
         context.SelectedFileCount = 0;
         context.SelectedBytes = 0;
-        return Task.CompletedTask;
     }
 
     public async IAsyncEnumerable<TransformResult> PreviewAsync(
