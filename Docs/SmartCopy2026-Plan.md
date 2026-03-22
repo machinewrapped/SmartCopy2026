@@ -658,6 +658,7 @@ Possible
 - [x] Added a dedicated `SmartCopy.Benchmarks` console runner for manual, real-disk copy benchmarking outside the unit-test suite.
 - [x] Runner writes a scenario template, append-only NDJSON timing results, a markdown task list, and per-run operation journals in the current working directory.
 - [x] Each execution performs at most one benchmark scenario so cache-sensitive runs can be spaced out over time and annotated with manual notes.
+- [x] First baseline captured across four destination scenarios and documented in `Docs/Benchmark-Baseline-2026-03.md`.
 
 | Topic | Default for v1 | Target date | Status |
 |---|---|---|---|
