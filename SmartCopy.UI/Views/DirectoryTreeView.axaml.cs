@@ -63,15 +63,16 @@ public partial class DirectoryTreeView : UserControl
 
         if (e.KeyModifiers == KeyModifiers.Alt && DirectoryTree.SelectedItem is DirectoryNode dirNode)
         {
-            if (e.Key == Key.Right)
+            switch (e.Key)
             {
-                dirNode.ExpandAll();
-                e.Handled = true;
-            }
-            else if (e.Key == Key.Left)
-            {
-                dirNode.CollapseAll();
-                e.Handled = true;
+                case Key.Right:
+                    dirNode.ExpandAll();
+                    e.Handled = true;
+                    break;
+                case Key.Left:
+                    dirNode.CollapseAll();
+                    e.Handled = true;
+                    break;
             }
         }
     }
