@@ -1,6 +1,6 @@
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using SmartCopy.Benchmarks;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
@@ -17,146 +17,206 @@ const string JournalDirectoryName = "benchmark-journals";
 var ct = CancellationToken.None;
 var workingDirectory = Directory.GetCurrentDirectory();
 var configPath = Path.Combine(workingDirectory, ConfigFileName);
-var resultsPath = Path.Combine(workingDirectory, ResultsFileName);
-var taskListPath = Path.Combine(workingDirectory, TaskListFileName);
-var journalDirectory = Path.Combine(workingDirectory, JournalDirectoryName);
+var selection = BenchmarkCliOptions.Parse(args);
 
 if (!File.Exists(configPath))
 {
     var template = BenchmarkConfig.CreateTemplate();
-    await WriteJsonAsync(configPath, template, ct);
-    await UpdateTaskListAsync(taskListPath, template, [], ct);
+    await BenchmarkJson.WriteAsync(configPath, template, ct);
     Console.WriteLine($"Created {ConfigFileName} in {workingDirectory}.");
     Console.WriteLine("Edit the scenario file if needed, then run the benchmark app again.");
     return;
 }
 
-var config = await ReadJsonAsync<BenchmarkConfig>(configPath, ct)
+var config = await BenchmarkJson.ReadAsync<BenchmarkConfig>(configPath, ct)
     ?? throw new InvalidOperationException($"Could not read {configPath}.");
 config.Normalize();
 
-var historicalRuns = await ReadExistingRunsAsync(resultsPath, ct);
-await UpdateTaskListAsync(taskListPath, config, historicalRuns, ct);
-
-var selection = BenchmarkCliOptions.Parse(args);
-var scenario = SelectScenario(config, historicalRuns, selection.ScenarioName);
-if (scenario is null)
+if (selection.Mode == BenchmarkRunMode.DatasetPreparation)
 {
-    Console.WriteLine("No eligible benchmark scenario found.");
-    Console.WriteLine($"See {ConfigFileName} and {TaskListFileName} in {workingDirectory}.");
+    await RunDatasetPreparationModeAsync(workingDirectory, config, selection, ct);
     return;
 }
 
-var runStartedUtc = DateTime.UtcNow;
-var sourcePath = Path.GetFullPath(config.SourcePath);
-var destinationPath = Path.GetFullPath(scenario.DestinationPath);
+await RunBenchmarkModeAsync(workingDirectory, config, selection, ct);
 
-ValidatePaths(sourcePath, destinationPath);
-
-Console.WriteLine($"Scenario: {scenario.Name}");
-Console.WriteLine($"Source:   {sourcePath}");
-Console.WriteLine($"Target:   {destinationPath}");
-
-var state = new BenchmarkState();
-
-try
+static async Task RunDatasetPreparationModeAsync(
+    string workingDirectory,
+    BenchmarkConfig config,
+    BenchmarkCliOptions selection,
+    CancellationToken ct)
 {
-    if (scenario.ClearDestinationBeforeRun)
+    var preparation = config.DatasetPreparation
+        ?? throw new InvalidOperationException("benchmark-scenarios.json does not define datasetPreparation.");
+    var artifactDirectory = ResolveArtifactDirectory(workingDirectory, preparation.SourcePath, config.ArtifactPath);
+
+    Console.WriteLine("Mode:     dataset-prep");
+    Console.WriteLine($"Source:   {preparation.SourcePath}");
+    Console.WriteLine($"Dataset:  {preparation.DestinationPath}");
+    Console.WriteLine($"Artifacts:{artifactDirectory}");
+
+    var service = new DatasetPreparationService();
+    var summary = await service.RunAsync(preparation, artifactDirectory, config.IncludeHidden, selection.Notes, ct);
+
+    Console.WriteLine($"Imported files: {summary.ImportedFileCount}, bytes: {summary.ImportedTotalBytes}.");
+    Console.WriteLine($"Skipped duplicates: {summary.DuplicateSourceSkips}, skipped conflicts: {summary.ExistingDestinationSkips}.");
+    Console.WriteLine($"Manifest: {summary.ManifestPath}");
+    Console.WriteLine($"Summary:  {summary.SummaryPath}");
+
+    foreach (var bucket in summary.Buckets)
     {
-        Console.WriteLine("Clearing destination contents before benchmark.");
-        ClearDirectoryContents(destinationPath);
+        var status = bucket.IsFull ? "full" : "underfilled";
+        Console.WriteLine(
+            $"Bucket {bucket.BucketName}: +{bucket.AddedFileCount} files / +{bucket.AddedTotalBytes} bytes, " +
+            $"now {bucket.AfterFileCount} files / {bucket.AfterTotalBytes} bytes ({status}).");
+    }
+}
+
+static async Task RunBenchmarkModeAsync(
+    string workingDirectory,
+    BenchmarkConfig config,
+    BenchmarkCliOptions selection,
+    CancellationToken ct)
+{
+    var artifactDirectory = ResolveArtifactDirectory(workingDirectory, config.SourcePath, config.ArtifactPath);
+    var resultsPath = Path.Combine(artifactDirectory, ResultsFileName);
+    var taskListPath = Path.Combine(artifactDirectory, TaskListFileName);
+    var journalDirectory = Path.Combine(artifactDirectory, JournalDirectoryName);
+
+    Directory.CreateDirectory(artifactDirectory);
+
+    var historicalRuns = await ReadExistingRunsAsync(resultsPath, ct);
+    await UpdateTaskListAsync(taskListPath, config, historicalRuns, ct);
+
+    var scenario = SelectScenario(config, historicalRuns, selection.ScenarioName);
+    if (scenario is null)
+    {
+        Console.WriteLine("No eligible benchmark scenario found.");
+        Console.WriteLine($"See {ConfigFileName} and {TaskListFileName} in {workingDirectory}.");
+        return;
     }
 
-    Directory.CreateDirectory(Path.GetDirectoryName(taskListPath) ?? workingDirectory);
-    Directory.CreateDirectory(journalDirectory);
+    var runStartedUtc = DateTime.UtcNow;
+    var sourcePath = Path.GetFullPath(config.SourcePath);
+    var destinationPath = Path.GetFullPath(scenario.DestinationPath);
 
-    var sourceProvider = new LocalFileSystemProvider(sourcePath);
-    var registry = new FileSystemProviderRegistry();
-    registry.Register(sourceProvider);
+    ValidatePaths(sourcePath, destinationPath);
 
-    var scanOptions = new ScanOptions
+    var providerOptions = scenario.CreateProviderOptions();
+
+    Console.WriteLine("Mode:     benchmark");
+    Console.WriteLine($"Scenario: {scenario.Name}");
+    Console.WriteLine($"Source:   {sourcePath}");
+    Console.WriteLine($"Target:   {destinationPath}");
+    Console.WriteLine($"Artifacts:{artifactDirectory}");
+    Console.WriteLine(
+        $"Provider: buffer={providerOptions.CopyBufferSizeBytes} bytes, " +
+        $"small-file-threshold={providerOptions.SmallFileProgressThresholdBytes} bytes");
+
+    var state = new BenchmarkState();
+
+    try
     {
-        IncludeHidden = config.IncludeHidden,
-        FullPreScan = true,
-        LazyExpand = false,
-        FollowSymlinks = false,
-    };
+        if (scenario.ClearDestinationBeforeRun)
+        {
+            Console.WriteLine("Clearing destination contents before benchmark.");
+            ClearDirectoryContents(destinationPath);
+        }
 
-    state.ScanStopwatch.Start();
-    state.Root = await ScanTreeAsync(sourceProvider, sourcePath, scanOptions, ct);
-    state.ScanStopwatch.Stop();
+        Directory.CreateDirectory(journalDirectory);
 
-    new SelectionManager().SelectAll(state.Root);
-    state.Root.BuildStats();
+        var sourceProvider = new LocalFileSystemProvider(sourcePath, options: providerOptions);
+        var destinationProvider = new LocalFileSystemProvider(destinationPath, options: providerOptions);
+        var registry = new FileSystemProviderRegistry();
+        registry.Register(sourceProvider);
+        registry.Register(destinationProvider);
 
-    var previewRunner = new PipelineRunner(new TransformPipeline([new CopyStep(destinationPath, scenario.OverwriteMode)]));
-    state.PreviewStopwatch.Start();
-    state.Preview = await previewRunner.PreviewAsync(new PipelineJob
+        var scanOptions = new ScanOptions
+        {
+            IncludeHidden = config.IncludeHidden,
+            FullPreScan = true,
+            LazyExpand = false,
+            FollowSymlinks = false,
+        };
+
+        state.ScanStopwatch.Start();
+        state.Root = await ScanTreeAsync(sourceProvider, sourcePath, scanOptions, ct);
+        state.ScanStopwatch.Stop();
+
+        new SelectionManager().SelectAll(state.Root);
+        state.Root.BuildStats();
+
+        var previewRunner = new PipelineRunner(new TransformPipeline([new CopyStep(destinationPath, scenario.OverwriteMode)]));
+        state.PreviewStopwatch.Start();
+        state.Preview = await previewRunner.PreviewAsync(new PipelineJob
+        {
+            RootNode = state.Root,
+            SourceProvider = sourceProvider,
+            ProviderRegistry = registry,
+            CancellationToken = ct,
+        }, ct);
+        state.PreviewStopwatch.Stop();
+
+        var resolvedDestinationProvider = registry.ResolveProvider(destinationPath)
+            ?? throw new InvalidOperationException($"No destination provider for {destinationPath}.");
+
+        state.FreeSpaceBefore = await resolvedDestinationProvider.GetAvailableFreeSpaceAsync(ct);
+
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep(destinationPath, scenario.OverwriteMode)]));
+        state.ExecuteStopwatch.Start();
+        state.Results = await runner.ExecuteAsync(new PipelineJob
+        {
+            RootNode = state.Root,
+            SourceProvider = sourceProvider,
+            ProviderRegistry = registry,
+            CancellationToken = ct,
+        }, ct);
+        state.ExecuteStopwatch.Stop();
+
+        state.FreeSpaceAfter = await resolvedDestinationProvider.GetAvailableFreeSpaceAsync(ct);
+
+        var journal = new OperationJournal(journalDirectory);
+        state.JournalPath = await journal.WriteAsync(
+            state.Results.Where(r => r.SourceNodeResult != SourceResult.None),
+            ct);
+
+        var record = BenchmarkRunRecord.CreateSuccess(
+            scenario,
+            sourcePath,
+            destinationPath,
+            artifactDirectory,
+            runStartedUtc,
+            state,
+            selection.Notes);
+
+        await AppendJsonLineAsync(resultsPath, record, ct);
+
+        historicalRuns.Add(record);
+        await UpdateTaskListAsync(taskListPath, config, historicalRuns, ct);
+
+        Console.WriteLine($"Completed in {record.ExecuteDuration}.");
+        Console.WriteLine($"Copied files: {record.CopiedFiles}, failed: {record.FailedFiles}, skipped: {record.SkippedFiles}.");
+        Console.WriteLine($"Results: {resultsPath}");
+        Console.WriteLine($"Journal: {state.JournalPath}");
+    }
+    catch (Exception ex)
     {
-        RootNode = state.Root,
-        SourceProvider = sourceProvider,
-        ProviderRegistry = registry,
-        CancellationToken = ct,
-    }, ct);
-    state.PreviewStopwatch.Stop();
+        var record = BenchmarkRunRecord.CreateFailure(
+            scenario,
+            sourcePath,
+            destinationPath,
+            artifactDirectory,
+            runStartedUtc,
+            state,
+            selection.Notes,
+            ex);
 
-    var destinationProvider = registry.ResolveProvider(destinationPath)
-        ?? throw new InvalidOperationException($"No destination provider for {destinationPath}.");
+        await AppendJsonLineAsync(resultsPath, record, ct);
 
-    state.FreeSpaceBefore = await destinationProvider.GetAvailableFreeSpaceAsync(ct);
-
-    var runner = new PipelineRunner(new TransformPipeline([new CopyStep(destinationPath, scenario.OverwriteMode)]));
-    state.ExecuteStopwatch.Start();
-    state.Results = await runner.ExecuteAsync(new PipelineJob
-    {
-        RootNode = state.Root,
-        SourceProvider = sourceProvider,
-        ProviderRegistry = registry,
-        CancellationToken = ct,
-    }, ct);
-    state.ExecuteStopwatch.Stop();
-
-    state.FreeSpaceAfter = await destinationProvider.GetAvailableFreeSpaceAsync(ct);
-
-    var journal = new OperationJournal(journalDirectory);
-    state.JournalPath = await journal.WriteAsync(
-        state.Results.Where(r => r.SourceNodeResult != SourceResult.None),
-        ct);
-
-    var record = BenchmarkRunRecord.CreateSuccess(
-        scenario,
-        sourcePath,
-        destinationPath,
-        runStartedUtc,
-        state,
-        selection.Notes);
-
-    await AppendJsonLineAsync(resultsPath, record, ct);
-
-    historicalRuns.Add(record);
-    await UpdateTaskListAsync(taskListPath, config, historicalRuns, ct);
-
-    Console.WriteLine($"Completed in {record.ExecuteDuration}.");
-    Console.WriteLine($"Copied files: {record.CopiedFiles}, failed: {record.FailedFiles}, skipped: {record.SkippedFiles}.");
-    Console.WriteLine($"Results: {resultsPath}");
-    Console.WriteLine($"Journal: {state.JournalPath}");
-}
-catch (Exception ex)
-{
-    var record = BenchmarkRunRecord.CreateFailure(
-        scenario,
-        sourcePath,
-        destinationPath,
-        runStartedUtc,
-        state,
-        selection.Notes,
-        ex);
-
-    await AppendJsonLineAsync(resultsPath, record, ct);
-
-    historicalRuns.Add(record);
-    await UpdateTaskListAsync(taskListPath, config, historicalRuns, ct);
-    throw;
+        historicalRuns.Add(record);
+        await UpdateTaskListAsync(taskListPath, config, historicalRuns, ct);
+        throw;
+    }
 }
 
 static async Task<DirectoryNode> ScanTreeAsync(
@@ -263,12 +323,32 @@ static bool IsSameOrNestedPath(string parentPath, string childPath)
 
 static string EnsureTrailingSeparator(string path)
 {
-    if (path.EndsWith(Path.DirectorySeparatorChar) || path.EndsWith(Path.AltDirectorySeparatorChar))
+    if (path.Length > 0 &&
+        (path[^1] == Path.DirectorySeparatorChar || path[^1] == Path.AltDirectorySeparatorChar))
     {
         return path;
     }
 
     return path + Path.DirectorySeparatorChar;
+}
+
+static string ResolveArtifactDirectory(string workingDirectory, string sourcePath, string? configuredArtifactPath)
+{
+    if (!string.IsNullOrWhiteSpace(configuredArtifactPath))
+    {
+        return Path.GetFullPath(configuredArtifactPath, workingDirectory);
+    }
+
+    var fullWorkingDirectory = Path.GetFullPath(workingDirectory);
+    var fullSourcePath = Path.GetFullPath(sourcePath);
+    if (IsSameOrNestedPath(fullSourcePath, fullWorkingDirectory) || IsSameOrNestedPath(fullWorkingDirectory, fullSourcePath))
+    {
+        var sourceParent = Path.GetDirectoryName(fullSourcePath) ?? fullWorkingDirectory;
+        var sourceLeaf = Path.GetFileName(fullSourcePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        return Path.Combine(sourceParent, $"{sourceLeaf}-benchmark-artifacts");
+    }
+
+    return fullWorkingDirectory;
 }
 
 static void ClearDirectoryContents(string destinationPath)
@@ -294,18 +374,6 @@ static void ClearDirectoryContents(string destinationPath)
     {
         Directory.Delete(directory, recursive: true);
     }
-}
-
-static async Task<T?> ReadJsonAsync<T>(string path, CancellationToken ct)
-{
-    await using var stream = File.OpenRead(path);
-    return await JsonSerializer.DeserializeAsync<T>(stream, JsonOptions.Default, ct);
-}
-
-static async Task WriteJsonAsync<T>(string path, T value, CancellationToken ct)
-{
-    await using var stream = File.Create(path);
-    await JsonSerializer.SerializeAsync(stream, value, JsonOptions.Indented, ct);
 }
 
 static async Task AppendJsonLineAsync<T>(string path, T value, CancellationToken ct)
@@ -357,179 +425,3 @@ static async Task UpdateTaskListAsync(
 }
 
 static string EscapeTable(string value) => value.Replace("|", "\\|");
-
-file sealed class BenchmarkCliOptions
-{
-    public string? ScenarioName { get; init; }
-    public string? Notes { get; init; }
-
-    public static BenchmarkCliOptions Parse(string[] args)
-    {
-        string? scenarioName = null;
-        string? notes = null;
-
-        for (var i = 0; i < args.Length; i++)
-        {
-            if (string.Equals(args[i], "--scenario", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
-            {
-                scenarioName = args[++i];
-            }
-            else if (string.Equals(args[i], "--notes", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
-            {
-                notes = args[++i];
-            }
-        }
-
-        return new BenchmarkCliOptions
-        {
-            ScenarioName = scenarioName,
-            Notes = notes,
-        };
-    }
-}
-
-file sealed class BenchmarkConfig
-{
-    public string SourcePath { get; set; } = @"R:\TestData\MP3";
-    public bool IncludeHidden { get; set; }
-    public List<BenchmarkScenario> Scenarios { get; set; } = [];
-
-    public static BenchmarkConfig CreateTemplate() =>
-        new()
-        {
-            Scenarios =
-            [
-                new BenchmarkScenario { Name = "SameDriveTest", DestinationPath = @"R:\TestData\SameDriveTest" },
-                new BenchmarkScenario { Name = "SSDtoSSD", DestinationPath = @"D:\TestData\SSDtoSSD" },
-                new BenchmarkScenario { Name = "SSDtoHDD", DestinationPath = @"L:\TestData\SSDtoHDD" },
-                new BenchmarkScenario { Name = "SSDtoUSBFlash", DestinationPath = @"T:\TestData\SSDtoUSBFlash" },
-            ],
-        };
-
-    public void Normalize()
-    {
-        SourcePath = Path.GetFullPath(SourcePath);
-        foreach (var scenario in Scenarios)
-        {
-            scenario.Name = scenario.Name.Trim();
-            scenario.DestinationPath = Path.GetFullPath(scenario.DestinationPath);
-        }
-    }
-}
-
-file sealed class BenchmarkScenario
-{
-    public string Name { get; set; } = string.Empty;
-    public string DestinationPath { get; set; } = string.Empty;
-    public bool Enabled { get; set; } = true;
-    public bool ClearDestinationBeforeRun { get; set; } = true;
-    public OverwriteMode OverwriteMode { get; set; } = OverwriteMode.Always;
-}
-
-file sealed class BenchmarkState
-{
-    public DirectoryNode? Root { get; set; }
-    public OperationPlan? Preview { get; set; }
-    public IReadOnlyList<TransformResult> Results { get; set; } = [];
-    public long? FreeSpaceBefore { get; set; }
-    public long? FreeSpaceAfter { get; set; }
-    public string? JournalPath { get; set; }
-    public System.Diagnostics.Stopwatch ScanStopwatch { get; } = new();
-    public System.Diagnostics.Stopwatch PreviewStopwatch { get; } = new();
-    public System.Diagnostics.Stopwatch ExecuteStopwatch { get; } = new();
-}
-
-file sealed class BenchmarkRunRecord
-{
-    public required string ScenarioName { get; init; }
-    public required string SourcePath { get; init; }
-    public required string DestinationPath { get; init; }
-    public required DateTime RunStartedUtc { get; init; }
-    public required string HostName { get; init; }
-    public required string OsDescription { get; init; }
-    public required string FrameworkDescription { get; init; }
-    public required string? Notes { get; init; }
-    public required TimeSpan ScanDuration { get; init; }
-    public required TimeSpan PreviewDuration { get; init; }
-    public required TimeSpan ExecuteDuration { get; init; }
-    public required int SelectedFiles { get; init; }
-    public required long SelectedBytes { get; init; }
-    public required int PreviewWarnings { get; init; }
-    public required int CopiedFiles { get; init; }
-    public required int SkippedFiles { get; init; }
-    public required int FailedFiles { get; init; }
-    public required long OutputBytes { get; init; }
-    public required long? DestinationFreeSpaceBeforeBytes { get; init; }
-    public required long? DestinationFreeSpaceAfterBytes { get; init; }
-    public required string JournalPath { get; init; }
-    public required string? ExceptionType { get; init; }
-    public required string? ExceptionMessage { get; init; }
-
-    public static BenchmarkRunRecord CreateSuccess(
-        BenchmarkScenario scenario,
-        string sourcePath,
-        string destinationPath,
-        DateTime runStartedUtc,
-        BenchmarkState state,
-        string? notes) => Create(scenario, sourcePath, destinationPath, runStartedUtc, state, notes, ex: null);
-
-    public static BenchmarkRunRecord CreateFailure(
-        BenchmarkScenario scenario,
-        string sourcePath,
-        string destinationPath,
-        DateTime runStartedUtc,
-        BenchmarkState state,
-        string? notes,
-        Exception ex) => Create(scenario, sourcePath, destinationPath, runStartedUtc, state, notes, ex);
-
-    private static BenchmarkRunRecord Create(
-        BenchmarkScenario scenario,
-        string sourcePath,
-        string destinationPath,
-        DateTime runStartedUtc,
-        BenchmarkState state,
-        string? notes,
-        Exception? ex)
-    {
-        return new BenchmarkRunRecord
-        {
-            ScenarioName = scenario.Name,
-            SourcePath = sourcePath,
-            DestinationPath = destinationPath,
-            RunStartedUtc = runStartedUtc,
-            HostName = Environment.MachineName,
-            OsDescription = RuntimeInformation.OSDescription,
-            FrameworkDescription = RuntimeInformation.FrameworkDescription,
-            Notes = notes,
-            ScanDuration = state.ScanStopwatch.Elapsed,
-            PreviewDuration = state.PreviewStopwatch.Elapsed,
-            ExecuteDuration = state.ExecuteStopwatch.Elapsed,
-            SelectedFiles = state.Root?.NumSelectedFiles ?? 0,
-            SelectedBytes = state.Root?.TotalSelectedBytes ?? 0,
-            PreviewWarnings = state.Preview?.Warnings.Count ?? 0,
-            CopiedFiles = state.Results.Sum(r => r.NumberOfFilesAffected),
-            SkippedFiles = state.Results.Sum(r => r.NumberOfFilesSkipped),
-            FailedFiles = state.Results.Count(r => !r.IsSuccess),
-            OutputBytes = state.Results.Sum(r => r.OutputBytes),
-            DestinationFreeSpaceBeforeBytes = state.FreeSpaceBefore,
-            DestinationFreeSpaceAfterBytes = state.FreeSpaceAfter,
-            JournalPath = state.JournalPath is null ? string.Empty : Path.GetFullPath(state.JournalPath),
-            ExceptionType = ex?.GetType().FullName,
-            ExceptionMessage = ex?.Message,
-        };
-    }
-}
-
-file static class JsonOptions
-{
-    public static JsonSerializerOptions Default { get; } = new()
-    {
-        WriteIndented = false,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-    };
-
-    public static JsonSerializerOptions Indented { get; } = new(Default)
-    {
-        WriteIndented = true,
-    };
-}

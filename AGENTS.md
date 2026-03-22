@@ -26,7 +26,7 @@ dotnet build | Out-String
 dotnet watch run
 
 # Run tests
-# IMPORTANT: Codex (only) is unable to run the tests and must ask the user to run them manually.
+# IMPORTANT: Codex can run the tests, but in this environment it must do so outside the sandbox.
 dotnet test | Out-String
 
 # Run a single test
