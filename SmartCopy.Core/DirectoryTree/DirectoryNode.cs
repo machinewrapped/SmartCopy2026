@@ -38,6 +38,20 @@ public sealed class DirectoryNode : DirectoryTreeNode
         }
     }
 
+    public void ExpandAll()
+    {
+        IsExpanded = true;
+        foreach (var child in Children)
+            child.ExpandAll();
+    }
+
+    public void CollapseAll()
+    {
+        IsExpanded = false;
+        foreach (var child in Children)
+            child.CollapseAll();
+    }
+
     // ── CheckState overrides ──────────────────────────────────────────────────
 
     protected override void OnChecked()
