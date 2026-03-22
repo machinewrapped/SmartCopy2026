@@ -1,5 +1,4 @@
 using SmartCopy.Core.DirectoryTree;
-using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Selection;
 using SmartCopy.Tests.TestInfrastructure;
 
@@ -139,5 +138,106 @@ public sealed class SelectionManagerTests
 
         Assert.Equal(CheckState.Unchecked, fileA.CheckState);
         Assert.Equal(CheckState.Checked, fileB.CheckState);
+    }
+
+    // ── RemoveFromSnapshot ────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task RemoveFromSnapshot_UnchecksMatchedNodes_LeavesOthersUnchanged()
+    {
+        var (root, fileA, fileB) = await BuildTree();
+        fileA.CheckState = CheckState.Checked;
+        fileB.CheckState = CheckState.Checked;
+
+        var snapshot = new SelectionSnapshot([fileA.CanonicalRelativePath]);
+        new SelectionManager().RemoveFromSnapshot(root, snapshot);
+
+        Assert.Equal(CheckState.Unchecked, fileA.CheckState);
+        Assert.Equal(CheckState.Checked,   fileB.CheckState);
+    }
+
+    [Fact]
+    public async Task RemoveFromSnapshot_ReturnsMatchedCount()
+    {
+        var (root, fileA, _) = await BuildTree();
+        fileA.CheckState = CheckState.Checked;
+
+        var snapshot = new SelectionSnapshot([fileA.CanonicalRelativePath]);
+        var result = new SelectionManager().RemoveFromSnapshot(root, snapshot);
+
+        Assert.Equal(1, result.MatchedCount);
+        Assert.False(result.HasUnmatched);
+    }
+
+    [Fact]
+    public async Task RemoveFromSnapshot_ReturnsUnmatchedPaths()
+    {
+        var (root, _, _) = await BuildTree();
+        var snapshot = new SelectionSnapshot(["does/not/exist.mp3"]);
+
+        var result = new SelectionManager().RemoveFromSnapshot(root, snapshot);
+
+        Assert.Equal(0, result.MatchedCount);
+        Assert.True(result.HasUnmatched);
+    }
+
+    // ── ExpandSelectedFolders ─────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ExpandSelectedFolders_ExpandsDirsWithCheckStateNotUnchecked()
+    {
+        var (root, fileA, _) = await BuildTree();
+        fileA.CheckState = CheckState.Checked;
+
+        // "root/a.mp3" being checked makes the "root" directory Indeterminate (or Checked)
+        var subDir = (DirectoryNode?)root.FindNodeByPathSegments(["root"]);
+        Assert.NotNull(subDir);
+        subDir.IsExpanded = false;
+
+        new SelectionManager().ExpandSelectedFolders(root);
+
+        Assert.True(subDir.IsExpanded);
+    }
+
+    [Fact]
+    public async Task ExpandSelectedFolders_DoesNotExpandUncheckedDirs()
+    {
+        var (root, _, _) = await BuildTree();
+
+        var subDir = (DirectoryNode?)root.FindNodeByPathSegments(["root"]);
+        Assert.NotNull(subDir);
+        Assert.Equal(CheckState.Unchecked, subDir.CheckState);
+        subDir.IsExpanded = false;
+
+        new SelectionManager().ExpandSelectedFolders(root);
+
+        Assert.False(subDir.IsExpanded);
+    }
+
+    // ── SelectAllFilesInSelectedFolders ───────────────────────────────────────
+
+    [Fact]
+    public async Task SelectAllFilesInSelectedFolders_ChecksFilterIncludedFilesInSelectedDirs()
+    {
+        var (root, fileA, fileB) = await BuildTree();
+        fileA.CheckState = CheckState.Checked;   // makes parent Indeterminate
+        fileB.CheckState = CheckState.Unchecked; // should be checked by the command
+
+        new SelectionManager().SelectAllFilesInSelectedFolders(root);
+
+        Assert.Equal(CheckState.Checked, fileB.CheckState);
+    }
+
+    [Fact]
+    public async Task SelectAllFilesInSelectedFolders_SkipsExcludedFiles()
+    {
+        var (root, fileA, fileB) = await BuildTree();
+        fileA.CheckState = CheckState.Checked;   // makes parent non-Unchecked
+        fileB.CheckState = CheckState.Unchecked;
+        fileB.FilterResult = FilterResult.Excluded;
+
+        new SelectionManager().SelectAllFilesInSelectedFolders(root);
+
+        Assert.Equal(CheckState.Unchecked, fileB.CheckState);
     }
 }

@@ -18,7 +18,7 @@
               AutomationProperties.Name="Directory tree"
               Background="Transparent"
               BorderThickness="0"
-              KeyDown="OnTreeKeyDown">
+>
         <TreeView.Styles>
             <Style Selector="TreeViewItem">
                 <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
@@ -44,6 +44,9 @@
                     <StackPanel.ContextMenu>
                         <ContextMenu>
                             <MenuItem Header="Set as Source Path" Click="OnSetAsSourcePathClick" />
+                            <Separator />
+                            <MenuItem Header="Expand All" Click="OnExpandAllClick" InputGesture="Alt+Right" />
+                            <MenuItem Header="Collapse All" Click="OnCollapseAllClick" InputGesture="Alt+Left" />
                         </ContextMenu>
                     </StackPanel.ContextMenu>
                     <CheckBox IsChecked="{Binding CheckState, Converter={StaticResource CheckStateConverter}}"

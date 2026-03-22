@@ -18,26 +18,19 @@ public sealed class SelectionManager
 
     public SelectionRestoreResult Restore(DirectoryNode root, SelectionSnapshot snapshot)
     {
-        var matchedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var matchedKeys = new HashSet<string>(StringComparer.Ordinal);
         foreach (var node in Traverse(root))
         {
             // Accept snapshots saved with either relative or absolute paths.
             // Track matched keys using whichever form the snapshot contains so that
             // the unmatched calculation below works correctly for both cases.
-            if (snapshot.Contains(node.CanonicalRelativePath))
-            {
-                node.CheckState = CheckState.Checked;
-                matchedKeys.Add(node.CanonicalRelativePath);
-            }
-            else if (snapshot.Contains(node.FullPath))
-            {
-                node.CheckState = CheckState.Checked;
-                matchedKeys.Add(node.FullPath);
-            }
-            else
-            {
-                node.CheckState = CheckState.Unchecked;
-            }
+            var matchedPath = snapshot.Contains(node.CanonicalRelativePath) ? node.CanonicalRelativePath
+                            : snapshot.Contains(node.FullPath)              ? node.FullPath
+                            : null;
+
+            node.CheckState = matchedPath is not null ? CheckState.Checked : CheckState.Unchecked;
+            if (matchedPath is not null)
+                matchedKeys.Add(matchedPath);
         }
 
         var unmatched = snapshot.Paths.Where(p => !matchedKeys.Contains(p)).ToList();
@@ -66,6 +59,51 @@ public sealed class SelectionManager
                 fileNode.CheckState = fileNode.CheckState == CheckState.Checked
                     ? CheckState.Unchecked
                     : CheckState.Checked;
+    }
+
+    public SelectionRestoreResult RemoveFromSnapshot(DirectoryNode root, SelectionSnapshot snapshot)
+    {
+        var matchedKeys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var node in Traverse(root))
+        {
+            var matchedPath = snapshot.Contains(node.CanonicalRelativePath) ? node.CanonicalRelativePath
+                            : snapshot.Contains(node.FullPath)              ? node.FullPath
+                            : null;
+
+            if (matchedPath is not null)
+            {
+                node.CheckState = CheckState.Unchecked;
+                matchedKeys.Add(matchedPath);
+            }
+            // else: leave current CheckState untouched
+        }
+
+        var unmatched = snapshot.Paths.Where(p => !matchedKeys.Contains(p)).ToList();
+        return new SelectionRestoreResult(matchedKeys.Count, unmatched);
+    }
+
+    public void ExpandSelectedFolders(DirectoryNode root)
+    {
+        foreach (var node in Traverse(root))
+        {
+            if (node is DirectoryNode dir && dir.CheckState != CheckState.Unchecked)
+                dir.IsExpanded = true;
+        }
+    }
+
+    public void SelectAllFilesInSelectedFolders(DirectoryNode root)
+    {
+        foreach (var node in Traverse(root))
+        {
+            if (node is DirectoryNode dir && dir.CheckState != CheckState.Unchecked)
+            {
+                foreach (var file in dir.Files)
+                {
+                    if (file.IsFilterIncluded && file.CheckState == CheckState.Unchecked)
+                        file.CheckState = CheckState.Checked;
+                }
+            }
+        }
     }
 
     private static IEnumerable<DirectoryTreeNode> Traverse(DirectoryNode root)

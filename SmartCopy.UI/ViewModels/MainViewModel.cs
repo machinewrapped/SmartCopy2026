@@ -661,6 +661,52 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 result.UnmatchedPaths.Count, string.Join(", ", result.UnmatchedPaths));
     }
 
+    [RelayCommand]
+    private async Task RemoveSelectionFromFile()
+    {
+        if (DirectoryTree.RootNode == null) return;
+
+        var mainWindow = GetMainWindow();
+        if (mainWindow is null) return;
+
+        var files = await mainWindow.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Deselect From File",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("Selection Files") { Patterns = ["*.sc2sel", "*.txt", "*.m3u", "*.m3u8"] },
+                new FilePickerFileType("All Files")       { Patterns = ["*.*"] },
+            ],
+        });
+
+        if (files is not { Count: > 0 }) return;
+        var path = files[0].Path.LocalPath;
+        var snapshot = await _selectionSerializer.LoadAsync(path);
+        var result = _selectionManager.RemoveFromSnapshot(DirectoryTree.RootNode, snapshot);
+        RefreshIdleStats();
+
+        if (result.HasUnmatched)
+            _logger.LogWarning("Deselected {Matched} of {Total}; {Unmatched} unmatched: {Paths}",
+                result.MatchedCount, snapshot.Paths.Count,
+                result.UnmatchedPaths.Count, string.Join(", ", result.UnmatchedPaths));
+    }
+
+    [RelayCommand]
+    private void ExpandSelectedFolders()
+    {
+        if (DirectoryTree.RootNode == null) return;
+        _selectionManager.ExpandSelectedFolders(DirectoryTree.RootNode);
+    }
+
+    [RelayCommand]
+    private void SelectAllFilesInSelectedFolders()
+    {
+        if (DirectoryTree.RootNode == null) return;
+        _selectionManager.SelectAllFilesInSelectedFolders(DirectoryTree.RootNode);
+        RefreshIdleStats();
+    }
+
     private static Window? GetMainWindow()
         => Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime d
             ? d.MainWindow : null;

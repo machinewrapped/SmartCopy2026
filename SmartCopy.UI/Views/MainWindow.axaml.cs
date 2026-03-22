@@ -175,7 +175,13 @@ public partial class MainWindow : Window
 
         Add(item("Save as _Text..."),      () => _mainVm?.SaveSelectionAsTextCommand.Execute(null));
         Add(item("Save as _Playlist..."),  () => _mainVm?.SaveSelectionAsPlaylistCommand.Execute(null));
-        Add(item("_Restore From File..."), () => _mainVm?.RestoreSelectionCommand.Execute(null));
+        Add(item("_Restore From File..."),   () => _mainVm?.RestoreSelectionCommand.Execute(null));
+        Add(item("_Deselect From File..."),  () => _mainVm?.RemoveSelectionFromFileCommand.Execute(null));
+
+        SelectionMenu.Items.Add(new Separator());
+
+        Add(item("_Expand Selected Folders"),              () => _mainVm?.ExpandSelectedFoldersCommand.Execute(null));
+        Add(item("Select All Files in _Selected Folders"), () => _mainVm?.SelectAllFilesInSelectedFoldersCommand.Execute(null));
 
         SelectionMenu.Items.Add(new Separator());
 

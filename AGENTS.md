@@ -64,3 +64,11 @@ All projects have `<ImplicitUsings>enable</ImplicitUsings>` in their `.csproj` f
   - In the handler, set `e.Handled = true` to prevent unwanted event bubbling (e.g., stopping a menu item from triggering its own action when a nested button is clicked).
   - Extract the command parameter from the `sender` and execute the command manually by casting the View's `DataContext` to the appropriate ViewModel type.
 
+### Keyboard Handling — Tunnel vs. Bubble
+- **`KeyDown="handler"` in AXAML registers a bubbling handler.** Controls like `TreeView` and `ListBox` consume certain keys (e.g. arrow keys) during the *tunnel* phase, marking them handled before the event bubbles. A bubbling handler will never fire for those keys.
+- **Fix:** In the code-behind constructor, use `AddHandler` with `RoutingStrategies.Tunnel` instead:
+  ```csharp
+  DirectoryTree.AddHandler(KeyDownEvent, OnTreeKeyDown, RoutingStrategies.Tunnel);
+  ```
+  This fires before the control's built-in handling. Mark `e.Handled = true` to suppress the default behaviour where needed. See `MainWindow.axaml.cs` (window-level shortcuts) and `DirectoryTreeView.axaml.cs` (`Alt+Arrow` recursive expand/collapse) for reference.
+
