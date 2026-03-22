@@ -60,7 +60,6 @@ static async Task RunDatasetPreparationModeAsync(
 
     Console.WriteLine($"Imported files: {summary.ImportedFileCount}, bytes: {summary.ImportedTotalBytes}.");
     Console.WriteLine($"Skipped duplicates: {summary.DuplicateSourceSkips}, skipped conflicts: {summary.ExistingDestinationSkips}.");
-    Console.WriteLine($"Manifest: {summary.ManifestPath}");
     Console.WriteLine($"Summary:  {summary.SummaryPath}");
 
     foreach (var bucket in summary.Buckets)

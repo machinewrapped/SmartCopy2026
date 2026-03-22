@@ -94,21 +94,42 @@ internal sealed class BenchmarkConfig
                         Name = "Tiny",
                         MinimumFileSizeBytes = 0,
                         MaximumFileSizeBytes = 64 * 1024,
-                        TargetFileCount = 500,
+                        TargetTotalBytes = 256L * 1024 * 1024,
                     },
                     new DatasetPreparationBucketConfig
                     {
                         Name = "Small",
                         MinimumFileSizeBytes = 64 * 1024 + 1,
-                        MaximumFileSizeBytes = 1 * 1024 * 1024,
-                        TargetFileCount = 250,
+                        MaximumFileSizeBytes = 512 * 1024,
+                        TargetTotalBytes = 512L * 1024 * 1024,
                     },
                     new DatasetPreparationBucketConfig
                     {
                         Name = "Medium",
-                        MinimumFileSizeBytes = 1 * 1024 * 1024 + 1,
-                        MaximumFileSizeBytes = 32 * 1024 * 1024,
+                        MinimumFileSizeBytes = 512 * 1024 + 1,
+                        MaximumFileSizeBytes = 4 * 1024 * 1024,
                         TargetTotalBytes = 2L * 1024 * 1024 * 1024,
+                    },
+                    new DatasetPreparationBucketConfig
+                    {
+                        Name = "Large",
+                        MinimumFileSizeBytes = 4 * 1024 * 1024 + 1,
+                        MaximumFileSizeBytes = 32 * 1024 * 1024,
+                        TargetTotalBytes = 3L * 1024 * 1024 * 1024,
+                    },
+                    new DatasetPreparationBucketConfig
+                    {
+                        Name = "XLarge",
+                        MinimumFileSizeBytes = 32 * 1024 * 1024 + 1,
+                        MaximumFileSizeBytes = 256 * 1024 * 1024,
+                        TargetTotalBytes = 4L * 1024 * 1024 * 1024,
+                    },
+                    new DatasetPreparationBucketConfig
+                    {
+                        Name = "Huge",
+                        MinimumFileSizeBytes = 256 * 1024 * 1024 + 1,
+                        MaximumFileSizeBytes = 2L * 1024 * 1024 * 1024,
+                        TargetTotalBytes = 4L * 1024 * 1024 * 1024,
                     },
                 ],
             },
@@ -314,28 +335,6 @@ internal sealed class DatasetPreparationConfig
     public DatasetPreparationBucketConfig? FindBucket(long sizeBytes) =>
         Buckets.FirstOrDefault(b => b.Contains(sizeBytes));
 
-    public bool IsCompatibleWith(DatasetPreparationManifest manifest)
-    {
-        if (!string.Equals(Path.GetFullPath(DestinationPath), Path.GetFullPath(manifest.DestinationPath), StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        if (Buckets.Count != manifest.Buckets.Count)
-        {
-            return false;
-        }
-
-        for (var i = 0; i < Buckets.Count; i++)
-        {
-            if (!Buckets[i].Matches(manifest.Buckets[i]))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
 }
 
 internal sealed class DatasetPreparationBucketConfig
@@ -343,8 +342,7 @@ internal sealed class DatasetPreparationBucketConfig
     public string Name { get; set; } = string.Empty;
     public long MinimumFileSizeBytes { get; set; }
     public long MaximumFileSizeBytes { get; set; }
-    public int? TargetFileCount { get; set; }
-    public long? TargetTotalBytes { get; set; }
+    public long TargetTotalBytes { get; set; }
 
     public void Normalize()
     {
@@ -364,20 +362,9 @@ internal sealed class DatasetPreparationBucketConfig
             throw new InvalidOperationException($"datasetPreparation bucket '{Name}' has max size below min size.");
         }
 
-        if (TargetFileCount is <= 0)
+        if (TargetTotalBytes <= 0)
         {
-            throw new InvalidOperationException($"datasetPreparation bucket '{Name}' targetFileCount must be positive when provided.");
-        }
-
-        if (TargetTotalBytes is <= 0)
-        {
-            throw new InvalidOperationException($"datasetPreparation bucket '{Name}' targetTotalBytes must be positive when provided.");
-        }
-
-        if (TargetFileCount is null && TargetTotalBytes is null)
-        {
-            throw new InvalidOperationException(
-                $"datasetPreparation bucket '{Name}' must define targetFileCount and/or targetTotalBytes.");
+            throw new InvalidOperationException($"datasetPreparation bucket '{Name}' targetTotalBytes must be positive.");
         }
     }
 
@@ -388,19 +375,7 @@ internal sealed class DatasetPreparationBucketConfig
         string.Equals(Name, other.Name, StringComparison.OrdinalIgnoreCase) &&
         MinimumFileSizeBytes == other.MinimumFileSizeBytes &&
         MaximumFileSizeBytes == other.MaximumFileSizeBytes &&
-        TargetFileCount == other.TargetFileCount &&
         TargetTotalBytes == other.TargetTotalBytes;
-}
-
-internal sealed class DatasetPreparationManifest
-{
-    public int SchemaVersion { get; set; } = 1;
-    public string DestinationPath { get; set; } = string.Empty;
-    public List<DatasetPreparationBucketConfig> Buckets { get; set; } = [];
-    public List<DatasetPreparationBucketState> BucketStates { get; set; } = [];
-    public List<DatasetPreparationImportedFileRecord> ImportedFiles { get; set; } = [];
-    public List<DatasetPreparationManifestRunRecord> Runs { get; set; } = [];
-    public DateTime LastUpdatedUtc { get; set; }
 }
 
 internal sealed class DatasetPreparationBucketState
@@ -420,26 +395,12 @@ internal sealed class DatasetPreparationImportedFileRecord
     public required DateTime ImportedUtc { get; init; }
 }
 
-internal sealed class DatasetPreparationManifestRunRecord
-{
-    public required DateTime RunStartedUtc { get; init; }
-    public required DateTime RunCompletedUtc { get; init; }
-    public required string SourcePath { get; init; }
-    public string? Notes { get; init; }
-    public required int ImportedFileCount { get; init; }
-    public required long ImportedTotalBytes { get; init; }
-    public required int DuplicateSourceSkips { get; init; }
-    public required int ExistingDestinationSkips { get; init; }
-    public required List<DatasetPreparationBucketProgress> Buckets { get; init; }
-}
-
 internal sealed class DatasetPreparationRunSummary
 {
     public required DateTime RunStartedUtc { get; init; }
     public required DateTime RunCompletedUtc { get; init; }
     public required string SourcePath { get; init; }
     public required string DestinationPath { get; init; }
-    public required string ManifestPath { get; init; }
     public required string SummaryPath { get; init; }
     public string? Notes { get; init; }
     public required int ImportedFileCount { get; init; }
@@ -453,8 +414,7 @@ internal sealed class DatasetPreparationRunSummary
 internal sealed class DatasetPreparationBucketProgress
 {
     public required string BucketName { get; init; }
-    public int? TargetFileCount { get; init; }
-    public long? TargetTotalBytes { get; init; }
+    public required long TargetTotalBytes { get; init; }
     public required int BeforeFileCount { get; init; }
     public required long BeforeTotalBytes { get; init; }
     public required int AddedFileCount { get; init; }

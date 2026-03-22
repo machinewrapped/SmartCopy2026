@@ -2,7 +2,6 @@ namespace SmartCopy.Benchmarks;
 
 internal sealed class DatasetPreparationService
 {
-    private const string ManifestFileName = "dataset-prep-manifest.json";
     private readonly Random random;
     private readonly Func<DateTime> utcNow;
 
@@ -25,24 +24,11 @@ internal sealed class DatasetPreparationService
         Directory.CreateDirectory(artifactDirectory);
         Directory.CreateDirectory(config.DestinationPath);
 
-        var manifestPath = Path.Combine(artifactDirectory, ManifestFileName);
         var runStartedUtc = utcNow();
-        var manifest = await LoadManifestAsync(config, manifestPath, ct);
-        ValidateManifestFilesExist(manifest);
-
-        var importedSources = new HashSet<string>(
-            manifest.ImportedFiles.Select(f => Path.GetFullPath(f.SourcePath)),
-            StringComparer.OrdinalIgnoreCase);
-        var bucketStates = manifest.BucketStates.ToDictionary(s => s.BucketName, StringComparer.OrdinalIgnoreCase);
-        var beforeStates = manifest.BucketStates.ToDictionary(
-            s => s.BucketName,
-            s => new DatasetPreparationBucketState
-            {
-                BucketName = s.BucketName,
-                ActualFileCount = s.ActualFileCount,
-                ActualTotalBytes = s.ActualTotalBytes,
-            },
-            StringComparer.OrdinalIgnoreCase);
+        var existingDataset = ScanExistingDataset(config, includeHidden, ct);
+        var existingRelativePaths = existingDataset.ExistingRelativePaths;
+        var bucketStates = existingDataset.BucketStates;
+        var beforeStates = CloneBucketStates(bucketStates);
 
         var duplicateSourceSkips = 0;
         var existingDestinationSkips = 0;
@@ -50,7 +36,7 @@ internal sealed class DatasetPreparationService
         var candidatesByBucket = BuildCandidates(
             config,
             includeHidden,
-            importedSources,
+            existingRelativePaths,
             ref duplicateSourceSkips,
             ct);
 
@@ -98,9 +84,8 @@ internal sealed class DatasetPreparationService
                     ImportedUtc = utcNow(),
                 };
 
-                importedSources.Add(imported.SourcePath);
+                existingRelativePaths.Add(imported.RelativePath);
                 importedThisRun.Add(imported);
-                manifest.ImportedFiles.Add(imported);
                 bucketState.ActualFileCount++;
                 bucketState.ActualTotalBytes += imported.SizeBytes;
             }
@@ -117,7 +102,6 @@ internal sealed class DatasetPreparationService
             RunCompletedUtc = runCompletedUtc,
             SourcePath = config.SourcePath,
             DestinationPath = config.DestinationPath,
-            ManifestPath = manifestPath,
             SummaryPath = summaryPath,
             Notes = notes,
             ImportedFileCount = importedThisRun.Count,
@@ -128,21 +112,6 @@ internal sealed class DatasetPreparationService
             Buckets = bucketProgress,
         };
 
-        manifest.LastUpdatedUtc = runCompletedUtc;
-        manifest.Runs.Add(new DatasetPreparationManifestRunRecord
-        {
-            RunStartedUtc = runStartedUtc,
-            RunCompletedUtc = runCompletedUtc,
-            SourcePath = config.SourcePath,
-            Notes = notes,
-            ImportedFileCount = summary.ImportedFileCount,
-            ImportedTotalBytes = summary.ImportedTotalBytes,
-            DuplicateSourceSkips = duplicateSourceSkips,
-            ExistingDestinationSkips = existingDestinationSkips,
-            Buckets = bucketProgress,
-        });
-
-        await BenchmarkJson.WriteAsync(manifestPath, manifest, ct);
         await BenchmarkJson.WriteAsync(summaryPath, summary, ct);
         return summary;
     }
@@ -183,7 +152,7 @@ internal sealed class DatasetPreparationService
     private static Dictionary<string, List<DatasetCandidate>> BuildCandidates(
         DatasetPreparationConfig config,
         bool includeHidden,
-        HashSet<string> importedSources,
+        HashSet<string> existingRelativePaths,
         ref int duplicateSourceSkips,
         CancellationToken ct)
     {
@@ -209,12 +178,6 @@ internal sealed class DatasetPreparationService
                 continue;
             }
 
-            if (importedSources.Contains(fullPath))
-            {
-                duplicateSourceSkips++;
-                continue;
-            }
-
             var info = new FileInfo(fullPath);
             var bucket = config.FindBucket(info.Length);
             if (bucket is null)
@@ -223,6 +186,12 @@ internal sealed class DatasetPreparationService
             }
 
             var relativePath = Path.GetRelativePath(config.SourcePath, fullPath);
+            if (existingRelativePaths.Contains(relativePath))
+            {
+                duplicateSourceSkips++;
+                continue;
+            }
+
             result[bucket.Name].Add(new DatasetCandidate(
                 fullPath,
                 relativePath,
@@ -233,72 +202,60 @@ internal sealed class DatasetPreparationService
         return result;
     }
 
-    private async Task<DatasetPreparationManifest> LoadManifestAsync(
+    private static ExistingDatasetScanResult ScanExistingDataset(
         DatasetPreparationConfig config,
-        string manifestPath,
+        bool includeHidden,
         CancellationToken ct)
     {
-        if (!File.Exists(manifestPath))
+        var bucketStates = config.Buckets.ToDictionary(
+            bucket => bucket.Name,
+            bucket => new DatasetPreparationBucketState { BucketName = bucket.Name },
+            StringComparer.OrdinalIgnoreCase);
+        var existingRelativePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var options = new EnumerationOptions
         {
-            return new DatasetPreparationManifest
-            {
-                DestinationPath = config.DestinationPath,
-                Buckets = config.Buckets.Select(CloneBucket).ToList(),
-                BucketStates = config.Buckets
-                    .Select(b => new DatasetPreparationBucketState { BucketName = b.Name })
-                    .ToList(),
-                LastUpdatedUtc = utcNow(),
-            };
-        }
-
-        var manifest = await BenchmarkJson.ReadAsync<DatasetPreparationManifest>(manifestPath, ct)
-            ?? throw new InvalidOperationException($"Could not read dataset manifest at {manifestPath}.");
-
-        if (manifest.SchemaVersion != 1)
-        {
-            throw new InvalidOperationException($"Unsupported dataset manifest schema version {manifest.SchemaVersion}.");
-        }
-
-        if (!config.IsCompatibleWith(manifest))
-        {
-            throw new InvalidOperationException(
-                "Existing dataset manifest is incompatible with the current datasetPreparation destination or bucket definitions.");
-        }
-
-        foreach (var bucket in config.Buckets)
-        {
-            if (!manifest.BucketStates.Any(s => string.Equals(s.BucketName, bucket.Name, StringComparison.OrdinalIgnoreCase)))
-            {
-                throw new InvalidOperationException(
-                    $"Existing dataset manifest does not contain state for bucket '{bucket.Name}'.");
-            }
-        }
-
-        return manifest;
-    }
-
-    private static void ValidateManifestFilesExist(DatasetPreparationManifest manifest)
-    {
-        foreach (var imported in manifest.ImportedFiles)
-        {
-            if (!File.Exists(imported.DestinationPath))
-            {
-                throw new InvalidOperationException(
-                    $"Dataset manifest references a missing destination file: {imported.DestinationPath}");
-            }
-        }
-    }
-
-    private static DatasetPreparationBucketConfig CloneBucket(DatasetPreparationBucketConfig bucket)
-    {
-        return new DatasetPreparationBucketConfig
-        {
-            Name = bucket.Name,
-            MinimumFileSizeBytes = bucket.MinimumFileSizeBytes,
-            MaximumFileSizeBytes = bucket.MaximumFileSizeBytes,
-            TargetFileCount = bucket.TargetFileCount,
-            TargetTotalBytes = bucket.TargetTotalBytes,
+            RecurseSubdirectories = true,
+            IgnoreInaccessible = true,
+            AttributesToSkip = 0,
+            ReturnSpecialDirectories = false,
         };
+
+        foreach (var path in Directory.EnumerateFiles(config.DestinationPath, "*", options))
+        {
+            ct.ThrowIfCancellationRequested();
+            var fullPath = Path.GetFullPath(path);
+            if (!includeHidden && IsHidden(fullPath, config.DestinationPath))
+            {
+                continue;
+            }
+
+            var info = new FileInfo(fullPath);
+            var bucket = config.FindBucket(info.Length);
+            if (bucket is not null)
+            {
+                var state = bucketStates[bucket.Name];
+                state.ActualFileCount++;
+                state.ActualTotalBytes += info.Length;
+            }
+
+            existingRelativePaths.Add(Path.GetRelativePath(config.DestinationPath, fullPath));
+        }
+
+        return new ExistingDatasetScanResult(existingRelativePaths, bucketStates);
+    }
+
+    private static Dictionary<string, DatasetPreparationBucketState> CloneBucketStates(
+        IReadOnlyDictionary<string, DatasetPreparationBucketState> bucketStates)
+    {
+        return bucketStates.ToDictionary(
+            pair => pair.Key,
+            pair => new DatasetPreparationBucketState
+            {
+                BucketName = pair.Value.BucketName,
+                ActualFileCount = pair.Value.ActualFileCount,
+                ActualTotalBytes = pair.Value.ActualTotalBytes,
+            },
+            StringComparer.OrdinalIgnoreCase);
     }
 
     private static List<DatasetPreparationBucketProgress> BuildBucketProgress(
@@ -315,7 +272,6 @@ internal sealed class DatasetPreparationService
             results.Add(new DatasetPreparationBucketProgress
             {
                 BucketName = bucket.Name,
-                TargetFileCount = bucket.TargetFileCount,
                 TargetTotalBytes = bucket.TargetTotalBytes,
                 BeforeFileCount = before.ActualFileCount,
                 BeforeTotalBytes = before.ActualTotalBytes,
@@ -332,17 +288,7 @@ internal sealed class DatasetPreparationService
 
     private static bool IsBucketFull(DatasetPreparationBucketConfig bucket, DatasetPreparationBucketState state)
     {
-        if (bucket.TargetFileCount is int targetFileCount && state.ActualFileCount >= targetFileCount)
-        {
-            return true;
-        }
-
-        if (bucket.TargetTotalBytes is long targetTotalBytes && state.ActualTotalBytes >= targetTotalBytes)
-        {
-            return true;
-        }
-
-        return false;
+        return state.ActualTotalBytes >= bucket.TargetTotalBytes;
     }
 
     private static bool IsHidden(string path, string rootPath)
@@ -407,4 +353,8 @@ internal sealed class DatasetPreparationService
         string RelativePath,
         string DestinationPath,
         long SizeBytes);
+
+    private sealed record ExistingDatasetScanResult(
+        HashSet<string> ExistingRelativePaths,
+        Dictionary<string, DatasetPreparationBucketState> BucketStates);
 }
