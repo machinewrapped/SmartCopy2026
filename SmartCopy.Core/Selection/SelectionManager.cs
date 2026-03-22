@@ -68,6 +68,52 @@ public sealed class SelectionManager
                     : CheckState.Checked;
     }
 
+    public SelectionRestoreResult RemoveFromSnapshot(DirectoryNode root, SelectionSnapshot snapshot)
+    {
+        var matchedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var node in Traverse(root))
+        {
+            if (snapshot.Contains(node.CanonicalRelativePath))
+            {
+                node.CheckState = CheckState.Unchecked;
+                matchedKeys.Add(node.CanonicalRelativePath);
+            }
+            else if (snapshot.Contains(node.FullPath))
+            {
+                node.CheckState = CheckState.Unchecked;
+                matchedKeys.Add(node.FullPath);
+            }
+            // else: leave current CheckState untouched
+        }
+
+        var unmatched = snapshot.Paths.Where(p => !matchedKeys.Contains(p)).ToList();
+        return new SelectionRestoreResult(matchedKeys.Count, unmatched);
+    }
+
+    public void ExpandSelectedFolders(DirectoryNode root)
+    {
+        foreach (var node in Traverse(root))
+        {
+            if (node is DirectoryNode dir && dir.CheckState != CheckState.Unchecked)
+                dir.IsExpanded = true;
+        }
+    }
+
+    public void SelectAllFilesInSelectedFolders(DirectoryNode root)
+    {
+        foreach (var node in Traverse(root))
+        {
+            if (node is DirectoryNode dir && dir.CheckState != CheckState.Unchecked)
+            {
+                foreach (var file in dir.Files)
+                {
+                    if (file.IsFilterIncluded && file.CheckState == CheckState.Unchecked)
+                        file.CheckState = CheckState.Checked;
+                }
+            }
+        }
+    }
+
     private static IEnumerable<DirectoryTreeNode> Traverse(DirectoryNode root)
     {
         var stack = new Stack<DirectoryNode>([root]);
