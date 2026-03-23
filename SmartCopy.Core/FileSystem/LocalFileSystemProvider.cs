@@ -1,5 +1,10 @@
 namespace SmartCopy.Core.FileSystem;
 
+/// <summary>
+/// <see cref="IFileSystemProvider"/> backed by <see cref="System.IO"/> and the local (or UNC) filesystem.
+/// Network paths are detected at construction time; they lose atomic-move, trash, watch, and free-space
+/// capabilities because the underlying OS APIs either don't apply or are unreliable over the network.
+/// </summary>
 public sealed class LocalFileSystemProvider : IFileSystemProvider
 {
     private readonly bool _isNetworkPath;
@@ -142,6 +147,8 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 
         if (writeMode == LocalFileSystemWriteMode.CopyToAsync)
         {
+            // CopyToAsync mode: wraps the source in a ProgressReportingReadStream so the
+            // framework's internal buffer loop reports progress without a manual loop here.
             await CopyViaCopyToAsync(data, output, progress, ct);
             return;
         }
@@ -150,6 +157,9 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
             remainingBytes is long autoBytesRemaining &&
             autoBytesRemaining <= _options.SmallFileProgressThresholdBytes)
         {
+            // Small-file optimisation: for files whose full size fits in memory we know
+            // exactly how many bytes will be written, so we let the framework copy without
+            // overhead and report progress in one shot at the end instead of per-chunk.
             await data.CopyToAsync(output, _options.CopyBufferSizeBytes, ct);
             if (progress is not null && autoBytesRemaining > 0)
             {
@@ -159,17 +169,24 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
             return;
         }
 
+        // Large files and unknown-length streams: manual loop reports progress per chunk,
+        // which keeps UI responsive during long transfers without adding a stream wrapper.
         await CopyWithManualLoopAsync(data, output, progress, ct);
     }
+
+    // Write strategy — private helpers for WriteAsync above.
 
     private LocalFileSystemWriteMode DetermineWriteMode(IProgress<long>? progress, long? remainingBytes)
     {
         if (_options.WriteMode != LocalFileSystemWriteMode.Auto)
             return _options.WriteMode;
+        // No progress handler: CopyToAsync with no wrapper is the fastest path.
         if (progress is null)
             return LocalFileSystemWriteMode.CopyToAsync;
+        // Unknown length: can't apply the small-file optimisation, go straight to manual loop.
         if (remainingBytes is null)
             return LocalFileSystemWriteMode.ManualLoop;
+        // Known length with progress: WriteAsync resolves the heuristic inline.
         return LocalFileSystemWriteMode.Auto;
     }
 
@@ -244,93 +261,6 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 
         remainingBytes = Math.Max(0, data.Length - data.Position);
         return true;
-    }
-
-    private sealed class ProgressReportingReadStream(Stream inner, IProgress<long> progress) : Stream
-    {
-        public override bool CanRead => inner.CanRead;
-        public override bool CanSeek => inner.CanSeek;
-        public override bool CanWrite => inner.CanWrite;
-        public override long Length => inner.Length;
-
-        public override long Position
-        {
-            get => inner.Position;
-            set => inner.Position = value;
-        }
-
-        public override void Flush() => inner.Flush();
-        public override int Read(byte[] buffer, int offset, int count)
-        {
-            var read = inner.Read(buffer, offset, count);
-            if (read > 0)
-            {
-                progress.Report(read);
-            }
-
-            return read;
-        }
-
-        public override int Read(Span<byte> buffer)
-        {
-            var read = inner.Read(buffer);
-            if (read > 0)
-            {
-                progress.Report(read);
-            }
-
-            return read;
-        }
-
-        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
-            ReportReadAsync(inner.ReadAsync(buffer, cancellationToken));
-
-        public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
-        {
-            var read = await inner.ReadAsync(buffer, offset, count, cancellationToken);
-            if (read > 0)
-            {
-                progress.Report(read);
-            }
-
-            return read;
-        }
-
-        public override long Seek(long offset, SeekOrigin origin) => inner.Seek(offset, origin);
-        public override void SetLength(long value) => inner.SetLength(value);
-        public override void Write(byte[] buffer, int offset, int count) => inner.Write(buffer, offset, count);
-        public override void Write(ReadOnlySpan<byte> buffer) => inner.Write(buffer);
-        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) =>
-            inner.WriteAsync(buffer, cancellationToken);
-        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
-            inner.WriteAsync(buffer, offset, count, cancellationToken);
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                inner.Dispose();
-            }
-
-            base.Dispose(disposing);
-        }
-
-        public override async ValueTask DisposeAsync()
-        {
-            await inner.DisposeAsync();
-            await base.DisposeAsync();
-        }
-
-        private async ValueTask<int> ReportReadAsync(ValueTask<int> readTask)
-        {
-            var read = await readTask;
-            if (read > 0)
-            {
-                progress.Report(read);
-            }
-
-            return read;
-        }
     }
 
     public Task DeleteAsync(string path, CancellationToken ct)
@@ -430,6 +360,9 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         }
     }
 
+    // Path utilities — all paths passed to public methods may be absolute or root-relative;
+    // Resolve() converts them to absolute before any System.IO call.
+
     public string GetRelativePath(string basePath, string fullPath)
     {
         string normalBase = NormalizePath(basePath);
@@ -527,9 +460,5 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         };
     }
 
-    private string GetCanonicalPath(string path)
-    {
-        var segments = SplitPath(path);
-        return string.Join("/", segments);
-    }
+
 }
