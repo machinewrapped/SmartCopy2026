@@ -22,6 +22,17 @@
             "cwd": "${workspaceFolder}/SmartCopy.App",
             "console": "internalConsole",
             "stopAtEntry": false
+        },
+        {
+            "name": ".NET Launch (SmartCopy.Benchmarks)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/artifacts/bin/SmartCopy.Benchmarks/debug/SmartCopy.Benchmarks.dll",
+            "args": ["--mode", "dataset-prep"],
+            "cwd": "${workspaceFolder}/SmartCopy.Benchmarks",
+            "console": "integratedTerminal",
+            "stopAtEntry": false
         }
     ]
 }

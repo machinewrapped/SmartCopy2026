@@ -67,7 +67,7 @@ internal sealed class BenchmarkCliOptions
 
 internal sealed class BenchmarkConfig
 {
-    public string SourcePath { get; set; } = @"R:\TestData\MP3";
+    public string SourcePath { get; set; } = @"R:\TestData\MixedDataset";
     public string? ArtifactPath { get; set; }
     public bool IncludeHidden { get; set; }
     public List<BenchmarkScenario> Scenarios { get; set; } = [];
