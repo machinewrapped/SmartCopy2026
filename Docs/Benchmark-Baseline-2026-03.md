@@ -99,7 +99,8 @@ Candidate experiments:
 After this baseline was captured, the benchmark runner was updated so that:
 
 - Benchmark artifacts default to a separate artifact directory when the working directory overlaps the source dataset.
-- Each scenario can now override `LocalFileSystemProvider` copy buffer size and small-file threshold, making controlled chunk-size experiments possible without editing production constants.
+- Benchmark definitions can now combine destination scenarios with reusable strategy variants and target repeated runs per variant.
+- Strategy variants can now override `LocalFileSystemProvider` copy buffer size, small-file threshold, write mode, array-pool usage, and destination preallocation without editing production defaults.
 - The runner now also supports `--mode dataset-prep`, which incrementally builds a benchmark dataset from one source path at a time using a durable manifest and size buckets.
 
 ### Dataset prep workflow

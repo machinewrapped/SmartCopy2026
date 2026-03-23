@@ -127,20 +127,100 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                 Options = FileOptions.Asynchronous | FileOptions.SequentialScan
             });
 
-        if (TryGetRemainingLength(data, out var remainingBytes) &&
-            remainingBytes <= _options.SmallFileProgressThresholdBytes)
+        long? remainingBytes = TryGetRemainingLength(data, out var knownRemainingBytes)
+            ? knownRemainingBytes
+            : null;
+
+        if (remainingBytes is long bytesRemaining &&
+            _options.PreallocateDestinationFile &&
+            bytesRemaining > 0)
+        {
+            output.SetLength(bytesRemaining);
+        }
+
+        var writeMode = DetermineWriteMode(progress, remainingBytes);
+
+        if (writeMode == LocalFileSystemWriteMode.CopyToAsync)
+        {
+            await CopyWithCopyToAsyncAsync(data, output, progress, ct);
+            return;
+        }
+
+        if (writeMode == LocalFileSystemWriteMode.Auto &&
+            remainingBytes is long autoBytesRemaining &&
+            autoBytesRemaining <= _options.SmallFileProgressThresholdBytes)
         {
             await data.CopyToAsync(output, _options.CopyBufferSizeBytes, ct);
-            if (progress is not null && remainingBytes > 0)
+            if (progress is not null && autoBytesRemaining > 0)
             {
-                progress.Report(remainingBytes);
+                progress.Report(autoBytesRemaining);
+            }
+
+            return;
+        }
+
+        await CopyWithManualLoopAsync(data, output, progress, ct);
+    }
+
+    private LocalFileSystemWriteMode DetermineWriteMode(IProgress<long>? progress, long? remainingBytes)
+    {
+        return _options.WriteMode switch
+        {
+            LocalFileSystemWriteMode.ManualLoop => LocalFileSystemWriteMode.ManualLoop,
+            LocalFileSystemWriteMode.CopyToAsync => LocalFileSystemWriteMode.CopyToAsync,
+            _ when progress is null => LocalFileSystemWriteMode.CopyToAsync,
+            _ when remainingBytes is null => LocalFileSystemWriteMode.ManualLoop,
+            _ => LocalFileSystemWriteMode.Auto,
+        };
+    }
+
+    private async Task CopyWithCopyToAsyncAsync(
+        Stream data,
+        Stream output,
+        IProgress<long>? progress,
+        CancellationToken ct)
+    {
+        Stream source = data;
+        if (progress is not null)
+        {
+            source = new ProgressReportingReadStream(data, progress);
+        }
+
+        await source.CopyToAsync(output, _options.CopyBufferSizeBytes, ct);
+    }
+
+    private async Task CopyWithManualLoopAsync(
+        Stream data,
+        Stream output,
+        IProgress<long>? progress,
+        CancellationToken ct)
+    {
+        if (_options.UseArrayPoolForManualLoop)
+        {
+            var rentedBuffer = System.Buffers.ArrayPool<byte>.Shared.Rent(_options.CopyBufferSizeBytes);
+            try
+            {
+                await CopyWithManualLoopCoreAsync(data, output, rentedBuffer, progress, ct);
+            }
+            finally
+            {
+                System.Buffers.ArrayPool<byte>.Shared.Return(rentedBuffer);
             }
 
             return;
         }
 
         var buffer = new byte[_options.CopyBufferSizeBytes];
+        await CopyWithManualLoopCoreAsync(data, output, buffer, progress, ct);
+    }
 
+    private static async Task CopyWithManualLoopCoreAsync(
+        Stream data,
+        Stream output,
+        byte[] buffer,
+        IProgress<long>? progress,
+        CancellationToken ct)
+    {
         while (true)
         {
             ct.ThrowIfCancellationRequested();
@@ -165,6 +245,85 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 
         remainingBytes = Math.Max(0, data.Length - data.Position);
         return true;
+    }
+
+    private sealed class ProgressReportingReadStream(Stream inner, IProgress<long> progress) : Stream
+    {
+        public override bool CanRead => inner.CanRead;
+        public override bool CanSeek => inner.CanSeek;
+        public override bool CanWrite => inner.CanWrite;
+        public override long Length => inner.Length;
+
+        public override long Position
+        {
+            get => inner.Position;
+            set => inner.Position = value;
+        }
+
+        public override void Flush() => inner.Flush();
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            var read = inner.Read(buffer, offset, count);
+            if (read > 0)
+            {
+                progress.Report(read);
+            }
+
+            return read;
+        }
+
+        public override int Read(Span<byte> buffer)
+        {
+            var read = inner.Read(buffer);
+            if (read > 0)
+            {
+                progress.Report(read);
+            }
+
+            return read;
+        }
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+            ReportReadAsync(inner.ReadAsync(buffer, cancellationToken));
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            ReportReadAsync(new ValueTask<int>(inner.ReadAsync(buffer, offset, count, cancellationToken))).AsTask();
+
+        public override long Seek(long offset, SeekOrigin origin) => inner.Seek(offset, origin);
+        public override void SetLength(long value) => inner.SetLength(value);
+        public override void Write(byte[] buffer, int offset, int count) => inner.Write(buffer, offset, count);
+        public override void Write(ReadOnlySpan<byte> buffer) => inner.Write(buffer);
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) =>
+            inner.WriteAsync(buffer, cancellationToken);
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            inner.WriteAsync(buffer, offset, count, cancellationToken);
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                inner.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
+
+        public override async ValueTask DisposeAsync()
+        {
+            await inner.DisposeAsync();
+            await base.DisposeAsync();
+        }
+
+        private async ValueTask<int> ReportReadAsync(ValueTask<int> readTask)
+        {
+            var read = await readTask;
+            if (read > 0)
+            {
+                progress.Report(read);
+            }
+
+            return read;
+        }
     }
 
     public Task DeleteAsync(string path, CancellationToken ct)
