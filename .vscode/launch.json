@@ -29,8 +29,9 @@
             "request": "launch",
             "preLaunchTask": "build",
             "program": "${workspaceFolder}/artifacts/bin/SmartCopy.Benchmarks/debug/SmartCopy.Benchmarks.dll",
-            "args": ["--mode", "dataset-prep"],
-            "cwd": "${workspaceFolder}/SmartCopy.Benchmarks",
+            // "args": ["--mode", "dataset-prep"],
+            "args": [],
+            "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "stopAtEntry": false
         }
