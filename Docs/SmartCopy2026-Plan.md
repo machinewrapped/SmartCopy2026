@@ -661,6 +661,7 @@ Possible
 - [x] First baseline captured across four destination scenarios and documented in `Docs/Benchmark-Baseline-2026-03.md`.
 - [x] Runner now isolates artifacts from the source dataset by default and supports per-scenario `LocalFileSystemProvider` tuning for write-path experiments.
 - [x] Runner now supports incremental dataset preparation with size buckets and a durable manifest so benchmark datasets can be assembled across multiple source paths.
+- [x] Runner now supports a scenario/variant matrix with repeated runs, so `LocalFileSystemProvider` write strategies can be compared on the same destination target instead of only comparing drive classes.
 
 | Topic | Default for v1 | Target date | Status |
 |---|---|---|---|

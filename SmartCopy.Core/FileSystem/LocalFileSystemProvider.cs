@@ -1,5 +1,10 @@
 namespace SmartCopy.Core.FileSystem;
 
+/// <summary>
+/// <see cref="IFileSystemProvider"/> backed by <see cref="System.IO"/> and the local (or UNC) filesystem.
+/// Network paths are detected at construction time; they lose atomic-move, trash, watch, and free-space
+/// capabilities because the underlying OS APIs either don't apply or are unreliable over the network.
+/// </summary>
 public sealed class LocalFileSystemProvider : IFileSystemProvider
 {
     private readonly bool _isNetworkPath;
@@ -127,20 +132,111 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                 Options = FileOptions.Asynchronous | FileOptions.SequentialScan
             });
 
-        if (TryGetRemainingLength(data, out var remainingBytes) &&
-            remainingBytes <= _options.SmallFileProgressThresholdBytes)
+        long? remainingBytes = TryGetRemainingLength(data, out var knownRemainingBytes)
+            ? knownRemainingBytes
+            : null;
+
+        if (remainingBytes is long bytesRemaining &&
+            _options.PreallocateDestinationFile &&
+            bytesRemaining > 0)
         {
+            output.SetLength(bytesRemaining);
+        }
+
+        var writeMode = DetermineWriteMode(progress, remainingBytes);
+
+        if (writeMode == LocalFileSystemWriteMode.CopyToAsync)
+        {
+            // CopyToAsync mode: wraps the source in a ProgressReportingReadStream so the
+            // framework's internal buffer loop reports progress without a manual loop here.
+            await CopyViaCopyToAsync(data, output, progress, ct);
+            return;
+        }
+
+        if (writeMode == LocalFileSystemWriteMode.Auto &&
+            remainingBytes is long autoBytesRemaining &&
+            autoBytesRemaining <= _options.SmallFileProgressThresholdBytes)
+        {
+            // Small-file optimisation: for files whose full size fits in memory we know
+            // exactly how many bytes will be written, so we let the framework copy without
+            // overhead and report progress in one shot at the end instead of per-chunk.
             await data.CopyToAsync(output, _options.CopyBufferSizeBytes, ct);
-            if (progress is not null && remainingBytes > 0)
+            if (progress is not null && autoBytesRemaining > 0)
             {
-                progress.Report(remainingBytes);
+                progress.Report(autoBytesRemaining);
+            }
+
+            return;
+        }
+
+        // Large files and unknown-length streams: manual loop reports progress per chunk,
+        // which keeps UI responsive during long transfers without adding a stream wrapper.
+        await CopyWithManualLoopAsync(data, output, progress, ct);
+    }
+
+    // Write strategy — private helpers for WriteAsync above.
+
+    private LocalFileSystemWriteMode DetermineWriteMode(IProgress<long>? progress, long? remainingBytes)
+    {
+        if (_options.WriteMode != LocalFileSystemWriteMode.Auto)
+            return _options.WriteMode;
+        // No progress handler: CopyToAsync with no wrapper is the fastest path.
+        if (progress is null)
+            return LocalFileSystemWriteMode.CopyToAsync;
+        // Unknown length: can't apply the small-file optimisation, go straight to manual loop.
+        if (remainingBytes is null)
+            return LocalFileSystemWriteMode.ManualLoop;
+        // Known length with progress: WriteAsync resolves the heuristic inline.
+        return LocalFileSystemWriteMode.Auto;
+    }
+
+    private async Task CopyViaCopyToAsync(
+        Stream data,
+        Stream output,
+        IProgress<long>? progress,
+        CancellationToken ct)
+    {
+        Stream source = data;
+        if (progress is not null)
+        {
+            source = new ProgressReportingReadStream(data, progress);
+        }
+
+        await source.CopyToAsync(output, _options.CopyBufferSizeBytes, ct);
+    }
+
+    private async Task CopyWithManualLoopAsync(
+        Stream data,
+        Stream output,
+        IProgress<long>? progress,
+        CancellationToken ct)
+    {
+        if (_options.UseArrayPoolForManualLoop)
+        {
+            var rentedBuffer = System.Buffers.ArrayPool<byte>.Shared.Rent(_options.CopyBufferSizeBytes);
+            try
+            {
+                await CopyWithManualLoopCoreAsync(data, output, rentedBuffer, progress, ct);
+            }
+            finally
+            {
+                System.Buffers.ArrayPool<byte>.Shared.Return(rentedBuffer);
             }
 
             return;
         }
 
         var buffer = new byte[_options.CopyBufferSizeBytes];
+        await CopyWithManualLoopCoreAsync(data, output, buffer, progress, ct);
+    }
 
+    private static async Task CopyWithManualLoopCoreAsync(
+        Stream data,
+        Stream output,
+        byte[] buffer,
+        IProgress<long>? progress,
+        CancellationToken ct)
+    {
         while (true)
         {
             ct.ThrowIfCancellationRequested();
@@ -264,6 +360,9 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         }
     }
 
+    // Path utilities — all paths passed to public methods may be absolute or root-relative;
+    // Resolve() converts them to absolute before any System.IO call.
+
     public string GetRelativePath(string basePath, string fullPath)
     {
         string normalBase = NormalizePath(basePath);
@@ -361,9 +460,5 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         };
     }
 
-    private string GetCanonicalPath(string path)
-    {
-        var segments = SplitPath(path);
-        return string.Join("/", segments);
-    }
+
 }

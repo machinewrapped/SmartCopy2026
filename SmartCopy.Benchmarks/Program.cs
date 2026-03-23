@@ -87,13 +87,17 @@ static async Task RunBenchmarkModeAsync(
     var historicalRuns = await ReadExistingRunsAsync(resultsPath, ct);
     await UpdateTaskListAsync(taskListPath, config, historicalRuns, ct);
 
-    var scenario = SelectScenario(config, historicalRuns, selection.ScenarioName);
-    if (scenario is null)
+    var benchmarkSelection = SelectBenchmarkSelection(config, historicalRuns, selection);
+    if (benchmarkSelection is null)
     {
         Console.WriteLine("No eligible benchmark scenario found.");
         Console.WriteLine($"See {ConfigFileName} and {TaskListFileName} in {workingDirectory}.");
         return;
     }
+
+    var scenario = benchmarkSelection.Scenario;
+    var variant = benchmarkSelection.Variant;
+    var nextRunIndex = benchmarkSelection.NextRunIndex;
 
     var runStartedUtc = DateTime.UtcNow;
     var sourcePath = Path.GetFullPath(config.SourcePath);
@@ -101,16 +105,21 @@ static async Task RunBenchmarkModeAsync(
 
     ValidatePaths(sourcePath, destinationPath);
 
-    var providerOptions = scenario.CreateProviderOptions();
+    var providerOptions = variant.CreateProviderOptions(scenario);
+    var overwriteMode = variant.OverwriteMode ?? scenario.OverwriteMode;
 
     Console.WriteLine("Mode:     benchmark");
     Console.WriteLine($"Scenario: {scenario.Name}");
+    Console.WriteLine($"Variant:  {variant.Name} (run {nextRunIndex}/{variant.DesiredRunCount})");
     Console.WriteLine($"Source:   {sourcePath}");
     Console.WriteLine($"Target:   {destinationPath}");
     Console.WriteLine($"Artifacts:{artifactDirectory}");
     Console.WriteLine(
         $"Provider: buffer={providerOptions.CopyBufferSizeBytes} bytes, " +
-        $"small-file-threshold={providerOptions.SmallFileProgressThresholdBytes} bytes");
+        $"small-file-threshold={providerOptions.SmallFileProgressThresholdBytes} bytes, " +
+        $"write-mode={providerOptions.WriteMode}, " +
+        $"array-pool={providerOptions.UseArrayPoolForManualLoop}, " +
+        $"preallocate={providerOptions.PreallocateDestinationFile}");
 
     var state = new BenchmarkState();
 
@@ -145,7 +154,7 @@ static async Task RunBenchmarkModeAsync(
         new SelectionManager().SelectAll(state.Root);
         state.Root.BuildStats();
 
-        var previewRunner = new PipelineRunner(new TransformPipeline([new CopyStep(destinationPath, scenario.OverwriteMode)]));
+        var previewRunner = new PipelineRunner(new TransformPipeline([new CopyStep(destinationPath, overwriteMode)]));
         state.PreviewStopwatch.Start();
         state.Preview = await previewRunner.PreviewAsync(new PipelineJob
         {
@@ -161,7 +170,7 @@ static async Task RunBenchmarkModeAsync(
 
         state.FreeSpaceBefore = await resolvedDestinationProvider.GetAvailableFreeSpaceAsync(ct);
 
-        var runner = new PipelineRunner(new TransformPipeline([new CopyStep(destinationPath, scenario.OverwriteMode)]));
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep(destinationPath, overwriteMode)]));
         state.ExecuteStopwatch.Start();
         state.Results = await runner.ExecuteAsync(new PipelineJob
         {
@@ -181,12 +190,14 @@ static async Task RunBenchmarkModeAsync(
 
         var record = BenchmarkRunRecord.CreateSuccess(
             scenario,
+            variant,
             sourcePath,
             destinationPath,
             artifactDirectory,
             runStartedUtc,
             state,
-            selection.Notes);
+            selection.Notes,
+            nextRunIndex);
 
         await AppendJsonLineAsync(resultsPath, record, ct);
 
@@ -202,12 +213,14 @@ static async Task RunBenchmarkModeAsync(
     {
         var record = BenchmarkRunRecord.CreateFailure(
             scenario,
+            variant,
             sourcePath,
             destinationPath,
             artifactDirectory,
             runStartedUtc,
             state,
             selection.Notes,
+            nextRunIndex,
             ex);
 
         await AppendJsonLineAsync(resultsPath, record, ct);
@@ -235,31 +248,51 @@ static async Task<DirectoryNode> ScanTreeAsync(
     return root ?? throw new InvalidOperationException($"Scan did not produce a directory root for {sourcePath}.");
 }
 
-static BenchmarkScenario? SelectScenario(
+static BenchmarkSelection? SelectBenchmarkSelection(
     BenchmarkConfig config,
     IReadOnlyList<BenchmarkRunRecord> historicalRuns,
-    string? explicitScenarioName)
+    BenchmarkCliOptions selection)
 {
-    if (!string.IsNullOrWhiteSpace(explicitScenarioName))
-    {
-        return config.Scenarios.FirstOrDefault(s =>
-            s.Enabled &&
-            string.Equals(s.Name, explicitScenarioName, StringComparison.OrdinalIgnoreCase));
-    }
-
-    return config.Scenarios
-        .Where(s => s.Enabled)
-        .OrderBy(s => historicalRuns.Count(r => IsSuccessfulRunForScenario(r, s.Name)))
-        .ThenBy(s => historicalRuns
-            .Where(r => string.Equals(r.ScenarioName, s.Name, StringComparison.OrdinalIgnoreCase))
+    var candidates = (
+        from scenario in config.Scenarios
+        where scenario.Enabled
+        from variant in config.Variants
+        where variant.Enabled
+        let successfulRuns = historicalRuns.Count(r => IsSuccessfulRunForScenarioVariant(r, scenario.Name, variant.Name))
+        let totalRuns = historicalRuns.Count(r => IsRunForScenarioVariant(r, scenario.Name, variant.Name))
+        let lastRunUtc = historicalRuns
+            .Where(r => IsRunForScenarioVariant(r, scenario.Name, variant.Name))
             .Select(r => r.RunStartedUtc)
             .DefaultIfEmpty(DateTime.MinValue)
-            .Max())
+            .Max()
+        let nextRunIndex = totalRuns + 1
+        select new BenchmarkSelection(scenario, variant, successfulRuns, totalRuns, lastRunUtc, nextRunIndex))
+        .ToList();
+
+    if (!string.IsNullOrWhiteSpace(selection.ScenarioName) || !string.IsNullOrWhiteSpace(selection.VariantName))
+    {
+        candidates = candidates
+            .Where(c =>
+                (string.IsNullOrWhiteSpace(selection.ScenarioName) ||
+                 string.Equals(c.Scenario.Name, selection.ScenarioName, StringComparison.OrdinalIgnoreCase)) &&
+                (string.IsNullOrWhiteSpace(selection.VariantName) ||
+                 string.Equals(c.Variant.Name, selection.VariantName, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+    }
+
+    return candidates
+        .OrderBy(c => c.SuccessfulRunCount >= c.Variant.DesiredRunCount ? 1 : 0)
+        .ThenBy(c => c.SuccessfulRunCount)
+        .ThenBy(c => c.LastRunUtc)
         .FirstOrDefault();
 }
 
-static bool IsSuccessfulRunForScenario(BenchmarkRunRecord run, string scenarioName) =>
+static bool IsRunForScenarioVariant(BenchmarkRunRecord run, string scenarioName, string variantName) =>
     string.Equals(run.ScenarioName, scenarioName, StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(run.VariantName, variantName, StringComparison.OrdinalIgnoreCase);
+
+static bool IsSuccessfulRunForScenarioVariant(BenchmarkRunRecord run, string scenarioName, string variantName) =>
+    IsRunForScenarioVariant(run, scenarioName, variantName) &&
     run.FailedFiles == 0 &&
     run.ExceptionType is null;
 
@@ -392,35 +425,47 @@ static async Task UpdateTaskListAsync(
     builder.AppendLine();
     builder.AppendLine($"Source: `{Path.GetFullPath(config.SourcePath)}`");
     builder.AppendLine();
-    builder.AppendLine("| Scenario | Destination | Enabled | Successful runs | Last run (UTC) | Last status |");
-    builder.AppendLine("|---|---|---|---:|---|---|");
+    builder.AppendLine("| Scenario | Variant | Destination | Target runs | Successful runs | Last run (UTC) | Last status |");
+    builder.AppendLine("|---|---|---|---:|---:|---|---|");
 
-    foreach (var scenario in config.Scenarios)
+    foreach (var variant in config.Variants.Where(v => v.Enabled))
     {
-        var scenarioRuns = runs
-            .Where(r => string.Equals(r.ScenarioName, scenario.Name, StringComparison.OrdinalIgnoreCase))
-            .OrderByDescending(r => r.RunStartedUtc)
-            .ToList();
-        var lastRun = scenarioRuns.FirstOrDefault();
-        var successfulRuns = scenarioRuns.Count(r => r.FailedFiles == 0 && r.ExceptionType is null);
-        var lastStatus = lastRun is null
-            ? "pending"
-            : lastRun.ExceptionType is not null
-                ? $"error ({lastRun.ExceptionType})"
-                : lastRun.FailedFiles > 0
-                    ? $"failed ({lastRun.FailedFiles})"
-                    : "ok";
+        foreach (var scenario in config.Scenarios.Where(s => s.Enabled))
+        {
+            var scenarioRuns = runs
+                .Where(r => IsRunForScenarioVariant(r, scenario.Name, variant.Name))
+                .OrderByDescending(r => r.RunStartedUtc)
+                .ToList();
+            var lastRun = scenarioRuns.FirstOrDefault();
+            var successfulRuns = scenarioRuns.Count(r => r.FailedFiles == 0 && r.ExceptionType is null);
+            var lastStatus = lastRun is null
+                ? "pending"
+                : lastRun.ExceptionType is not null
+                    ? $"error ({lastRun.ExceptionType})"
+                    : lastRun.FailedFiles > 0
+                        ? $"failed ({lastRun.FailedFiles})"
+                        : "ok";
 
-        builder.Append("| ")
-            .Append(EscapeTable(scenario.Name)).Append(" | ")
-            .Append(EscapeTable(Path.GetFullPath(scenario.DestinationPath))).Append(" | ")
-            .Append(scenario.Enabled ? "yes" : "no").Append(" | ")
-            .Append(successfulRuns).Append(" | ")
-            .Append(lastRun?.RunStartedUtc.ToString("O") ?? "-").Append(" | ")
-            .Append(EscapeTable(lastStatus)).AppendLine(" |");
+            builder.Append("| ")
+                .Append(EscapeTable(scenario.Name)).Append(" | ")
+                .Append(EscapeTable(variant.Name)).Append(" | ")
+                .Append(EscapeTable(Path.GetFullPath(scenario.DestinationPath))).Append(" | ")
+                .Append(variant.DesiredRunCount).Append(" | ")
+                .Append(successfulRuns).Append(" | ")
+                .Append(lastRun?.RunStartedUtc.ToString("O") ?? "-").Append(" | ")
+                .Append(EscapeTable(lastStatus)).AppendLine(" |");
+        }
     }
 
     await File.WriteAllTextAsync(taskListPath, builder.ToString(), ct);
 }
 
 static string EscapeTable(string value) => value.Replace("|", "\\|");
+
+internal sealed record BenchmarkSelection(
+    BenchmarkScenario Scenario,
+    BenchmarkVariant Variant,
+    int SuccessfulRunCount,
+    int TotalRunCount,
+    DateTime LastRunUtc,
+    int NextRunIndex);

@@ -499,12 +499,6 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
             : path.TrimStart('/');
     }
 
-    private string GetCanonicalPath(string path)
-    {
-        var segments = SplitPath(path);
-        return string.Join("/", segments);
-    }
-
     private void TouchParentModifiedTime(string path, DateTime timestamp)
     {
         var parentPath = GetParentPath(path);

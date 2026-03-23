@@ -16,12 +16,14 @@ internal sealed class BenchmarkCliOptions
 {
     public BenchmarkRunMode Mode { get; init; } = BenchmarkRunMode.Benchmark;
     public string? ScenarioName { get; init; }
+    public string? VariantName { get; init; }
     public string? Notes { get; init; }
 
     public static BenchmarkCliOptions Parse(string[] args)
     {
         var mode = BenchmarkRunMode.Benchmark;
         string? scenarioName = null;
+        string? variantName = null;
         string? notes = null;
 
         for (var i = 0; i < args.Length; i++)
@@ -29,6 +31,10 @@ internal sealed class BenchmarkCliOptions
             if (string.Equals(args[i], "--scenario", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
             {
                 scenarioName = args[++i];
+            }
+            else if (string.Equals(args[i], "--variant", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            {
+                variantName = args[++i];
             }
             else if (string.Equals(args[i], "--notes", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
             {
@@ -44,6 +50,7 @@ internal sealed class BenchmarkCliOptions
         {
             Mode = mode,
             ScenarioName = scenarioName,
+            VariantName = variantName,
             Notes = notes,
         };
     }
@@ -71,6 +78,7 @@ internal sealed class BenchmarkConfig
     public string? ArtifactPath { get; set; }
     public bool IncludeHidden { get; set; }
     public List<BenchmarkScenario> Scenarios { get; set; } = [];
+    public List<BenchmarkVariant> Variants { get; set; } = [];
     public DatasetPreparationConfig? DatasetPreparation { get; set; }
 
     public static BenchmarkConfig CreateTemplate() =>
@@ -82,6 +90,42 @@ internal sealed class BenchmarkConfig
                 new BenchmarkScenario { Name = "SSDtoSSD", DestinationPath = @"D:\TestData\SSDtoSSD" },
                 new BenchmarkScenario { Name = "SSDtoHDD", DestinationPath = @"L:\TestData\SSDtoHDD" },
                 new BenchmarkScenario { Name = "SSDtoUSBFlash", DestinationPath = @"T:\TestData\SSDtoUSBFlash" },
+            ],
+            Variants =
+            [
+                new BenchmarkVariant
+                {
+                    Name = "BaselineAuto",
+                    Notes = "Current heuristic defaults.",
+                    DesiredRunCount = 3,
+                },
+                new BenchmarkVariant
+                {
+                    Name = "CopyToAsync512KiB",
+                    Notes = "Always uses Stream.CopyToAsync with a 512 KiB buffer.",
+                    DesiredRunCount = 1,
+                    ProviderCopyBufferSizeBytes = 512 * 1024,
+                    ProviderWriteMode = LocalFileSystemWriteMode.CopyToAsync,
+                },
+                new BenchmarkVariant
+                {
+                    Name = "ManualLoop512KiBArrayPool",
+                    Notes = "Manual loop with a 512 KiB buffer and pooled buffers.",
+                    DesiredRunCount = 1,
+                    ProviderCopyBufferSizeBytes = 512 * 1024,
+                    ProviderWriteMode = LocalFileSystemWriteMode.ManualLoop,
+                    ProviderUseArrayPoolForManualLoop = true,
+                },
+                new BenchmarkVariant
+                {
+                    Name = "ManualLoop1MiBPreallocate",
+                    Notes = "Manual loop with a 1 MiB buffer and destination preallocation.",
+                    DesiredRunCount = 1,
+                    ProviderCopyBufferSizeBytes = 1024 * 1024,
+                    ProviderWriteMode = LocalFileSystemWriteMode.ManualLoop,
+                    ProviderUseArrayPoolForManualLoop = true,
+                    ProviderPreallocateDestinationFile = true,
+                },
             ],
             DatasetPreparation = new DatasetPreparationConfig
             {
@@ -147,6 +191,21 @@ internal sealed class BenchmarkConfig
             scenario.Normalize();
         }
 
+        if (Variants.Count == 0)
+        {
+            Variants.Add(new BenchmarkVariant
+            {
+                Name = "ScenarioDefaults",
+                Notes = "Synthesized for legacy configs without a variants section.",
+                DesiredRunCount = 1,
+            });
+        }
+
+        foreach (var variant in Variants)
+        {
+            variant.Normalize();
+        }
+
         DatasetPreparation?.Normalize();
     }
 }
@@ -160,6 +219,9 @@ internal sealed class BenchmarkScenario
     public OverwriteMode OverwriteMode { get; set; } = OverwriteMode.Always;
     public int? ProviderCopyBufferSizeBytes { get; set; }
     public long? ProviderSmallFileProgressThresholdBytes { get; set; }
+    public LocalFileSystemWriteMode? ProviderWriteMode { get; set; }
+    public bool? ProviderUseArrayPoolForManualLoop { get; set; }
+    public bool? ProviderPreallocateDestinationFile { get; set; }
 
     public void Normalize()
     {
@@ -174,6 +236,61 @@ internal sealed class BenchmarkScenario
             CopyBufferSizeBytes = ProviderCopyBufferSizeBytes ?? LocalFileSystemProviderOptions.Default.CopyBufferSizeBytes,
             SmallFileProgressThresholdBytes = ProviderSmallFileProgressThresholdBytes
                 ?? LocalFileSystemProviderOptions.Default.SmallFileProgressThresholdBytes,
+            WriteMode = ProviderWriteMode ?? LocalFileSystemProviderOptions.Default.WriteMode,
+            UseArrayPoolForManualLoop = ProviderUseArrayPoolForManualLoop
+                ?? LocalFileSystemProviderOptions.Default.UseArrayPoolForManualLoop,
+            PreallocateDestinationFile = ProviderPreallocateDestinationFile
+                ?? LocalFileSystemProviderOptions.Default.PreallocateDestinationFile,
+        }.Normalize();
+    }
+}
+
+internal sealed class BenchmarkVariant
+{
+    public string Name { get; set; } = string.Empty;
+    public string? Notes { get; set; }
+    public bool Enabled { get; set; } = true;
+    public int DesiredRunCount { get; set; } = 3;
+    public OverwriteMode? OverwriteMode { get; set; }
+    public int? ProviderCopyBufferSizeBytes { get; set; }
+    public long? ProviderSmallFileProgressThresholdBytes { get; set; }
+    public LocalFileSystemWriteMode? ProviderWriteMode { get; set; }
+    public bool? ProviderUseArrayPoolForManualLoop { get; set; }
+    public bool? ProviderPreallocateDestinationFile { get; set; }
+
+    public void Normalize()
+    {
+        Name = Name.Trim();
+        if (string.IsNullOrWhiteSpace(Name))
+        {
+            throw new InvalidOperationException("benchmark variant name is required.");
+        }
+
+        if (DesiredRunCount <= 0)
+        {
+            throw new InvalidOperationException($"benchmark variant '{Name}' must have desiredRunCount > 0.");
+        }
+    }
+
+    public LocalFileSystemProviderOptions CreateProviderOptions(BenchmarkScenario scenario)
+    {
+        return new LocalFileSystemProviderOptions
+        {
+            CopyBufferSizeBytes = ProviderCopyBufferSizeBytes
+                ?? scenario.ProviderCopyBufferSizeBytes
+                ?? LocalFileSystemProviderOptions.Default.CopyBufferSizeBytes,
+            SmallFileProgressThresholdBytes = ProviderSmallFileProgressThresholdBytes
+                ?? scenario.ProviderSmallFileProgressThresholdBytes
+                ?? LocalFileSystemProviderOptions.Default.SmallFileProgressThresholdBytes,
+            WriteMode = ProviderWriteMode
+                ?? scenario.ProviderWriteMode
+                ?? LocalFileSystemProviderOptions.Default.WriteMode,
+            UseArrayPoolForManualLoop = ProviderUseArrayPoolForManualLoop
+                ?? scenario.ProviderUseArrayPoolForManualLoop
+                ?? LocalFileSystemProviderOptions.Default.UseArrayPoolForManualLoop,
+            PreallocateDestinationFile = ProviderPreallocateDestinationFile
+                ?? scenario.ProviderPreallocateDestinationFile
+                ?? LocalFileSystemProviderOptions.Default.PreallocateDestinationFile,
         }.Normalize();
     }
 }
@@ -194,6 +311,7 @@ internal sealed class BenchmarkState
 internal sealed class BenchmarkRunRecord
 {
     public required string ScenarioName { get; init; }
+    public required string VariantName { get; init; }
     public required string SourcePath { get; init; }
     public required string DestinationPath { get; init; }
     public string? ArtifactPath { get; init; }
@@ -202,8 +320,12 @@ internal sealed class BenchmarkRunRecord
     public required string OsDescription { get; init; }
     public required string FrameworkDescription { get; init; }
     public required string? Notes { get; init; }
+    public required int RunIndex { get; init; }
     public int? ProviderCopyBufferSizeBytes { get; init; }
     public long? ProviderSmallFileProgressThresholdBytes { get; init; }
+    public LocalFileSystemWriteMode? ProviderWriteMode { get; init; }
+    public bool? ProviderUseArrayPoolForManualLoop { get; init; }
+    public bool? ProviderPreallocateDestinationFile { get; init; }
     public required TimeSpan ScanDuration { get; init; }
     public required TimeSpan PreviewDuration { get; init; }
     public required TimeSpan ExecuteDuration { get; init; }
@@ -222,37 +344,44 @@ internal sealed class BenchmarkRunRecord
 
     public static BenchmarkRunRecord CreateSuccess(
         BenchmarkScenario scenario,
+        BenchmarkVariant variant,
         string sourcePath,
         string destinationPath,
         string artifactPath,
         DateTime runStartedUtc,
         BenchmarkState state,
-        string? notes) => Create(scenario, sourcePath, destinationPath, artifactPath, runStartedUtc, state, notes, ex: null);
+        string? notes,
+        int runIndex) => Create(scenario, variant, sourcePath, destinationPath, artifactPath, runStartedUtc, state, notes, runIndex, ex: null);
 
     public static BenchmarkRunRecord CreateFailure(
         BenchmarkScenario scenario,
+        BenchmarkVariant variant,
         string sourcePath,
         string destinationPath,
         string artifactPath,
         DateTime runStartedUtc,
         BenchmarkState state,
         string? notes,
-        Exception ex) => Create(scenario, sourcePath, destinationPath, artifactPath, runStartedUtc, state, notes, ex);
+        int runIndex,
+        Exception ex) => Create(scenario, variant, sourcePath, destinationPath, artifactPath, runStartedUtc, state, notes, runIndex, ex);
 
     private static BenchmarkRunRecord Create(
         BenchmarkScenario scenario,
+        BenchmarkVariant variant,
         string sourcePath,
         string destinationPath,
         string artifactPath,
         DateTime runStartedUtc,
         BenchmarkState state,
         string? notes,
+        int runIndex,
         Exception? ex)
     {
-        var providerOptions = scenario.CreateProviderOptions();
+        var providerOptions = variant.CreateProviderOptions(scenario);
         return new BenchmarkRunRecord
         {
             ScenarioName = scenario.Name,
+            VariantName = variant.Name,
             SourcePath = sourcePath,
             DestinationPath = destinationPath,
             ArtifactPath = artifactPath,
@@ -261,8 +390,12 @@ internal sealed class BenchmarkRunRecord
             OsDescription = RuntimeInformation.OSDescription,
             FrameworkDescription = RuntimeInformation.FrameworkDescription,
             Notes = notes,
+            RunIndex = runIndex,
             ProviderCopyBufferSizeBytes = providerOptions.CopyBufferSizeBytes,
             ProviderSmallFileProgressThresholdBytes = providerOptions.SmallFileProgressThresholdBytes,
+            ProviderWriteMode = providerOptions.WriteMode,
+            ProviderUseArrayPoolForManualLoop = providerOptions.UseArrayPoolForManualLoop,
+            ProviderPreallocateDestinationFile = providerOptions.PreallocateDestinationFile,
             ScanDuration = state.ScanStopwatch.Elapsed,
             PreviewDuration = state.PreviewStopwatch.Elapsed,
             ExecuteDuration = state.ExecuteStopwatch.Elapsed,
