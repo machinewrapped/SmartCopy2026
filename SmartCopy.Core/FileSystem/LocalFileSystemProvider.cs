@@ -142,7 +142,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 
         if (writeMode == LocalFileSystemWriteMode.CopyToAsync)
         {
-            await CopyWithCopyToAsyncAsync(data, output, progress, ct);
+            await CopyViaCopyToAsync(data, output, progress, ct);
             return;
         }
 
@@ -164,17 +164,16 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 
     private LocalFileSystemWriteMode DetermineWriteMode(IProgress<long>? progress, long? remainingBytes)
     {
-        return _options.WriteMode switch
-        {
-            LocalFileSystemWriteMode.ManualLoop => LocalFileSystemWriteMode.ManualLoop,
-            LocalFileSystemWriteMode.CopyToAsync => LocalFileSystemWriteMode.CopyToAsync,
-            _ when progress is null => LocalFileSystemWriteMode.CopyToAsync,
-            _ when remainingBytes is null => LocalFileSystemWriteMode.ManualLoop,
-            _ => LocalFileSystemWriteMode.Auto,
-        };
+        if (_options.WriteMode != LocalFileSystemWriteMode.Auto)
+            return _options.WriteMode;
+        if (progress is null)
+            return LocalFileSystemWriteMode.CopyToAsync;
+        if (remainingBytes is null)
+            return LocalFileSystemWriteMode.ManualLoop;
+        return LocalFileSystemWriteMode.Auto;
     }
 
-    private async Task CopyWithCopyToAsyncAsync(
+    private async Task CopyViaCopyToAsync(
         Stream data,
         Stream output,
         IProgress<long>? progress,
@@ -286,8 +285,16 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
             ReportReadAsync(inner.ReadAsync(buffer, cancellationToken));
 
-        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
-            ReportReadAsync(new ValueTask<int>(inner.ReadAsync(buffer, offset, count, cancellationToken))).AsTask();
+        public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            var read = await inner.ReadAsync(buffer, offset, count, cancellationToken);
+            if (read > 0)
+            {
+                progress.Report(read);
+            }
+
+            return read;
+        }
 
         public override long Seek(long offset, SeekOrigin origin) => inner.Seek(offset, origin);
         public override void SetLength(long value) => inner.SetLength(value);

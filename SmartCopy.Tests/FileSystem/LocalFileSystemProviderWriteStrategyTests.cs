@@ -21,7 +21,7 @@ public sealed class LocalFileSystemProviderWriteStrategyTests
         var destination = Path.Combine(temp.Path, "copytoasync.txt");
         var payload = Encoding.UTF8.GetBytes("progress-check");
         var reportedBytes = 0L;
-        var progress = new Progress<long>(bytes => reportedBytes += bytes);
+        IProgress<long> progress = new SyncProgress<long>(bytes => reportedBytes += bytes);
 
         await using var source = new MemoryStream(payload);
         await provider.WriteAsync(destination, source, progress, CancellationToken.None);
@@ -47,7 +47,7 @@ public sealed class LocalFileSystemProviderWriteStrategyTests
         var destination = Path.Combine(temp.Path, "manualloop.txt");
         var payload = Encoding.UTF8.GetBytes("arraypool-check");
         var reportedBytes = 0L;
-        var progress = new Progress<long>(bytes => reportedBytes += bytes);
+        IProgress<long> progress = new SyncProgress<long>(bytes => reportedBytes += bytes);
 
         await using var source = new MemoryStream(payload);
         await provider.WriteAsync(destination, source, progress, CancellationToken.None);
