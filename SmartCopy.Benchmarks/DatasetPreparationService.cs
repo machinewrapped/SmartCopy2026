@@ -5,6 +5,7 @@ internal sealed class DatasetPreparationService
     private readonly Random random;
     private readonly Func<DateTime> utcNow;
 
+
     public DatasetPreparationService(Random? random = null, Func<DateTime>? utcNow = null)
     {
         this.random = random ?? Random.Shared;
@@ -16,6 +17,7 @@ internal sealed class DatasetPreparationService
         string artifactDirectory,
         bool includeHidden,
         string? notes,
+        IProgress<DatasetPreparationProgress>? progress,
         CancellationToken ct)
     {
         config.Normalize();
@@ -25,7 +27,7 @@ internal sealed class DatasetPreparationService
         Directory.CreateDirectory(config.DestinationPath);
 
         var runStartedUtc = utcNow();
-        var existingDataset = ScanExistingDataset(config, includeHidden, ct);
+        var existingDataset = ScanExistingDataset(config, includeHidden, progress, ct);
         var existingRelativePaths = existingDataset.ExistingRelativePaths;
         var bucketStates = existingDataset.BucketStates;
         var beforeStates = CloneBucketStates(bucketStates);
@@ -38,8 +40,11 @@ internal sealed class DatasetPreparationService
             includeHidden,
             existingRelativePaths,
             ref duplicateSourceSkips,
+            progress,
             ct);
 
+        long totalBytesImported = 0;
+        
         foreach (var bucket in config.Buckets)
         {
             var bucketState = bucketStates[bucket.Name];
@@ -88,6 +93,13 @@ internal sealed class DatasetPreparationService
                 importedThisRun.Add(imported);
                 bucketState.ActualFileCount++;
                 bucketState.ActualTotalBytes += imported.SizeBytes;
+                totalBytesImported += imported.SizeBytes;
+
+                progress?.Report(new DatasetPreparationProgress(
+                    0, // BuildCandidates handles its own progress for scanning
+                    importedThisRun.Count,
+                    totalBytesImported,
+                    imported.RelativePath));
             }
         }
 
@@ -149,11 +161,13 @@ internal sealed class DatasetPreparationService
         await input.CopyToAsync(output, 128 * 1024, ct);
     }
 
+
     private static Dictionary<string, List<DatasetCandidate>> BuildCandidates(
         DatasetPreparationConfig config,
         bool includeHidden,
         HashSet<string> existingRelativePaths,
         ref int duplicateSourceSkips,
+        IProgress<DatasetPreparationProgress>? progress,
         CancellationToken ct)
     {
         var result = config.Buckets.ToDictionary(
@@ -169,10 +183,16 @@ internal sealed class DatasetPreparationService
             ReturnSpecialDirectories = false,
         };
 
+        var scannedCount = 0;
         foreach (var path in Directory.EnumerateFiles(config.SourcePath, "*", options))
         {
             ct.ThrowIfCancellationRequested();
             var fullPath = Path.GetFullPath(path);
+            
+            scannedCount++;
+            if (scannedCount % 100 == 0)
+                progress?.Report(new DatasetPreparationProgress(scannedCount, 0, 0, Path.GetRelativePath(config.SourcePath, fullPath)));
+
             if (!includeHidden && IsHidden(fullPath, config.SourcePath))
             {
                 continue;
@@ -205,6 +225,7 @@ internal sealed class DatasetPreparationService
     private static ExistingDatasetScanResult ScanExistingDataset(
         DatasetPreparationConfig config,
         bool includeHidden,
+        IProgress<DatasetPreparationProgress>? progress,
         CancellationToken ct)
     {
         var bucketStates = config.Buckets.ToDictionary(
@@ -220,10 +241,16 @@ internal sealed class DatasetPreparationService
             ReturnSpecialDirectories = false,
         };
 
+        var scannedCount = 0;
         foreach (var path in Directory.EnumerateFiles(config.DestinationPath, "*", options))
         {
             ct.ThrowIfCancellationRequested();
             var fullPath = Path.GetFullPath(path);
+
+            scannedCount++;
+            if (scannedCount % 100 == 0)
+                progress?.Report(new DatasetPreparationProgress(scannedCount, 0, 0, Path.GetRelativePath(config.DestinationPath, fullPath)));
+
             if (!includeHidden && IsHidden(fullPath, config.DestinationPath))
             {
                 continue;

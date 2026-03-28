@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using SmartCopy.Benchmarks;
@@ -25,7 +26,7 @@ if (!File.Exists(configPath))
     await BenchmarkJson.WriteAsync(configPath, template, ct);
     Console.WriteLine($"Created {ConfigFileName} in {workingDirectory}.");
     Console.WriteLine("Edit the scenario file if needed, then run the benchmark app again.");
-    return;
+    return 0;
 }
 
 var config = await BenchmarkJson.ReadAsync<BenchmarkConfig>(configPath, ct)
@@ -35,10 +36,12 @@ config.Normalize();
 if (selection.Mode == BenchmarkRunMode.DatasetPreparation)
 {
     await RunDatasetPreparationModeAsync(workingDirectory, config, selection, ct);
-    return;
+    return 0;
 }
 
 await RunBenchmarkModeAsync(workingDirectory, config, selection, ct);
+
+return 0;
 
 static async Task RunDatasetPreparationModeAsync(
     string workingDirectory,
@@ -56,7 +59,14 @@ static async Task RunDatasetPreparationModeAsync(
     Console.WriteLine($"Artifacts:{artifactDirectory}");
 
     var service = new DatasetPreparationService();
-    var summary = await service.RunAsync(preparation, artifactDirectory, config.IncludeHidden, selection.Notes, ct);
+    DatasetPreparationRunSummary summary;
+
+    using (var progress = new ThrottledConsoleProgress<DatasetPreparationProgress>(p =>
+        UpdateProgress($"Prep: Scanned={p.TotalFilesScanned}, Imported={p.TotalFilesImported} ({FormatSize(p.TotalBytesImported)}), File={p.CurrentFile}")))
+    {
+        summary = await service.RunAsync(preparation, artifactDirectory, config.IncludeHidden, selection.Notes, progress, ct);
+    }
+    Console.WriteLine(); // Finalize progress line
 
     Console.WriteLine($"Imported files: {summary.ImportedFileCount}, bytes: {summary.ImportedTotalBytes}.");
     Console.WriteLine($"Skipped duplicates: {summary.DuplicateSourceSkips}, skipped conflicts: {summary.ExistingDestinationSkips}.");
@@ -127,8 +137,10 @@ static async Task RunBenchmarkModeAsync(
     {
         if (scenario.ClearDestinationBeforeRun)
         {
-            Console.WriteLine("Clearing destination contents before benchmark.");
-            ClearDirectoryContents(destinationPath);
+            Console.WriteLine("Clearing destination contents before benchmark...");
+            using var clearProgress = new ThrottledConsoleProgress<string>(s => UpdateProgress($"Clearing: {s}"));
+            ClearDirectoryContents(destinationPath, clearProgress);
+            Console.WriteLine(); // Finalize progress line
         }
 
         Directory.CreateDirectory(journalDirectory);
@@ -148,7 +160,12 @@ static async Task RunBenchmarkModeAsync(
         };
 
         state.ScanStopwatch.Start();
-        state.Root = await ScanTreeAsync(sourceProvider, sourcePath, scanOptions, ct);
+        Console.WriteLine("Scanning source...");
+        using (var scanProgress = new ThrottledConsoleProgress<ScanProgress>(p => UpdateProgress($"Scanned: {p.NodesDiscovered} nodes, {p.DirectoriesScanned} dirs")))
+        {
+            state.Root = await ScanTreeAsync(sourceProvider, sourcePath, scanOptions, scanProgress, ct);
+        }
+        Console.WriteLine(); // Finalize progress line
         state.ScanStopwatch.Stop();
 
         new SelectionManager().SelectAll(state.Root);
@@ -156,6 +173,7 @@ static async Task RunBenchmarkModeAsync(
 
         var previewRunner = new PipelineRunner(new TransformPipeline([new CopyStep(destinationPath, overwriteMode)]));
         state.PreviewStopwatch.Start();
+        Console.Write("Previewing operations... ");
         state.Preview = await previewRunner.PreviewAsync(new PipelineJob
         {
             RootNode = state.Root,
@@ -163,6 +181,7 @@ static async Task RunBenchmarkModeAsync(
             ProviderRegistry = registry,
             CancellationToken = ct,
         }, ct);
+        Console.WriteLine("Done.");
         state.PreviewStopwatch.Stop();
 
         var resolvedDestinationProvider = registry.ResolveProvider(destinationPath)
@@ -172,14 +191,22 @@ static async Task RunBenchmarkModeAsync(
 
         var runner = new PipelineRunner(new TransformPipeline([new CopyStep(destinationPath, overwriteMode)]));
         state.ExecuteStopwatch.Start();
-        state.Results = await runner.ExecuteAsync(new PipelineJob
+        Console.WriteLine("Executing copy...");
+        using (var executeProgress = new ThrottledConsoleProgress<OperationProgress>(p =>
+            UpdateProgress($"Copying: {p.FilesCompleted}/{p.FilesTotal} files ({FormatSize(p.TotalBytesCompleted)}/{FormatSize(p.TotalBytes)}), ETR: {FormatDuration(p.EstimatedRemaining)}")))
         {
-            RootNode = state.Root,
-            SourceProvider = sourceProvider,
-            ProviderRegistry = registry,
-            CancellationToken = ct,
-        }, ct);
-        state.ExecuteStopwatch.Stop();
+            state.ExecuteStopwatch.Start();
+            state.Results = await runner.ExecuteAsync(new PipelineJob
+            {
+                RootNode = state.Root,
+                SourceProvider = sourceProvider,
+                ProviderRegistry = registry,
+                Progress = executeProgress,
+                CancellationToken = ct,
+            }, ct);
+            state.ExecuteStopwatch.Stop();
+        }
+        Console.WriteLine(); // Finalize progress line
 
         state.FreeSpaceAfter = await resolvedDestinationProvider.GetAvailableFreeSpaceAsync(ct);
 
@@ -235,12 +262,13 @@ static async Task<DirectoryNode> ScanTreeAsync(
     IFileSystemProvider sourceProvider,
     string sourcePath,
     ScanOptions scanOptions,
+    IProgress<ScanProgress>? progress,
     CancellationToken ct)
 {
     var scanner = new DirectoryScanner(sourceProvider);
     DirectoryNode? root = null;
 
-    await foreach (var node in scanner.ScanAsync(sourcePath, scanOptions, progress: null, ct))
+    await foreach (var node in scanner.ScanAsync(sourcePath, scanOptions, progress, ct))
     {
         root ??= node as DirectoryNode;
     }
@@ -383,7 +411,7 @@ static string ResolveArtifactDirectory(string workingDirectory, string sourcePat
     return fullWorkingDirectory;
 }
 
-static void ClearDirectoryContents(string destinationPath)
+static void ClearDirectoryContents(string destinationPath, IProgress<string>? progress = null)
 {
     var fullDestinationPath = Path.GetFullPath(destinationPath);
     if (Path.GetPathRoot(fullDestinationPath)?.Equals(fullDestinationPath, StringComparison.OrdinalIgnoreCase) == true)
@@ -399,11 +427,13 @@ static void ClearDirectoryContents(string destinationPath)
 
     foreach (var file in Directory.EnumerateFiles(fullDestinationPath))
     {
+        progress?.Report(Path.GetFileName(file));
         File.Delete(file);
     }
 
     foreach (var directory in Directory.EnumerateDirectories(fullDestinationPath))
     {
+        progress?.Report(Path.GetFileName(directory));
         Directory.Delete(directory, recursive: true);
     }
 }
@@ -461,6 +491,71 @@ static async Task UpdateTaskListAsync(
 }
 
 static string EscapeTable(string value) => value.Replace("|", "\\|");
+
+static void UpdateProgress(string message)
+{
+    // Use carriage return to overwrite the current line
+    // ANSI escape code \x1b[K clears from cursor to end of line
+    Console.Write($"\r{message}\x1b[K");
+}
+
+static string FormatSize(long bytes)
+{
+    string[] units = { "B", "KB", "MB", "GB", "TB" };
+    double len = bytes;
+    int order = 0;
+    while (len >= 1024 && order < units.Length - 1)
+    {
+        order++;
+        len /= 1024;
+    }
+    return $"{len:0.##} {units[order]}";
+}
+
+static string FormatDuration(TimeSpan duration)
+{
+    if (duration == TimeSpan.Zero) return "0s";
+    if (duration.TotalDays >= 1) return $"{(int)duration.TotalDays}d {duration.Hours}h";
+    if (duration.TotalHours >= 1) return $"{(int)duration.TotalHours}h {duration.Minutes}m";
+    if (duration.TotalMinutes >= 1) return $"{(int)duration.TotalMinutes}m {duration.Seconds}s";
+    return $"{(int)duration.TotalSeconds}s";
+}
+
+internal sealed class ThrottledConsoleProgress<T> : IProgress<T>, IDisposable
+{
+    private readonly Action<T> _handler;
+    private readonly TimeSpan _throttle;
+    private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
+    private T? _lastValue;
+    private bool _hasValue;
+
+    public ThrottledConsoleProgress(Action<T> handler, TimeSpan? throttle = null)
+    {
+        _handler = handler;
+        _throttle = throttle ?? TimeSpan.FromMilliseconds(100);
+    }
+
+    public void Report(T value)
+    {
+        _lastValue = value;
+        _hasValue = true;
+
+        if (_stopwatch.Elapsed >= _throttle)
+        {
+            _handler(value);
+            _stopwatch.Restart();
+            _hasValue = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_hasValue && _lastValue != null)
+        {
+            _handler(_lastValue);
+        }
+    }
+}
 
 internal sealed record BenchmarkSelection(
     BenchmarkScenario Scenario,
