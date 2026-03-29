@@ -69,6 +69,9 @@ public sealed class PipelineRunner
 
                 if (result.ActionSummary is not null)
                     infoMessages.Add(result.ActionSummary);
+
+                if (!result.IsSuccess && result.ErrorMessage is { Length: > 0 } errMsg)
+                    errors.Add(errMsg);
             }
 
             if (step is IHasDestinationPath destination)
@@ -113,6 +116,7 @@ public sealed class PipelineRunner
             TotalEstimatedOutputBytes = actions.Sum(a => a.OutputBytes),
             Warnings = warnings,
             InfoMessages = infoMessages,
+            Errors = errors,
         };
     }
 
