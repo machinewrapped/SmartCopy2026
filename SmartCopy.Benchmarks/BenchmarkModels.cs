@@ -298,13 +298,11 @@ internal sealed class BenchmarkVariant
 internal sealed class BenchmarkState
 {
     public DirectoryNode? Root { get; set; }
-    public OperationPlan? Preview { get; set; }
     public IReadOnlyList<TransformResult> Results { get; set; } = [];
     public long? FreeSpaceBefore { get; set; }
     public long? FreeSpaceAfter { get; set; }
     public string? JournalPath { get; set; }
     public System.Diagnostics.Stopwatch ScanStopwatch { get; } = new();
-    public System.Diagnostics.Stopwatch PreviewStopwatch { get; } = new();
     public System.Diagnostics.Stopwatch ExecuteStopwatch { get; } = new();
 }
 
@@ -327,11 +325,7 @@ internal sealed class BenchmarkRunRecord
     public bool? ProviderUseArrayPoolForManualLoop { get; init; }
     public bool? ProviderPreallocateDestinationFile { get; init; }
     public required TimeSpan ScanDuration { get; init; }
-    public required TimeSpan PreviewDuration { get; init; }
     public required TimeSpan ExecuteDuration { get; init; }
-    public required int SelectedFiles { get; init; }
-    public required long SelectedBytes { get; init; }
-    public required int PreviewWarnings { get; init; }
     public required int CopiedFiles { get; init; }
     public required int SkippedFiles { get; init; }
     public required int FailedFiles { get; init; }
@@ -397,11 +391,7 @@ internal sealed class BenchmarkRunRecord
             ProviderUseArrayPoolForManualLoop = providerOptions.UseArrayPoolForManualLoop,
             ProviderPreallocateDestinationFile = providerOptions.PreallocateDestinationFile,
             ScanDuration = state.ScanStopwatch.Elapsed,
-            PreviewDuration = state.PreviewStopwatch.Elapsed,
             ExecuteDuration = state.ExecuteStopwatch.Elapsed,
-            SelectedFiles = state.Root?.NumSelectedFiles ?? 0,
-            SelectedBytes = state.Root?.TotalSelectedBytes ?? 0,
-            PreviewWarnings = state.Preview?.Warnings.Count ?? 0,
             CopiedFiles = state.Results.Sum(r => r.NumberOfFilesAffected),
             SkippedFiles = state.Results.Sum(r => r.NumberOfFilesSkipped),
             FailedFiles = state.Results.Count(r => !r.IsSuccess),

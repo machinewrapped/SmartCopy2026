@@ -171,19 +171,6 @@ static async Task RunBenchmarkModeAsync(
         new SelectionManager().SelectAll(state.Root);
         state.Root.BuildStats();
 
-        var previewRunner = new PipelineRunner(new TransformPipeline([new CopyStep(destinationPath, overwriteMode)]));
-        state.PreviewStopwatch.Start();
-        Console.Write("Previewing operations... ");
-        state.Preview = await previewRunner.PreviewAsync(new PipelineJob
-        {
-            RootNode = state.Root,
-            SourceProvider = sourceProvider,
-            ProviderRegistry = registry,
-            CancellationToken = ct,
-        }, ct);
-        Console.WriteLine("Done.");
-        state.PreviewStopwatch.Stop();
-
         var resolvedDestinationProvider = registry.ResolveProvider(destinationPath)
             ?? throw new InvalidOperationException($"No destination provider for {destinationPath}.");
 
