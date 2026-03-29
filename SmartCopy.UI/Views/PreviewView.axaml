@@ -30,7 +30,7 @@
                            Margin="4,2,0,2"
                            IsHitTestVisible="False"
                            IsVisible="{Binding IsPreparingPlan}" />
-                <!-- Normal title once plan is ready -->
+                <!-- Normal title once plan is ready (or has errors) -->
                 <TextBlock Grid.Column="0"
                            Text="{Binding TotalActionCount, StringFormat=Preview (\{0\} actions)}"
                            FontWeight="SemiBold"
@@ -69,11 +69,23 @@
                                HorizontalAlignment="Center" />
                 </StackPanel>
 
-                <!-- Content: warnings + group list (shown once plan is ready) -->
+                <!-- Content: banners + group list (shown once plan is ready or has errors) -->
                 <Grid RowDefinitions="Auto,*"
                       Margin="16,16,16,0"
                       IsVisible="{Binding !IsPreparingPlan}">
                     <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,10">
+                        <Border IsVisible="{Binding HasErrors}"
+                                Background="{DynamicResource ErrorBannerBackgroundBrush}"
+                                CornerRadius="4"
+                                Padding="8">
+                            <ItemsControl ItemsSource="{Binding Errors}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" Foreground="{DynamicResource ErrorBannerForegroundBrush}" TextWrapping="Wrap" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
                         <Border IsVisible="{Binding HasWarnings}"
                                 Background="{DynamicResource WarningBannerBackgroundBrush}"
                                 CornerRadius="4"
@@ -155,13 +167,13 @@
                         MinWidth="110"
                         HorizontalContentAlignment="Center"
                         Margin="0,0,8,0"
-                        IsEnabled="{Binding !IsPreparingPlan}"
+                        IsEnabled="{Binding IsReady}"
                         Command="{Binding SaveReportCommand}" />
                 <Button Grid.Column="2"
                         Content="{Binding ConfirmButtonText}"
                         MinWidth="200"
                         HorizontalContentAlignment="Center"
-                        IsEnabled="{Binding !IsPreparingPlan}"
+                        IsEnabled="{Binding IsReady}"
                         Command="{Binding RunCommand}" />
             </Grid>
         </Grid>

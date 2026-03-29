@@ -77,6 +77,9 @@
             <SolidColorBrush x:Key="DangerBannerBackgroundBrush"    Color="#3a2f1b" />
             <!-- Destructive action buttons and icons (✕ delete) -->
             <SolidColorBrush x:Key="DangerForegroundBrush"          Color="#f44736" />
+            <!-- Error banner (red-tinted dark background + red text) -->
+            <SolidColorBrush x:Key="ErrorBannerBackgroundBrush"     Color="#2d1b1b" />
+            <SolidColorBrush x:Key="ErrorBannerForegroundBrush"     Color="#f44736" />
             <!-- "Cancel scan" and similar in-progress abort buttons -->
             <SolidColorBrush x:Key="CancelButtonBackgroundBrush"    Color="#c0392b" />
 

@@ -232,7 +232,7 @@ public sealed class SelectionFileStepTests : IDisposable
     }
 
     [Fact]
-    public async Task AddSelectionFromFileStep_PreviewAsync_YieldsSummaryResult_DoesNotMutateReal()
+    public async Task AddSelectionFromFileStep_PreviewAsync_SetsVirtualCheckState_DoesNotMutateReal()
     {
         var (root, fileA, fileB, provider) = await MakeTwoFileTree();
         var selFile = await WriteTxtSelectionFile(["file_b.txt"]);
@@ -246,6 +246,7 @@ public sealed class SelectionFileStepTests : IDisposable
 
         Assert.Single(results);
         Assert.NotNull(results[0].ActionSummary);
+        Assert.Equal(CheckState.Checked, context.GetNodeContext(fileB).VirtualCheckState);
         Assert.Equal(CheckState.Unchecked, fileB.CheckState); // real state unchanged
     }
 
@@ -322,7 +323,7 @@ public sealed class SelectionFileStepTests : IDisposable
     }
 
     [Fact]
-    public async Task RemoveSelectionFromFileStep_PreviewAsync_YieldsSummaryResult_DoesNotMutateReal()
+    public async Task RemoveSelectionFromFileStep_PreviewAsync_SetsVirtualCheckState_DoesNotMutateReal()
     {
         var (root, fileA, fileB, provider) = await MakeTwoFileTree();
         var selFile = await WriteTxtSelectionFile(["file_a.txt"]);
@@ -336,6 +337,7 @@ public sealed class SelectionFileStepTests : IDisposable
 
         Assert.Single(results);
         Assert.NotNull(results[0].ActionSummary);
+        Assert.Equal(CheckState.Unchecked, context.GetNodeContext(fileA).VirtualCheckState);
         Assert.Equal(CheckState.Checked, fileA.CheckState); // real state unchanged
     }
 

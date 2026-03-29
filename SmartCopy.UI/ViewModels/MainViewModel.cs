@@ -1105,6 +1105,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             await dialogTask;
             return;
         }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Pipeline preview failed");
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => Preview.LoadError(ex.Message));
+        }
 
         // Wait for user's decision (Run or Close).
         var confirmRun = await dialogTask;
@@ -1226,6 +1231,22 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             logTimer.Stop();
             DrainResultQueue(resultQueue);
             StatusBar.Progress.Cancelled();
+        }
+        catch (PipelineStepException ex)
+        {
+            _logger.LogError(ex, "Pipeline step failed");
+            logTimer.Stop();
+            DrainResultQueue(resultQueue);
+            LogPanel.AddEntry($"Pipeline aborted — {ex.StepName}: {ex.UserMessage}", LogLevel.Error);
+            StatusBar.Progress.Complete();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Pipeline execution failed");
+            logTimer.Stop();
+            DrainResultQueue(resultQueue);
+            LogPanel.AddEntry($"Pipeline aborted: {ex.Message}", LogLevel.Error);
+            StatusBar.Progress.Complete();
         }
         finally
         {

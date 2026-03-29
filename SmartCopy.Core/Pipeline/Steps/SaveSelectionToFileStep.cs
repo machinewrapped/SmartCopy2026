@@ -62,7 +62,14 @@ public sealed class SaveSelectionToFileStep : IPipelineStep
         IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
         var snapshot = new SelectionManager().Capture(context.RootNode, UseAbsolutePaths);
-        await new SelectionSerializer().SaveAsync(FilePath, snapshot, ct);
+        try { await new SelectionSerializer().SaveAsync(FilePath, snapshot, ct); }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new PipelineStepException(
+                stepName: "Save Selection to File",
+                userMessage: $"Could not write to '{FilePath}' — check that the path is valid and you have write access",
+                innerException: ex);
+        }
         yield return new TransformResult(
             IsSuccess: true,
             SourceNode: context.RootNode,

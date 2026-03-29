@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.Pipeline.Validation;
 using SmartCopy.Core.Selection;
 
@@ -45,7 +46,28 @@ public sealed class AddSelectionFromFileStep : IPipelineStep
     public async IAsyncEnumerable<TransformResult> PreviewAsync(
         IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
-        await Task.Yield();
+        SelectionSnapshot? snapshot = null;
+        try { snapshot = await new SelectionSerializer().LoadAsync(FilePath, ct); }
+        catch (Exception ex) when (ex is not OperationCanceledException) { /* snapshot stays null → error result below */ }
+
+        if (snapshot is null)
+        {
+            yield return new TransformResult(
+                IsSuccess: false,
+                SourceNode: context.RootNode,
+                SourceNodeResult: SourceResult.None,
+                ErrorMessage: $"Add Selection from File: '{FilePath}' could not be read — the file may be corrupt or in an unsupported format");
+            yield break;
+        }
+
+        foreach (var node in context.RootNode.GetFilterIncludedDescendants())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (node is FileNode fileNode
+                && (snapshot.Contains(fileNode.CanonicalRelativePath) || snapshot.Contains(fileNode.FullPath)))
+                context.GetNodeContext(fileNode).VirtualCheckState = CheckState.Checked;
+        }
+
         yield return new TransformResult(
             IsSuccess: true,
             SourceNode: context.RootNode,
@@ -56,7 +78,15 @@ public sealed class AddSelectionFromFileStep : IPipelineStep
     public async IAsyncEnumerable<TransformResult> ApplyAsync(
         IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
-        var snapshot = await new SelectionSerializer().LoadAsync(FilePath, ct);
+        SelectionSnapshot snapshot;
+        try { snapshot = await new SelectionSerializer().LoadAsync(FilePath, ct); }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new PipelineStepException(
+                stepName: "Add Selection from File",
+                userMessage: $"'{FilePath}' could not be read — the file may be corrupt or in an unsupported format",
+                innerException: ex);
+        }
         new SelectionManager().AddFromSnapshot(context.RootNode, snapshot);
         context.RootNode.BuildStats();
         yield return new TransformResult(
