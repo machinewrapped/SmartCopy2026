@@ -1,19 +1,16 @@
 # AGENTS.md
-
 This file provides guidance to AI agents when working with code in this repository.
 
 ## Project Overview
-
 SmartCopy2026 is a cross-platform file manager (Windows/Linux/macOS) rewritten from SmartCopy 2015 (WinForms/.NET 4.8). It intelligently copies large directories via composable filters and transform pipelines. Stack: C#/.NET 10, Avalonia UI 11, CommunityToolkit.Mvvm.
 
 ## Project Status
-Current progress and outstanding tasks are recorded in `Docs/SmartCopy2026-Plan.md`. Refer to the plan document to get up to speed, update it when a deliverable is completed and validated.
+Implementation according to `Docs/SmartCopy2026-Plan.md` is complete. The app is launched and live on multiple sites.
 
 ## System Architecture
 Architectural overview and design principles are detailed in `Docs/Architecture.md`. Consult the architecture when designing a solution to ensure that it follows established principles, and update the document after refactoring or redesign changes the architecture.
 
 ## UI/UX Design Documentation
-
 Canonical UI and interaction designs can be found in `Docs/UIUX.md`. Refer to this document for UI consistency, update it when UI/UX decisions are made.
 
 ## Commands
@@ -35,6 +32,10 @@ dotnet test --filter "FullyQualifiedName~TestClassName" | Out-String
 # Publish self-contained single file
 dotnet publish -c Release --self-contained true -p:PublishSingleFile=true | Out-String
 ```
+
+## Error Handling
+
+**Thou Shalt Not Crash** The app must never crash to desktop. All operations (pipeline execution, preview generation, scanning) must catch exceptions at the top level and surface errors through the UI (log panel, banners, validation messages). Never let an exception propagate unhandled.
 
 ## Solution Structure
 
