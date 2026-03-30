@@ -69,6 +69,7 @@ jobs:
           echo "ARCHIVE=$ARCHIVE" >> "$GITHUB_ENV"
 
       - name: Upload artifact
+        id: upload
         uses: actions/upload-artifact@v7
         with:
           name: SmartCopy-${{ matrix.rid }}
