@@ -1,5 +1,7 @@
-﻿using Avalonia;
-using System;
+﻿using System;
+using System.Threading.Tasks;
+using Avalonia;
+using SmartCopy.Core.Logging;
 
 namespace SmartCopy.App;
 
@@ -11,11 +13,15 @@ class Program
     [System.STAThread]
     public static void Main(string[] args)
     {
-        Console.WriteLine("Available resources in UI Assembly:");
-        foreach (var res in typeof(SmartCopy.UI.Views.MainWindow).Assembly.GetManifestResourceNames())
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            CrashLogger.Write(e.ExceptionObject as Exception, "AppDomain");
+
+        TaskScheduler.UnobservedTaskException += (_, e) =>
         {
-            Console.WriteLine("  " + res);
-        }
+            CrashLogger.Write(e.Exception, "UnobservedTask");
+            e.SetObserved();
+        };
+
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
 
