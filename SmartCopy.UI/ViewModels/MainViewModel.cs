@@ -1105,6 +1105,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             await dialogTask;
             return;
         }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Pipeline preview failed");
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => Preview.LoadError(ex.Message));
+        }
 
         // Wait for user's decision (Run or Close).
         var confirmRun = await dialogTask;
@@ -1211,30 +1216,44 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         if (AutoOpenLogOnRun)
             LogPanel.IsExpanded = true;
 
+        IReadOnlyList<TransformResult>? results = null;
         try
         {
-            var results = await runner.ExecuteAsync(executionJob);
-            logTimer.Stop();
-            DrainResultQueue(resultQueue);
-
-            await _operationJournal.WriteAsync(results.Where(r => r.SourceNodeResult != SourceResult.None));
-
+            results = await runner.ExecuteAsync(executionJob);
             StatusBar.Progress.Complete();
         }
         catch (OperationCanceledException)
         {
-            logTimer.Stop();
-            DrainResultQueue(resultQueue);
             StatusBar.Progress.Cancelled();
+        }
+        catch (PipelineStepException ex)
+        {
+            _logger.LogError(ex, "Pipeline step failed");
+            LogPanel.AddEntry($"Pipeline aborted — {ex.StepName}: {ex.UserMessage}", LogLevel.Error);
+            StatusBar.Progress.Complete();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Pipeline execution failed");
+            LogPanel.AddEntry($"Pipeline aborted: {ex.Message}", LogLevel.Error);
+            StatusBar.Progress.Complete();
         }
         finally
         {
+            logTimer.Stop();
+            DrainResultQueue(resultQueue);
             Pipeline.ClearActiveStep();
             Pipeline.IsRunning = false;
             FilterChain.IsLocked = false;
             FileList.RemoveAllMarkedForRemoval();
             DirectoryTree.RemoveNodesMarkedForRemoval();
             await ApplyPendingWatcherBatchesAsync();
+        }
+
+        if (results is { Count: > 0 })
+        {
+            try { await _operationJournal.WriteAsync(results.Where(r => r.SourceNodeResult != SourceResult.None)); }
+            catch (Exception ex) { _logger.LogWarning(ex, "Failed to write operation journal"); }
         }
     }
 

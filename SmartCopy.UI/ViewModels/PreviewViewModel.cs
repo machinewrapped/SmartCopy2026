@@ -91,10 +91,21 @@ public partial class PreviewViewModel : ViewModelBase
     public bool HasInfoMessages => InfoMessages.Count > 0;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsReady))]
     private bool _isPreparingPlan;
 
     [ObservableProperty]
     private string _preparationMessage = "Preparing preview\u2026";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasErrors))]
+    [NotifyPropertyChangedFor(nameof(IsReady))]
+    private IReadOnlyList<string> _errors = [];
+
+    public bool HasErrors => Errors.Count > 0;
+
+    /// <summary>True when the plan is loaded with no blocking errors — gates the Run and Save Report buttons.</summary>
+    public bool IsReady => !IsPreparingPlan && !HasErrors;
 
     public ObservableCollection<PreviewGroupViewModel> Groups { get; } = [];
 
@@ -150,8 +161,15 @@ public partial class PreviewViewModel : ViewModelBase
         TotalEstimatedOutputBytes = 0;
         Warnings = [];
         InfoMessages = [];
+        Errors = [];
         Groups.Clear();
         OnPropertyChanged(nameof(ConfirmButtonText));
+    }
+
+    public void LoadError(string message)
+    {
+        IsPreparingPlan = false;
+        Errors = [message];
     }
 
     public void LoadFrom(OperationPlan plan)
@@ -165,6 +183,7 @@ public partial class PreviewViewModel : ViewModelBase
         TotalEstimatedOutputBytes = plan.TotalEstimatedOutputBytes;
         Warnings = plan.Warnings;
         InfoMessages = plan.InfoMessages;
+        Errors = plan.Errors;
 
         Groups.Clear();
 
