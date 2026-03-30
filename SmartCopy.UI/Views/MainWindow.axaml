@@ -20,6 +20,7 @@
         <Border Grid.Row="0" Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="0,0,0,1">
             <Menu>
                 <MenuItem Header="_File">
+                    <MenuItem Header="Trigger Crash (Debug)" x:Name="DebugCrashMenuItem" IsVisible="False" />
                     <MenuItem Header="_Quit" x:Name="QuitMenuItem" InputGesture="Ctrl+Q" />
                 </MenuItem>
                 <MenuItem Header="_Options" x:Name="OptionsMenu" />

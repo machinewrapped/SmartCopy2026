@@ -79,6 +79,11 @@ public partial class MainWindow : Window
         DataContextChanged += OnMainDataContextChanged;
         AboutMenuItem.Click += async (_, _) => await ShowAboutDialogAsync();
         QuitMenuItem.Click += (_, _) => Close();
+
+#if DEBUG
+        DebugCrashMenuItem.IsVisible = true;
+        DebugCrashMenuItem.Click += (_, _) => throw new InvalidOperationException("Test crash triggered from Debug menu.");
+#endif
     }
 
     private async Task ShowAboutDialogAsync()

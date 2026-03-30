@@ -19,7 +19,8 @@
             <Button Content="{Binding CancelText}"
                     Command="{Binding CancelCommand}"
                     MinWidth="80"
-                    IsCancel="True" />
+                    IsCancel="True"
+                    IsVisible="{Binding CancelText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
             <Button Content="{Binding ConfirmText}"
                     Command="{Binding ConfirmCommand}"
                     MinWidth="80"
