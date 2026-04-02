@@ -7,6 +7,12 @@ namespace SmartCopy.Core.FileSystem;
 /// </summary>
 public sealed class LocalFileSystemProvider : IFileSystemProvider
 {
+    private const int MaxFileNameLength = 255;
+    private const string StagedFilePrefix = ".";
+    private const string StagedFileSuffix = ".smartcopy.tmp.";
+    private const string CompactStagedFilePrefix = ".smartcopy.staging.";
+    private const int GuidNLength = 32;
+
     private readonly bool _isNetworkPath;
     private readonly ProviderCapabilities _capabilities;
     private readonly LocalFileSystemProviderOptions _options;
@@ -121,20 +127,16 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
             Directory.CreateDirectory(directory);
         }
 
-        var tempPath = BuildStagedWritePath(fullPath);
+        var tempPath = string.Empty;
+        var stagedOutsideDestinationDirectory = false;
         var committed = false;
         try
         {
-            await using (var output = new FileStream(
-                tempPath,
-                new FileStreamOptions
-                {
-                    Mode = FileMode.CreateNew,
-                    Access = FileAccess.Write,
-                    Share = FileShare.None,
-                    BufferSize = _options.CopyBufferSizeBytes,
-                    Options = FileOptions.Asynchronous | FileOptions.SequentialScan
-                }))
+            await using (var output = CreateStagedWriteStream(
+                fullPath,
+                _options.CopyBufferSizeBytes,
+                out tempPath,
+                out stagedOutsideDestinationDirectory))
             {
                 long? remainingBytes = TryGetRemainingLength(data, out var knownRemainingBytes)
                     ? knownRemainingBytes
@@ -178,12 +180,12 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                 await output.FlushAsync(ct);
             }
 
-            File.Move(tempPath, fullPath, overwrite: true);
+            CommitStagedWrite(tempPath, fullPath, stagedOutsideDestinationDirectory);
             committed = true;
         }
         finally
         {
-            if (!committed)
+            if (!committed && !string.IsNullOrWhiteSpace(tempPath))
             {
                 TryDeleteStagedFile(tempPath);
             }
@@ -282,9 +284,108 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     private static string BuildStagedWritePath(string destinationPath)
     {
         var fileName = Path.GetFileName(destinationPath);
+        var safeFileName = string.IsNullOrWhiteSpace(fileName) ? "smartcopy" : fileName;
+        var maxSourceSegmentLength = Math.Max(
+            0,
+            MaxFileNameLength - StagedFilePrefix.Length - StagedFileSuffix.Length - GuidNLength);
+
+        if (safeFileName.Length > maxSourceSegmentLength)
+        {
+            safeFileName = safeFileName[..maxSourceSegmentLength];
+        }
+
         return Path.Combine(
             Path.GetDirectoryName(destinationPath) ?? Path.GetTempPath(),
-            $".{fileName}.smartcopy.tmp.{Guid.NewGuid():N}");
+            $"{StagedFilePrefix}{safeFileName}{StagedFileSuffix}{Guid.NewGuid():N}");
+    }
+
+    private static string BuildCompactStagedWritePath(string destinationPath)
+    {
+        return Path.Combine(
+            Path.GetDirectoryName(destinationPath) ?? Path.GetTempPath(),
+            $"{CompactStagedFilePrefix}{Guid.NewGuid():N}");
+    }
+
+    private static string BuildSystemTempStagedWritePath()
+    {
+        return Path.Combine(Path.GetTempPath(), $"{CompactStagedFilePrefix}{Guid.NewGuid():N}");
+    }
+
+    private static FileStream CreateStagedWriteStream(
+        string destinationPath,
+        int bufferSizeBytes,
+        out string stagedPath,
+        out bool stagedOutsideDestinationDirectory)
+    {
+        var candidates = new[]
+        {
+            BuildStagedWritePath(destinationPath),
+            BuildCompactStagedWritePath(destinationPath),
+            BuildSystemTempStagedWritePath(),
+        };
+
+        Exception? lastException = null;
+        foreach (var candidate in candidates)
+        {
+            try
+            {
+                var stream = new FileStream(
+                    candidate,
+                    new FileStreamOptions
+                    {
+                        Mode = FileMode.CreateNew,
+                        Access = FileAccess.Write,
+                        Share = FileShare.None,
+                        BufferSize = bufferSizeBytes,
+                        Options = FileOptions.Asynchronous | FileOptions.SequentialScan
+                    });
+
+                stagedPath = candidate;
+                stagedOutsideDestinationDirectory = !AreSameDirectory(candidate, destinationPath);
+                return stream;
+            }
+            catch (PathTooLongException ex)
+            {
+                lastException = ex;
+            }
+            catch (DirectoryNotFoundException ex)
+            {
+                lastException = ex;
+            }
+            catch (IOException ex)
+            {
+                // CreateNew may race on name collisions; long paths may also surface as IO exceptions.
+                lastException = ex;
+            }
+        }
+
+        throw new IOException(
+            $"Unable to create a staged file for destination '{destinationPath}'.",
+            lastException);
+    }
+
+    private static void CommitStagedWrite(string stagedPath, string destinationPath, bool stagedOutsideDestinationDirectory)
+    {
+        try
+        {
+            File.Move(stagedPath, destinationPath, overwrite: true);
+        }
+        catch (IOException) when (stagedOutsideDestinationDirectory)
+        {
+            // Cross-volume moves fail on many filesystems; fallback to copy+delete for temp-dir staging.
+            File.Copy(stagedPath, destinationPath, overwrite: true);
+            File.Delete(stagedPath);
+        }
+    }
+
+    private static bool AreSameDirectory(string pathA, string pathB)
+    {
+        var dirA = Path.GetDirectoryName(pathA) ?? string.Empty;
+        var dirB = Path.GetDirectoryName(pathB) ?? string.Empty;
+        var comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        return string.Equals(NormalizePath(dirA), NormalizePath(dirB), comparison);
     }
 
     private static void TryDeleteStagedFile(string stagedPath)

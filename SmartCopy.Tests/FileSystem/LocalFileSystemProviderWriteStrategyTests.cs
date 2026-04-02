@@ -92,6 +92,22 @@ public sealed class LocalFileSystemProviderWriteStrategyTests
         Assert.Empty(Directory.GetFiles(temp.Path, "*.smartcopy.tmp.*", SearchOption.TopDirectoryOnly));
     }
 
+    [Fact]
+    public async Task WriteAsync_LongDestinationFileName_UsesTruncatedStageNameAndSucceeds()
+    {
+        using var temp = new TempDirectory();
+        var provider = new LocalFileSystemProvider(temp.Path);
+        var longFileName = $"{new string('a', 230)}.txt";
+        var destination = Path.Combine(temp.Path, longFileName);
+
+        await using var source = new MemoryStream("long-name-check"u8.ToArray());
+        await provider.WriteAsync(destination, source, progress: null, CancellationToken.None);
+
+        Assert.True(File.Exists(destination));
+        Assert.Equal("long-name-check", await File.ReadAllTextAsync(destination));
+        Assert.Empty(Directory.GetFiles(temp.Path, "*.smartcopy.tmp.*", SearchOption.TopDirectoryOnly));
+    }
+
     private sealed class InterruptingReadStream(int totalBytes, int throwAfterBytes) : Stream
     {
         private readonly int _totalBytes = totalBytes;
