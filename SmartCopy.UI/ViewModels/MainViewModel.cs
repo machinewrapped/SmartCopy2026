@@ -738,6 +738,127 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         RefreshIdleStats();
     }
 
+    [RelayCommand]
+    private async Task ExportSettings()
+    {
+        var mainWindow = GetMainWindow();
+        if (mainWindow is null) return;
+
+        var file = await mainWindow.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export Settings",
+            SuggestedFileName = "SmartCopy2026-settings",
+            DefaultExtension = ".sc2backup",
+            FileTypeChoices =
+            [
+                new FilePickerFileType("SmartCopy Backup") { Patterns = ["*.sc2backup"] },
+            ],
+        });
+
+        if (file is null) return;
+
+        try
+        {
+            var service = new SettingsArchiveService();
+            await service.ExportAsync(_appContext.DataStore.BaseDirectory, file.Path.LocalPath);
+            LogPanel.AddEntry("Settings exported successfully.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to export settings");
+            LogPanel.AddEntry($"Export failed: {ex.Message}", LogLevel.Error);
+        }
+    }
+
+    [RelayCommand]
+    private async Task ImportSettings()
+    {
+        var mainWindow = GetMainWindow();
+        if (mainWindow is null) return;
+
+        var files = await mainWindow.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Import Settings",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("SmartCopy Backup") { Patterns = ["*.sc2backup"] },
+            ],
+        });
+
+        if (files is not { Count: > 0 }) return;
+        var archivePath = files[0].Path.LocalPath;
+
+        try
+        {
+            var service = new SettingsArchiveService();
+            var baseDir = _appContext.DataStore.BaseDirectory;
+            var manifest = await service.AnalyzeArchiveAsync(archivePath, baseDir);
+
+            var resolution = ConflictResolution.OverwriteAll;
+
+            if (manifest.ConflictingFiles.Count > 0)
+            {
+                var resolved = await ShowImportConflictDialogAsync(mainWindow, manifest);
+                if (resolved is null) return; // user cancelled
+                resolution = resolved.Value;
+            }
+
+            await service.ImportAsync(archivePath, baseDir, resolution);
+            await ReloadAllSettingsAsync();
+            LogPanel.AddEntry("Settings imported successfully.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to import settings");
+            LogPanel.AddEntry($"Import failed: {ex.Message}", LogLevel.Error);
+        }
+    }
+
+    private static async Task<ConflictResolution?> ShowImportConflictDialogAsync(Window owner, ImportManifest manifest)
+    {
+        var conflictCount = manifest.ConflictingFiles.Count;
+        var message = conflictCount == 1
+            ? $"1 item in the archive already exists and will be affected.\n\nOverwrite the existing item, or skip it and only import new items?"
+            : $"{conflictCount} items in the archive already exist and will be affected.\n\nOverwrite existing items, or skip them and only import new items?";
+
+        var vm = new ImportConflictDialogViewModel { Message = message };
+        var dialog = new ImportConflictDialog { DataContext = vm };
+        return await dialog.ShowDialog<ConflictResolution?>(owner);
+    }
+
+    private async Task ReloadAllSettingsAsync()
+    {
+        await _settingsStore.LoadIntoAsync(_settings);
+
+        UseAbsolutePathsForSelection = _settings.UseAbsolutePathsForSelectionSave;
+        AutoOpenLogOnRun = _settings.AutoOpenLogOnRun;
+        VerboseLogging = _settings.VerboseLogging;
+        ShowExcludedNodesByDefault = _settings.ShowFilteredNodesInTree;
+        RestoreLastWorkflow = _settings.RestoreLastWorkflow;
+        RestoreLastSourcePath = _settings.RestoreLastSourcePath;
+        AllowDeleteWithoutPreview = _settings.AllowDeleteWithoutPreview;
+        AllowOverwriteWithoutPreview = _settings.AllowOverwriteWithoutPreview;
+        SaveSessionLocally = _settings.SaveSessionLocally;
+        FullPreScan = _settings.FullPreScan;
+        LazyExpandScan = _settings.LazyExpandScan;
+        FollowSymlinks = _settings.FollowSymlinks;
+        DefaultOverwriteMode = _settings.DefaultOverwriteMode;
+        DefaultDeleteMode = _settings.DefaultDeleteMode;
+        ShowHiddenFiles = _settings.ShowHiddenFiles;
+        AllowDeleteReadOnly = _settings.AllowDeleteReadOnly;
+#if DEBUG
+        EnableMemoryFileSystem = _settings.EnableMemoryFileSystem;
+        AddArtificialDelay = _settings.AddArtificialDelay;
+        LimitMemoryFileSystemCapacity = _settings.LimitMemoryFileSystemCapacity;
+#endif
+
+        SourcePathPicker.RefreshSettings();
+        await FilterChain.RefreshPresetsAsync();
+        await Pipeline.RefreshPresetsAsync();
+        await WorkflowMenu.RefreshAsync();
+    }
+
     private static Window? GetMainWindow()
         => Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime d
             ? d.MainWindow : null;

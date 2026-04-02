@@ -1,0 +1,33 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
+        x:Class="SmartCopy.UI.Views.ImportConflictDialog"
+        x:DataType="vm:ImportConflictDialogViewModel"
+        Title="{Binding Title}"
+        Width="400"
+        SizeToContent="Height"
+        CanResize="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppBackgroundBrush}">
+    <StackPanel Spacing="12" Margin="20">
+
+        <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button Content="Cancel"
+                    Command="{Binding CancelCommand}"
+                    MinWidth="80"
+                    IsCancel="True" />
+            <Button Content="Skip Existing"
+                    Command="{Binding SkipCommand}"
+                    MinWidth="80" />
+            <Button Content="Overwrite All"
+                    Command="{Binding OverwriteCommand}"
+                    MinWidth="80"
+                    IsDefault="True" />
+        </StackPanel>
+
+    </StackPanel>
+</Window>

@@ -406,7 +406,7 @@ public partial class PipelineViewModel : ViewModelBase
         }
     }
 
-    private async Task RefreshPresetsAsync()
+    public async Task RefreshPresetsAsync()
     {
         var users = await _presetStore.GetUserPresetsAsync();
 

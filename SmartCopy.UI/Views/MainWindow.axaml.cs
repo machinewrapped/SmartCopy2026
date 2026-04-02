@@ -79,6 +79,8 @@ public partial class MainWindow : Window
         DataContextChanged += OnMainDataContextChanged;
         AboutMenuItem.Click += async (_, _) => await ShowAboutDialogAsync();
         QuitMenuItem.Click += (_, _) => Close();
+        ExportSettingsMenuItem.Click += async (_, _) => { if (_mainVm is not null) await _mainVm.ExportSettingsCommand.ExecuteAsync(null); };
+        ImportSettingsMenuItem.Click += async (_, _) => { if (_mainVm is not null) await _mainVm.ImportSettingsCommand.ExecuteAsync(null); };
 
 #if DEBUG
         DebugCrashMenuItem.IsVisible = true;
