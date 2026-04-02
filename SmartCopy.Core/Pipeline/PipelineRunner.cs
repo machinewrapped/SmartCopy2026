@@ -163,7 +163,7 @@ public sealed class PipelineRunner
 
         void ReportTransferBytes(DirectoryTreeNode node, long bytesDelta, long fileTotalBytes)
         {
-            if (bytesDelta <= 0 || totalBytes <= 0)
+            if (totalBytes <= 0)
             {
                 return;
             }
@@ -174,6 +174,11 @@ public sealed class PipelineRunner
                 inFlightNodeBytes = 0;
                 inFlightNodeTotalBytes = Math.Max(0, fileTotalBytes);
                 lastInFlightProgressReportTick = 0;
+            }
+
+            if (bytesDelta <= 0)
+            {
+                return;
             }
 
             inFlightNodeBytes += bytesDelta;
@@ -284,7 +289,11 @@ public sealed class PipelineRunner
         if (rate <= 0)
             return TimeSpan.Zero;
 
-        return TimeSpan.FromSeconds((total - completed) / rate);
+        var remainingSeconds = (total - completed) / rate;
+        if (double.IsInfinity(remainingSeconds) || remainingSeconds > TimeSpan.MaxValue.TotalSeconds)
+            return TimeSpan.MaxValue;
+
+        return TimeSpan.FromSeconds(remainingSeconds);
     }
 
     private sealed class StepContext : IStepContext, IFileTransferProgressSink
