@@ -86,39 +86,12 @@ public sealed class AppSettings
     /// </summary>
     public void MergeFrom(AppSettings saved)
     {
-        SchemaVersion = saved.SchemaVersion;
-        LastSourcePath = saved.LastSourcePath;
-        ShowHiddenFiles = saved.ShowHiddenFiles;
-        ShowFilteredNodesInTree = saved.ShowFilteredNodesInTree;
-        AllowDeleteReadOnly = saved.AllowDeleteReadOnly;
-        LazyExpandScan = saved.LazyExpandScan;
-        FullPreScan = saved.FullPreScan;
-        FollowSymlinks = saved.FollowSymlinks;
-        EnableFilesystemWatcher = saved.EnableFilesystemWatcher;
-        CopyChunkSizeKb = saved.CopyChunkSizeKb;
-        DefaultOverwriteMode = saved.DefaultOverwriteMode;
-        DefaultDeleteMode = saved.DefaultDeleteMode;
-        RestoreLastWorkflow = saved.RestoreLastWorkflow;
-        RestoreLastSourcePath = saved.RestoreLastSourcePath;
-        AllowDeleteWithoutPreview = saved.AllowDeleteWithoutPreview;
-        AllowOverwriteWithoutPreview = saved.AllowOverwriteWithoutPreview;
-        SaveSessionLocally = saved.SaveSessionLocally;
-        EnableMemoryFileSystem = saved.EnableMemoryFileSystem;
-        AddArtificialDelay = saved.AddArtificialDelay;
-        LimitMemoryFileSystemCapacity = saved.LimitMemoryFileSystemCapacity;
-        LogRetentionDays = saved.LogRetentionDays;
-        RecentSources = saved.RecentSources;
-        RecentTargets = saved.RecentTargets;
-        RecentSelectionFiles = saved.RecentSelectionFiles;
-        FavouritePaths = saved.FavouritePaths;
-        FavouriteSelectionFiles = saved.FavouriteSelectionFiles;
-        RecentFilterChains = saved.RecentFilterChains;
-        RecentPipelines = saved.RecentPipelines;
-        FilterTypeMruPresetIds = saved.FilterTypeMruPresetIds;
-        StepTypeMruPresetIds = saved.StepTypeMruPresetIds;
-        UseAbsolutePathsForSelectionSave = saved.UseAbsolutePathsForSelectionSave;
-        AutoOpenLogOnRun = saved.AutoOpenLogOnRun;
-        VerboseLogging = saved.VerboseLogging;
+        foreach (var prop in typeof(AppSettings).GetProperties())
+        {
+            if (!prop.CanRead || !prop.CanWrite) continue;
+            if (prop.IsDefined(typeof(JsonIgnoreAttribute), inherit: false)) continue;
+            prop.SetValue(this, prop.GetValue(saved));
+        }
     }
 }
 
