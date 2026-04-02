@@ -37,7 +37,7 @@ public interface IFileSystemProvider
     /// Writes <paramref name="data"/> to <paramref name="path"/>.
     /// Implementations should commit the destination only after the full payload is written
     /// (for example via temp-file staging + rename) to avoid leaving truncated files when
-    /// interrupted. When true transactional commit is unavailable, implementations should
+    /// interrupted. When transactional commit is unavailable, implementations should
     /// still best-effort clean up partial output before returning an error.
     /// </summary>
     Task WriteAsync(string path, Stream data, IProgress<long>? progress, CancellationToken ct);
