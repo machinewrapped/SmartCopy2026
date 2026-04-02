@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.Progress;
 using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
@@ -299,9 +300,16 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
                 bool copied = false;
                 try
                 {
+                    IProgress<long>? writeProgress = null;
+                    if (context is IFileTransferProgressSink progressSink)
+                    {
+                        writeProgress = new DelegateProgress<long>(
+                            bytes => progressSink.ReportFileTransferBytes(file, bytes, file.Size));
+                    }
+
                     await using (var stream = await context.SourceProvider.OpenReadAsync(file.FullPath, ct))
                     {
-                        await targetProvider.WriteAsync(fileDest, stream, progress: null, ct);
+                        await targetProvider.WriteAsync(fileDest, stream, writeProgress, ct);
                     }
                     copied = true;
                     await context.SourceProvider.DeleteAsync(file.FullPath, ct);
