@@ -65,3 +65,4 @@ benchmark-results.ndjson
 benchmark-scenarios.json
 benchmark-tasklist.md
 dataset-prep-summary-*.json
+.codex
