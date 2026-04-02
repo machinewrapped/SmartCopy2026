@@ -121,57 +121,73 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
             Directory.CreateDirectory(directory);
         }
 
-        await using var output = new FileStream(
-            fullPath,
-            new FileStreamOptions
+        var tempPath = BuildStagedWritePath(fullPath);
+        var committed = false;
+        try
+        {
+            await using (var output = new FileStream(
+                tempPath,
+                new FileStreamOptions
+                {
+                    Mode = FileMode.CreateNew,
+                    Access = FileAccess.Write,
+                    Share = FileShare.None,
+                    BufferSize = _options.CopyBufferSizeBytes,
+                    Options = FileOptions.Asynchronous | FileOptions.SequentialScan
+                }))
             {
-                Mode = FileMode.Create,
-                Access = FileAccess.Write,
-                Share = FileShare.None,
-                BufferSize = _options.CopyBufferSizeBytes,
-                Options = FileOptions.Asynchronous | FileOptions.SequentialScan
-            });
+                long? remainingBytes = TryGetRemainingLength(data, out var knownRemainingBytes)
+                    ? knownRemainingBytes
+                    : null;
 
-        long? remainingBytes = TryGetRemainingLength(data, out var knownRemainingBytes)
-            ? knownRemainingBytes
-            : null;
+                if (remainingBytes is long bytesRemaining &&
+                    _options.PreallocateDestinationFile &&
+                    bytesRemaining > 0)
+                {
+                    output.SetLength(bytesRemaining);
+                }
 
-        if (remainingBytes is long bytesRemaining &&
-            _options.PreallocateDestinationFile &&
-            bytesRemaining > 0)
-        {
-            output.SetLength(bytesRemaining);
-        }
+                var writeMode = DetermineWriteMode(progress, remainingBytes);
 
-        var writeMode = DetermineWriteMode(progress, remainingBytes);
+                if (writeMode == LocalFileSystemWriteMode.CopyToAsync)
+                {
+                    // CopyToAsync mode: wraps the source in a ProgressReportingReadStream so the
+                    // framework's internal buffer loop reports progress without a manual loop here.
+                    await CopyViaCopyToAsync(data, output, progress, ct);
+                }
+                else if (writeMode == LocalFileSystemWriteMode.Auto &&
+                         remainingBytes is long autoBytesRemaining &&
+                         autoBytesRemaining <= _options.SmallFileProgressThresholdBytes)
+                {
+                    // Small-file optimisation: for files whose full size fits in memory we know
+                    // exactly how many bytes will be written, so we let the framework copy without
+                    // overhead and report progress in one shot at the end instead of per-chunk.
+                    await data.CopyToAsync(output, _options.CopyBufferSizeBytes, ct);
+                    if (progress is not null && autoBytesRemaining > 0)
+                    {
+                        progress.Report(autoBytesRemaining);
+                    }
+                }
+                else
+                {
+                    // Large files and unknown-length streams: manual loop reports progress per chunk,
+                    // which keeps UI responsive during long transfers without adding a stream wrapper.
+                    await CopyWithManualLoopAsync(data, output, progress, ct);
+                }
 
-        if (writeMode == LocalFileSystemWriteMode.CopyToAsync)
-        {
-            // CopyToAsync mode: wraps the source in a ProgressReportingReadStream so the
-            // framework's internal buffer loop reports progress without a manual loop here.
-            await CopyViaCopyToAsync(data, output, progress, ct);
-            return;
-        }
-
-        if (writeMode == LocalFileSystemWriteMode.Auto &&
-            remainingBytes is long autoBytesRemaining &&
-            autoBytesRemaining <= _options.SmallFileProgressThresholdBytes)
-        {
-            // Small-file optimisation: for files whose full size fits in memory we know
-            // exactly how many bytes will be written, so we let the framework copy without
-            // overhead and report progress in one shot at the end instead of per-chunk.
-            await data.CopyToAsync(output, _options.CopyBufferSizeBytes, ct);
-            if (progress is not null && autoBytesRemaining > 0)
-            {
-                progress.Report(autoBytesRemaining);
+                await output.FlushAsync(ct);
             }
 
-            return;
+            File.Move(tempPath, fullPath, overwrite: true);
+            committed = true;
         }
-
-        // Large files and unknown-length streams: manual loop reports progress per chunk,
-        // which keeps UI responsive during long transfers without adding a stream wrapper.
-        await CopyWithManualLoopAsync(data, output, progress, ct);
+        finally
+        {
+            if (!committed)
+            {
+                TryDeleteStagedFile(tempPath);
+            }
+        }
     }
 
     // Write strategy — private helpers for WriteAsync above.
@@ -261,6 +277,29 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 
         remainingBytes = Math.Max(0, data.Length - data.Position);
         return true;
+    }
+
+    private static string BuildStagedWritePath(string destinationPath)
+    {
+        var fileName = Path.GetFileName(destinationPath);
+        return Path.Combine(
+            Path.GetDirectoryName(destinationPath) ?? Path.GetTempPath(),
+            $".{fileName}.smartcopy.tmp.{Guid.NewGuid():N}");
+    }
+
+    private static void TryDeleteStagedFile(string stagedPath)
+    {
+        try
+        {
+            if (File.Exists(stagedPath))
+            {
+                File.Delete(stagedPath);
+            }
+        }
+        catch
+        {
+            // Best-effort cleanup only; preserve the original write failure.
+        }
     }
 
     public Task DeleteAsync(string path, CancellationToken ct)
