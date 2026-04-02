@@ -1,4 +1,5 @@
 using SmartCopy.Core.DirectoryTree;
+using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Progress;
@@ -168,6 +169,73 @@ public sealed class PipelineIntegrationTests
         Assert.True(await provider.ExistsAsync("/backup/src/song.mp3", CancellationToken.None));
         Assert.True(await provider.ExistsAsync("/archive/src/song.mp3", CancellationToken.None));
         Assert.False(await provider.ExistsAsync("/src/song.mp3", CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task CopyPipeline_ReportsInFlightByteProgress_ForLargeFile()
+    {
+        var content = new byte[700 * 1024];
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithDirectory("/src")
+            .WithDirectory("/dest")
+            .WithFile("/src/big.bin", content));
+
+        var root = await provider.BuildDirectoryTree();
+        var node = root.FindNodeByPathSegments(["src", "big.bin"]);
+        Assert.NotNull(node);
+        node.CheckState = CheckState.Checked;
+
+        var progressUpdates = new List<OperationProgress>();
+        var runner = new PipelineRunner(new TransformPipeline([new CopyStep("mem://dest")]));
+
+        await runner.ExecuteAsync(
+            new PipelineJob
+            {
+                RootNode = root,
+                SourceProvider = provider,
+                ProviderRegistry = provider.CreateRegistry(),
+                Progress = new SyncProgress<OperationProgress>(progressUpdates.Add),
+            });
+
+        Assert.NotEmpty(progressUpdates);
+        Assert.Contains(progressUpdates, p => p.CurrentFileBytes > 0 && p.CurrentFileBytes < p.CurrentFileTotalBytes);
+        Assert.Equal(progressUpdates[^1].TotalBytes, progressUpdates[^1].TotalBytesCompleted);
+    }
+
+    [Fact]
+    public async Task MovePipeline_CrossVolume_ReportsInFlightByteProgress_ForLargeFile()
+    {
+        var content = new byte[700 * 1024];
+        var sourceProvider = MemoryFileSystemFixtures.Create(f => f
+            .WithDirectory("/src")
+            .WithFile("/src/big.bin", content), volumeId: "VOL1");
+        var targetProvider = MemoryFileSystemFixtures.Create(f => f
+            .WithDirectory("/dest"), customRootPath: "mem://target", volumeId: "VOL2");
+
+        var root = await sourceProvider.BuildDirectoryTree();
+        var node = root.FindNodeByPathSegments(["src", "big.bin"]);
+        Assert.NotNull(node);
+        node.CheckState = CheckState.Checked;
+
+        var registry = new FileSystemProviderRegistry();
+        registry.Register(sourceProvider);
+        registry.Register(targetProvider);
+
+        var progressUpdates = new List<OperationProgress>();
+        var runner = new PipelineRunner(new TransformPipeline([new MoveStep("mem://target/dest")]));
+
+        await runner.ExecuteAsync(
+            new PipelineJob
+            {
+                RootNode = root,
+                SourceProvider = sourceProvider,
+                ProviderRegistry = registry,
+                Progress = new SyncProgress<OperationProgress>(progressUpdates.Add),
+            });
+
+        Assert.NotEmpty(progressUpdates);
+        Assert.Contains(progressUpdates, p => p.CurrentFileBytes > 0 && p.CurrentFileBytes < p.CurrentFileTotalBytes);
+        Assert.Equal(progressUpdates[^1].TotalBytes, progressUpdates[^1].TotalBytesCompleted);
     }
 
     [Fact]

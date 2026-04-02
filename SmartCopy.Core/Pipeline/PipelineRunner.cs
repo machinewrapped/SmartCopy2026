@@ -146,7 +146,6 @@ public sealed class PipelineRunner
                 "Pipelines containing a DeleteStep must be previewed before execution.");
         }
 
-        var context = new StepContext(job);
         var results = new List<TransformResult>();
 
         var stopwatch = Stopwatch.StartNew();
@@ -154,7 +153,69 @@ public sealed class PipelineRunner
         int totalFiles = 0;
         long completedBytes = 0;
         int filesCompleted = 0;
+        DirectoryTreeNode? inFlightNode = null;
+        long inFlightNodeBytes = 0;
+        long inFlightNodeTotalBytes = 0;
+        var inFlightProgressMinIntervalTicks = Stopwatch.Frequency / 10; // ~10 Hz
+        long lastInFlightProgressReportTick = 0;
         int stepIndex = 0;
+        var context = new StepContext(job, ReportTransferBytes);
+
+        void ReportTransferBytes(DirectoryTreeNode node, long bytesDelta, long fileTotalBytes)
+        {
+            if (totalBytes <= 0)
+            {
+                return;
+            }
+
+            if (!ReferenceEquals(inFlightNode, node))
+            {
+                inFlightNode = node;
+                inFlightNodeBytes = 0;
+                inFlightNodeTotalBytes = Math.Max(0, fileTotalBytes);
+                lastInFlightProgressReportTick = 0;
+            }
+
+            if (bytesDelta <= 0)
+            {
+                return;
+            }
+
+            inFlightNodeBytes += bytesDelta;
+            if (inFlightNodeTotalBytes > 0 && inFlightNodeBytes > inFlightNodeTotalBytes)
+            {
+                inFlightNodeBytes = inFlightNodeTotalBytes;
+            }
+
+            var completedWithTransfer = completedBytes + inFlightNodeBytes;
+            if (completedWithTransfer > totalBytes)
+            {
+                completedWithTransfer = totalBytes;
+            }
+
+            var elapsed = stopwatch.Elapsed;
+            var remaining = EstimateRemaining(elapsed, completedWithTransfer, totalBytes);
+            var nowTick = Stopwatch.GetTimestamp();
+            var fileTransferComplete = inFlightNodeTotalBytes > 0 && inFlightNodeBytes >= inFlightNodeTotalBytes;
+            if (!fileTransferComplete &&
+                lastInFlightProgressReportTick != 0 &&
+                nowTick - lastInFlightProgressReportTick < inFlightProgressMinIntervalTicks)
+            {
+                return;
+            }
+
+            lastInFlightProgressReportTick = nowTick;
+            job.Progress?.Report(new OperationProgress(
+                CurrentFile: node.CanonicalRelativePath,
+                CurrentFileBytes: inFlightNodeBytes,
+                CurrentFileTotalBytes: inFlightNodeTotalBytes,
+                FilesCompleted: filesCompleted,
+                FilesTotal: totalFiles,
+                TotalBytesCompleted: completedWithTransfer,
+                TotalBytes: totalBytes,
+                Elapsed: elapsed,
+                EstimatedRemaining: remaining));
+        }
 
         foreach (var step in _pipeline.Steps)
         {
@@ -167,6 +228,10 @@ public sealed class PipelineRunner
                 totalFiles = job.RootNode.NumSelectedFiles;
                 completedBytes = 0;
                 filesCompleted = 0;
+                inFlightNode = null;
+                inFlightNodeBytes = 0;
+                inFlightNodeTotalBytes = 0;
+                lastInFlightProgressReportTick = 0;
                 stopwatch.Restart();
             }
 
@@ -177,6 +242,14 @@ public sealed class PipelineRunner
 
                 results.Add(result);
                 job.NodeProgress?.Report(result);
+
+                if (ReferenceEquals(inFlightNode, result.SourceNode))
+                {
+                    inFlightNode = null;
+                    inFlightNodeBytes = 0;
+                    inFlightNodeTotalBytes = 0;
+                    lastInFlightProgressReportTick = 0;
+                }
 
                 if (!result.IsSuccess || result.SourceNodeResult == SourceResult.None)
                     continue;
@@ -216,13 +289,18 @@ public sealed class PipelineRunner
         if (rate <= 0)
             return TimeSpan.Zero;
 
-        return TimeSpan.FromSeconds((total - completed) / rate);
+        var remainingSeconds = (total - completed) / rate;
+        if (double.IsInfinity(remainingSeconds) || remainingSeconds > TimeSpan.MaxValue.TotalSeconds)
+            return TimeSpan.MaxValue;
+
+        return TimeSpan.FromSeconds(remainingSeconds);
     }
 
-    private sealed class StepContext : IStepContext
+    private sealed class StepContext : IStepContext, IFileTransferProgressSink
     {
         private readonly Dictionary<DirectoryTreeNode, PipelineContext> _contexts = new();
         private readonly HashSet<DirectoryTreeNode> _failedNodes = new();
+        private readonly Action<DirectoryTreeNode, long, long>? _fileTransferProgress;
 
         public DirectoryNode RootNode { get; }
         public IFileSystemProvider SourceProvider { get; }
@@ -231,7 +309,9 @@ public sealed class PipelineRunner
         public bool AllowDeleteReadOnly { get; }
         public ITrashService TrashService { get; }
 
-        public StepContext(PipelineJob job)
+        public StepContext(
+            PipelineJob job,
+            Action<DirectoryTreeNode, long, long>? fileTransferProgress = null)
         {
             RootNode = job.RootNode;
             SourceProvider = job.SourceProvider;
@@ -239,6 +319,7 @@ public sealed class PipelineRunner
             ShowHiddenFiles = job.ShowHiddenFiles;
             AllowDeleteReadOnly = job.AllowDeleteReadOnly;
             TrashService = job.TrashService;
+            _fileTransferProgress = fileTransferProgress;
         }
 
         public PipelineContext GetNodeContext(DirectoryTreeNode node)
@@ -266,5 +347,7 @@ public sealed class PipelineRunner
 
         public bool IsNodeFailed(DirectoryTreeNode node) => _failedNodes.Contains(node);
         public void MarkFailed(DirectoryTreeNode node) => _failedNodes.Add(node);
+        public void ReportFileTransferBytes(DirectoryTreeNode node, long bytesDelta, long fileTotalBytes) =>
+            _fileTransferProgress?.Invoke(node, bytesDelta, fileTotalBytes);
     }
 }
