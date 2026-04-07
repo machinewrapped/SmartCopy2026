@@ -235,8 +235,15 @@ public sealed class PipelineRunner
                 stopwatch.Restart();
             }
 
-            await foreach (var result in step.ApplyAsync(context, job.CancellationToken))
+            var lastResultElapsed = stopwatch.Elapsed;
+            await foreach (var rawResult in step.ApplyAsync(context, job.CancellationToken))
             {
+                var currentElapsed = stopwatch.Elapsed;
+                var perResultDuration = currentElapsed - lastResultElapsed;
+                var result = rawResult.ExecutionDuration is null
+                    ? rawResult with { ExecutionDuration = perResultDuration }
+                    : rawResult;
+
                 if (job.PauseToken is not null)
                     await job.PauseToken.WaitIfPausedAsync(job.CancellationToken);
 
@@ -251,15 +258,11 @@ public sealed class PipelineRunner
                     lastInFlightProgressReportTick = 0;
                 }
 
-                if (!result.IsSuccess || result.SourceNodeResult == SourceResult.None)
-                    continue;
-
-                if (step.IsExecutable)
+                if (result.IsSuccess && result.SourceNodeResult != SourceResult.None && step.IsExecutable)
                 {
                     filesCompleted += result.NumberOfFilesAffected;
                     completedBytes += result.InputBytes;
-                    var elapsed = stopwatch.Elapsed;
-                    var remaining = EstimateRemaining(elapsed, completedBytes, totalBytes);
+                    var remaining = EstimateRemaining(currentElapsed, completedBytes, totalBytes);
 
                     job.Progress?.Report(new OperationProgress(
                         CurrentFile: result.SourceNode.CanonicalRelativePath,
@@ -269,9 +272,11 @@ public sealed class PipelineRunner
                         FilesTotal: totalFiles,
                         TotalBytesCompleted: completedBytes,
                         TotalBytes: totalBytes,
-                        Elapsed: elapsed,
+                        Elapsed: currentElapsed,
                         EstimatedRemaining: remaining));
                 }
+
+                lastResultElapsed = currentElapsed;
             }
 
             stepIndex++;
