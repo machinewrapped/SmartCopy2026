@@ -40,6 +40,12 @@ if (selection.Mode == BenchmarkRunMode.DatasetPreparation)
     return 0;
 }
 
+if (selection.Mode == BenchmarkRunMode.Analysis)
+{
+    await RunAnalysisModeAsync(workingDirectory, config, selection, ct);
+    return 0;
+}
+
 await RunBenchmarkModeAsync(workingDirectory, config, selection, ct);
 
 return 0;
@@ -82,6 +88,122 @@ static async Task RunDatasetPreparationModeAsync(
     }
 }
 
+static async Task RunAnalysisModeAsync(
+    string workingDirectory,
+    BenchmarkConfig config,
+    BenchmarkCliOptions selection,
+    CancellationToken ct)
+{
+    var artifactDirectory = ResolveArtifactDirectory(workingDirectory, config.SourcePath, config.ArtifactPath);
+    var fileResultsPath = Path.Combine(artifactDirectory, FileResultsFileName);
+    if (!File.Exists(fileResultsPath))
+    {
+        Console.WriteLine($"No file-level results found: {fileResultsPath}");
+        Console.WriteLine("Run benchmark mode first to produce benchmark-file-results.ndjson.");
+        return;
+    }
+
+    var allRecords = await ReadExistingRunsAsync<BenchmarkFileCopyRecord>(fileResultsPath, ct);
+    if (allRecords.Count == 0)
+    {
+        Console.WriteLine($"No records available in {fileResultsPath}.");
+        return;
+    }
+
+    var scenarioOrder = BuildScenarioOrder(config, config.Scenarios.Where(s => s.Enabled).Select(s => s.Name));
+    var selectedScenario = !string.IsNullOrWhiteSpace(selection.ScenarioName)
+        ? selection.ScenarioName.Trim()
+        : scenarioOrder.FirstOrDefault(s => allRecords.Any(r => string.Equals(r.ScenarioName, s, StringComparison.OrdinalIgnoreCase)))
+            ?? allRecords.Select(r => r.ScenarioName).First();
+
+    var records = allRecords
+        .Where(r => string.Equals(r.ScenarioName, selectedScenario, StringComparison.OrdinalIgnoreCase))
+        .Where(r => string.IsNullOrWhiteSpace(selection.VariantName) ||
+                    string.Equals(r.VariantName, selection.VariantName, StringComparison.OrdinalIgnoreCase))
+        .ToList();
+
+    if (records.Count == 0)
+    {
+        Console.WriteLine($"No file-level records found for scenario '{selectedScenario}'.");
+        if (!string.IsNullOrWhiteSpace(selection.VariantName))
+        {
+            Console.WriteLine($"Variant filter: '{selection.VariantName}'.");
+        }
+
+        return;
+    }
+
+    var variants = records
+        .Select(r => r.VariantName)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(v => v, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+
+    Console.WriteLine("Mode:     analysis");
+    Console.WriteLine($"Source:   {Path.GetFullPath(config.SourcePath)}");
+    Console.WriteLine($"Scenario: {selectedScenario}");
+    Console.WriteLine($"Records:  {records.Count}");
+    Console.WriteLine($"Variants: {string.Join(", ", variants)}");
+    Console.WriteLine($"Input:    {fileResultsPath}");
+    Console.WriteLine();
+
+    Console.WriteLine("Overall by variant");
+    Console.WriteLine("| Variant | Files | Avg MiB/s | P50 MiB/s | P95 MiB/s |");
+    Console.WriteLine("|---|---:|---:|---:|---:|");
+
+    foreach (var variant in variants)
+    {
+        var speeds = records
+            .Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase))
+            .Select(r => r.ThroughputMiBPerSecond)
+            .Where(v => v is not null)
+            .Select(v => v!.Value)
+            .OrderBy(v => v)
+            .ToList();
+
+        if (speeds.Count == 0)
+        {
+            continue;
+        }
+
+        Console.WriteLine(
+            $"| {EscapeTable(variant)} | {speeds.Count} | {speeds.Average():0.00} | {Percentile(speeds, 0.50):0.00} | {Percentile(speeds, 0.95):0.00} |");
+    }
+
+    Console.WriteLine();
+    Console.WriteLine("Size buckets (Avg MiB/s by variant)");
+    Console.WriteLine("| Size Bucket | Variant | Files | Avg MiB/s | P50 MiB/s | P95 MiB/s |");
+    Console.WriteLine("|---|---|---:|---:|---:|---:|");
+
+    foreach (var bucket in FileSizeBuckets.All)
+    {
+        var bucketRecords = records.Where(r => bucket.Contains(r.FileSizeBytes)).ToList();
+        if (bucketRecords.Count == 0)
+        {
+            continue;
+        }
+
+        foreach (var variant in variants)
+        {
+            var speeds = bucketRecords
+                .Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase))
+                .Select(r => r.ThroughputMiBPerSecond)
+                .Where(v => v is not null)
+                .Select(v => v!.Value)
+                .OrderBy(v => v)
+                .ToList();
+
+            if (speeds.Count == 0)
+            {
+                continue;
+            }
+
+            Console.WriteLine(
+                $"| {bucket.Label} | {EscapeTable(variant)} | {speeds.Count} | {speeds.Average():0.00} | {Percentile(speeds, 0.50):0.00} | {Percentile(speeds, 0.95):0.00} |");
+        }
+    }
+}
+
 static async Task RunBenchmarkModeAsync(
     string workingDirectory,
     BenchmarkConfig config,
@@ -96,7 +218,7 @@ static async Task RunBenchmarkModeAsync(
 
     Directory.CreateDirectory(artifactDirectory);
 
-    var historicalRuns = await ReadExistingRunsAsync(resultsPath, ct);
+    var historicalRuns = await ReadExistingRunsAsync<BenchmarkRunRecord>(resultsPath, ct);
     await UpdateTaskListAsync(taskListPath, config, historicalRuns, ct);
 
     var benchmarkSelection = SelectBenchmarkSelection(config, historicalRuns, selection);
@@ -377,9 +499,9 @@ static bool IsSuccessfulRunForScenarioVariant(BenchmarkRunRecord run, string sce
     run.FailedFiles == 0 &&
     run.ExceptionType is null;
 
-static async Task<List<BenchmarkRunRecord>> ReadExistingRunsAsync(string resultsPath, CancellationToken ct)
+static async Task<List<T>> ReadExistingRunsAsync<T>(string resultsPath, CancellationToken ct)
 {
-    var runs = new List<BenchmarkRunRecord>();
+    var runs = new List<T>();
     if (!File.Exists(resultsPath))
     {
         return runs;
@@ -394,7 +516,7 @@ static async Task<List<BenchmarkRunRecord>> ReadExistingRunsAsync(string results
 
         try
         {
-            var run = JsonSerializer.Deserialize<BenchmarkRunRecord>(line, JsonOptions.Default);
+            var run = JsonSerializer.Deserialize<T>(line, JsonOptions.Default);
             if (run is not null)
             {
                 runs.Add(run);
@@ -407,6 +529,31 @@ static async Task<List<BenchmarkRunRecord>> ReadExistingRunsAsync(string results
     }
 
     return runs;
+}
+
+static double Percentile(IReadOnlyList<double> sortedValuesAscending, double percentile)
+{
+    if (sortedValuesAscending.Count == 0)
+    {
+        return 0;
+    }
+
+    if (sortedValuesAscending.Count == 1)
+    {
+        return sortedValuesAscending[0];
+    }
+
+    var clamped = Math.Clamp(percentile, 0d, 1d);
+    var index = (sortedValuesAscending.Count - 1) * clamped;
+    var lower = (int)Math.Floor(index);
+    var upper = (int)Math.Ceiling(index);
+    if (lower == upper)
+    {
+        return sortedValuesAscending[lower];
+    }
+
+    var weight = index - lower;
+    return sortedValuesAscending[lower] + ((sortedValuesAscending[upper] - sortedValuesAscending[lower]) * weight);
 }
 
 static void ValidatePaths(string sourcePath, string destinationPath)
@@ -670,3 +817,22 @@ internal sealed record BenchmarkSelection(
     int TotalRunCount,
     DateTime LastRunUtc,
     int NextRunIndex);
+
+internal sealed record FileSizeBucket(long MinBytesInclusive, long MaxBytesInclusive, string Label)
+{
+    public bool Contains(long value) => value >= MinBytesInclusive && value <= MaxBytesInclusive;
+}
+
+internal static class FileSizeBuckets
+{
+    public static IReadOnlyList<FileSizeBucket> All { get; } =
+    [
+        new FileSizeBucket(0, 64 * 1024, "0-64 KiB"),
+        new FileSizeBucket(64 * 1024 + 1, 512 * 1024, "64-512 KiB"),
+        new FileSizeBucket(512 * 1024 + 1, 4 * 1024 * 1024, "512 KiB-4 MiB"),
+        new FileSizeBucket(4 * 1024 * 1024 + 1, 32 * 1024 * 1024, "4-32 MiB"),
+        new FileSizeBucket(32 * 1024 * 1024 + 1, 256 * 1024 * 1024, "32-256 MiB"),
+        new FileSizeBucket(256 * 1024 * 1024 + 1, 2L * 1024 * 1024 * 1024, "256 MiB-2 GiB"),
+        new FileSizeBucket(2L * 1024 * 1024 * 1024 + 1, long.MaxValue, ">2 GiB"),
+    ];
+}

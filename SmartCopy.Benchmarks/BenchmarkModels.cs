@@ -10,6 +10,7 @@ internal enum BenchmarkRunMode
 {
     Benchmark,
     DatasetPreparation,
+    Analysis,
 }
 
 internal sealed class BenchmarkCliOptions
@@ -68,7 +69,13 @@ internal sealed class BenchmarkCliOptions
             return BenchmarkRunMode.DatasetPreparation;
         }
 
-        throw new InvalidOperationException($"Unknown benchmark mode '{value}'. Expected 'benchmark' or 'dataset-prep'.");
+        if (string.Equals(value, "analysis", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(value, "analyze", StringComparison.OrdinalIgnoreCase))
+        {
+            return BenchmarkRunMode.Analysis;
+        }
+
+        throw new InvalidOperationException($"Unknown benchmark mode '{value}'. Expected 'benchmark', 'dataset-prep', or 'analysis'.");
     }
 }
 
