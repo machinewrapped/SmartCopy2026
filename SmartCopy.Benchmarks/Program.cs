@@ -12,6 +12,7 @@ using SmartCopy.Core.Selection;
 
 const string ConfigFileName = "benchmark-scenarios.json";
 const string ResultsFileName = "benchmark-results.ndjson";
+const string FileResultsFileName = "benchmark-file-results.ndjson";
 const string TaskListFileName = "benchmark-tasklist.md";
 const string JournalDirectoryName = "benchmark-journals";
 
@@ -89,6 +90,7 @@ static async Task RunBenchmarkModeAsync(
 {
     var artifactDirectory = ResolveArtifactDirectory(workingDirectory, config.SourcePath, config.ArtifactPath);
     var resultsPath = Path.Combine(artifactDirectory, ResultsFileName);
+    var fileResultsPath = Path.Combine(artifactDirectory, FileResultsFileName);
     var taskListPath = Path.Combine(artifactDirectory, TaskListFileName);
     var journalDirectory = Path.Combine(artifactDirectory, JournalDirectoryName);
 
@@ -214,6 +216,7 @@ static async Task RunBenchmarkModeAsync(
             nextRunIndex);
 
         await AppendJsonLineAsync(resultsPath, record, ct);
+        await AppendFileCopyRecordsAsync(fileResultsPath, record, state.Results, ct);
 
         historicalRuns.Add(record);
         await UpdateTaskListAsync(taskListPath, config, historicalRuns, ct);
@@ -221,6 +224,7 @@ static async Task RunBenchmarkModeAsync(
         Console.WriteLine($"Completed in {record.ExecuteDuration}.");
         Console.WriteLine($"Copied files: {record.CopiedFiles}, failed: {record.FailedFiles}, skipped: {record.SkippedFiles}.");
         Console.WriteLine($"Results: {resultsPath}");
+        Console.WriteLine($"File results: {fileResultsPath}");
         Console.WriteLine($"Journal: {state.JournalPath}");
     }
     catch (Exception ex)
@@ -238,6 +242,7 @@ static async Task RunBenchmarkModeAsync(
             ex);
 
         await AppendJsonLineAsync(resultsPath, record, ct);
+        await AppendFileCopyRecordsAsync(fileResultsPath, record, state.Results, ct);
 
         historicalRuns.Add(record);
         await UpdateTaskListAsync(taskListPath, config, historicalRuns, ct);
@@ -295,11 +300,72 @@ static BenchmarkSelection? SelectBenchmarkSelection(
             .ToList();
     }
 
+    if (string.IsNullOrWhiteSpace(selection.ScenarioName))
+    {
+        var scenarioOrder = BuildScenarioOrder(config, candidates.Select(c => c.Scenario.Name));
+        foreach (var scenarioName in scenarioOrder)
+        {
+            var stageCandidates = candidates
+                .Where(c => string.Equals(c.Scenario.Name, scenarioName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (stageCandidates.Count == 0)
+            {
+                continue;
+            }
+
+            var hasPendingRuns = stageCandidates.Any(c => c.SuccessfulRunCount < c.Variant.DesiredRunCount);
+            if (hasPendingRuns)
+            {
+                candidates = stageCandidates;
+                break;
+            }
+        }
+    }
+
+    var scenarioPriority = BuildScenarioPriority(config, candidates.Select(c => c.Scenario.Name));
+
     return candidates
         .OrderBy(c => c.SuccessfulRunCount >= c.Variant.DesiredRunCount ? 1 : 0)
+        .ThenBy(c => scenarioPriority[c.Scenario.Name])
         .ThenBy(c => c.SuccessfulRunCount)
         .ThenBy(c => c.LastRunUtc)
         .FirstOrDefault();
+}
+
+static Dictionary<string, int> BuildScenarioPriority(BenchmarkConfig config, IEnumerable<string> scenarioNames)
+{
+    var ordered = BuildScenarioOrder(config, scenarioNames);
+    var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    for (var i = 0; i < ordered.Count; i++)
+    {
+        map[ordered[i]] = i;
+    }
+
+    return map;
+}
+
+static List<string> BuildScenarioOrder(BenchmarkConfig config, IEnumerable<string> scenarioNames)
+{
+    var names = scenarioNames
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToList();
+
+    var configuredOrder = config.ScenarioExecutionOrder.Count > 0
+        ? config.ScenarioExecutionOrder
+        : ["SSDtoSSD", "SameDriveTest", "SSDtoHDD", "SSDtoUSBFlash"];
+
+    var ordered = new List<string>();
+    foreach (var configured in configuredOrder)
+    {
+        var match = names.FirstOrDefault(n => string.Equals(n, configured, StringComparison.OrdinalIgnoreCase));
+        if (match is not null)
+        {
+            ordered.Add(match);
+        }
+    }
+
+    ordered.AddRange(names.Where(n => !ordered.Contains(n, StringComparer.OrdinalIgnoreCase)).OrderBy(n => n, StringComparer.OrdinalIgnoreCase));
+    return ordered;
 }
 
 static bool IsRunForScenarioVariant(BenchmarkRunRecord run, string scenarioName, string variantName) =>
@@ -431,6 +497,51 @@ static async Task AppendJsonLineAsync<T>(string path, T value, CancellationToken
     await File.AppendAllTextAsync(path, line + Environment.NewLine, Encoding.UTF8, ct);
 }
 
+static async Task AppendFileCopyRecordsAsync(
+    string path,
+    BenchmarkRunRecord run,
+    IReadOnlyList<TransformResult> results,
+    CancellationToken ct)
+{
+    var copiedResults = results.Where(r =>
+        r.IsSuccess &&
+        r.SourceNodeResult == SourceResult.Copied &&
+        r.NumberOfFilesAffected > 0 &&
+        r.ExecutionDuration is TimeSpan duration &&
+        duration > TimeSpan.Zero);
+
+    await using var stream = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.Read);
+    await using var writer = new StreamWriter(stream, Encoding.UTF8);
+
+    foreach (var result in copiedResults)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        var duration = result.ExecutionDuration!.Value;
+        var sizeBytes = result.InputBytes;
+        double? throughputMiBPerSecond = sizeBytes > 0 && duration.TotalSeconds > 0
+            ? (sizeBytes / 1048576d) / duration.TotalSeconds
+            : null;
+
+        var fileRecord = new BenchmarkFileCopyRecord
+        {
+            RunStartedUtc = run.RunStartedUtc,
+            RunIndex = run.RunIndex,
+            ScenarioName = run.ScenarioName,
+            VariantName = run.VariantName,
+            SourceRelativePath = result.SourceNode.CanonicalRelativePath ?? string.Empty,
+            DestinationPath = result.DestinationPath ?? string.Empty,
+            FileSizeBytes = sizeBytes,
+            CopyDurationMilliseconds = duration.TotalMilliseconds,
+            ThroughputMiBPerSecond = throughputMiBPerSecond,
+        };
+
+        await writer.WriteLineAsync(JsonSerializer.Serialize(fileRecord, JsonOptions.Default));
+    }
+
+    await writer.FlushAsync(ct);
+}
+
 static async Task UpdateTaskListAsync(
     string taskListPath,
     BenchmarkConfig config,
@@ -441,6 +552,14 @@ static async Task UpdateTaskListAsync(
     builder.AppendLine("# Benchmark Task List");
     builder.AppendLine();
     builder.AppendLine($"Source: `{Path.GetFullPath(config.SourcePath)}`");
+
+    var scenarioOrder = BuildScenarioOrder(config, config.Scenarios.Where(s => s.Enabled).Select(s => s.Name));
+    if (scenarioOrder.Count > 0)
+    {
+        builder.AppendLine();
+        builder.AppendLine($"Scenario execution order: `{string.Join(" -> ", scenarioOrder)}`");
+    }
+
     builder.AppendLine();
     builder.AppendLine("| Scenario | Variant | Destination | Target runs | Successful runs | Last run (UTC) | Last status |");
     builder.AppendLine("|---|---|---|---:|---:|---|---|");

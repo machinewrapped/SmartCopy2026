@@ -78,6 +78,7 @@ internal sealed class BenchmarkConfig
     public string? ArtifactPath { get; set; }
     public bool IncludeHidden { get; set; }
     public List<BenchmarkScenario> Scenarios { get; set; } = [];
+    public List<string> ScenarioExecutionOrder { get; set; } = [];
     public List<BenchmarkVariant> Variants { get; set; } = [];
     public DatasetPreparationConfig? DatasetPreparation { get; set; }
 
@@ -90,6 +91,13 @@ internal sealed class BenchmarkConfig
                 new BenchmarkScenario { Name = "SSDtoSSD", DestinationPath = @"D:\TestData\SSDtoSSD" },
                 new BenchmarkScenario { Name = "SSDtoHDD", DestinationPath = @"L:\TestData\SSDtoHDD" },
                 new BenchmarkScenario { Name = "SSDtoUSBFlash", DestinationPath = @"T:\TestData\SSDtoUSBFlash" },
+            ],
+            ScenarioExecutionOrder =
+            [
+                "SSDtoSSD",
+                "SameDriveTest",
+                "SSDtoHDD",
+                "SSDtoUSBFlash",
             ],
             Variants =
             [
@@ -190,6 +198,12 @@ internal sealed class BenchmarkConfig
         {
             scenario.Normalize();
         }
+
+        ScenarioExecutionOrder = ScenarioExecutionOrder
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         if (Variants.Count == 0)
         {
@@ -403,6 +417,19 @@ internal sealed class BenchmarkRunRecord
             ExceptionMessage = ex?.Message,
         };
     }
+}
+
+internal sealed class BenchmarkFileCopyRecord
+{
+    public required DateTime RunStartedUtc { get; init; }
+    public required int RunIndex { get; init; }
+    public required string ScenarioName { get; init; }
+    public required string VariantName { get; init; }
+    public required string SourceRelativePath { get; init; }
+    public required string DestinationPath { get; init; }
+    public required long FileSizeBytes { get; init; }
+    public required double CopyDurationMilliseconds { get; init; }
+    public double? ThroughputMiBPerSecond { get; init; }
 }
 
 internal sealed class DatasetPreparationConfig

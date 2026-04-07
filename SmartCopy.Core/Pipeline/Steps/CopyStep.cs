@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
+using System.Diagnostics;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Progress;
@@ -172,6 +173,7 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
             }
 
             string? copyError = null;
+            var fileStopwatch = Stopwatch.StartNew();
             try
             {
                 IProgress<long>? writeProgress = null;
@@ -196,7 +198,8 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
                     IsSuccess: false,
                     SourceNode: node,
                     SourceNodeResult: SourceResult.Skipped,
-                    ErrorMessage: copyError);
+                    ErrorMessage: copyError,
+                    ExecutionDuration: fileStopwatch.Elapsed);
                 continue;
             }
 
@@ -208,7 +211,8 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
                 DestinationResult: destinationExists ? DestinationResult.Overwritten : DestinationResult.Created,
                 NumberOfFilesAffected: 1,
                 InputBytes: node.Size,
-                OutputBytes: node.Size);
+                OutputBytes: node.Size,
+                ExecutionDuration: fileStopwatch.Elapsed);
         }
     }
 }

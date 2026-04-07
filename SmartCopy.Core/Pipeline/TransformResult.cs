@@ -19,4 +19,5 @@ public readonly record struct TransformResult(
     int NumberOfFilesSkipped                    = 0,
     int NumberOfFoldersSkipped                  = 0,
     string? ErrorMessage                        = null,
-    string? ActionSummary                       = null);
+    string? ActionSummary                       = null,
+    TimeSpan? ExecutionDuration                 = null);
