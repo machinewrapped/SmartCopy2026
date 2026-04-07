@@ -6,8 +6,12 @@
              x:DataType="vm:MirrorFilterEditorViewModel">
     <StackPanel Spacing="10">
 
-        <!-- Comparison path -->
-        <StackPanel Spacing="4">
+        <!-- Automatic path toggle -->
+        <CheckBox Content="Use pipeline destination automatically"
+                  IsChecked="{Binding UseAutomaticPath}" />
+
+        <!-- Comparison path (disabled when automatic) -->
+        <StackPanel Spacing="4" IsEnabled="{Binding IsManualPath}">
             <TextBlock Text="Comparison path" FontSize="12" Opacity="0.7" />
             <views:PathPickerControl DataContext="{Binding ComparisonPathPicker}"
                                      BrowseDialogTitle="Select comparison folder"

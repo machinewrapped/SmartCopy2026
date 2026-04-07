@@ -43,7 +43,7 @@ public partial class SizeRangeFilterEditorViewModel : FilterEditorViewModelBase
     };
 
     public override IFilter BuildFilter()
-        => new SizeRangeFilter(ToBytes(MinValue, MinUnit), ToBytes(MaxValue, MaxUnit), Mode);
+        => new SizeRangeFilter(ToBytes(MinValue, MinUnit), ToBytes(MaxValue, MaxUnit), Mode, IsEnabled);
 
     public override void LoadFrom(IFilter filter)
     {
@@ -53,6 +53,7 @@ public partial class SizeRangeFilterEditorViewModel : FilterEditorViewModelBase
         }
 
         Mode = sr.Mode;
+        IsEnabled = sr.IsEnabled;
         (MinValue, MinUnit) = BackCalculate(sr.MinBytes);
         (MaxValue, MaxUnit) = BackCalculate(sr.MaxBytes);
         FilterName = sr.CustomName ?? string.Empty;

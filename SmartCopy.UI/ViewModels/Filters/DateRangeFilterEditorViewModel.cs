@@ -40,7 +40,7 @@ public partial class DateRangeFilterEditorViewModel : FilterEditorViewModelBase
     public override bool IsValid => MinDate.HasValue || MaxDate.HasValue;
 
     public override IFilter BuildFilter()
-        => new DateRangeFilter(Field, MinDate, MaxDate, Mode);
+        => new DateRangeFilter(Field, MinDate, MaxDate, Mode, IsEnabled);
 
     public override void LoadFrom(IFilter filter)
     {
@@ -50,6 +50,7 @@ public partial class DateRangeFilterEditorViewModel : FilterEditorViewModelBase
         }
 
         Mode = dr.Mode;
+        IsEnabled = dr.IsEnabled;
         Field = dr.Field;
         MinDate = dr.Min;
         MaxDate = dr.Max;
