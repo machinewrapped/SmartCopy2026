@@ -112,13 +112,13 @@ internal sealed class BenchmarkConfig
                 {
                     Name = "BaselineAuto",
                     Notes = "Current heuristic defaults.",
-                    DesiredRunCount = 3,
+                    DesiredRunCount = 2,
                 },
                 new BenchmarkVariant
                 {
                     Name = "CopyToAsync512KiB",
                     Notes = "Always uses Stream.CopyToAsync with a 512 KiB buffer.",
-                    DesiredRunCount = 1,
+                    DesiredRunCount = 2,
                     ProviderCopyBufferSizeBytes = 512 * 1024,
                     ProviderWriteMode = LocalFileSystemWriteMode.CopyToAsync,
                 },
@@ -126,7 +126,7 @@ internal sealed class BenchmarkConfig
                 {
                     Name = "ManualLoop512KiBArrayPool",
                     Notes = "Manual loop with a 512 KiB buffer and pooled buffers.",
-                    DesiredRunCount = 1,
+                    DesiredRunCount = 2,
                     ProviderCopyBufferSizeBytes = 512 * 1024,
                     ProviderWriteMode = LocalFileSystemWriteMode.ManualLoop,
                     ProviderUseArrayPoolForManualLoop = true,
@@ -135,7 +135,7 @@ internal sealed class BenchmarkConfig
                 {
                     Name = "ManualLoop1MiBPreallocate",
                     Notes = "Manual loop with a 1 MiB buffer and destination preallocation.",
-                    DesiredRunCount = 1,
+                    DesiredRunCount = 2,
                     ProviderCopyBufferSizeBytes = 1024 * 1024,
                     ProviderWriteMode = LocalFileSystemWriteMode.ManualLoop,
                     ProviderUseArrayPoolForManualLoop = true,

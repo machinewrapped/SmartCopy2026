@@ -13,6 +13,7 @@ using SmartCopy.Core.Selection;
 const string ConfigFileName = "benchmark-scenarios.json";
 const string ResultsFileName = "benchmark-results.ndjson";
 const string FileResultsFileName = "benchmark-file-results.ndjson";
+const string AnalysisFileName = "benchmark-analysis.md";
 const string TaskListFileName = "benchmark-tasklist.md";
 const string JournalDirectoryName = "benchmark-journals";
 
@@ -96,17 +97,35 @@ static async Task RunAnalysisModeAsync(
 {
     var artifactDirectory = ResolveArtifactDirectory(workingDirectory, config.SourcePath, config.ArtifactPath);
     var fileResultsPath = Path.Combine(artifactDirectory, FileResultsFileName);
+    var analysisPath = Path.Combine(artifactDirectory, AnalysisFileName);
+    var reportBuilder = new StringBuilder();
+
+    void Report(string? line = null)
+    {
+        var text = line ?? string.Empty;
+        Console.WriteLine(text);
+        reportBuilder.AppendLine(text);
+    }
+
+    async Task FlushReportAsync()
+    {
+        Directory.CreateDirectory(artifactDirectory);
+        await File.WriteAllTextAsync(analysisPath, reportBuilder.ToString(), ct);
+    }
+
     if (!File.Exists(fileResultsPath))
     {
-        Console.WriteLine($"No file-level results found: {fileResultsPath}");
-        Console.WriteLine("Run benchmark mode first to produce benchmark-file-results.ndjson.");
+        Report($"No file-level results found: {fileResultsPath}");
+        Report("Run benchmark mode first to produce benchmark-file-results.ndjson.");
+        await FlushReportAsync();
         return;
     }
 
     var allRecords = await ReadExistingRunsAsync<BenchmarkFileCopyRecord>(fileResultsPath, ct);
     if (allRecords.Count == 0)
     {
-        Console.WriteLine($"No records available in {fileResultsPath}.");
+        Report($"No records available in {fileResultsPath}.");
+        await FlushReportAsync();
         return;
     }
 
@@ -124,12 +143,13 @@ static async Task RunAnalysisModeAsync(
 
     if (records.Count == 0)
     {
-        Console.WriteLine($"No file-level records found for scenario '{selectedScenario}'.");
+        Report($"No file-level records found for scenario '{selectedScenario}'.");
         if (!string.IsNullOrWhiteSpace(selection.VariantName))
         {
-            Console.WriteLine($"Variant filter: '{selection.VariantName}'.");
+            Report($"Variant filter: '{selection.VariantName}'.");
         }
 
+        await FlushReportAsync();
         return;
     }
 
@@ -139,17 +159,18 @@ static async Task RunAnalysisModeAsync(
         .OrderBy(v => v, StringComparer.OrdinalIgnoreCase)
         .ToList();
 
-    Console.WriteLine("Mode:     analysis");
-    Console.WriteLine($"Source:   {Path.GetFullPath(config.SourcePath)}");
-    Console.WriteLine($"Scenario: {selectedScenario}");
-    Console.WriteLine($"Records:  {records.Count}");
-    Console.WriteLine($"Variants: {string.Join(", ", variants)}");
-    Console.WriteLine($"Input:    {fileResultsPath}");
-    Console.WriteLine();
+    Report("## Analysis Summary");
+    Report($"- **Mode:** `analysis`");
+    Report($"- **Source:** `{Path.GetFullPath(config.SourcePath)}`");
+    Report($"- **Scenario:** `{selectedScenario}`");
+    Report($"- **Records:** `{records.Count}`");
+    Report($"- **Variants:** {string.Join(", ", variants.Select(v => $"`{v}`"))}");
+    Report($"- **Input:** `{fileResultsPath}`");
+    Report();
 
-    Console.WriteLine("Overall by variant");
-    Console.WriteLine("| Variant | Files | Avg MiB/s | P50 MiB/s | P95 MiB/s |");
-    Console.WriteLine("|---|---:|---:|---:|---:|");
+    Report("## Overall by variant");
+    Report("| Variant | Files | Avg MiB/s | P50 MiB/s | P95 MiB/s |");
+    Report("|---|---:|---:|---:|---:|");
 
     foreach (var variant in variants)
     {
@@ -166,14 +187,14 @@ static async Task RunAnalysisModeAsync(
             continue;
         }
 
-        Console.WriteLine(
+        Report(
             $"| {EscapeTable(variant)} | {speeds.Count} | {speeds.Average():0.00} | {Percentile(speeds, 0.50):0.00} | {Percentile(speeds, 0.95):0.00} |");
     }
 
-    Console.WriteLine();
-    Console.WriteLine("Size buckets (Avg MiB/s by variant)");
-    Console.WriteLine("| Size Bucket | Variant | Files | Avg MiB/s | P50 MiB/s | P95 MiB/s |");
-    Console.WriteLine("|---|---|---:|---:|---:|---:|");
+    Report();
+    Report("## Size buckets (Avg MiB/s by variant)");
+    Report("| Size Bucket | Variant | Files | Avg MiB/s | P50 MiB/s | P95 MiB/s |");
+    Report("|---|---|---:|---:|---:|---:|");
 
     foreach (var bucket in FileSizeBuckets.All)
     {
@@ -198,10 +219,13 @@ static async Task RunAnalysisModeAsync(
                 continue;
             }
 
-            Console.WriteLine(
+            Report(
                 $"| {bucket.Label} | {EscapeTable(variant)} | {speeds.Count} | {speeds.Average():0.00} | {Percentile(speeds, 0.50):0.00} | {Percentile(speeds, 0.95):0.00} |");
         }
     }
+
+    await FlushReportAsync();
+    Console.WriteLine($"Analysis: {analysisPath}");
 }
 
 static async Task RunBenchmarkModeAsync(
