@@ -73,7 +73,7 @@ public partial class MirrorFilterEditorViewModel : FilterEditorViewModelBase
     }
 
     public override IFilter BuildFilter()
-        => new MirrorFilter(ComparisonPath, CompareMode, Mode, isEnabled: true, UseAutomaticPath);
+        => new MirrorFilter(ComparisonPath, CompareMode, Mode, IsEnabled, UseAutomaticPath);
 
     public override void LoadFrom(IFilter filter)
     {
@@ -83,6 +83,7 @@ public partial class MirrorFilterEditorViewModel : FilterEditorViewModelBase
         }
 
         Mode = mf.Mode;
+        IsEnabled = mf.IsEnabled;
         ComparisonPath = mf.ComparisonPath;
         CompareMode = mf.CompareMode;
         UseAutomaticPath = mf.UseAutomaticPath;

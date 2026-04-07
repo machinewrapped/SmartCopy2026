@@ -18,6 +18,11 @@ public abstract partial class FilterEditorViewModelBase : ObservableObject
     [ObservableProperty]
     private bool _saveAsPreset;
 
+    /// <summary>
+    /// Whether the filter is enabled. Preserved from the original filter on edit; true for new filters.
+    /// </summary>
+    public bool IsEnabled { get; set; } = true;
+
     private bool _userHasEditedName;
 
     partial void OnFilterNameChanged(string value)

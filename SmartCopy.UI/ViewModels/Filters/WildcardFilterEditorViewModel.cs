@@ -14,7 +14,7 @@ public partial class WildcardFilterEditorViewModel : FilterEditorViewModelBase
 
     public override bool IsValid => !string.IsNullOrWhiteSpace(Pattern);
 
-    public override IFilter BuildFilter() => new WildcardFilter(Pattern, Mode);
+    public override IFilter BuildFilter() => new WildcardFilter(Pattern, Mode, IsEnabled);
 
     public override void LoadFrom(IFilter filter)
     {
@@ -24,6 +24,7 @@ public partial class WildcardFilterEditorViewModel : FilterEditorViewModelBase
         }
 
         Mode = wf.Mode;
+        IsEnabled = wf.IsEnabled;
         Pattern = wf.Pattern;
         FilterName = wf.CustomName ?? string.Empty;
     }

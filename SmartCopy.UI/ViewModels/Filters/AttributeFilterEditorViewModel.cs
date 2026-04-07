@@ -33,7 +33,7 @@ public partial class AttributeFilterEditorViewModel : FilterEditorViewModelBase
         return attrs;
     }
 
-    public override IFilter BuildFilter() => new AttributeFilter(BuildAttributes(), Mode);
+    public override IFilter BuildFilter() => new AttributeFilter(BuildAttributes(), Mode, IsEnabled);
 
     public override void LoadFrom(IFilter filter)
     {
@@ -43,6 +43,7 @@ public partial class AttributeFilterEditorViewModel : FilterEditorViewModelBase
         }
 
         Mode = af.Mode;
+        IsEnabled = af.IsEnabled;
         Hidden = (af.RequiredAttributes & FileAttributes.Hidden) != 0;
         ReadOnly = (af.RequiredAttributes & FileAttributes.ReadOnly) != 0;
         System = (af.RequiredAttributes & FileAttributes.System) != 0;
