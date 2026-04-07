@@ -21,6 +21,13 @@ public partial class MirrorFilterEditorViewModel : FilterEditorViewModelBase
     [NotifyPropertyChangedFor(nameof(CompareModeIsNameAndSize))]
     private MirrorCompareMode _compareMode = MirrorCompareMode.NameAndSize;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsValid))]
+    [NotifyPropertyChangedFor(nameof(IsManualPath))]
+    private bool _useAutomaticPath;
+
+    public bool IsManualPath => !UseAutomaticPath;
+
     public bool CompareModeIsNameOnly
     {
         get => CompareMode == MirrorCompareMode.NameOnly;
@@ -49,22 +56,24 @@ public partial class MirrorFilterEditorViewModel : FilterEditorViewModelBase
 
     partial void OnCompareModeChanged(MirrorCompareMode value) => AutoUpdateName();
 
-    public override bool IsValid => !string.IsNullOrWhiteSpace(ComparisonPath);
+    partial void OnUseAutomaticPathChanged(bool value) => AutoUpdateName();
+
+    public override bool IsValid => UseAutomaticPath || !string.IsNullOrWhiteSpace(ComparisonPath);
 
     /// <summary>
     /// Populates ComparisonPath from the pipeline destination, but only if the user
-    /// hasn't already typed a path.
+    /// hasn't already typed a path and automatic mode is not active.
     /// </summary>
     public void SetSuggestedPath(string path)
     {
-        if (string.IsNullOrEmpty(ComparisonPath))
+        if (!UseAutomaticPath && string.IsNullOrEmpty(ComparisonPath))
         {
             ComparisonPath = path;
         }
     }
 
     public override IFilter BuildFilter()
-        => new MirrorFilter(ComparisonPath, CompareMode, Mode);
+        => new MirrorFilter(ComparisonPath, CompareMode, Mode, isEnabled: true, UseAutomaticPath);
 
     public override void LoadFrom(IFilter filter)
     {
@@ -76,12 +85,15 @@ public partial class MirrorFilterEditorViewModel : FilterEditorViewModelBase
         Mode = mf.Mode;
         ComparisonPath = mf.ComparisonPath;
         CompareMode = mf.CompareMode;
+        UseAutomaticPath = mf.UseAutomaticPath;
         FilterName = mf.CustomName ?? string.Empty;
     }
 
     public override string GenerateName()
     {
         var prefix = Mode.ToString();
+        if (UseAutomaticPath)
+            return $"{prefix} mirrored (auto)";
         return string.IsNullOrEmpty(ComparisonPath)
             ? $"{prefix} mirrored files"
             : $"{prefix} already in {ComparisonPath}";

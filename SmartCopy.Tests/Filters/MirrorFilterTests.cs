@@ -297,4 +297,127 @@ public sealed class MirrorFilterTests
         var filter = new MirrorFilter(mirrorRoot, MirrorCompareMode.NameOnly, FilterMode.Exclude);
         Assert.True(await filter.MatchesAsync(song, new TestAppContext()));
     }
+
+    // -------------------------------------------------------------------------
+    // Automatic path mode
+    // ---
+
+    [Fact]
+    public async Task MatchesAsync_AutomaticPath_UsesInjectedPipelineDestinationPath()
+    {
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithSimulatedFile($"{SourceRoot}/song.mp3", size: 500)
+            .WithSimulatedFile($"{MirrorRoot}/song.mp3", size: 500));
+
+        var root = await provider.BuildDirectoryTree(SourceRoot);
+        var node = root.FindNodeByPathSegments(["song.mp3"]);
+        Assert.NotNull(node);
+
+        var filter = new MirrorFilter(string.Empty, MirrorCompareMode.NameOnly, FilterMode.Exclude, useAutomaticPath: true);
+        filter.PipelineDestinationPath = MirrorProviderPath;
+
+        Assert.True(await filter.MatchesAsync(node, TestAppContext.FromProvider(provider)));
+    }
+
+    [Fact]
+    public async Task MatchesAsync_AutomaticPath_ExcludeMode_ReturnsFalseWhenPipelineDestinationNotSet()
+    {
+        // Exclude mode + no path → false (neutral: nothing excluded)
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithSimulatedFile($"{SourceRoot}/song.mp3", size: 500));
+
+        var root = await provider.BuildDirectoryTree(SourceRoot);
+        var node = root.FindNodeByPathSegments(["song.mp3"]);
+        Assert.NotNull(node);
+
+        var filter = new MirrorFilter(string.Empty, MirrorCompareMode.NameOnly, FilterMode.Exclude, useAutomaticPath: true);
+
+        Assert.False(await filter.MatchesAsync(node, TestAppContext.FromProvider(provider)));
+    }
+
+    [Fact]
+    public async Task MatchesAsync_AutomaticPath_OnlyMode_ReturnsTrueWhenPipelineDestinationNotSet()
+    {
+        // Only mode + no path → true (neutral: nothing excluded)
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithSimulatedFile($"{SourceRoot}/song.mp3", size: 500));
+
+        var root = await provider.BuildDirectoryTree(SourceRoot);
+        var node = root.FindNodeByPathSegments(["song.mp3"]);
+        Assert.NotNull(node);
+
+        var filter = new MirrorFilter(string.Empty, MirrorCompareMode.NameOnly, FilterMode.Only, useAutomaticPath: true);
+
+        Assert.True(await filter.MatchesAsync(node, TestAppContext.FromProvider(provider)));
+    }
+
+    [Fact]
+    public async Task MatchesAsync_AutomaticPath_IgnoresComparisonPath()
+    {
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithSimulatedFile($"{SourceRoot}/song.mp3", size: 500)
+            .WithSimulatedFile($"{MirrorRoot}/song.mp3", size: 500));
+
+        var root = await provider.BuildDirectoryTree(SourceRoot);
+        var node = root.FindNodeByPathSegments(["song.mp3"]);
+        Assert.NotNull(node);
+
+        // ComparisonPath points to a non-existent location; PipelineDestinationPath points to the real mirror
+        var filter = new MirrorFilter("mem://nonexistent", MirrorCompareMode.NameOnly, FilterMode.Exclude, useAutomaticPath: true);
+        filter.PipelineDestinationPath = MirrorProviderPath;
+
+        Assert.True(await filter.MatchesAsync(node, TestAppContext.FromProvider(provider)));
+    }
+
+    [Fact]
+    public async Task MatchesAsync_AutomaticPath_NameAndSize_MatchesCorrectly()
+    {
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithSimulatedFile($"{SourceRoot}/song.mp3", size: 1000)
+            .WithSimulatedFile($"{MirrorRoot}/song.mp3", size: 1000));
+
+        var root = await provider.BuildDirectoryTree(SourceRoot);
+        var node = root.FindNodeByPathSegments(["song.mp3"]);
+        Assert.NotNull(node);
+
+        var filter = new MirrorFilter(string.Empty, MirrorCompareMode.NameAndSize, FilterMode.Exclude, useAutomaticPath: true);
+        filter.PipelineDestinationPath = MirrorProviderPath;
+
+        Assert.True(await filter.MatchesAsync(node, TestAppContext.FromProvider(provider)));
+    }
+
+    [Fact]
+    public void Config_SerializesUseAutomaticPath()
+    {
+        var filter = new MirrorFilter("mem://dest", MirrorCompareMode.NameOnly, FilterMode.Exclude, useAutomaticPath: true);
+        var config = filter.Config;
+
+        Assert.Equal("true", config.Parameters["useAutomaticPath"]?.GetValue<bool>().ToString().ToLower());
+    }
+
+    [Fact]
+    public void FilterFactory_RoundTrip_PreservesUseAutomaticPath()
+    {
+        var original = new MirrorFilter("mem://dest", MirrorCompareMode.NameAndSize, FilterMode.Exclude, useAutomaticPath: true);
+        var restored = FilterFactory.FromConfig(original.Config) as MirrorFilter;
+
+        Assert.NotNull(restored);
+        Assert.True(restored.UseAutomaticPath);
+        Assert.Equal("mem://dest", restored.ComparisonPath);
+        Assert.Equal(MirrorCompareMode.NameAndSize, restored.CompareMode);
+    }
+
+    [Fact]
+    public void FilterFactory_OldConfig_DefaultsUseAutomaticPathToFalse()
+    {
+        // Config without useAutomaticPath (old format) — must default to false
+        var original = new MirrorFilter("mem://dest", MirrorCompareMode.NameOnly, FilterMode.Only, useAutomaticPath: false);
+        var config = original.Config;
+        config.Parameters.Remove("useAutomaticPath");
+
+        var restored = FilterFactory.FromConfig(config) as MirrorFilter;
+
+        Assert.NotNull(restored);
+        Assert.False(restored.UseAutomaticPath);
+    }
 }
