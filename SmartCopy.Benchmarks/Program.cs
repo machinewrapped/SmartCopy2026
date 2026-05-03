@@ -130,20 +130,37 @@ static async Task RunAnalysisModeAsync(
     }
 
     var scenarioOrder = BuildScenarioOrder(config, config.Scenarios.Where(s => s.Enabled).Select(s => s.Name));
-    var selectedScenario = !string.IsNullOrWhiteSpace(selection.ScenarioName)
-        ? selection.ScenarioName.Trim()
-        : scenarioOrder.FirstOrDefault(s => allRecords.Any(r => string.Equals(r.ScenarioName, s, StringComparison.OrdinalIgnoreCase)))
-            ?? allRecords.Select(r => r.ScenarioName).First();
+    var scenariosToAnalyze = !string.IsNullOrWhiteSpace(selection.ScenarioName)
+        ? [selection.ScenarioName.Trim()]
+        : scenarioOrder;
 
-    var records = allRecords
-        .Where(r => string.Equals(r.ScenarioName, selectedScenario, StringComparison.OrdinalIgnoreCase))
+    if (scenariosToAnalyze.Count == 0)
+    {
+        scenariosToAnalyze = allRecords
+            .Select(r => r.ScenarioName)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    var scenarioSet = new HashSet<string>(scenariosToAnalyze, StringComparer.OrdinalIgnoreCase);
+    var filteredRecords = allRecords
+        .Where(r => scenarioSet.Contains(r.ScenarioName))
         .Where(r => string.IsNullOrWhiteSpace(selection.VariantName) ||
                     string.Equals(r.VariantName, selection.VariantName, StringComparison.OrdinalIgnoreCase))
         .ToList();
 
-    if (records.Count == 0)
+    if (filteredRecords.Count == 0)
     {
-        Report($"No file-level records found for scenario '{selectedScenario}'.");
+        if (!string.IsNullOrWhiteSpace(selection.ScenarioName))
+        {
+            Report($"No file-level records found for scenario '{selection.ScenarioName.Trim()}'.");
+        }
+        else
+        {
+            Report("No file-level records found for the selected scenarios.");
+        }
+
         if (!string.IsNullOrWhiteSpace(selection.VariantName))
         {
             Report($"Variant filter: '{selection.VariantName}'.");
@@ -153,7 +170,7 @@ static async Task RunAnalysisModeAsync(
         return;
     }
 
-    var variants = records
+    var allVariants = filteredRecords
         .Select(r => r.VariantName)
         .Distinct(StringComparer.OrdinalIgnoreCase)
         .OrderBy(v => v, StringComparer.OrdinalIgnoreCase)
@@ -162,51 +179,45 @@ static async Task RunAnalysisModeAsync(
     Report("## Analysis Summary");
     Report($"- **Mode:** `analysis`");
     Report($"- **Source:** `{Path.GetFullPath(config.SourcePath)}`");
-    Report($"- **Scenario:** `{selectedScenario}`");
-    Report($"- **Records:** `{records.Count}`");
-    Report($"- **Variants:** {string.Join(", ", variants.Select(v => $"`{v}`"))}");
+    Report($"- **Scenario filter:** `{(string.IsNullOrWhiteSpace(selection.ScenarioName) ? "all (configured order)" : selection.ScenarioName.Trim())}`");
+    Report($"- **Scenario count:** `{scenariosToAnalyze.Count}`");
+    Report($"- **Records:** `{filteredRecords.Count}`");
+    Report($"- **Variants:** {string.Join(", ", allVariants.Select(v => $"`{v}`"))}");
     Report($"- **Input:** `{fileResultsPath}`");
     Report();
 
-    Report("## Overall by variant");
-    Report("| Variant | Files | Avg MiB/s | P50 MiB/s | P95 MiB/s |");
-    Report("|---|---:|---:|---:|---:|");
-
-    foreach (var variant in variants)
+    foreach (var scenarioName in scenariosToAnalyze)
     {
-        var speeds = records
-            .Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase))
-            .Select(r => r.ThroughputMiBPerSecond)
-            .Where(v => v is not null)
-            .Select(v => v!.Value)
-            .OrderBy(v => v)
+        var records = filteredRecords
+            .Where(r => string.Equals(r.ScenarioName, scenarioName, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        if (speeds.Count == 0)
+        Report($"## Scenario: `{scenarioName}`");
+
+        if (records.Count == 0)
         {
+            Report("No records for this scenario.");
+            Report();
             continue;
         }
 
-        Report(
-            $"| {EscapeTable(variant)} | {speeds.Count} | {speeds.Average():0.00} | {Percentile(speeds, 0.50):0.00} | {Percentile(speeds, 0.95):0.00} |");
-    }
+        var variants = records
+            .Select(r => r.VariantName)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(v => v, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
-    Report();
-    Report("## Size buckets (Avg MiB/s by variant)");
-    Report("| Size Bucket | Variant | Files | Avg MiB/s | P50 MiB/s | P95 MiB/s |");
-    Report("|---|---|---:|---:|---:|---:|");
+        Report($"- **Records:** `{records.Count}`");
+        Report($"- **Variants:** {string.Join(", ", variants.Select(v => $"`{v}`"))}");
+        Report();
 
-    foreach (var bucket in FileSizeBuckets.All)
-    {
-        var bucketRecords = records.Where(r => bucket.Contains(r.FileSizeBytes)).ToList();
-        if (bucketRecords.Count == 0)
-        {
-            continue;
-        }
+        Report("### Overall by variant");
+        Report("| Variant | Files | Avg MiB/s | P50 MiB/s | P95 MiB/s |");
+        Report("|---|---:|---:|---:|---:|");
 
         foreach (var variant in variants)
         {
-            var speeds = bucketRecords
+            var speeds = records
                 .Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase))
                 .Select(r => r.ThroughputMiBPerSecond)
                 .Where(v => v is not null)
@@ -220,8 +231,43 @@ static async Task RunAnalysisModeAsync(
             }
 
             Report(
-                $"| {bucket.Label} | {EscapeTable(variant)} | {speeds.Count} | {speeds.Average():0.00} | {Percentile(speeds, 0.50):0.00} | {Percentile(speeds, 0.95):0.00} |");
+                $"| {EscapeTable(variant)} | {speeds.Count} | {speeds.Average():0.00} | {Percentile(speeds, 0.50):0.00} | {Percentile(speeds, 0.95):0.00} |");
         }
+
+        Report();
+        Report("### Size buckets (Avg MiB/s by variant)");
+        Report("| Size Bucket | Variant | Files | Avg MiB/s | P50 MiB/s | P95 MiB/s |");
+        Report("|---|---|---:|---:|---:|---:|");
+
+        foreach (var bucket in FileSizeBuckets.All)
+        {
+            var bucketRecords = records.Where(r => bucket.Contains(r.FileSizeBytes)).ToList();
+            if (bucketRecords.Count == 0)
+            {
+                continue;
+            }
+
+            foreach (var variant in variants)
+            {
+                var speeds = bucketRecords
+                    .Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase))
+                    .Select(r => r.ThroughputMiBPerSecond)
+                    .Where(v => v is not null)
+                    .Select(v => v!.Value)
+                    .OrderBy(v => v)
+                    .ToList();
+
+                if (speeds.Count == 0)
+                {
+                    continue;
+                }
+
+                Report(
+                    $"| {bucket.Label} | {EscapeTable(variant)} | {speeds.Count} | {speeds.Average():0.00} | {Percentile(speeds, 0.50):0.00} | {Percentile(speeds, 0.95):0.00} |");
+            }
+        }
+
+        Report();
     }
 
     await FlushReportAsync();
