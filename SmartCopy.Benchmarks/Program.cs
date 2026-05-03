@@ -268,6 +268,67 @@ static async Task RunAnalysisModeAsync(
         }
 
         Report();
+        Report("### Size Bucket Breakdown");
+        Report("| Size Bucket | Files | Total Bytes | % Bytes | Avg MiB/s | Est. Wall Time | % Wall Time |");
+        Report("|---|---:|---:|---:|---:|---:|---:|");
+
+        var uniqueFiles = records
+            .GroupBy(r => r.SourceRelativePath)
+            .Select(g => (g.Key, g.First().FileSizeBytes))
+            .ToList();
+
+        var totalBytesAll = (double)uniqueFiles.Sum(f => f.FileSizeBytes);
+
+        var bucketBreakdowns = new List<(FileSizeBucket Bucket, int FileCount, long Bytes, double AvgThroughput)>();
+
+        foreach (var bucket in FileSizeBuckets.All)
+        {
+            var bucketUniqueFiles = uniqueFiles
+                .Where(f => bucket.Contains(f.FileSizeBytes))
+                .ToList();
+
+            if (bucketUniqueFiles.Count == 0)
+            {
+                continue;
+            }
+
+            var bytesInBucket = bucketUniqueFiles.Sum(f => f.FileSizeBytes);
+
+            var bucketThroughputs = records
+                .Where(r => bucket.Contains(r.FileSizeBytes))
+                .Select(r => r.ThroughputMiBPerSecond)
+                .Where(v => v is not null)
+                .Select(v => v!.Value)
+                .ToList();
+
+            var avgThroughput = bucketThroughputs.Count > 0 ? bucketThroughputs.Average() : 0.0;
+
+            bucketBreakdowns.Add((bucket, bucketUniqueFiles.Count, bytesInBucket, avgThroughput));
+        }
+
+        var totalEstimatedWallSeconds = bucketBreakdowns
+            .Where(b => b.AvgThroughput > 0.0)
+            .Sum(b => b.Bytes / (b.AvgThroughput * 1024.0 * 1024.0));
+
+        foreach (var (bucket, fileCount, bytesInBucket, avgThroughput) in bucketBreakdowns)
+        {
+            var pctBytes = totalBytesAll > 0 ? bytesInBucket / totalBytesAll * 100.0 : 0.0;
+            var bytesStr = FormatBytesHuman(bytesInBucket);
+            var estWallSeconds = avgThroughput > 0.0
+                ? bytesInBucket / (avgThroughput * 1024.0 * 1024.0)
+                : double.NaN;
+            var pctWall = totalEstimatedWallSeconds > 0.0
+                ? estWallSeconds / totalEstimatedWallSeconds * 100.0
+                : 0.0;
+            var wallStr = double.IsNaN(estWallSeconds) || double.IsInfinity(estWallSeconds)
+                ? "—"
+                : FormatDurationHuman(estWallSeconds);
+
+            Report(
+                $"| {bucket.Label} | {fileCount} | {bytesStr} | {pctBytes:0.0}% | {avgThroughput:0.00} | {wallStr} | {(double.IsNaN(estWallSeconds) ? "—" : $"{pctWall:0.0}%")} |");
+        }
+
+        Report();
     }
 
     await FlushReportAsync();
@@ -842,6 +903,16 @@ static string FormatDuration(TimeSpan duration)
     if (duration.TotalHours >= 1) return $"{(int)duration.TotalHours}h {duration.Minutes}m";
     if (duration.TotalMinutes >= 1) return $"{(int)duration.TotalMinutes}m {duration.Seconds}s";
     return $"{(int)duration.TotalSeconds}s";
+}
+
+static string FormatBytesHuman(long bytes) => FormatSize(bytes);
+
+static string FormatDurationHuman(double totalSeconds)
+{
+    if (totalSeconds < 1.0) return $"{totalSeconds * 1000.0:0} ms";
+    if (totalSeconds < 60.0) return $"{totalSeconds:0.0} sec";
+    if (totalSeconds < 3600.0) return $"{(int)(totalSeconds / 60.0)}m {(int)(totalSeconds % 60.0)}s";
+    return $"{(int)(totalSeconds / 3600.0)}h {((int)(totalSeconds % 3600.0) / 60)}m";
 }
 
 internal sealed class ThrottledConsoleProgress<T> : IProgress<T>, IDisposable

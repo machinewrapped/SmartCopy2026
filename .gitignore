@@ -68,3 +68,4 @@ dataset-prep-summary-*.json
 .codex
 benchmark-analysis.md
 benchmark-file-results.ndjson
+/.obsidian
