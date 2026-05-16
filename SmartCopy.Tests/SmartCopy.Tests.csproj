@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\SmartCopy.Benchmarks\SmartCopy.Benchmarks.csproj" />
     <ProjectReference Include="..\SmartCopy.Core\SmartCopy.Core.csproj" />
     <ProjectReference Include="..\SmartCopy.UI\SmartCopy.UI.csproj" />
   </ItemGroup>

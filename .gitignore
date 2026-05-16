@@ -69,3 +69,4 @@ dataset-prep-summary-*.json
 benchmark-analysis.md
 benchmark-file-results.ndjson
 /.obsidian
+*.lscache

@@ -11,6 +11,7 @@ internal enum BenchmarkRunMode
     Benchmark,
     DatasetPreparation,
     Analysis,
+    SizeScaling,
 }
 
 internal sealed class BenchmarkCliOptions
@@ -75,7 +76,13 @@ internal sealed class BenchmarkCliOptions
             return BenchmarkRunMode.Analysis;
         }
 
-        throw new InvalidOperationException($"Unknown benchmark mode '{value}'. Expected 'benchmark', 'dataset-prep', or 'analysis'.");
+        if (string.Equals(value, "size-scaling", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(value, "scaling", StringComparison.OrdinalIgnoreCase))
+        {
+            return BenchmarkRunMode.SizeScaling;
+        }
+
+        throw new InvalidOperationException($"Unknown benchmark mode '{value}'. Expected 'benchmark', 'dataset-prep', 'analysis', or 'size-scaling'.");
     }
 }
 
@@ -329,6 +336,7 @@ internal sealed class BenchmarkState
 
 internal sealed class BenchmarkRunRecord
 {
+    public string RunStatus { get; init; } = BenchmarkRunStatus.Completed;
     public required string ScenarioName { get; init; }
     public required string VariantName { get; init; }
     public required string SourcePath { get; init; }
@@ -356,6 +364,50 @@ internal sealed class BenchmarkRunRecord
     public required string JournalPath { get; init; }
     public required string? ExceptionType { get; init; }
     public required string? ExceptionMessage { get; init; }
+
+    public static BenchmarkRunRecord CreateInProgress(
+        BenchmarkScenario scenario,
+        BenchmarkVariant variant,
+        string sourcePath,
+        string destinationPath,
+        string artifactPath,
+        DateTime runStartedUtc,
+        string? notes,
+        int runIndex)
+    {
+        var providerOptions = variant.CreateProviderOptions(scenario);
+        return new BenchmarkRunRecord
+        {
+            RunStatus = BenchmarkRunStatus.InProgress,
+            ScenarioName = scenario.Name,
+            VariantName = variant.Name,
+            SourcePath = sourcePath,
+            DestinationPath = destinationPath,
+            ArtifactPath = artifactPath,
+            RunStartedUtc = runStartedUtc,
+            HostName = Environment.MachineName,
+            OsDescription = RuntimeInformation.OSDescription,
+            FrameworkDescription = RuntimeInformation.FrameworkDescription,
+            Notes = notes,
+            RunIndex = runIndex,
+            ProviderCopyBufferSizeBytes = providerOptions.CopyBufferSizeBytes,
+            ProviderSmallFileProgressThresholdBytes = providerOptions.SmallFileProgressThresholdBytes,
+            ProviderWriteMode = providerOptions.WriteMode,
+            ProviderUseArrayPoolForManualLoop = providerOptions.UseArrayPoolForManualLoop,
+            ProviderPreallocateDestinationFile = providerOptions.PreallocateDestinationFile,
+            ScanDuration = TimeSpan.Zero,
+            ExecuteDuration = TimeSpan.Zero,
+            CopiedFiles = 0,
+            SkippedFiles = 0,
+            FailedFiles = 0,
+            OutputBytes = 0,
+            DestinationFreeSpaceBeforeBytes = null,
+            DestinationFreeSpaceAfterBytes = null,
+            JournalPath = string.Empty,
+            ExceptionType = null,
+            ExceptionMessage = null,
+        };
+    }
 
     public static BenchmarkRunRecord CreateSuccess(
         BenchmarkScenario scenario,
@@ -395,6 +447,7 @@ internal sealed class BenchmarkRunRecord
         var providerOptions = variant.CreateProviderOptions(scenario);
         return new BenchmarkRunRecord
         {
+            RunStatus = ex is null ? BenchmarkRunStatus.Completed : BenchmarkRunStatus.Failed,
             ScenarioName = scenario.Name,
             VariantName = variant.Name,
             SourcePath = sourcePath,
@@ -424,6 +477,13 @@ internal sealed class BenchmarkRunRecord
             ExceptionMessage = ex?.Message,
         };
     }
+}
+
+internal static class BenchmarkRunStatus
+{
+    public const string InProgress = "inProgress";
+    public const string Completed = "completed";
+    public const string Failed = "failed";
 }
 
 internal sealed class BenchmarkFileCopyRecord

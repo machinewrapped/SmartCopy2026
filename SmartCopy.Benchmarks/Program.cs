@@ -14,6 +14,7 @@ const string ConfigFileName = "benchmark-scenarios.json";
 const string ResultsFileName = "benchmark-results.ndjson";
 const string FileResultsFileName = "benchmark-file-results.ndjson";
 const string AnalysisFileName = "benchmark-analysis.md";
+const string SizeScalingAnalysisFileName = "benchmark-size-scaling.md";
 const string TaskListFileName = "benchmark-tasklist.md";
 const string JournalDirectoryName = "benchmark-journals";
 
@@ -44,6 +45,12 @@ if (selection.Mode == BenchmarkRunMode.DatasetPreparation)
 if (selection.Mode == BenchmarkRunMode.Analysis)
 {
     await RunAnalysisModeAsync(workingDirectory, config, selection, ct);
+    return 0;
+}
+
+if (selection.Mode == BenchmarkRunMode.SizeScaling)
+{
+    await RunSizeScalingModeAsync(workingDirectory, config, selection, ct);
     return 0;
 }
 
@@ -335,6 +342,54 @@ static async Task RunAnalysisModeAsync(
     Console.WriteLine($"Analysis: {analysisPath}");
 }
 
+static async Task RunSizeScalingModeAsync(
+    string workingDirectory,
+    BenchmarkConfig config,
+    BenchmarkCliOptions selection,
+    CancellationToken ct)
+{
+    var artifactDirectory = ResolveArtifactDirectory(workingDirectory, config.SourcePath, config.ArtifactPath);
+    var fileResultsPath = Path.Combine(artifactDirectory, FileResultsFileName);
+    var analysisPath = Path.Combine(artifactDirectory, SizeScalingAnalysisFileName);
+
+    if (!File.Exists(fileResultsPath))
+    {
+        Console.WriteLine($"No file-level results found: {fileResultsPath}");
+        Console.WriteLine("Run benchmark mode first to produce benchmark-file-results.ndjson.");
+        return;
+    }
+
+    var allRecords = await ReadExistingRunsAsync<BenchmarkFileCopyRecord>(fileResultsPath, ct);
+    var filteredRecords = allRecords
+        .Where(r => string.IsNullOrWhiteSpace(selection.ScenarioName) ||
+                    string.Equals(r.ScenarioName, selection.ScenarioName.Trim(), StringComparison.OrdinalIgnoreCase))
+        .Where(r => string.IsNullOrWhiteSpace(selection.VariantName) ||
+                    string.Equals(r.VariantName, selection.VariantName.Trim(), StringComparison.OrdinalIgnoreCase))
+        .Select(r => new SizeScalingInputRecord(
+            r.ScenarioName,
+            r.VariantName,
+            r.SourceRelativePath,
+            r.FileSizeBytes,
+            r.CopyDurationMilliseconds,
+            r.ThroughputMiBPerSecond))
+        .ToList();
+
+    if (filteredRecords.Count == 0)
+    {
+        Console.WriteLine("No file-level records found for the selected size-scaling filters.");
+        return;
+    }
+
+    var report = BenchmarkSizeScalingAnalysis.Analyze(filteredRecords);
+    var markdown = BenchmarkSizeScalingAnalysis.ToMarkdown(report, fileResultsPath);
+
+    Directory.CreateDirectory(artifactDirectory);
+    await File.WriteAllTextAsync(analysisPath, markdown, ct);
+
+    Console.WriteLine(markdown);
+    Console.WriteLine($"Size scaling analysis: {analysisPath}");
+}
+
 static async Task RunBenchmarkModeAsync(
     string workingDirectory,
     BenchmarkConfig config,
@@ -372,6 +427,21 @@ static async Task RunBenchmarkModeAsync(
 
     var providerOptions = variant.CreateProviderOptions(scenario);
     var overwriteMode = variant.OverwriteMode ?? scenario.OverwriteMode;
+    var state = new BenchmarkState();
+
+    var inProgressRecord = BenchmarkRunRecord.CreateInProgress(
+        scenario,
+        variant,
+        sourcePath,
+        destinationPath,
+        artifactDirectory,
+        runStartedUtc,
+        selection.Notes,
+        nextRunIndex);
+
+    await AppendJsonLineAsync(resultsPath, inProgressRecord, ct);
+    historicalRuns.Add(inProgressRecord);
+    await UpdateTaskListAsync(taskListPath, config, historicalRuns, ct);
 
     Console.WriteLine("Mode:     benchmark");
     Console.WriteLine($"Scenario: {scenario.Name}");
@@ -385,8 +455,6 @@ static async Task RunBenchmarkModeAsync(
         $"write-mode={providerOptions.WriteMode}, " +
         $"array-pool={providerOptions.UseArrayPoolForManualLoop}, " +
         $"preallocate={providerOptions.PreallocateDestinationFile}");
-
-    var state = new BenchmarkState();
 
     try
     {
@@ -455,6 +523,7 @@ static async Task RunBenchmarkModeAsync(
         var journal = new OperationJournal(journalDirectory);
         state.JournalPath = await journal.WriteAsync(
             state.Results.Where(r => r.SourceNodeResult != SourceResult.None),
+            BuildBenchmarkJournalMetadata(scenario, variant, sourcePath, destinationPath, artifactDirectory, runStartedUtc, state, selection.Notes, nextRunIndex),
             ct);
 
         var record = BenchmarkRunRecord.CreateSuccess(
@@ -521,6 +590,49 @@ static async Task<DirectoryNode> ScanTreeAsync(
     return root ?? throw new InvalidOperationException($"Scan did not produce a directory root for {sourcePath}.");
 }
 
+static Dictionary<string, string?> BuildBenchmarkJournalMetadata(
+    BenchmarkScenario scenario,
+    BenchmarkVariant variant,
+    string sourcePath,
+    string destinationPath,
+    string artifactPath,
+    DateTime runStartedUtc,
+    BenchmarkState state,
+    string? notes,
+    int runIndex)
+{
+    var providerOptions = variant.CreateProviderOptions(scenario);
+    return new Dictionary<string, string?>
+    {
+        ["recordType"] = "benchmarkRun",
+        ["runStatus"] = BenchmarkRunStatus.Completed,
+        ["scenarioName"] = scenario.Name,
+        ["variantName"] = variant.Name,
+        ["sourcePath"] = sourcePath,
+        ["destinationPath"] = destinationPath,
+        ["artifactPath"] = artifactPath,
+        ["runStartedUtc"] = runStartedUtc.ToString("O"),
+        ["hostName"] = Environment.MachineName,
+        ["osDescription"] = System.Runtime.InteropServices.RuntimeInformation.OSDescription,
+        ["frameworkDescription"] = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
+        ["notes"] = notes,
+        ["runIndex"] = runIndex.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        ["providerCopyBufferSizeBytes"] = providerOptions.CopyBufferSizeBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        ["providerSmallFileProgressThresholdBytes"] = providerOptions.SmallFileProgressThresholdBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        ["providerWriteMode"] = providerOptions.WriteMode.ToString(),
+        ["providerUseArrayPoolForManualLoop"] = providerOptions.UseArrayPoolForManualLoop.ToString(),
+        ["providerPreallocateDestinationFile"] = providerOptions.PreallocateDestinationFile.ToString(),
+        ["scanDuration"] = state.ScanStopwatch.Elapsed.ToString("c"),
+        ["executeDuration"] = state.ExecuteStopwatch.Elapsed.ToString("c"),
+        ["copiedFiles"] = state.Results.Sum(r => r.NumberOfFilesAffected).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        ["skippedFiles"] = state.Results.Sum(r => r.NumberOfFilesSkipped).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        ["failedFiles"] = state.Results.Count(r => !r.IsSuccess).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        ["outputBytes"] = state.Results.Sum(r => r.OutputBytes).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        ["destinationFreeSpaceBeforeBytes"] = state.FreeSpaceBefore?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        ["destinationFreeSpaceAfterBytes"] = state.FreeSpaceAfter?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+    };
+}
+
 static BenchmarkSelection? SelectBenchmarkSelection(
     BenchmarkConfig config,
     IReadOnlyList<BenchmarkRunRecord> historicalRuns,
@@ -532,7 +644,7 @@ static BenchmarkSelection? SelectBenchmarkSelection(
         from variant in config.Variants
         where variant.Enabled
         let successfulRuns = historicalRuns.Count(r => IsSuccessfulRunForScenarioVariant(r, scenario.Name, variant.Name))
-        let totalRuns = historicalRuns.Count(r => IsRunForScenarioVariant(r, scenario.Name, variant.Name))
+        let totalRuns = historicalRuns.Count(r => IsTerminalRunForScenarioVariant(r, scenario.Name, variant.Name))
         let lastRunUtc = historicalRuns
             .Where(r => IsRunForScenarioVariant(r, scenario.Name, variant.Name))
             .Select(r => r.RunStartedUtc)
@@ -625,8 +737,16 @@ static bool IsRunForScenarioVariant(BenchmarkRunRecord run, string scenarioName,
     string.Equals(run.ScenarioName, scenarioName, StringComparison.OrdinalIgnoreCase) &&
     string.Equals(run.VariantName, variantName, StringComparison.OrdinalIgnoreCase);
 
+static bool IsTerminalRun(BenchmarkRunRecord run) =>
+    !string.Equals(run.RunStatus, BenchmarkRunStatus.InProgress, StringComparison.OrdinalIgnoreCase);
+
+static bool IsTerminalRunForScenarioVariant(BenchmarkRunRecord run, string scenarioName, string variantName) =>
+    IsRunForScenarioVariant(run, scenarioName, variantName) &&
+    IsTerminalRun(run);
+
 static bool IsSuccessfulRunForScenarioVariant(BenchmarkRunRecord run, string scenarioName, string variantName) =>
     IsRunForScenarioVariant(run, scenarioName, variantName) &&
+    string.Equals(run.RunStatus, BenchmarkRunStatus.Completed, StringComparison.OrdinalIgnoreCase) &&
     run.FailedFiles == 0 &&
     run.ExceptionType is null;
 
@@ -849,12 +969,18 @@ static async Task UpdateTaskListAsync(
             var scenarioRuns = runs
                 .Where(r => IsRunForScenarioVariant(r, scenario.Name, variant.Name))
                 .OrderByDescending(r => r.RunStartedUtc)
+                .ThenByDescending(IsTerminalRun)
                 .ToList();
             var lastRun = scenarioRuns.FirstOrDefault();
-            var successfulRuns = scenarioRuns.Count(r => r.FailedFiles == 0 && r.ExceptionType is null);
+            var successfulRuns = scenarioRuns.Count(r =>
+                string.Equals(r.RunStatus, BenchmarkRunStatus.Completed, StringComparison.OrdinalIgnoreCase) &&
+                r.FailedFiles == 0 &&
+                r.ExceptionType is null);
             var lastStatus = lastRun is null
                 ? "pending"
-                : lastRun.ExceptionType is not null
+                : string.Equals(lastRun.RunStatus, BenchmarkRunStatus.InProgress, StringComparison.OrdinalIgnoreCase)
+                    ? "in progress"
+                    : lastRun.ExceptionType is not null
                     ? $"error ({lastRun.ExceptionType})"
                     : lastRun.FailedFiles > 0
                         ? $"failed ({lastRun.FailedFiles})"
