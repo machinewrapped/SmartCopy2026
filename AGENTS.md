@@ -31,6 +31,12 @@ dotnet test --filter "FullyQualifiedName~TestClassName" | Out-String
 
 # Publish self-contained single file
 dotnet publish -c Release --self-contained true -p:PublishSingleFile=true | Out-String
+
+# Run benchmark suite
+dotnet run --project .\SmartCopy.Benchmarks
+
+# Analyze benchmark results
+dotnet run --project .\SmartCopy.Benchmarks --mode analyze
 ```
 
 ## Error Handling
