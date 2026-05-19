@@ -169,11 +169,7 @@ The current per-file overhead chain:
 
 **Goal:** Measure the cost of the staged temp-file lifecycle (create + write + rename) for small files by bypassing it entirely, and find the file-size threshold below which direct write is a meaningful win.
 
-**Phase 2 prerequisite (mandatory):** Add benchmarking tooling and a dedicated small-file dataset so results are actionable.
-
-- Add granular size buckets for tiny files in the benchmark analysis output (for example: 0-4 KiB, 4-8 KiB, 8-16 KiB, 16-32 KiB, 32-64 KiB, 64-128 KiB, 128-256 KiB, 256-512 KiB, 512 KiB-1 MiB).
-- Add a repeatable dataset-generation flow focused on tiny files across those buckets (plus a representative tail above 1 MiB), so Phase 2 can be run quickly and frequently.
-- Treat this dataset/tooling work as part of Phase 2, not a separate optional pre-task.
+**Phase 2 prerequisite (mandatory):** See Section 6.2 for the full dataset specification and required tooling changes. Both must be complete before Phase 2 benchmarks can produce actionable results.
 
 **Integrity trade-off:** Staged writes ensure an interrupted write does not leave a partial file at the destination. For very small files the write may be effectively atomic at the OS or firmware level (writes are per-sector or per-block), so staging may be overhead with no integrity benefit. Benchmarks are needed to weigh the trade-off; the implementation should expose a threshold setting rather than hardcode one.
 
@@ -361,7 +357,45 @@ All four variants have two successful runs on SSDtoSSD, SameDriveTest, and SSDto
 
 These four variants establish the Phase 1 baseline only. No Phase 2+ variants have been benchmarked yet.
 
-### 6.2 Pending: Byte-Volume-Dominated Dataset
+### 6.2 Pending: Small-File Granular Dataset
+
+**Required before Phase 2 can be benchmarked.**
+
+The MixedDataset aggregates all files under 64 KiB into a single "Tiny" bucket. This is sufficient to establish that per-file overhead dominates, but cannot identify *at which size threshold* staging removal becomes effective — the core question of Phase 2. A dedicated dataset with fine-grained sub-64 KiB buckets is required for Phase 2 benchmark results to be actionable.
+
+**Design rationale:** Optimises for signal over realism. Files are selected by size from the source pool and written into flat per-bucket subdirectories rather than preserving source directory structure. This deliberately produces a controlled layout — same-sized files grouped together — which maximises the signal-to-noise ratio for per-file overhead measurement by size band. The MixedDataset (source structure preserved) serves as the real-world validation pass once strategies are identified.
+
+**Run-time basis:** MixedDataset SSDtoSSD data gives ~9.1 ms/file overhead rate (123 s ÷ 13,540 files in the 0–64 KiB bucket). At ~1,000 files per sub-bucket, ~5,100 total files × 9 ms ≈ **~60 seconds per variant** on SSD. Phase 2's 14+ variants × 2 runs ≈ 28–35 minutes total for a full SSD matrix.
+
+**Dataset name:** `SmallFileDataset`, destination e.g. `R:\TestData\SmallFileDataset`
+
+**Bucket specification** — boundaries deliberately aligned to Phase 2 variant thresholds (4 / 16 / 64 / 256 / 1024 KiB) so each variant's impact falls cleanly within named buckets:
+
+| Bucket | Min | Max | Target | Approx files |
+|--------|-----|-----|--------|--------------|
+| `Sub4KiB` | 0 | 4 KiB | 2 MiB | ~1,000 |
+| `Sub16KiB` | 4 KiB+1 | 16 KiB | 8 MiB | ~1,000 |
+| `Sub64KiB` | 16 KiB+1 | 64 KiB | 32 MiB | ~1,000 |
+| `Sub256KiB` | 64 KiB+1 | 256 KiB | 128 MiB | ~1,000 |
+| `Sub1MiB` | 256 KiB+1 | 1 MiB | 512 MiB | ~1,000 |
+| `Tail` | 1 MiB+1 | 4 MiB | 256 MiB | ~128 |
+
+Total: ~938 MiB. File counts are estimates at average sizes. If the primary source directory does not supply enough candidates to fill all buckets, point the tool at an additional source directory and re-run — the existing `ExistingDestinationSkips` logic ensures already-filled buckets are not overwritten. Do not pad with synthetic files.
+
+**Tooling changes required (all three mandatory before Phase 2 benchmarks can run):**
+
+1. **`OrganizeByBucket` flag in `DatasetPreparationConfig`** — when `true`, files are written to `{DestinationPath}\{BucketName}\{filename}` (flat per bucket) rather than preserving source relative paths. Default `false` preserves existing MixedDataset behaviour exactly. On filename collision within a bucket directory, skip the candidate and source the next one — do not rename or append an index. This naturally suppresses ubiquitous filenames (`desktop.ini`, `thumbs.db`, etc.) that would otherwise crowd out more varied candidates in small buckets. The existing `ExistingDestinationSkips` counter covers skipped collisions.
+
+2. **New `SmallFileDataset` scenario in `benchmark-scenarios.json`** — bucket config as above with `OrganizeByBucket: true` and destination path. No other code changes; generation runs with the existing `--mode dataset-prep` flow:
+   ```
+   dotnet run --project .\SmartCopy.Benchmarks --mode dataset-prep --scenario SmallFileDataset
+   ```
+
+3. **Analysis tool — configurable bucket breakpoints** — the analysis tool currently reports per-bucket metrics using the MixedDataset bucket names (Tiny / Small / Medium / Large / XLarge / Huge). Running analysis against SmallFileDataset must use the dataset's own bucket definitions so results show the Sub4KiB / Sub16KiB breakdown rather than one aggregated "Tiny" row. Verify whether the analysis code reads bucket boundaries from the scenario config or has them hardcoded; if hardcoded, parameterise before Phase 2 benchmarks run.
+
+---
+
+### 6.3 Pending: Byte-Volume-Dominated Dataset
 
 **Required before Phases 5 and 6 can be completed.**
 
@@ -417,6 +451,6 @@ Apply before each Core merge. Benchmark-only changes (no Core code) do not requi
 4. Results appended to `benchmark-results.ndjson` and `benchmark-file-results.ndjson`.
 5. Architectural changes reflected in `Docs/Architecture.md`.
 6. New `LocalFileSystemProviderOptions` fields default to 0/disabled — no behaviour change without explicit opt-in.
-7. Small-file strategy changes validated on MixedDataset; buffer scaling changes validated on byte-volume-dominated dataset.
+7. Small-file strategy changes validated on SmallFileDataset first; real-world validation pass on MixedDataset before promoting defaults. Buffer scaling changes validated on byte-volume-dominated dataset.
 8. `copiedFiles + failedFiles + skippedFiles` equals the expected total across all runs.
 9. Direct-write (non-staged) changes: spot-check file content bit-identity against staged baseline.
