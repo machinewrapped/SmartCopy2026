@@ -70,3 +70,4 @@ benchmark-analysis.md
 benchmark-file-results.ndjson
 /.obsidian
 *.lscache
+benchmark-size-scaling.md
