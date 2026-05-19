@@ -163,19 +163,31 @@ The current per-file overhead chain:
 
 ---
 
-### Phase 2 — Tiny-File Direct Write
+### Phase 2 — Tiny-File Direct Write (+ Overwrite Check Matrix)
 
-**Status:** Needs benchmarking.
+**Status:** Prerequisite tooling/dataset work required, then benchmark.
 
 **Goal:** Measure the cost of the staged temp-file lifecycle (create + write + rename) for small files by bypassing it entirely, and find the file-size threshold below which direct write is a meaningful win.
+
+**Phase 2 prerequisite (mandatory):** Add benchmarking tooling and a dedicated small-file dataset so results are actionable.
+
+- Add granular size buckets for tiny files in the benchmark analysis output (for example: 0-4 KiB, 4-8 KiB, 8-16 KiB, 16-32 KiB, 32-64 KiB, 64-128 KiB, 128-256 KiB, 256-512 KiB, 512 KiB-1 MiB).
+- Add a repeatable dataset-generation flow focused on tiny files across those buckets (plus a representative tail above 1 MiB), so Phase 2 can be run quickly and frequently.
+- Treat this dataset/tooling work as part of Phase 2, not a separate optional pre-task.
 
 **Integrity trade-off:** Staged writes ensure an interrupted write does not leave a partial file at the destination. For very small files the write may be effectively atomic at the OS or firmware level (writes are per-sector or per-block), so staging may be overhead with no integrity benefit. Benchmarks are needed to weigh the trade-off; the implementation should expose a threshold setting rather than hardcode one.
 
 Direct write *without staging* trades durability for speed: a power loss or unplug mid-write leaves a partial file. **Mitigation:** On stream error (not unplug), delete the partial destination file to restore integrity. If the destination device is unplugged mid-operation, partial files are an unavoidable consequence of direct write — this is the explicit trade-off. Users can opt-in to direct write knowing this risk, or remain on staged (safer) defaults.
 
-**Step 1 — Benchmark variant (no Core changes):**
+**Step 1 — Benchmark matrix (no Core behavioural change by default):**
 
 Add a threshold sweep to `BenchmarkCopyRunner`. Each variant applies direct write via `File.WriteAllBytesAsync` for files below its threshold; files at or above use the existing staged path unchanged.
+
+Run each threshold with both overwrite modes:
+- `OverwriteExistsCheckOn` (current behaviour)
+- `OverwriteExistsCheckOff` (experimental path currently default-off in Core)
+
+This makes overwrite pre-check removal a measured Phase 2 variable instead of an unvalidated Phase 1 loose end.
 
 | Variant | Direct-write threshold |
 |---|---|
@@ -192,8 +204,13 @@ Files to modify:
 
 Run per the standard protocol (Section 7.1) — SSDtoSSD first, `BaselineAuto` included as reference, randomised order. The sweep answers two questions: does direct write help at all, and at what threshold does staging overhead become negligible?
 
+Include matched controls for overwrite mode so attribution is clear:
+- `BaselineAuto + OverwriteExistsCheckOn`
+- `BaselineAuto + OverwriteExistsCheckOff`
+
 **Gate:**
-- Any threshold shows ≥20% P50/P95 improvement over baseline → proceed to Core integration using the highest-threshold variant that still shows a meaningful gain.
+- Any threshold shows ≥20% P50/P95 improvement over matched overwrite-mode baseline → proceed to Core integration using the highest-threshold variant that still shows a meaningful gain.
+- `OverwriteExistsCheckOff` shows meaningful gain without behavioural regressions in overwrite/error semantics → keep as opt-in candidate for later default discussion.
 - No threshold shows ≥10% improvement → staging is not the primary bottleneck; proceed to Phase 3 and revisit Phase 2 priority.
 
 **Step 2 — Core integration (after gate):**
