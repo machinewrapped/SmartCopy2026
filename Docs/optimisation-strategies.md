@@ -382,7 +382,7 @@ The MixedDataset aggregates all files under 64 KiB into a single "Tiny" bucket. 
 
 Total: ~938 MiB. File counts are estimates at average sizes. If the primary source directory does not supply enough candidates to fill all buckets, point the tool at an additional source directory and re-run — the existing `ExistingDestinationSkips` logic ensures already-filled buckets are not overwritten. Do not pad with synthetic files.
 
-**Tooling changes required (all three mandatory before Phase 2 benchmarks can run):**
+**Tooling changes required (all five mandatory before Phase 2 benchmarks can run):**
 
 1. **`OrganizeByBucket` flag in `DatasetPreparationConfig`** — when `true`, files are written to `{DestinationPath}\{BucketName}\{filename}` (flat per bucket) rather than preserving source relative paths. Default `false` preserves existing MixedDataset behaviour exactly. On filename collision within a bucket directory, skip the candidate and source the next one — do not rename or append an index. This naturally suppresses ubiquitous filenames (`desktop.ini`, `thumbs.db`, etc.) that would otherwise crowd out more varied candidates in small buckets. The existing `ExistingDestinationSkips` counter covers skipped collisions.
 
@@ -392,6 +392,14 @@ Total: ~938 MiB. File counts are estimates at average sizes. If the primary sour
    ```
 
 3. **Analysis tool — configurable bucket breakpoints** — the analysis tool currently reports per-bucket metrics using the MixedDataset bucket names (Tiny / Small / Medium / Large / XLarge / Huge). Running analysis against SmallFileDataset must use the dataset's own bucket definitions so results show the Sub4KiB / Sub16KiB breakdown rather than one aggregated "Tiny" row. Verify whether the analysis code reads bucket boundaries from the scenario config or has them hardcoded; if hardcoded, parameterise before Phase 2 benchmarks run.
+
+4. **`--config <file>` CLI flag in `BenchmarkCliOptions`** — override the config file name (default: `benchmark-scenarios.json`). Phase 2 lives in its own config file (e.g. `benchmark-scenarios-phase2.json`) so the Phase 1 historical results and scenario definitions are frozen and isolated. Run dataset prep and benchmarks with:
+   ```
+   dotnet run --project .\SmartCopy.Benchmarks --config benchmark-scenarios-phase2.json --mode dataset-prep
+   dotnet run --project .\SmartCopy.Benchmarks --config benchmark-scenarios-phase2.json
+   ```
+
+5. **`SourcePath` on `BenchmarkScenario`** (optional, falls back to global `config.SourcePath`) — allows a single Phase 2 config to hold both SmallFileDataset discovery scenarios and MixedDataset validation scenarios without switching config files mid-phase. MixedDataset validation scenarios start `Enabled: false` and are enabled manually after the top candidates are identified from SmallFileDataset results.
 
 ---
 
@@ -454,3 +462,55 @@ Apply before each Core merge. Benchmark-only changes (no Core code) do not requi
 7. Small-file strategy changes validated on SmallFileDataset first; real-world validation pass on MixedDataset before promoting defaults. Buffer scaling changes validated on byte-volume-dominated dataset.
 8. `copiedFiles + failedFiles + skippedFiles` equals the expected total across all runs.
 9. Direct-write (non-staged) changes: spot-check file content bit-identity against staged baseline.
+
+---
+
+### 7.5 Phase 2 Execution Checklist
+
+Ordered steps to completion. To continue: find the first unchecked item and execute it.
+
+**A — Tooling (code changes, no benchmarks yet)**
+
+- [ ] Implement `OrganizeByBucket` in `DatasetPreparationConfig` (`BenchmarkModels.cs`) and `DatasetPreparationService.cs`
+- [ ] Add `--config <file>` flag to `BenchmarkCliOptions.Parse()` (default: `benchmark-scenarios.json`)
+- [ ] Add optional `SourcePath` to `BenchmarkScenario` (falls back to global `config.SourcePath`)
+- [ ] Verify/fix analysis tool bucket parameterization — confirm it reads bucket boundaries from the scenario config rather than hardcoding MixedDataset names
+- [ ] Add Phase 2 variants to `BenchmarkModels.cs`: `DirectWrite4KiB`, `DirectWrite16KiB`, `DirectWrite64KiB`, `DirectWrite256KiB`, `DirectWrite512KiB`, `DirectWrite1MiB` — each ×`OverwriteExistsCheckOn/Off`; plus `BaselineAuto+OverwriteExistsCheckOn` and `BaselineAuto+OverwriteExistsCheckOff` controls
+- [ ] Implement direct-write copy engine in `BenchmarkCopyRunner.cs` — parameterised by threshold bytes, using `File.WriteAllBytesAsync` for files below threshold; existing staged path for files at or above
+- [ ] Create `benchmark-scenarios-phase2.json` — SmallFileDataset prep config (`OrganizeByBucket: true`), SmallFileDataset × SSDtoSSD discovery scenarios, MixedDataset validation scenarios (`Enabled: false` initially)
+
+**B — Dataset generation**
+
+- [ ] Generate SmallFileDataset:
+  ```
+  dotnet run --project .\SmartCopy.Benchmarks --config benchmark-scenarios-phase2.json --mode dataset-prep
+  ```
+- [ ] Check bucket fill report in output; re-run against an additional source directory if any bucket is underfilled
+
+**C — Discovery benchmarks (SmallFileDataset × SSDtoSSD)**
+
+- [ ] Run Phase 2 variants — re-run until 2 successful runs per variant:
+  ```
+  dotnet run --project .\SmartCopy.Benchmarks --config benchmark-scenarios-phase2.json
+  ```
+- [ ] Analyze:
+  ```
+  dotnet run --project .\SmartCopy.Benchmarks --config benchmark-scenarios-phase2.json --mode analyze
+  ```
+- [ ] Apply gate (Section 5, Phase 2): identify which thresholds show ≥20% P50/P95 improvement over matched overwrite-mode baseline; record top candidates
+
+**D — MixedDataset validation (top candidates only)**
+
+- [ ] In `benchmark-scenarios-phase2.json`: enable MixedDataset-SSDtoSSD validation scenarios for the top-3 candidates; set `Enabled: false` on all others
+- [ ] Run:
+  ```
+  dotnet run --project .\SmartCopy.Benchmarks --config benchmark-scenarios-phase2.json --scenario MixedDataset-SSDtoSSD
+  ```
+- [ ] Analyze; confirm improvement holds on real-world directory structure
+- [ ] If confirmed: extend to SameDriveTest, then SSDtoHDD
+
+**E — Gate decision**
+
+- [ ] Update Phase 2 status in Section 5 of this document
+- [ ] **Gate passes** (any threshold ≥20%): proceed to Core integration — add `TinyFileFastPathThresholdBytes` to `LocalFileSystemProviderOptions`, integrate in `LocalFileSystemProvider.WriteAsync`, run full test suite
+- [ ] **Gate fails** (no threshold ≥10%): update Phase 2 status to "staging not the bottleneck" and proceed to Phase 3
