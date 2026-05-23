@@ -205,12 +205,18 @@ internal sealed class DatasetPreparationService
                 continue;
             }
 
-            var relativePath = Path.GetRelativePath(config.SourcePath, fullPath);
+            var relativePath = config.OrganizeByBucket
+                ? Path.Combine(bucket.Name, Path.GetFileName(fullPath))
+                : Path.GetRelativePath(config.SourcePath, fullPath);
+
             if (existingRelativePaths.Contains(relativePath))
             {
                 duplicateSourceSkips++;
                 continue;
             }
+
+            // Reserve/deduplicate this destination path for this candidate during this prep run.
+            existingRelativePaths.Add(relativePath);
 
             result[bucket.Name].Add(new DatasetCandidate(
                 fullPath,

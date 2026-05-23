@@ -20,6 +20,7 @@ internal sealed class BenchmarkCliOptions
     public string? ScenarioName { get; init; }
     public string? VariantName { get; init; }
     public string? Notes { get; init; }
+    public string ConfigPath { get; init; } = "benchmark-scenarios.json";
 
     public static BenchmarkCliOptions Parse(string[] args)
     {
@@ -27,6 +28,7 @@ internal sealed class BenchmarkCliOptions
         string? scenarioName = null;
         string? variantName = null;
         string? notes = null;
+        var configPath = "benchmark-scenarios.json";
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -46,6 +48,10 @@ internal sealed class BenchmarkCliOptions
             {
                 mode = ParseMode(args[++i]);
             }
+            else if (string.Equals(args[i], "--config", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            {
+                configPath = args[++i];
+            }
         }
 
         return new BenchmarkCliOptions
@@ -54,6 +60,7 @@ internal sealed class BenchmarkCliOptions
             ScenarioName = scenarioName,
             VariantName = variantName,
             Notes = notes,
+            ConfigPath = configPath,
         };
     }
 
@@ -242,6 +249,7 @@ internal sealed class BenchmarkScenario
 {
     public string Name { get; set; } = string.Empty;
     public string DestinationPath { get; set; } = string.Empty;
+    public string? SourcePath { get; set; }
     public bool Enabled { get; set; } = true;
     public bool ClearDestinationBeforeRun { get; set; } = true;
     public OverwriteMode OverwriteMode { get; set; } = OverwriteMode.Always;
@@ -250,11 +258,17 @@ internal sealed class BenchmarkScenario
     public LocalFileSystemWriteMode? ProviderWriteMode { get; set; }
     public bool? ProviderUseArrayPoolForManualLoop { get; set; }
     public bool? ProviderPreallocateDestinationFile { get; set; }
+    public long? DirectWriteThresholdBytes { get; set; }
+    public bool? SkipExistsCheckForOverwrite { get; set; }
 
     public void Normalize()
     {
         Name = Name.Trim();
         DestinationPath = Path.GetFullPath(DestinationPath);
+        if (!string.IsNullOrWhiteSpace(SourcePath))
+        {
+            SourcePath = Path.GetFullPath(SourcePath);
+        }
     }
 
     public LocalFileSystemProviderOptions CreateProviderOptions()
@@ -285,6 +299,8 @@ internal sealed class BenchmarkVariant
     public LocalFileSystemWriteMode? ProviderWriteMode { get; set; }
     public bool? ProviderUseArrayPoolForManualLoop { get; set; }
     public bool? ProviderPreallocateDestinationFile { get; set; }
+    public long? DirectWriteThresholdBytes { get; set; }
+    public bool? SkipExistsCheckForOverwrite { get; set; }
 
     public void Normalize()
     {
@@ -353,6 +369,8 @@ internal sealed class BenchmarkRunRecord
     public LocalFileSystemWriteMode? ProviderWriteMode { get; init; }
     public bool? ProviderUseArrayPoolForManualLoop { get; init; }
     public bool? ProviderPreallocateDestinationFile { get; init; }
+    public long? DirectWriteThresholdBytes { get; init; }
+    public bool? SkipExistsCheckForOverwrite { get; init; }
     public required TimeSpan ScanDuration { get; init; }
     public required TimeSpan ExecuteDuration { get; init; }
     public required int CopiedFiles { get; init; }
@@ -364,7 +382,7 @@ internal sealed class BenchmarkRunRecord
     public required string JournalPath { get; init; }
     public required string? ExceptionType { get; init; }
     public required string? ExceptionMessage { get; init; }
-
+ 
     public static BenchmarkRunRecord CreateInProgress(
         BenchmarkScenario scenario,
         BenchmarkVariant variant,
@@ -395,6 +413,8 @@ internal sealed class BenchmarkRunRecord
             ProviderWriteMode = providerOptions.WriteMode,
             ProviderUseArrayPoolForManualLoop = providerOptions.UseArrayPoolForManualLoop,
             ProviderPreallocateDestinationFile = providerOptions.PreallocateDestinationFile,
+            DirectWriteThresholdBytes = variant.DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes,
+            SkipExistsCheckForOverwrite = variant.SkipExistsCheckForOverwrite ?? scenario.SkipExistsCheckForOverwrite,
             ScanDuration = TimeSpan.Zero,
             ExecuteDuration = TimeSpan.Zero,
             CopiedFiles = 0,
@@ -408,7 +428,7 @@ internal sealed class BenchmarkRunRecord
             ExceptionMessage = null,
         };
     }
-
+ 
     public static BenchmarkRunRecord CreateSuccess(
         BenchmarkScenario scenario,
         BenchmarkVariant variant,
@@ -419,7 +439,7 @@ internal sealed class BenchmarkRunRecord
         BenchmarkState state,
         string? notes,
         int runIndex) => Create(scenario, variant, sourcePath, destinationPath, artifactPath, runStartedUtc, state, notes, runIndex, ex: null);
-
+ 
     public static BenchmarkRunRecord CreateFailure(
         BenchmarkScenario scenario,
         BenchmarkVariant variant,
@@ -431,7 +451,7 @@ internal sealed class BenchmarkRunRecord
         string? notes,
         int runIndex,
         Exception ex) => Create(scenario, variant, sourcePath, destinationPath, artifactPath, runStartedUtc, state, notes, runIndex, ex);
-
+ 
     private static BenchmarkRunRecord Create(
         BenchmarkScenario scenario,
         BenchmarkVariant variant,
@@ -464,6 +484,8 @@ internal sealed class BenchmarkRunRecord
             ProviderWriteMode = providerOptions.WriteMode,
             ProviderUseArrayPoolForManualLoop = providerOptions.UseArrayPoolForManualLoop,
             ProviderPreallocateDestinationFile = providerOptions.PreallocateDestinationFile,
+            DirectWriteThresholdBytes = variant.DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes,
+            SkipExistsCheckForOverwrite = variant.SkipExistsCheckForOverwrite ?? scenario.SkipExistsCheckForOverwrite,
             ScanDuration = state.ScanStopwatch.Elapsed,
             ExecuteDuration = state.ExecuteStopwatch.Elapsed,
             CopiedFiles = state.Results.Sum(r => r.NumberOfFilesAffected),
@@ -503,6 +525,7 @@ internal sealed class DatasetPreparationConfig
 {
     public string SourcePath { get; set; } = string.Empty;
     public string DestinationPath { get; set; } = string.Empty;
+    public bool OrganizeByBucket { get; set; }
     public List<DatasetPreparationBucketConfig> Buckets { get; set; } = [];
 
     public void Normalize()

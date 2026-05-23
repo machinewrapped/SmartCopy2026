@@ -1,0 +1,206 @@
+{
+  "sourcePath": "R:\\TestData\\SmallFileDataset",
+  "artifactPath": null,
+  "includeHidden": false,
+  "scenarios": [
+    {
+      "name": "SmallFileDataset-SSDtoSSD",
+      "sourcePath": "R:\\TestData\\SmallFileDataset",
+      "destinationPath": "D:\\TestData\\SmallFileDataset_SSDtoSSD",
+      "enabled": true,
+      "clearDestinationBeforeRun": true,
+      "overwriteMode": 1
+    },
+    {
+      "name": "MixedDataset-SSDtoSSD",
+      "sourcePath": "R:\\TestData\\MixedDataset",
+      "destinationPath": "D:\\TestData\\MixedDataset_SSDtoSSD",
+      "enabled": false,
+      "clearDestinationBeforeRun": true,
+      "overwriteMode": 1
+    }
+  ],
+  "scenarioExecutionOrder": [
+    "SmallFileDataset-SSDtoSSD",
+    "MixedDataset-SSDtoSSD"
+  ],
+  "variants": [
+    {
+      "name": "Control_BaselineAuto",
+      "notes": "Staged only. Existing heuristics.",
+      "enabled": true,
+      "desiredRunCount": 2,
+      "directWriteThresholdBytes": 0,
+      "skipExistsCheckForOverwrite": false
+    },
+    {
+      "name": "Control_SkipCheckOn",
+      "notes": "Staged only. Overwrite check skipped.",
+      "enabled": true,
+      "desiredRunCount": 2,
+      "directWriteThresholdBytes": 0,
+      "skipExistsCheckForOverwrite": true
+    },
+    {
+      "name": "DirectWrite4KiB_ExistsCheckOn",
+      "notes": "Direct write threshold 4KiB. Overwrite check active.",
+      "enabled": true,
+      "desiredRunCount": 2,
+      "directWriteThresholdBytes": 4096,
+      "skipExistsCheckForOverwrite": false
+    },
+    {
+      "name": "DirectWrite4KiB_ExistsCheckOff",
+      "notes": "Direct write threshold 4KiB. Overwrite check skipped.",
+      "enabled": true,
+      "desiredRunCount": 2,
+      "directWriteThresholdBytes": 4096,
+      "skipExistsCheckForOverwrite": true
+    },
+    {
+      "name": "DirectWrite16KiB_ExistsCheckOn",
+      "notes": "Direct write threshold 16KiB. Overwrite check active.",
+      "enabled": true,
+      "desiredRunCount": 2,
+      "directWriteThresholdBytes": 16384,
+      "skipExistsCheckForOverwrite": false
+    },
+    {
+      "name": "DirectWrite16KiB_ExistsCheckOff",
+      "notes": "Direct write threshold 16KiB. Overwrite check skipped.",
+      "enabled": true,
+      "desiredRunCount": 2,
+      "directWriteThresholdBytes": 16384,
+      "skipExistsCheckForOverwrite": true
+    },
+    {
+      "name": "DirectWrite64KiB_ExistsCheckOn",
+      "notes": "Direct write threshold 64KiB. Overwrite check active.",
+      "enabled": true,
+      "desiredRunCount": 2,
+      "directWriteThresholdBytes": 65536,
+      "skipExistsCheckForOverwrite": false
+    },
+    {
+      "name": "DirectWrite64KiB_ExistsCheckOff",
+      "notes": "Direct write threshold 64KiB. Overwrite check skipped.",
+      "enabled": true,
+      "desiredRunCount": 2,
+      "directWriteThresholdBytes": 65536,
+      "skipExistsCheckForOverwrite": true
+    },
+    {
+      "name": "DirectWrite256KiB_ExistsCheckOn",
+      "notes": "Direct write threshold 256KiB. Overwrite check active.",
+      "enabled": true,
+      "desiredRunCount": 2,
+      "directWriteThresholdBytes": 262144,
+      "skipExistsCheckForOverwrite": false
+    },
+    {
+      "name": "DirectWrite256KiB_ExistsCheckOff",
+      "notes": "Direct write threshold 256KiB. Overwrite check skipped.",
+      "enabled": true,
+      "desiredRunCount": 2,
+      "directWriteThresholdBytes": 262144,
+      "skipExistsCheckForOverwrite": true
+    },
+    {
+      "name": "DirectWrite512KiB_ExistsCheckOn",
+      "notes": "Direct write threshold 512KiB. Overwrite check active.",
+      "enabled": true,
+      "desiredRunCount": 2,
+      "directWriteThresholdBytes": 524288,
+      "skipExistsCheckForOverwrite": false
+    },
+    {
+      "name": "DirectWrite512KiB_ExistsCheckOff",
+      "notes": "Direct write threshold 512KiB. Overwrite check skipped.",
+      "enabled": true,
+      "desiredRunCount": 2,
+      "directWriteThresholdBytes": 524288,
+      "skipExistsCheckForOverwrite": true
+    },
+    {
+      "name": "DirectWrite1MiB_ExistsCheckOn",
+      "notes": "Direct write threshold 1MiB. Overwrite check active.",
+      "enabled": true,
+      "desiredRunCount": 2,
+      "directWriteThresholdBytes": 1048576,
+      "skipExistsCheckForOverwrite": false
+    },
+    {
+      "name": "DirectWrite1MiB_ExistsCheckOff",
+      "notes": "Direct write threshold 1MiB. Overwrite check skipped.",
+      "enabled": true,
+      "desiredRunCount": 2,
+      "directWriteThresholdBytes": 1048576,
+      "skipExistsCheckForOverwrite": true
+    },
+    {
+      "name": "DirectWrite4MiB_ExistsCheckOn",
+      "notes": "Direct write threshold 4MiB. Overwrite check active.",
+      "enabled": true,
+      "desiredRunCount": 2,
+      "directWriteThresholdBytes": 4194304,
+      "skipExistsCheckForOverwrite": false
+    },
+    {
+      "name": "DirectWrite4MiB_ExistsCheckOff",
+      "notes": "Direct write threshold 4MiB. Overwrite check skipped.",
+      "enabled": true,
+      "desiredRunCount": 2,
+      "directWriteThresholdBytes": 4194304,
+      "skipExistsCheckForOverwrite": true
+    }
+  ],
+  "datasetPreparation": {
+    "sourcePath": "R:\\TestData\\MixedDataset",
+    "destinationPath": "R:\\TestData\\SmallFileDataset",
+    "organizeByBucket": true,
+    "buckets": [
+      {
+        "name": "Sub4KiB",
+        "minimumFileSizeBytes": 0,
+        "maximumFileSizeBytes": 4096,
+        "targetTotalBytes": 41943040
+      },
+      {
+        "name": "Sub16KiB",
+        "minimumFileSizeBytes": 4097,
+        "maximumFileSizeBytes": 16384,
+        "targetTotalBytes": 83886080
+      },
+      {
+        "name": "Sub64KiB",
+        "minimumFileSizeBytes": 16385,
+        "maximumFileSizeBytes": 65536,
+        "targetTotalBytes": 125829120
+      },
+      {
+        "name": "Sub256KiB",
+        "minimumFileSizeBytes": 65537,
+        "maximumFileSizeBytes": 262144,
+        "targetTotalBytes": 167772160
+      },
+      {
+        "name": "Sub512KiB",
+        "minimumFileSizeBytes": 262145,
+        "maximumFileSizeBytes": 524288,
+        "targetTotalBytes": 209715200
+      },
+      {
+        "name": "Sub1MiB",
+        "minimumFileSizeBytes": 524289,
+        "maximumFileSizeBytes": 1048576,
+        "targetTotalBytes": 209715200
+      },
+      {
+        "name": "Tail",
+        "minimumFileSizeBytes": 1048577,
+        "maximumFileSizeBytes": 4194304,
+        "targetTotalBytes": 209715200
+      }
+    ]
+  }
+}

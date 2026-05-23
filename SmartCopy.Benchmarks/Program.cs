@@ -12,22 +12,20 @@ using SmartCopy.Core.Selection;
 
 const string ConfigFileName = "benchmark-scenarios.json";
 const string ResultsFileName = "benchmark-results.ndjson";
-const string FileResultsFileName = "benchmark-file-results.ndjson";
-const string AnalysisFileName = "benchmark-analysis.md";
-const string SizeScalingAnalysisFileName = "benchmark-size-scaling.md";
-const string TaskListFileName = "benchmark-tasklist.md";
 const string JournalDirectoryName = "benchmark-journals";
 
 var ct = CancellationToken.None;
 var workingDirectory = Directory.GetCurrentDirectory();
-var configPath = Path.Combine(workingDirectory, ConfigFileName);
 var selection = BenchmarkCliOptions.Parse(args);
+var configPath = Path.IsPathFullyQualified(selection.ConfigPath)
+    ? selection.ConfigPath
+    : Path.Combine(workingDirectory, selection.ConfigPath);
 
 if (!File.Exists(configPath))
 {
     var template = BenchmarkConfig.CreateTemplate();
     await BenchmarkJson.WriteAsync(configPath, template, ct);
-    Console.WriteLine($"Created {ConfigFileName} in {workingDirectory}.");
+    Console.WriteLine($"Created {Path.GetFileName(configPath)} in {Path.GetDirectoryName(configPath) ?? workingDirectory}.");
     Console.WriteLine("Edit the scenario file if needed, then run the benchmark app again.");
     return 0;
 }
@@ -102,9 +100,10 @@ static async Task RunAnalysisModeAsync(
     BenchmarkCliOptions selection,
     CancellationToken ct)
 {
+    var fileNames = FileNamesResolver.GetFileNames(selection.ConfigPath);
     var artifactDirectory = ResolveArtifactDirectory(workingDirectory, config.SourcePath, config.ArtifactPath);
-    var fileResultsPath = Path.Combine(artifactDirectory, FileResultsFileName);
-    var analysisPath = Path.Combine(artifactDirectory, AnalysisFileName);
+    var fileResultsPath = Path.Combine(artifactDirectory, fileNames.FileResults);
+    var analysisPath = Path.Combine(artifactDirectory, fileNames.Analysis);
     var reportBuilder = new StringBuilder();
 
     void Report(string? line = null)
@@ -246,7 +245,10 @@ static async Task RunAnalysisModeAsync(
         Report("| Size Bucket | Variant | Files | Avg MiB/s | P50 MiB/s | P95 MiB/s |");
         Report("|---|---|---:|---:|---:|---:|");
 
-        foreach (var bucket in FileSizeBuckets.All)
+        var buckets = config.DatasetPreparation?.Buckets?.Select(b => new FileSizeBucket(b.MinimumFileSizeBytes, b.MaximumFileSizeBytes, b.Name)).ToList()
+                      ?? FileSizeBuckets.All.ToList();
+
+        foreach (var bucket in buckets)
         {
             var bucketRecords = records.Where(r => bucket.Contains(r.FileSizeBytes)).ToList();
             if (bucketRecords.Count == 0)
@@ -288,7 +290,7 @@ static async Task RunAnalysisModeAsync(
 
         var bucketBreakdowns = new List<(FileSizeBucket Bucket, int FileCount, long Bytes, double AvgThroughput)>();
 
-        foreach (var bucket in FileSizeBuckets.All)
+        foreach (var bucket in buckets)
         {
             var bucketUniqueFiles = uniqueFiles
                 .Where(f => bucket.Contains(f.FileSizeBytes))
@@ -348,9 +350,10 @@ static async Task RunSizeScalingModeAsync(
     BenchmarkCliOptions selection,
     CancellationToken ct)
 {
+    var fileNames = FileNamesResolver.GetFileNames(selection.ConfigPath);
     var artifactDirectory = ResolveArtifactDirectory(workingDirectory, config.SourcePath, config.ArtifactPath);
-    var fileResultsPath = Path.Combine(artifactDirectory, FileResultsFileName);
-    var analysisPath = Path.Combine(artifactDirectory, SizeScalingAnalysisFileName);
+    var fileResultsPath = Path.Combine(artifactDirectory, fileNames.FileResults);
+    var analysisPath = Path.Combine(artifactDirectory, fileNames.SizeScaling);
 
     if (!File.Exists(fileResultsPath))
     {
@@ -396,10 +399,11 @@ static async Task RunBenchmarkModeAsync(
     BenchmarkCliOptions selection,
     CancellationToken ct)
 {
+    var fileNames = FileNamesResolver.GetFileNames(selection.ConfigPath);
     var artifactDirectory = ResolveArtifactDirectory(workingDirectory, config.SourcePath, config.ArtifactPath);
-    var resultsPath = Path.Combine(artifactDirectory, ResultsFileName);
-    var fileResultsPath = Path.Combine(artifactDirectory, FileResultsFileName);
-    var taskListPath = Path.Combine(artifactDirectory, TaskListFileName);
+    var resultsPath = Path.Combine(artifactDirectory, fileNames.Results);
+    var fileResultsPath = Path.Combine(artifactDirectory, fileNames.FileResults);
+    var taskListPath = Path.Combine(artifactDirectory, fileNames.TaskList);
     var journalDirectory = Path.Combine(artifactDirectory, JournalDirectoryName);
 
     Directory.CreateDirectory(artifactDirectory);
@@ -411,7 +415,7 @@ static async Task RunBenchmarkModeAsync(
     if (benchmarkSelection is null)
     {
         Console.WriteLine("No eligible benchmark scenario found.");
-        Console.WriteLine($"See {ConfigFileName} and {TaskListFileName} in {workingDirectory}.");
+        Console.WriteLine($"See {Path.GetFileName(selection.ConfigPath)} and {Path.GetFileName(taskListPath)} in {workingDirectory}.");
         return;
     }
 
@@ -420,7 +424,7 @@ static async Task RunBenchmarkModeAsync(
     var nextRunIndex = benchmarkSelection.NextRunIndex;
 
     var runStartedUtc = DateTime.UtcNow;
-    var sourcePath = Path.GetFullPath(config.SourcePath);
+    var sourcePath = Path.GetFullPath(!string.IsNullOrWhiteSpace(scenario.SourcePath) ? scenario.SourcePath : config.SourcePath);
     var destinationPath = Path.GetFullPath(scenario.DestinationPath);
 
     ValidatePaths(sourcePath, destinationPath);
@@ -498,22 +502,50 @@ static async Task RunBenchmarkModeAsync(
             ?? throw new InvalidOperationException($"No destination provider for {destinationPath}.");
 
         state.FreeSpaceBefore = await resolvedDestinationProvider.GetAvailableFreeSpaceAsync(ct);
+        
+        var copyStep = new CopyStep(destinationPath, overwriteMode)
+        {
+            SkipExistsCheckForOverwrite = variant.SkipExistsCheckForOverwrite
+                ?? scenario.SkipExistsCheckForOverwrite
+                ?? false
+        };
+        var runner = new PipelineRunner(new TransformPipeline([copyStep]));
 
-        var runner = new PipelineRunner(new TransformPipeline([new CopyStep(destinationPath, overwriteMode)]));
-        state.ExecuteStopwatch.Start();
+        var directWriteThresholdBytes = variant.DirectWriteThresholdBytes
+            ?? scenario.DirectWriteThresholdBytes
+            ?? 0L;
+
+        var skipExistsCheckForOverwrite = variant.SkipExistsCheckForOverwrite
+            ?? scenario.SkipExistsCheckForOverwrite
+            ?? false;
+
         Console.WriteLine("Executing copy...");
         using (var executeProgress = new ThrottledConsoleProgress<OperationProgress>(p =>
             UpdateProgress($"Copying: {p.FilesCompleted}/{p.FilesTotal} files ({FormatSize(p.TotalBytesCompleted)}/{FormatSize(p.TotalBytes)}), ETR: {FormatDuration(p.EstimatedRemaining)}")))
         {
             state.ExecuteStopwatch.Start();
-            state.Results = await runner.ExecuteAsync(new PipelineJob
+            if (directWriteThresholdBytes > 0)
             {
-                RootNode = state.Root,
-                SourceProvider = sourceProvider,
-                ProviderRegistry = registry,
-                Progress = executeProgress,
-                CancellationToken = ct,
-            }, ct);
+                state.Results = await BenchmarkCopyRunner.RunAsync(new PipelineJob
+                {
+                    RootNode = state.Root,
+                    SourceProvider = sourceProvider,
+                    ProviderRegistry = registry,
+                    Progress = executeProgress,
+                    CancellationToken = ct,
+                }, destinationPath, overwriteMode, directWriteThresholdBytes, skipExistsCheckForOverwrite, providerOptions.CopyBufferSizeBytes, ct);
+            }
+            else
+            {
+                state.Results = await runner.ExecuteAsync(new PipelineJob
+                {
+                    RootNode = state.Root,
+                    SourceProvider = sourceProvider,
+                    ProviderRegistry = registry,
+                    Progress = executeProgress,
+                    CancellationToken = ct,
+                }, ct);
+            }
             state.ExecuteStopwatch.Stop();
         }
         Console.WriteLine(); // Finalize progress line
@@ -1102,4 +1134,30 @@ internal static class FileSizeBuckets
         new FileSizeBucket(256 * 1024 * 1024 + 1, 2L * 1024 * 1024 * 1024, "256 MiB-2 GiB"),
         new FileSizeBucket(2L * 1024 * 1024 * 1024 + 1, long.MaxValue, ">2 GiB"),
     ];
+}
+
+internal static class FileNamesResolver
+{
+    public static (string Results, string FileResults, string Analysis, string SizeScaling, string TaskList) GetFileNames(string configPath)
+    {
+        var configFileName = Path.GetFileName(configPath);
+        var prefix = configFileName.EndsWith(".json") ? configFileName[..^5] : configFileName;
+        
+        var results = prefix.Replace("scenarios", "results") + ".ndjson";
+        if (results == prefix + ".ndjson") results = "benchmark-results.ndjson";
+        
+        var fileResults = prefix.Replace("scenarios", "file-results") + ".ndjson";
+        if (fileResults == prefix + ".ndjson") fileResults = "benchmark-file-results.ndjson";
+        
+        var analysis = prefix.Replace("scenarios", "analysis") + ".md";
+        if (analysis == prefix + ".md") analysis = "benchmark-analysis.md";
+        
+        var sizeScaling = prefix.Replace("scenarios", "size-scaling") + ".md";
+        if (sizeScaling == prefix + ".md") sizeScaling = "benchmark-size-scaling.md";
+        
+        var taskList = prefix.Replace("scenarios", "tasklist") + ".md";
+        if (taskList == prefix + ".md") taskList = "benchmark-tasklist.md";
+        
+        return (results, fileResults, analysis, sizeScaling, taskList);
+    }
 }

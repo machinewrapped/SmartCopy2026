@@ -164,9 +164,9 @@ The current per-file overhead chain:
 ---
 
 ### Phase 2 — Tiny-File Direct Write (+ Overwrite Check Matrix)
-
-**Status:** Prerequisite tooling/dataset work required, then benchmark.
-
+ 
+**Status:** Tooling, scenarios, and dataset prep (doubled 7-bucket dataset, 11,253 files) are complete. Ready for validation/discovery sweeps.
+ 
 **Goal:** Measure the cost of the staged temp-file lifecycle (create + write + rename) for small files by bypassing it entirely, and find the file-size threshold below which direct write is a meaningful win.
 
 **Phase 2 prerequisite (mandatory):** See Section 6.2 for the full dataset specification and required tooling changes. Both must be complete before Phase 2 benchmarks can produce actionable results.
@@ -471,17 +471,17 @@ Ordered steps to completion. To continue: find the first unchecked item and exec
 
 **A — Tooling (code changes, no benchmarks yet)**
 
-- [ ] Implement `OrganizeByBucket` in `DatasetPreparationConfig` (`BenchmarkModels.cs`) and `DatasetPreparationService.cs`
-- [ ] Add `--config <file>` flag to `BenchmarkCliOptions.Parse()` (default: `benchmark-scenarios.json`)
-- [ ] Add optional `SourcePath` to `BenchmarkScenario` (falls back to global `config.SourcePath`)
-- [ ] Verify/fix analysis tool bucket parameterization — confirm it reads bucket boundaries from the scenario config rather than hardcoding MixedDataset names
-- [ ] Add Phase 2 variants to `BenchmarkModels.cs`: `DirectWrite4KiB`, `DirectWrite16KiB`, `DirectWrite64KiB`, `DirectWrite256KiB`, `DirectWrite512KiB`, `DirectWrite1MiB` — each ×`OverwriteExistsCheckOn/Off`; plus `BaselineAuto+OverwriteExistsCheckOn` and `BaselineAuto+OverwriteExistsCheckOff` controls
-- [ ] Implement direct-write copy engine in `BenchmarkCopyRunner.cs` — parameterised by threshold bytes, using `File.WriteAllBytesAsync` for files below threshold; existing staged path for files at or above
-- [ ] Create `benchmark-scenarios-phase2.json` — SmallFileDataset prep config (`OrganizeByBucket: true`), SmallFileDataset × SSDtoSSD discovery scenarios, MixedDataset validation scenarios (`Enabled: false` initially)
+- [x] Implement `OrganizeByBucket` in `DatasetPreparationConfig` (`BenchmarkModels.cs`) and `DatasetPreparationService.cs`
+- [x] Add `--config <file>` flag to `BenchmarkCliOptions.Parse()` (default: `benchmark-scenarios.json`)
+- [x] Add optional `SourcePath` to `BenchmarkScenario` (falls back to global `config.SourcePath`)
+- [x] Verify/fix analysis tool bucket parameterization — confirm it reads bucket boundaries from the scenario config rather than hardcoding MixedDataset names
+- [x] Add Phase 2 variants to `BenchmarkModels.cs`: `DirectWrite4KiB`, `DirectWrite16KiB`, `DirectWrite64KiB`, `DirectWrite256KiB`, `DirectWrite512KiB`, `DirectWrite1MiB` — each ×`OverwriteExistsCheckOn/Off`; plus `BaselineAuto+OverwriteExistsCheckOn` and `BaselineAuto+OverwriteExistsCheckOff` controls
+- [x] Implement direct-write copy engine in `BenchmarkCopyRunner.cs` — parameterised by threshold bytes, using `File.WriteAllBytesAsync` for files below threshold; existing staged path for files at or above
+- [x] Create `benchmark-scenarios-phase2.json` — SmallFileDataset prep config (`OrganizeByBucket: true`), SmallFileDataset × SSDtoSSD discovery scenarios, MixedDataset validation scenarios (`Enabled: false` initially)
 
 **B — Dataset generation**
 
-- [ ] Generate SmallFileDataset:
+- [x] Generate SmallFileDataset:
   ```
   dotnet run --project .\SmartCopy.Benchmarks --config benchmark-scenarios-phase2.json --mode dataset-prep
   ```
