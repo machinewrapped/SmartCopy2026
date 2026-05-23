@@ -19,6 +19,7 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
     }
 
     public OverwriteMode OverwriteMode { get; set; }
+    public bool SkipExistsCheckForOverwrite { get; set; }
 
     internal static CopyStep FromConfig(TransformStepConfig config) =>
         new(config.GetRequired("destinationPath"),
@@ -138,6 +139,11 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
             throw new InvalidOperationException("DestinationPath must be set for CopyStep.");
         }
 
+        var targetProvider = context.GetNodeContext(context.RootNode).ResolveProvider(DestinationPath)
+            ?? throw new InvalidOperationException("TargetProvider must be set for CopyStep.");
+
+        await using var _ = targetProvider.BeginBulkWriteAsync();
+
         foreach (var node in context.RootNode.GetSelectedDescendants())
         {
             ct.ThrowIfCancellationRequested();
@@ -153,22 +159,24 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
             }
 
             var nodeCtx = context.GetNodeContext(node);
-            var targetProvider = nodeCtx.ResolveProvider(DestinationPath)
-                ?? throw new InvalidOperationException("TargetProvider must be set for CopyStep.");
-
             var destination = targetProvider.JoinPath(DestinationPath, nodeCtx.PathSegments);
-            var destinationExists = await targetProvider.ExistsAsync(destination, ct);
 
-            if (destinationExists && OverwriteMode == OverwriteMode.Skip)
+            var destResult = DestinationResult.Written;
+            if (!SkipExistsCheckForOverwrite || OverwriteMode == OverwriteMode.Skip)
             {
-                yield return new TransformResult(
-                    IsSuccess: true,
-                    SourceNode: node,
-                    SourceNodeResult: SourceResult.Skipped,
-                    DestinationPath: destination,
-                    NumberOfFilesSkipped: 1,
-                    InputBytes: node.Size);
-                continue;
+                var exists = await targetProvider.ExistsAsync(destination, ct);
+                if (exists && OverwriteMode == OverwriteMode.Skip)
+                {
+                    yield return new TransformResult(
+                        IsSuccess: true,
+                        SourceNode: node,
+                        SourceNodeResult: SourceResult.Skipped,
+                        DestinationPath: destination,
+                        NumberOfFilesSkipped: 1,
+                        InputBytes: node.Size);
+                    continue;
+                }
+                destResult = exists ? DestinationResult.Overwritten : DestinationResult.Created;
             }
 
             string? copyError = null;
@@ -205,7 +213,7 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
                 SourceNode: node,
                 SourceNodeResult: SourceResult.Copied,
                 DestinationPath: destination,
-                DestinationResult: destinationExists ? DestinationResult.Overwritten : DestinationResult.Created,
+                DestinationResult: destResult,
                 NumberOfFilesAffected: 1,
                 InputBytes: node.Size,
                 OutputBytes: node.Size);

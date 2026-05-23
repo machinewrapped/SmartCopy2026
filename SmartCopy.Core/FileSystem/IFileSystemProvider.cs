@@ -91,6 +91,19 @@ public interface IFileSystemProvider
     }
 
     /// <summary>
+    /// Opens a bulk-write scope that spans a multi-file operation. Dispose when done.
+    /// Providers may use this to reset write-optimisation caches or establish
+    /// protocol-level bulk-transfer sessions (e.g. MTP). Default: no-op.
+    /// </summary>
+    IAsyncDisposable BeginBulkWriteAsync() => NullScope.Instance;
+
+    private sealed class NullScope : IAsyncDisposable
+    {
+        internal static readonly NullScope Instance = new();
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    /// <summary>
     /// Returns the available free bytes on the volume hosting this provider,
     /// or <see langword="null"/> if the provider does not support querying free space
     /// (see <see cref="ProviderCapabilities.CanQueryFreeSpace"/>).

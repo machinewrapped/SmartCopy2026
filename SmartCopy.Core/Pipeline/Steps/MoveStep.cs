@@ -172,6 +172,8 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
         var sameVolume = context.SourceProvider.VolumeId is { } vid && targetProvider.VolumeId == vid;
         var canAtomicMove = sameVolume && targetProvider.Capabilities.CanAtomicMove;
 
+        await using var _ = targetProvider.BeginBulkWriteAsync();
+
         await foreach (var result in WalkAndMoveAsync(context.RootNode, context, DestinationPath, targetProvider, canAtomicMove, OverwriteMode, ct))
             yield return result;
     }

@@ -16,6 +16,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     private readonly bool _isNetworkPath;
     private readonly ProviderCapabilities _capabilities;
     private readonly LocalFileSystemProviderOptions _options;
+    private string? _lastCreatedDirectory;
 
     public LocalFileSystemProvider(
         string rootPath,
@@ -100,11 +101,6 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
             ct.ThrowIfCancellationRequested();
             var fullPath = Resolve(path);
 
-            if (!File.Exists(fullPath))
-            {
-                throw new FileNotFoundException($"File does not exist: {fullPath}", fullPath);
-            }
-
             return new FileStream(
                 fullPath,
                 new FileStreamOptions
@@ -122,9 +118,13 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     {
         var fullPath = Resolve(path);
         var directory = Path.GetDirectoryName(fullPath);
-        if (!string.IsNullOrEmpty(directory))
+        if (!string.IsNullOrEmpty(directory) && directory != _lastCreatedDirectory)
         {
-            Directory.CreateDirectory(directory);
+            if (!Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+                _lastCreatedDirectory = directory;
+            }
         }
 
         var tempPath = string.Empty;
@@ -482,8 +482,26 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         {
             ct.ThrowIfCancellationRequested();
             var fullPath = Resolve(path);
+            if (_lastCreatedDirectory != null &&
+                Path.GetDirectoryName(fullPath) == _lastCreatedDirectory)
+                return false;
             return File.Exists(fullPath) || Directory.Exists(fullPath);
         }, ct);
+    }
+
+    public IAsyncDisposable BeginBulkWriteAsync()
+    {
+        _lastCreatedDirectory = null;
+        return new BulkWriteScope(this);
+    }
+
+    private sealed class BulkWriteScope(LocalFileSystemProvider owner) : IAsyncDisposable
+    {
+        public ValueTask DisposeAsync()
+        {
+            owner._lastCreatedDirectory = null;
+            return ValueTask.CompletedTask;
+        }
     }
 
     public Task<long?> GetAvailableFreeSpaceAsync(CancellationToken ct)
