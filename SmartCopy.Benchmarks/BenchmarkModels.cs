@@ -17,10 +17,12 @@ internal enum BenchmarkRunMode
 internal sealed class BenchmarkCliOptions
 {
     public BenchmarkRunMode Mode { get; init; } = BenchmarkRunMode.Benchmark;
+    public const string DefaultConfigFileName = "benchmark-scenarios.json";
+
     public string? ScenarioName { get; init; }
     public string? VariantName { get; init; }
     public string? Notes { get; init; }
-    public string ConfigPath { get; init; } = "benchmark-scenarios.json";
+    public string ConfigPath { get; init; } = DefaultConfigFileName;
 
     public static BenchmarkCliOptions Parse(string[] args)
     {
@@ -28,7 +30,7 @@ internal sealed class BenchmarkCliOptions
         string? scenarioName = null;
         string? variantName = null;
         string? notes = null;
-        var configPath = "benchmark-scenarios.json";
+        var configPath = DefaultConfigFileName;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -260,6 +262,7 @@ internal sealed class BenchmarkScenario
     public bool? ProviderPreallocateDestinationFile { get; set; }
     public long? DirectWriteThresholdBytes { get; set; }
     public bool? SkipExistsCheckForOverwrite { get; set; }
+    public bool UsePathPool { get; set; }
 
     public void Normalize()
     {

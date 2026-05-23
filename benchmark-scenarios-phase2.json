@@ -9,7 +9,8 @@
       "destinationPath": "D:\\TestData\\SmallFileDataset_SSDtoSSD",
       "enabled": true,
       "clearDestinationBeforeRun": true,
-      "overwriteMode": 1
+      "overwriteMode": 1,
+      "usePathPool": true
     },
     {
       "name": "MixedDataset-SSDtoSSD",

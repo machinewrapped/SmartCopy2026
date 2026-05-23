@@ -165,7 +165,7 @@ The current per-file overhead chain:
 
 ### Phase 2 — Tiny-File Direct Write (+ Overwrite Check Matrix)
  
-**Status:** Tooling, scenarios, and dataset prep (doubled 7-bucket dataset, 11,253 files) are complete. Ready for validation/discovery sweeps.
+**Status:** Tooling, scenarios, dataset preparation, and duplication are complete. To eliminate OS-level read/write page cache warming bias, we implemented sequential loop execution, 32 sequential copies of the source dataset, and a persistent shuffled path queue (`benchmark-path-pool.json`). The runner is fully ready for discovery sweeps on a cold cache boot.
  
 **Goal:** Measure the cost of the staged temp-file lifecycle (create + write + rename) for small files by bypassing it entirely, and find the file-size threshold below which direct write is a meaningful win.
 
@@ -485,7 +485,7 @@ Ordered steps to completion. To continue: find the first unchecked item and exec
   ```
   dotnet run --project .\SmartCopy.Benchmarks --config benchmark-scenarios-phase2.json --mode dataset-prep
   ```
-- [ ] Check bucket fill report in output; re-run against an additional source directory if any bucket is underfilled
+- [x] Check bucket fill report in output; re-run against an additional source directory if any bucket is underfilled
 
 **C — Discovery benchmarks (SmallFileDataset × SSDtoSSD)**
 
