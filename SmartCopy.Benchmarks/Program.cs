@@ -940,7 +940,7 @@ static string ResolveArtifactDirectory(string workingDirectory, string sourcePat
         return Path.Combine(sourceParent, $"{sourceLeaf}-benchmark-artifacts");
     }
 
-    return fullWorkingDirectory;
+    return Path.Combine(fullWorkingDirectory, ".benchmarks");
 }
 
 static void ClearDirectoryContents(string destinationPath, IProgress<string>? progress = null)
