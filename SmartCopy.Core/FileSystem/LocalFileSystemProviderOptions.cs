@@ -9,7 +9,7 @@ public enum LocalFileSystemWriteMode
 
 public sealed class LocalFileSystemProviderOptions
 {
-    public static LocalFileSystemProviderOptions Default { get; } = new();
+    public static LocalFileSystemProviderOptions Default { get; set; } = new();
 
     public int CopyBufferSizeBytes { get; init; } = 256 * 1024;
     public long SmallFileProgressThresholdBytes { get; init; } = 10L * 1024 * 1024;
