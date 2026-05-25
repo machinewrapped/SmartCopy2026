@@ -35,28 +35,12 @@
       "skipExistsCheckForOverwrite": false
     },
     {
-      "name": "Control_SkipCheckOn",
-      "notes": "Staged only. Overwrite check skipped.",
-      "enabled": true,
-      "desiredRunCount": 2,
-      "directWriteThresholdBytes": 0,
-      "skipExistsCheckForOverwrite": true
-    },
-    {
       "name": "DirectWrite4KiB_ExistsCheckOn",
       "notes": "Direct write threshold 4KiB. Overwrite check active.",
       "enabled": true,
       "desiredRunCount": 2,
       "directWriteThresholdBytes": 4096,
       "skipExistsCheckForOverwrite": false
-    },
-    {
-      "name": "DirectWrite4KiB_ExistsCheckOff",
-      "notes": "Direct write threshold 4KiB. Overwrite check skipped.",
-      "enabled": true,
-      "desiredRunCount": 2,
-      "directWriteThresholdBytes": 4096,
-      "skipExistsCheckForOverwrite": true
     },
     {
       "name": "DirectWrite16KiB_ExistsCheckOn",
@@ -67,28 +51,12 @@
       "skipExistsCheckForOverwrite": false
     },
     {
-      "name": "DirectWrite16KiB_ExistsCheckOff",
-      "notes": "Direct write threshold 16KiB. Overwrite check skipped.",
-      "enabled": true,
-      "desiredRunCount": 2,
-      "directWriteThresholdBytes": 16384,
-      "skipExistsCheckForOverwrite": true
-    },
-    {
       "name": "DirectWrite64KiB_ExistsCheckOn",
       "notes": "Direct write threshold 64KiB. Overwrite check active.",
       "enabled": true,
       "desiredRunCount": 2,
       "directWriteThresholdBytes": 65536,
       "skipExistsCheckForOverwrite": false
-    },
-    {
-      "name": "DirectWrite64KiB_ExistsCheckOff",
-      "notes": "Direct write threshold 64KiB. Overwrite check skipped.",
-      "enabled": true,
-      "desiredRunCount": 2,
-      "directWriteThresholdBytes": 65536,
-      "skipExistsCheckForOverwrite": true
     },
     {
       "name": "DirectWrite256KiB_ExistsCheckOn",
@@ -99,28 +67,12 @@
       "skipExistsCheckForOverwrite": false
     },
     {
-      "name": "DirectWrite256KiB_ExistsCheckOff",
-      "notes": "Direct write threshold 256KiB. Overwrite check skipped.",
-      "enabled": true,
-      "desiredRunCount": 2,
-      "directWriteThresholdBytes": 262144,
-      "skipExistsCheckForOverwrite": true
-    },
-    {
       "name": "DirectWrite512KiB_ExistsCheckOn",
       "notes": "Direct write threshold 512KiB. Overwrite check active.",
       "enabled": true,
       "desiredRunCount": 2,
       "directWriteThresholdBytes": 524288,
       "skipExistsCheckForOverwrite": false
-    },
-    {
-      "name": "DirectWrite512KiB_ExistsCheckOff",
-      "notes": "Direct write threshold 512KiB. Overwrite check skipped.",
-      "enabled": true,
-      "desiredRunCount": 2,
-      "directWriteThresholdBytes": 524288,
-      "skipExistsCheckForOverwrite": true
     },
     {
       "name": "DirectWrite1MiB_ExistsCheckOn",
@@ -131,28 +83,12 @@
       "skipExistsCheckForOverwrite": false
     },
     {
-      "name": "DirectWrite1MiB_ExistsCheckOff",
-      "notes": "Direct write threshold 1MiB. Overwrite check skipped.",
-      "enabled": true,
-      "desiredRunCount": 2,
-      "directWriteThresholdBytes": 1048576,
-      "skipExistsCheckForOverwrite": true
-    },
-    {
       "name": "DirectWrite4MiB_ExistsCheckOn",
       "notes": "Direct write threshold 4MiB. Overwrite check active.",
       "enabled": true,
       "desiredRunCount": 2,
       "directWriteThresholdBytes": 4194304,
       "skipExistsCheckForOverwrite": false
-    },
-    {
-      "name": "DirectWrite4MiB_ExistsCheckOff",
-      "notes": "Direct write threshold 4MiB. Overwrite check skipped.",
-      "enabled": true,
-      "desiredRunCount": 2,
-      "directWriteThresholdBytes": 4194304,
-      "skipExistsCheckForOverwrite": true
     }
   ],
   "datasetPreparation": {
