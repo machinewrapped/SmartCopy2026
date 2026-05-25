@@ -108,6 +108,82 @@ public sealed class LocalFileSystemProviderWriteStrategyTests
         Assert.Empty(Directory.GetFiles(temp.Path, "*.smartcopy.tmp.*", SearchOption.TopDirectoryOnly));
     }
 
+    [Fact]
+    public async Task WriteAsync_TinyFileFastPath_WritesContentDirectlyAndSucceeds()
+    {
+        using var temp = new TempDirectory();
+        var provider = new LocalFileSystemProvider(
+            temp.Path,
+            options: new LocalFileSystemProviderOptions
+            {
+                CopyBufferSizeBytes = 4,
+                TinyFileFastPathThresholdBytes = 100,
+            });
+
+        var destination = Path.Combine(temp.Path, "directtiny.txt");
+        var payload = Encoding.UTF8.GetBytes("tiny-direct-write");
+        var reportedBytes = 0L;
+        IProgress<long> progress = new SyncProgress<long>(bytes => reportedBytes += bytes);
+
+        await using var source = new MemoryStream(payload);
+        await provider.WriteAsync(destination, source, progress, CancellationToken.None);
+
+        Assert.Equal(payload.LongLength, reportedBytes);
+        Assert.True(File.Exists(destination));
+        Assert.Equal("tiny-direct-write", await File.ReadAllTextAsync(destination));
+        Assert.Empty(Directory.GetFiles(temp.Path, "*.smartcopy.tmp.*", SearchOption.TopDirectoryOnly));
+    }
+
+    [Fact]
+    public async Task WriteAsync_TinyFileFastPath_WhenInterrupted_DoesNotLeaveCorruptedFile()
+    {
+        using var temp = new TempDirectory();
+        var provider = new LocalFileSystemProvider(
+            temp.Path,
+            options: new LocalFileSystemProviderOptions
+            {
+                CopyBufferSizeBytes = 4,
+                TinyFileFastPathThresholdBytes = 1024,
+            });
+        var destination = Path.Combine(temp.Path, "direct-interrupted.txt");
+
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+        {
+            await using var source = new InterruptingReadStream(totalBytes: 512, throwAfterBytes: 128);
+            await provider.WriteAsync(destination, source, progress: null, CancellationToken.None);
+        });
+
+        Assert.False(File.Exists(destination));
+        Assert.Empty(Directory.GetFiles(temp.Path, "*.smartcopy.tmp.*", SearchOption.TopDirectoryOnly));
+    }
+
+    [Fact]
+    public async Task WriteAsync_TinyFileFastPath_WhenOpenFails_DoesNotDeletePreExistingFile()
+    {
+        using var temp = new TempDirectory();
+        var provider = new LocalFileSystemProvider(
+            temp.Path,
+            options: new LocalFileSystemProviderOptions
+            {
+                CopyBufferSizeBytes = 4,
+                TinyFileFastPathThresholdBytes = 1024,
+            });
+        var destination = Path.Combine(temp.Path, "pre-existing.txt");
+        await File.WriteAllTextAsync(destination, "do-not-delete-me");
+
+        var invalidDestination = Path.Combine(destination, "invalid-subdir", "file.txt");
+
+        await Assert.ThrowsAnyAsync<IOException>(async () =>
+        {
+            await using var source = new MemoryStream("payload"u8.ToArray());
+            await provider.WriteAsync(invalidDestination, source, progress: null, CancellationToken.None);
+        });
+
+        // Ensure the actual pre-existing file was completely untouched
+        Assert.True(File.Exists(destination));
+        Assert.Equal("do-not-delete-me", await File.ReadAllTextAsync(destination));
+    }
+
     private sealed class InterruptingReadStream(int totalBytes, int throwAfterBytes) : Stream
     {
         private readonly int _totalBytes = totalBytes;

@@ -16,6 +16,7 @@ public sealed class LocalFileSystemProviderOptions
     public LocalFileSystemWriteMode WriteMode { get; init; } = LocalFileSystemWriteMode.Auto;
     public bool UseArrayPoolForManualLoop { get; init; }
     public bool PreallocateDestinationFile { get; init; }
+    public long TinyFileFastPathThresholdBytes { get; init; }
 
     public LocalFileSystemProviderOptions Normalize()
     {
@@ -34,6 +35,13 @@ public sealed class LocalFileSystemProviderOptions
         if (!Enum.IsDefined(WriteMode))
         {
             throw new ArgumentOutOfRangeException(nameof(WriteMode), "Write mode must be a defined value.");
+        }
+
+        if (TinyFileFastPathThresholdBytes < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(TinyFileFastPathThresholdBytes),
+                "Tiny-file fast-path threshold must be zero or greater.");
         }
 
         return this;
