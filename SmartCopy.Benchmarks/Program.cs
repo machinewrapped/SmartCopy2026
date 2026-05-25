@@ -424,6 +424,39 @@ static async Task RunBenchmarkModeAsync(
     Directory.CreateDirectory(artifactDirectory);
 
     var historicalRuns = await ReadExistingRunsAsync<BenchmarkRunRecord>(resultsPath, ct);
+
+    if (historicalRuns.Count > 0)
+    {
+        var hasPending = false;
+        foreach (var scenario in config.Scenarios.Where(s => s.Enabled))
+        {
+            foreach (var variant in config.Variants.Where(v => v.Enabled))
+            {
+                var successfulRuns = historicalRuns.Count(r => IsSuccessfulRunForScenarioVariant(r, scenario.Name, variant.Name));
+                if (successfulRuns < variant.DesiredRunCount)
+                {
+                    hasPending = true;
+                    break;
+                }
+            }
+            if (hasPending) break;
+        }
+
+        if (!hasPending)
+        {
+            Console.WriteLine();
+            Console.WriteLine("-------------------------------------------------------------------");
+            Console.WriteLine("All previous benchmark runs in the active scenarios are completed.");
+            Console.WriteLine("Archiving completed runs to a dated subfolder to start fresh...");
+            Console.WriteLine("-------------------------------------------------------------------");
+
+            await ArchiveResultsAsync(artifactDirectory, selection.ConfigPath, ct);
+
+            // Reload historical runs (should be empty now)
+            historicalRuns = await ReadExistingRunsAsync<BenchmarkRunRecord>(resultsPath, ct);
+        }
+    }
+
     await UpdateTaskListAsync(taskListPath, config, historicalRuns, ct);
 
     int totalPoolRunsNeeded = config.Scenarios.Count(s => s.Enabled && s.UsePathPool)
@@ -650,6 +683,78 @@ static async Task RunBenchmarkModeAsync(
         }
 
         lastScenario = scenario;
+
+        // Apply a 60-second cooldown if there are more benchmarks left in the queue
+        var nextSelection = SelectBenchmarkSelection(config, historicalRuns, selection);
+        if (nextSelection is not null && nextSelection.SuccessfulRunCount < nextSelection.Variant.DesiredRunCount)
+        {
+            Console.WriteLine();
+            Console.WriteLine("-------------------------------------------------------------------");
+            Console.WriteLine("Applying 60-second cooldown to let the drive cache settle and cool...");
+            Console.WriteLine("-------------------------------------------------------------------");
+            for (int i = 60; i > 0; i--)
+            {
+                if (ct.IsCancellationRequested) break;
+                Console.Write($"\rResuming next variant in {i} seconds...   ");
+                await Task.Delay(1000, ct);
+            }
+            Console.WriteLine("\rCooldown complete. Starting next variant.                   ");
+            Console.WriteLine();
+        }
+    }
+}
+
+static async Task ArchiveResultsAsync(string artifactDirectory, string configPath, CancellationToken ct)
+{
+    var fileNames = FileNamesResolver.GetFileNames(configPath);
+    var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+    var configName = Path.GetFileNameWithoutExtension(configPath);
+    var archiveDirName = $"{timestamp}_{configName}";
+    var archiveDirectory = Path.Combine(artifactDirectory, "archive", archiveDirName);
+
+    Directory.CreateDirectory(archiveDirectory);
+    Console.WriteLine($"Created archive directory: {archiveDirectory}");
+
+    var filesToMove = new[]
+    {
+        fileNames.Results,
+        fileNames.FileResults,
+        fileNames.Analysis,
+        fileNames.TaskList,
+        "benchmark-path-pool.json"
+    };
+
+    foreach (var fileName in filesToMove)
+    {
+        var src = Path.Combine(artifactDirectory, fileName);
+        if (File.Exists(src))
+        {
+            var dest = Path.Combine(archiveDirectory, fileName);
+            try
+            {
+                File.Move(src, dest, overwrite: true);
+                Console.WriteLine($"Archived file: {fileName}");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error archiving {fileName}: {ex.Message}");
+            }
+        }
+    }
+
+    var journalSrc = Path.Combine(artifactDirectory, JournalDirectoryName);
+    if (Directory.Exists(journalSrc))
+    {
+        var journalDest = Path.Combine(archiveDirectory, JournalDirectoryName);
+        try
+        {
+            Directory.Move(journalSrc, journalDest);
+            Console.WriteLine("Archived journals directory.");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error archiving journals directory: {ex.Message}");
+        }
     }
 }
 
@@ -766,6 +871,16 @@ static BenchmarkSelection? SelectBenchmarkSelection(
                 break;
             }
         }
+    }
+
+    var pendingCandidates = candidates
+        .Where(c => c.SuccessfulRunCount < c.Variant.DesiredRunCount)
+        .ToList();
+
+    if (pendingCandidates.Count > 0)
+    {
+        var rand = new Random();
+        return pendingCandidates[rand.Next(pendingCandidates.Count)];
     }
 
     var scenarioPriority = BuildScenarioPriority(config, candidates.Select(c => c.Scenario.Name));
