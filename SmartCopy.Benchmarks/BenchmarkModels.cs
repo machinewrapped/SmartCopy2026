@@ -708,3 +708,123 @@ internal static class BenchmarkJson
         await JsonSerializer.SerializeAsync(stream, value, JsonOptions.Indented, ct);
     }
 }
+
+internal sealed record BenchmarkSelection(
+    BenchmarkScenario Scenario,
+    BenchmarkVariant Variant,
+    int SuccessfulRunCount,
+    int TotalRunCount,
+    DateTime LastRunUtc,
+    int NextRunIndex);
+
+internal sealed record FileSizeBucket(long MinBytesInclusive, long MaxBytesInclusive, string Label)
+{
+    public bool Contains(long value) => value >= MinBytesInclusive && value <= MaxBytesInclusive;
+}
+
+internal sealed record RunVariantEvidence(
+    string VariantName,
+    int TotalRuns,
+    int ValidRuns,
+    int InvalidRuns,
+    double MedianSeconds,
+    double MeanSeconds,
+    double MinSeconds,
+    double MaxSeconds,
+    double SpreadSeconds);
+
+internal sealed record BucketVariantEvidence(
+    string BucketLabel,
+    string VariantName,
+    int RecordCount,
+    long TotalBytes,
+    double MeanDurationMilliseconds,
+    double MedianDurationMilliseconds,
+    double P95DurationMilliseconds,
+    double AggregateThroughputMiBPerSecond,
+    double MeanThroughputMiBPerSecond,
+    double P50ThroughputMiBPerSecond,
+    double P95ThroughputMiBPerSecond,
+    double RunMedianSpreadMilliseconds)
+{
+    public static BucketVariantEvidence Empty(string bucketLabel, string variantName) =>
+        new(bucketLabel, variantName, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+}
+
+internal sealed record EvidenceComparison(
+    string Verdict,
+    string DeltaText,
+    string NoiseText);
+
+internal static class FileSizeBuckets
+{
+    public static IReadOnlyList<FileSizeBucket> All { get; } =
+    [
+        new FileSizeBucket(0, 4 * 1024, "Sub4KiB"),
+        new FileSizeBucket(4 * 1024 + 1, 16 * 1024, "Sub16KiB"),
+        new FileSizeBucket(16 * 1024 + 1, 64 * 1024, "Sub64KiB"),
+        new FileSizeBucket(64 * 1024 + 1, 256 * 1024, "Sub256KiB"),
+        new FileSizeBucket(256 * 1024 + 1, 512 * 1024, "Sub512KiB"),
+        new FileSizeBucket(512 * 1024 + 1, 1024 * 1024, "Sub1MiB"),
+        new FileSizeBucket(1024 * 1024 + 1, 4L * 1024 * 1024, "Sub4MiB"),
+        new FileSizeBucket(4L * 1024 * 1024 + 1, long.MaxValue, "Tail"),
+    ];
+}
+
+internal static class FileNamesResolver
+{
+    public const string DefaultResults = "benchmark-results.ndjson";
+    public const string DefaultFileResults = "benchmark-file-results.ndjson";
+    public const string DefaultAnalysis = "benchmark-analysis.md";
+    public const string DefaultSizeScaling = "benchmark-size-scaling.md";
+    public const string DefaultTaskList = "benchmark-tasklist.md";
+
+    public static (string Results, string FileResults, string Analysis, string SizeScaling, string TaskList) GetFileNames(string configPath)
+    {
+        var configFileName = Path.GetFileName(configPath);
+        var prefix = configFileName.EndsWith(".json") ? configFileName[..^5] : configFileName;
+
+        var results = prefix.Replace("scenarios", "results") + ".ndjson";
+        if (results == prefix + ".ndjson") results = DefaultResults;
+
+        var fileResults = prefix.Replace("scenarios", "file-results") + ".ndjson";
+        if (fileResults == prefix + ".ndjson") fileResults = DefaultFileResults;
+
+        var analysis = prefix.Replace("scenarios", "analysis") + ".md";
+        if (analysis == prefix + ".md") analysis = DefaultAnalysis;
+
+        var sizeScaling = prefix.Replace("scenarios", "size-scaling") + ".md";
+        if (sizeScaling == prefix + ".md") sizeScaling = DefaultSizeScaling;
+
+        var taskList = prefix.Replace("scenarios", "tasklist") + ".md";
+        if (taskList == prefix + ".md") taskList = DefaultTaskList;
+
+        return (results, fileResults, analysis, sizeScaling, taskList);
+    }
+}
+
+internal sealed class VariantNameComparer : IComparer<string>
+{
+    public int Compare(string? x, string? y)
+    {
+        if (x == y) return 0;
+        if (x == null) return -1;
+        if (y == null) return 1;
+
+        var matchX = System.Text.RegularExpressions.Regex.Match(x, @"\d+");
+        var matchY = System.Text.RegularExpressions.Regex.Match(y, @"\d+");
+        
+        long numX = matchX.Success ? long.Parse(matchX.Value) : -1;
+        long numY = matchY.Success ? long.Parse(matchY.Value) : -1;
+
+        // If both have numbers and the numbers differ, sort by the number
+        if (numX != -1 && numY != -1 && numX != numY)
+        {
+            return numX.CompareTo(numY);
+        }
+
+        // Fallback to string comparison
+        return string.Compare(x, y, StringComparison.OrdinalIgnoreCase);
+    }
+}
+
