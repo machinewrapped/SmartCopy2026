@@ -1,6 +1,8 @@
 # SmartCopy2026 — Optimisation Strategies
 
-This document is the reference for copy performance optimisation: what we know, what we're doing about it, and in what order.
+This document is the reference for copy performance optimisation: what we know, what we are testing next, and how benchmark evidence should be interpreted.
+
+The end goal is not a single universally "best" copy strategy. The target is an adaptive routing policy: choose the safest and fastest practical strategy for each file-size range, then validate the whole policy against realistic datasets and destination types.
 
 ## 1. The Core Tension
 
@@ -118,17 +120,27 @@ These improve user experience but are subject to benchmarking and user preferenc
 
 **Directory cohesion:** Interrupted runs ideally complete full directories before stopping rather than scattering files across multiple directories. This improves resume semantics. Benchmark Phase 3 to measure the cost; provide a user setting to control the behaviour (e.g., batch size, or `CoherenceMode: None | PerDirectory | Adaptive`).
 
-## 4. Adaptive Routing
+## 4. Adaptive Routing And Policy Discovery
 
-The pipeline knows every file's size before execution begins. The target architecture routes each file through an appropriate code path based on size, rather than using a single strategy for all files, e.g.
+The pipeline knows every file's size before execution begins. The target architecture routes each file through an appropriate code path based on size, destination profile, overwrite mode, and provider capabilities rather than using a single strategy for all files, e.g.
 
 | File Size | Code Path |
 |---|---|
-| ≤T (tiny) | No staging, throttled progress events |
-| T–4 MiB | Staged write, throttled progress |
-| >4 MiB | Staged write, granular progress |
+| ≤T (tiny) | No staging, buffered read/write batching |
+| T–S | Staging, buffered read/write batching |
+| S–M | Staging, unbuffered, throttled progress updates |
+| >M | Staged write, granular progress |
 
-This is a routing function at the top of `CopyStep.ApplyAsync` operating on already-known data (`node.Size`, `overwriteMode`, `providerCapabilities`) — no I/O in the hot path. The threshold T is provisional; Phase 2 benchmarking will determine the actual file size at which staging overhead is significant enough to bypass.
+This should be a routing function operating on already-known data (`node.Size`, `overwriteMode`, `providerCapabilities`) — no I/O in the hot path.
+
+Benchmark variants are discovery tools, not necessarily final product configurations. Early phases should identify which strategy wins per file-size bucket. Later phases should compose those bucket-level findings into candidate policies and validate those policies against whole-workload wall-clock time.
+
+Evidence flow:
+1. **Discovery:** run strategy variants on fine-grained size buckets.
+2. **Bucket recommendation:** identify the best-supported strategy for each size range.
+3. **Policy construction:** convert recommendations into a small routing table.
+4. **Policy validation:** benchmark the whole policy on MixedDataset and destination-specific scenarios.
+5. **Default promotion:** only promote defaults after whole-policy validation passes.
 
 ## 5. Phases
 
@@ -163,13 +175,13 @@ The current per-file overhead chain:
 
 ---
 
-### Phase 2 — Tiny-File Direct Write (+ Overwrite Check Matrix)
+### Phase 2 — Tiny-File Direct Write
  
-**Status:** Fully Completed and Integrated. Benchmark discovery sweeps were run under a 60-second cooldown on a cold boot. The **256 KiB** threshold was identified as the optimal sweet spot, delivering an **18.9% overall wall-clock speedup (17.22 seconds saved)** and a **+25.1% overall throughput boost** (from 8.75 MiB/s to 10.95 MiB/s), while avoiding Large Object Heap (LOH) GC pressure and reducing system calls by 63.7%. The feature has been fully integrated into `SmartCopy.Core` with safe, non-destructive catch-and-delete cleanup, and protected with a comprehensive unit test suite (530 tests passing).
+**Status:** Implemented and benchmarked as a discovery mechanism. `LocalFileSystemProviderOptions.TinyFileFastPathThresholdBytes` exists and defaults to `0` (disabled). The benchmark sweep showed that removing the overwrite existence check produced differences smaller than run-to-run variance, so the `ExistsCheckOff` variants have been retired from the active matrix.
  
 **Goal:** Measure the cost of the staged temp-file lifecycle (create + write + rename) for small files by bypassing it entirely, and find the file-size threshold below which direct write is a meaningful win.
 
-**Phase 2 prerequisite (mandatory):** See Section 6.2 for the full dataset specification and required tooling changes. Both must be complete before Phase 2 benchmarks can produce actionable results.
+**Phase 2 prerequisite:** See Section 6.2 for the dataset specification and tooling requirements. These are implemented for current benchmark runs.
 
 **Integrity trade-off:** Staged writes ensure an interrupted write does not leave a partial file at the destination. For very small files the write may be effectively atomic at the OS or firmware level (writes are per-sector or per-block), so staging may be overhead with no integrity benefit. Benchmarks are needed to weigh the trade-off; the implementation should expose a threshold setting rather than hardcode one.
 
@@ -179,11 +191,7 @@ Direct write *without staging* trades durability for speed: a power loss or unpl
 
 Add a threshold sweep to `BenchmarkCopyRunner`. Each variant applies direct write via `File.WriteAllBytesAsync` for files below its threshold; files at or above use the existing staged path unchanged.
 
-Run each threshold with both overwrite modes:
-- `OverwriteExistsCheckOn` (current behaviour)
-- `OverwriteExistsCheckOff` (experimental path currently default-off in Core)
-
-This makes overwrite pre-check removal a measured Phase 2 variable instead of an unvalidated Phase 1 loose end.
+Overwrite existence-check removal was measured and retired from the active benchmark matrix because the observed differences were smaller than benchmark variance. Keep the normal existence-check path as the active control unless future evidence shows a stable signal.
 
 | Variant | Direct-write threshold |
 |---|---|
@@ -193,20 +201,16 @@ This makes overwrite pre-check removal a measured Phase 2 variable instead of an
 | `DirectWrite256KiB` | ≤256 KiB |
 | `DirectWrite512KiB` | ≤512 KiB |
 | `DirectWrite1MiB` | ≤1 MiB |
+| `DirectWrite4MiB` | ≤4 MiB |
 
 Files to modify:
-- `SmartCopy.Benchmarks/BenchmarkModels.cs` — add the six variants
+- `SmartCopy.Benchmarks/BenchmarkModels.cs` — add threshold variants
 - `SmartCopy.Benchmarks/BenchmarkCopyRunner.cs` — direct-write copy engine parameterised by threshold
 
 Run per the standard protocol (Section 7.1) — SSDtoSSD first, `BaselineAuto` included as reference, randomised order. The sweep answers two questions: does direct write help at all, and at what threshold does staging overhead become negligible?
 
-Include matched controls for overwrite mode so attribution is clear:
-- `BaselineAuto + OverwriteExistsCheckOn`
-- `BaselineAuto + OverwriteExistsCheckOff`
-
 **Gate:**
-- Any threshold shows ≥20% P50/P95 improvement over matched overwrite-mode baseline → proceed to Core integration using the highest-threshold variant that still shows a meaningful gain.
-- `OverwriteExistsCheckOff` shows meaningful gain without behavioural regressions in overwrite/error semantics → keep as opt-in candidate for later default discussion.
+- Any threshold shows ≥20% P50/P95 improvement over matched baseline within the same size bucket → keep it as a candidate for policy construction.
 - No threshold shows ≥10% improvement → staging is not the primary bottleneck; proceed to Phase 3 and revisit Phase 2 priority.
 
 **Step 2 — Core integration (after gate):**
@@ -219,7 +223,7 @@ Acceptance criteria: improved P50/P95 for files below threshold matching benchma
 
 ### Phase 3 — Buffered Read-Write Batching
 
-**Status:** Benchmark after Phase 2 gate decision.
+**Status:** Benchmark tooling is implemented in `SmartCopy.Benchmarks`; discovery and analysis are in progress. Do not integrate into Core until bucket-level evidence identifies where batching helps and whole-policy validation confirms it improves realistic workloads.
 
 **Goal:** Test whether separating read I/O and write I/O into distinct phases reduces overhead for small files, and find the batch-buffer size at which gains plateau.
 
@@ -237,36 +241,39 @@ This is likely to be especially beneficial on same-drive copies (reduces seek/he
 
 **Memory:** Buffer is pool-allocated. Progress events are emitted per batch rather than per file.
 
+**Core batching rule:** a file is batched only if it fits in an empty batch buffer. If a file fits the configured buffer but not the remaining space, flush the current batch before reading it. Files larger than the configured batch buffer use the normal unbatched path. This prevents a small buffer variant from accidentally benchmarking an impossible buffer layout.
+
 **Benchmark variants (no Core changes):**
 
-Use the optimal direct-write threshold from Phase 2. Run a buffer-size sweep to find where gains plateau:
+Run matched staged/direct pairs across buffer sizes to find where gains plateau or reverse. Direct variants use the active direct-write threshold under test; current Phase 3 scenario files include the extended 4 MiB threshold so the 1-4 MiB tail can participate in policy discovery.
 
-Run matched pairs at every buffer size. `DirectWriteBatch{N} − ReadBatch{N}` isolates the staging-removal contribution at each buffer size; `ReadBatch{N} − BaselineAuto` isolates phase separation alone. Without matched pairs across the curve, a plateau in the `DirectWriteBatch` sweep cannot be attributed to either factor.
+Run matched pairs at every buffer size. `DirectWriteBatch{N} − StagedWriteBatch{N}` estimates the direct-write contribution at that buffer size; `StagedWriteBatch{N} − Control_BaselineAuto` estimates phase separation alone. `DirectWriteBatch{N} − UnbatchedDirectWrite{T}` estimates the incremental value of batching over direct write alone. Without matched controls, a plateau in the `DirectWriteBatch` sweep cannot be attributed to either factor.
 
 | Variant | Batch buffer | Write mode |
 |---|---|---|
-| `ReadBatch4MiB` | 4 MiB | staged |
+| `Control_BaselineAuto` | none | staged |
+| `UnbatchedDirectWrite{T}` | none | direct |
+| `StagedWriteBatch1MiB` | 1 MiB | staged |
+| `DirectWriteBatch1MiB` | 1 MiB | direct |
+| `StagedWriteBatch4MiB` | 4 MiB | staged |
 | `DirectWriteBatch4MiB` | 4 MiB | direct |
-| `ReadBatch16MiB` | 16 MiB | staged |
+| `StagedWriteBatch16MiB` | 16 MiB | staged |
 | `DirectWriteBatch16MiB` | 16 MiB | direct |
-| `ReadBatch64MiB` | 64 MiB | staged |
+| `StagedWriteBatch64MiB` | 64 MiB | staged |
 | `DirectWriteBatch64MiB` | 64 MiB | direct |
-| `ReadBatch256MiB` | 256 MiB | staged |
-| `DirectWriteBatch256MiB` | 256 MiB | direct |
-| `ReadBatch512MiB` | 512 MiB | staged |
-| `DirectWriteBatch512MiB` | 512 MiB | direct |
-
-All variants: files above the Phase 2 threshold use the existing staged path unchanged. Higher buffer sizes may not be practical on all machines; skip if system RAM is constrained, but keep pairs matched.
 
 Files to modify:
-- `SmartCopy.Benchmarks/BenchmarkCopyRunner.cs` — add `BufferBatchBytes` option
-- `SmartCopy.Benchmarks/BenchmarkModels.cs` — add variants
+- `SmartCopy.Benchmarks/BenchmarkCopyRunner.cs` — `BufferBatchBytes` support and batch-fit rule implemented
+- `SmartCopy.Benchmarks/BenchmarkModels.cs` — `BufferBatchBytes` on scenarios, variants, and run records
+- `benchmark-scenarios-phase3.json` / `benchmark-scenarios-consolidated.json` — active scenario matrices
 
-Run per the standard protocol (Section 7.1), randomised order. Run the best `DirectWriteBatch*` variant on SSDtoHDD once before committing to Core integration.
+Run per the standard protocol (Section 7.1), randomised order. Run SSDtoSSD first for fast feedback. Promote to SameDriveTest and SSDtoHDD only after the SSD results show a bucket-level signal that exceeds variance. USB remains a separate validation target.
 
 **Gate:**
-- Best `DirectWriteBatch*` ≥10% better than `DirectWrite` alone → proceed to Core integration using the buffer size where gains plateau.
-- All `ReadBatch*` ≈ `BaselineAuto` → phase separation alone does nothing; the gain is entirely from removing staging.
+- A bucket-level strategy recommendation is only valid when its improvement over matched controls exceeds run-to-run variance.
+- A whole-policy candidate is only valid when MixedDataset wall-clock `executeDuration` improves beyond variance with no correctness regressions.
+- All `StagedWriteBatch*` ≈ `Control_BaselineAuto` → phase separation alone does not produce a useful signal; any direct batch gain is probably from direct write rather than batching.
+- Best `DirectWriteBatch*` ≈ `UnbatchedDirectWrite{T}` → batching does not add enough value to justify Core complexity.
 
 **Step 2 — Core integration (after gate):** Design TBD from benchmark results. Likely a new batching coordinator above the step layer.
 
@@ -355,43 +362,48 @@ Starting configuration to test: `smallFileMaxConcurrency = 4`, then 6 and 8.
 
 All four variants have two successful runs on SSDtoSSD, SameDriveTest, and SSDtoHDD. The USB baseline is essentially complete: BaselineAuto and CopyToAsync512KiB have two USB runs each; ManualLoop512KiBArrayPool and ManualLoop1MiBPreallocate have one run each. The second ManualLoop USB runs are pending but results are consistent and unlikely to shift any conclusions.
 
-These four variants establish the Phase 1 baseline only. No Phase 2+ variants have been benchmarked yet.
+These four variants establish the Phase 1 baseline only.
 
-### 6.2 Pending: Small-File Granular Dataset
+Phase 2 direct-write discovery has since been run using `SmallFileDataset`. The active lesson is that direct write is worth keeping as a policy candidate, while `ExistsCheckOff` is retired because its measured effect was smaller than run-to-run variance. Treat precise Phase 2 summary numbers as provisional unless backed by the current benchmark artifacts and variance checks.
 
-**Required before Phase 2 can be benchmarked.**
+Phase 3 batching support and scenario configs are now present in the benchmark suite. The next task is to collect and analyze Phase 3 data with enough structure to identify bucket-level strategy recommendations, not just an overall "winner."
+
+### 6.2 Small-File Granular Dataset
+
+**Status:** Required for Phase 2/3 discovery. Tooling exists and `SmallFileDataset` has been used for Phase 2. Keep using it for per-bucket strategy discovery.
 
 The MixedDataset aggregates all files under 64 KiB into a single "Tiny" bucket. This is sufficient to establish that per-file overhead dominates, but cannot identify *at which size threshold* staging removal becomes effective — the core question of Phase 2. A dedicated dataset with fine-grained sub-64 KiB buckets is required for Phase 2 benchmark results to be actionable.
 
 **Design rationale:** Optimises for signal over realism. Files are selected by size from the source pool and written into flat per-bucket subdirectories rather than preserving source directory structure. This deliberately produces a controlled layout — same-sized files grouped together — which maximises the signal-to-noise ratio for per-file overhead measurement by size band. The MixedDataset (source structure preserved) serves as the real-world validation pass once strategies are identified.
 
-**Run-time basis:** MixedDataset SSDtoSSD data gives ~9.1 ms/file overhead rate (123 s ÷ 13,540 files in the 0–64 KiB bucket). At ~1,000 files per sub-bucket, ~5,100 total files × 9 ms ≈ **~60 seconds per variant** on SSD. Phase 2's 14+ variants × 2 runs ≈ 28–35 minutes total for a full SSD matrix.
+**Run-time basis:** MixedDataset SSDtoSSD data gives ~9.1 ms/file overhead rate (123 s ÷ 13,540 files in the 0–64 KiB bucket). At ~1,000 files per sub-bucket, ~5,100 total files × 9 ms ≈ **~60 seconds per variant** on SSD. The active matrix size changes as variants are retired or added; use the scenario config and desired run counts as the source of truth for total runtime.
 
 **Dataset name:** `SmallFileDataset`, destination e.g. `R:\TestData\SmallFileDataset`
 
-**Bucket specification** — boundaries deliberately aligned to Phase 2 variant thresholds (4 / 16 / 64 / 256 / 1024 KiB) so each variant's impact falls cleanly within named buckets:
+**Bucket specification** — boundaries deliberately aligned to Phase 2 variant thresholds (4 / 16 / 64 / 256 / 512 / 1024 KiB) plus a 1-4 MiB tail so each variant's impact falls cleanly within named buckets:
 
 | Bucket | Min | Max | Target | Approx files |
 |--------|-----|-----|--------|--------------|
-| `Sub4KiB` | 0 | 4 KiB | 2 MiB | ~1,000 |
-| `Sub16KiB` | 4 KiB+1 | 16 KiB | 8 MiB | ~1,000 |
-| `Sub64KiB` | 16 KiB+1 | 64 KiB | 32 MiB | ~1,000 |
-| `Sub256KiB` | 64 KiB+1 | 256 KiB | 128 MiB | ~1,000 |
-| `Sub1MiB` | 256 KiB+1 | 1 MiB | 512 MiB | ~1,000 |
-| `Tail` | 1 MiB+1 | 4 MiB | 256 MiB | ~128 |
+| `Sub4KiB` | 0 | 4 KiB | 40 MiB | source-dependent |
+| `Sub16KiB` | 4 KiB+1 | 16 KiB | 80 MiB | source-dependent |
+| `Sub64KiB` | 16 KiB+1 | 64 KiB | 120 MiB | source-dependent |
+| `Sub256KiB` | 64 KiB+1 | 256 KiB | 160 MiB | source-dependent |
+| `Sub512KiB` | 256 KiB+1 | 512 KiB | 200 MiB | source-dependent |
+| `Sub1MiB` | 512 KiB+1 | 1 MiB | 200 MiB | source-dependent |
+| `Tail` | 1 MiB+1 | 4 MiB | 200 MiB | source-dependent |
 
-Total: ~938 MiB. File counts are estimates at average sizes. If the primary source directory does not supply enough candidates to fill all buckets, point the tool at an additional source directory and re-run — the existing `ExistingDestinationSkips` logic ensures already-filled buckets are not overwritten. Do not pad with synthetic files.
+Total: ~1 GiB. File counts depend on the available source corpus. If the primary source directory does not supply enough candidates to fill all buckets, point the tool at an additional source directory and re-run — the existing `ExistingDestinationSkips` logic ensures already-filled buckets are not overwritten. Do not pad with synthetic files.
 
-**Tooling changes required (all five mandatory before Phase 2 benchmarks can run):**
+**Tooling requirements:**
 
 1. **`OrganizeByBucket` flag in `DatasetPreparationConfig`** — when `true`, files are written to `{DestinationPath}\{BucketName}\{filename}` (flat per bucket) rather than preserving source relative paths. Default `false` preserves existing MixedDataset behaviour exactly. On filename collision within a bucket directory, skip the candidate and source the next one — do not rename or append an index. This naturally suppresses ubiquitous filenames (`desktop.ini`, `thumbs.db`, etc.) that would otherwise crowd out more varied candidates in small buckets. The existing `ExistingDestinationSkips` counter covers skipped collisions.
 
-2. **New `SmallFileDataset` scenario in `benchmark-scenarios.json`** — bucket config as above with `OrganizeByBucket: true` and destination path. No other code changes; generation runs with the existing `--mode dataset-prep` flow:
+2. **New `SmallFileDataset` scenario in scenario config** — bucket config as above with `OrganizeByBucket: true` and destination path. Generation runs with the existing `--mode dataset-prep` flow:
    ```
    dotnet run --project .\SmartCopy.Benchmarks --mode dataset-prep --scenario SmallFileDataset
    ```
 
-3. **Analysis tool — configurable bucket breakpoints** — the analysis tool currently reports per-bucket metrics using the MixedDataset bucket names (Tiny / Small / Medium / Large / XLarge / Huge). Running analysis against SmallFileDataset must use the dataset's own bucket definitions so results show the Sub4KiB / Sub16KiB breakdown rather than one aggregated "Tiny" row. Verify whether the analysis code reads bucket boundaries from the scenario config or has them hardcoded; if hardcoded, parameterise before Phase 2 benchmarks run.
+3. **Analysis tool — configurable bucket breakpoints** — analysis must use the dataset's own bucket definitions so SmallFileDataset results show the Sub4KiB / Sub16KiB breakdown rather than one aggregated "Tiny" row. The current tool reads bucket boundaries from `datasetPreparation` when present; keep this behaviour for future discovery datasets.
 
 4. **`--config <file>` CLI flag in `BenchmarkCliOptions`** — override the config file name (default: `benchmark-scenarios.json`). Phase 2 lives in its own config file (e.g. `benchmark-scenarios-phase2.json`) so the Phase 1 historical results and scenario definitions are frozen and isolated. Run dataset prep and benchmarks with:
    ```
@@ -414,6 +426,16 @@ The MixedDataset cannot isolate large-file throughput — tiny-file overhead dom
 
 Run at minimum `ManualLoop512KiB`, `ManualLoop1MiB`, `ManualLoop2MiB`, `ManualLoop4MiB` on SSDtoSSD, ≥3 runs per variant, randomised. This validates that buffer scaling and preallocation produce measurable gains in real-world large-file scenarios before promoting any defaults.
 
+### 6.4 Pending: Policy Validation Datasets
+
+After bucket-level discovery identifies promising routing rules, benchmark complete policies against larger and more realistic datasets:
+
+- **MixedDataset:** realistic file-count distribution and directory structure; primary validation for small-file policy value.
+- **Byte-volume-dominated dataset:** large-file throughput and buffer-size policy validation.
+- **Destination matrix:** SSDtoSSD, SameDriveTest, SSDtoHDD, SSDtoUSBFlash. SameDrive and USB must not inherit SSD defaults without evidence.
+
+Policy validation uses whole-run `executeDuration` as the primary metric. Bucket metrics explain why a policy works or fails; they do not by themselves prove the policy should ship.
+
 ## 7. Operational Reference
 
 ### 7.1 Running Benchmarks
@@ -430,13 +452,63 @@ Per-iteration protocol:
 
 ### 7.2 Metrics
 
-**Primary:** job wall-clock `executeDuration` per scenario/variant.
+Use different metrics for different questions. Do not collapse discovery and validation into one headline number.
+
+#### 7.2.1 Whole-Policy Validation Metrics
+
+Use these when deciding whether a complete routing policy should be promoted:
+
+**Primary:** job wall-clock `executeDuration` per scenario/variant/policy.
 
 **Secondary:**
-- Per-size-bucket `Avg`, `P50`, `P95` MiB/s from `benchmark-file-results.ndjson`.
-- Per-bucket aggregate wall-clock time and %-of-bytes (emitted directly by the analysis tool).
 - Run-to-run variance (coefficient of variation or simple spread).
 - `failedFiles` and exception counts.
+- `copiedFiles + failedFiles + skippedFiles` versus expected selected file count.
+- Destination free-space sanity, source/destination paths, path-pool usage, cold/warm notes.
+
+Verdict rules:
+- **Strong improvement:** median `executeDuration` improvement exceeds the gate and is larger than run-to-run variance.
+- **Noise:** candidate delta is smaller than or equal to run-to-run variance.
+- **Regression:** candidate is slower beyond variance.
+- **Invalid:** any run has failed files, unexpected skipped files, or a correctness mismatch.
+
+#### 7.2.2 Bucket-Level Strategy Discovery Metrics
+
+Use these when deciding which strategy belongs to which file-size range:
+
+- File count, byte count, `% files`, `% bytes`.
+- Mean, median, and P95 per-file copy duration.
+- Aggregate bucket throughput: `sum(bytes) / sum(copy durations)`.
+- Mean, median, and P95 MiB/s from `benchmark-file-results.ndjson`.
+- Delta versus matched controls within the same bucket.
+- Variance or spread across runs for the same bucket/variant.
+
+Bucket comparisons must be within the same file-size bucket. Total wall-clock time is misleading for comparing buckets because buckets intentionally contain different file counts and total bytes. Bucket metrics are the discovery engine for adaptive routing; whole-run wall-clock is the final reality check.
+
+Matched controls:
+- Direct-write threshold variants compare against `Control_BaselineAuto` in the same bucket.
+- `StagedWriteBatch{N}` compares against `Control_BaselineAuto` to estimate phase separation.
+- `DirectWriteBatch{N}` compares against `StagedWriteBatch{N}` to estimate direct write at the same buffer size.
+- `DirectWriteBatch{N}` compares against `UnbatchedDirectWrite{T}` to estimate batching beyond direct write alone.
+
+If a matched control is missing, analysis must say "cannot isolate effect" rather than infer a cause.
+
+#### 7.2.3 Analysis Output Requirements
+
+Reports should separate measurement from interpretation:
+
+1. **Run-level table:** successful run count, median/mean/min/max `executeDuration`, spread, delta versus matched baseline, verdict.
+2. **Bucket strategy table:** best observed strategy per bucket, delta versus matched control, variance status, recommendation.
+3. **Missing-control warnings:** list variants that cannot support causal conclusions.
+4. **Policy candidate summary:** proposed routing table built from bucket evidence.
+5. **Policy validation summary:** whole-run result for candidate policies on MixedDataset and destination matrix.
+
+Use mechanical verdict language:
+- `PASS`: exceeds gate and variance.
+- `INCONCLUSIVE`: delta is within variance or matched control is missing.
+- `FAIL`: below required improvement.
+- `REGRESSION`: slower beyond variance.
+- `INVALID`: correctness or run-integrity problem.
 
 **Operational sanity:** CPU usage trend during tiny-file phases; per-file `ExecutionDuration` distribution (flag outliers >1 s).
 
@@ -475,9 +547,10 @@ Ordered steps to completion. To continue: find the first unchecked item and exec
 - [x] Add `--config <file>` flag to `BenchmarkCliOptions.Parse()` (default: `benchmark-scenarios.json`)
 - [x] Add optional `SourcePath` to `BenchmarkScenario` (falls back to global `config.SourcePath`)
 - [x] Verify/fix analysis tool bucket parameterization — confirm it reads bucket boundaries from the scenario config rather than hardcoding MixedDataset names
-- [x] Add Phase 2 variants to `BenchmarkModels.cs`: `DirectWrite4KiB`, `DirectWrite16KiB`, `DirectWrite64KiB`, `DirectWrite256KiB`, `DirectWrite512KiB`, `DirectWrite1MiB` — each ×`OverwriteExistsCheckOn/Off`; plus `BaselineAuto+OverwriteExistsCheckOn` and `BaselineAuto+OverwriteExistsCheckOff` controls
+- [x] Add Phase 2 variants to scenario config: `DirectWrite4KiB`, `DirectWrite16KiB`, `DirectWrite64KiB`, `DirectWrite256KiB`, `DirectWrite512KiB`, `DirectWrite1MiB`, and extended `DirectWrite4MiB`; plus `Control_BaselineAuto`
 - [x] Implement direct-write copy engine in `BenchmarkCopyRunner.cs` — parameterised by threshold bytes, using `File.WriteAllBytesAsync` for files below threshold; existing staged path for files at or above
 - [x] Create `benchmark-scenarios-phase2.json` — SmallFileDataset prep config (`OrganizeByBucket: true`), SmallFileDataset × SSDtoSSD discovery scenarios, MixedDataset validation scenarios (`Enabled: false` initially)
+- [x] Retire `ExistsCheckOff` variants after benchmark differences proved smaller than variance
 
 **B — Dataset generation**
 
@@ -497,7 +570,7 @@ Ordered steps to completion. To continue: find the first unchecked item and exec
   ```
   dotnet run --project .\SmartCopy.Benchmarks --config benchmark-scenarios-phase2.json --mode analyze
   ```
-- [x] Apply gate (Section 5, Phase 2): identify which thresholds show ≥20% P50/P95 improvement over matched overwrite-mode baseline; record top candidates
+- [x] Apply gate (Section 5, Phase 2): identify which thresholds show useful bucket-level improvement over `Control_BaselineAuto`; record top candidates
 
 **D — MixedDataset validation (top candidates only)**
 
@@ -512,5 +585,32 @@ Ordered steps to completion. To continue: find the first unchecked item and exec
 **E — Gate decision**
 
 - [x] Update Phase 2 status in Section 5 of this document
-- [x] **Gate passes** (any threshold ≥20%): proceed to Core integration — add `TinyFileFastPathThresholdBytes` to `LocalFileSystemProviderOptions`, integrate in `LocalFileSystemProvider.WriteAsync`, run full test suite (Gate passed successfully at **256 KiB**, yielding +25.1% overall throughput boost and 18.9% wall-clock time reduction. Fully integrated and covered by 530 passing tests).
-- [x] **Gate fails** (no threshold ≥10%): update Phase 2 status to "staging not the bottleneck" and proceed to Phase 3
+- [x] **Core integration complete:** add `TinyFileFastPathThresholdBytes` to `LocalFileSystemProviderOptions`, integrate in `LocalFileSystemProvider.WriteAsync`, default disabled
+- [ ] Re-run analysis under the stricter Section 7.2 rules and record bucket-level recommendations without unsupported causal claims
+
+### 7.6 Phase 3 Execution Checklist
+
+Ordered steps to completion. To continue: find the first unchecked item and execute it.
+
+**A — Tooling**
+
+- [x] Add `BufferBatchBytes` to benchmark scenario/variant/run models
+- [x] Implement buffered read/write batching in `BenchmarkCopyRunner`
+- [x] Enforce batch-fit rule: a file is batched only if it fits in the configured batch buffer
+- [x] Add Phase 3 scenario configs for staged/direct batch pairs
+- [x] Verify `dotnet build SmartCopy.Benchmarks/SmartCopy.Benchmarks.csproj`
+
+**B — Discovery Benchmarks**
+
+- [ ] Run `benchmark-scenarios-phase3.json` on SmallFileDataset × SSDtoSSD
+- [ ] Re-run variants until each has at least 2 successful runs
+- [ ] Add a 3rd run where run-level spread exceeds the variance threshold
+- [ ] Analyze with bucket-level matched controls
+- [ ] Produce bucket-level strategy recommendations
+
+**C — Policy Validation**
+
+- [ ] Convert bucket recommendations into one or more candidate routing policies
+- [ ] Run candidate policies on MixedDataset × SSDtoSSD
+- [ ] Promote to SameDriveTest and SSDtoHDD only after SSDtoSSD passes beyond variance
+- [ ] Treat USB as a separate validation target; do not infer USB defaults from SSD/HDD
