@@ -307,6 +307,7 @@ internal sealed class BenchmarkVariant
     public long? DirectWriteThresholdBytes { get; set; }
     public bool? SkipExistsCheckForOverwrite { get; set; }
     public long? BufferBatchBytes { get; set; }
+    public string? MatchedControl { get; set; }
 
     public void Normalize()
     {

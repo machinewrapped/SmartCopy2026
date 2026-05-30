@@ -36,13 +36,74 @@
                          "skipExistsCheckForOverwrite":  false
                      },
                      {
-                         "directWriteThresholdBytes":  4194304,
-                         "name":  "UnbatchedDirectWrite4MiB",
-                         "bufferBatchBytes":  0,
-                         "desiredRunCount":  2,
+                         "name":  "DirectWrite4KiB",
+                         "notes":  "Direct write for files <= 4 KiB.",
                          "enabled":  true,
+                         "desiredRunCount":  2,
+                         "directWriteThresholdBytes":  4096,
+                         "bufferBatchBytes":  0,
                          "skipExistsCheckForOverwrite":  false,
-                         "notes":  "Unbatched direct write for everything \u003c= 4MiB."
+                         "matchedControl":  "Control_BaselineAuto"
+                     },
+                     {
+                         "name":  "DirectWrite16KiB",
+                         "notes":  "Direct write for files <= 16 KiB.",
+                         "enabled":  true,
+                         "desiredRunCount":  2,
+                         "directWriteThresholdBytes":  16384,
+                         "bufferBatchBytes":  0,
+                         "skipExistsCheckForOverwrite":  false,
+                         "matchedControl":  "Control_BaselineAuto"
+                     },
+                     {
+                         "name":  "DirectWrite64KiB",
+                         "notes":  "Direct write for files <= 64 KiB.",
+                         "enabled":  true,
+                         "desiredRunCount":  2,
+                         "directWriteThresholdBytes":  65536,
+                         "bufferBatchBytes":  0,
+                         "skipExistsCheckForOverwrite":  false,
+                         "matchedControl":  "Control_BaselineAuto"
+                     },
+                     {
+                         "name":  "DirectWrite256KiB",
+                         "notes":  "Direct write for files <= 256 KiB.",
+                         "enabled":  true,
+                         "desiredRunCount":  2,
+                         "directWriteThresholdBytes":  262144,
+                         "bufferBatchBytes":  0,
+                         "skipExistsCheckForOverwrite":  false,
+                         "matchedControl":  "Control_BaselineAuto"
+                     },
+                     {
+                         "name":  "DirectWrite512KiB",
+                         "notes":  "Direct write for files <= 512 KiB.",
+                         "enabled":  true,
+                         "desiredRunCount":  2,
+                         "directWriteThresholdBytes":  524288,
+                         "bufferBatchBytes":  0,
+                         "skipExistsCheckForOverwrite":  false,
+                         "matchedControl":  "Control_BaselineAuto"
+                     },
+                     {
+                         "name":  "DirectWrite1MiB",
+                         "notes":  "Direct write for files <= 1 MiB.",
+                         "enabled":  true,
+                         "desiredRunCount":  2,
+                         "directWriteThresholdBytes":  1048576,
+                         "bufferBatchBytes":  0,
+                         "skipExistsCheckForOverwrite":  false,
+                         "matchedControl":  "Control_BaselineAuto"
+                     },
+                     {
+                         "name":  "UnbatchedDirectWrite4MiB",
+                         "notes":  "Unbatched direct write for files <= 4 MiB.",
+                         "enabled":  true,
+                         "desiredRunCount":  2,
+                         "directWriteThresholdBytes":  4194304,
+                         "bufferBatchBytes":  0,
+                         "skipExistsCheckForOverwrite":  false,
+                         "matchedControl":  "Control_BaselineAuto"
                      },
                      {
                          "name":  "StagedWriteBatch1MiB",
@@ -51,7 +112,8 @@
                          "desiredRunCount":  2,
                          "directWriteThresholdBytes":  0,
                          "bufferBatchBytes":  1048576,
-                         "skipExistsCheckForOverwrite":  false
+                         "skipExistsCheckForOverwrite":  false,
+                         "matchedControl":  "Control_BaselineAuto"
                      },
                      {
                          "name":  "DirectWriteBatch1MiB",
@@ -60,7 +122,8 @@
                          "desiredRunCount":  2,
                          "directWriteThresholdBytes":  4194304,
                          "bufferBatchBytes":  1048576,
-                         "skipExistsCheckForOverwrite":  false
+                         "skipExistsCheckForOverwrite":  false,
+                         "matchedControl":  "StagedWriteBatch1MiB"
                      },
                      {
                          "name":  "StagedWriteBatch4MiB",
@@ -69,7 +132,8 @@
                          "desiredRunCount":  2,
                          "directWriteThresholdBytes":  0,
                          "bufferBatchBytes":  4194304,
-                         "skipExistsCheckForOverwrite":  false
+                         "skipExistsCheckForOverwrite":  false,
+                         "matchedControl":  "Control_BaselineAuto"
                      },
                      {
                          "name":  "DirectWriteBatch4MiB",
@@ -78,7 +142,8 @@
                          "desiredRunCount":  2,
                          "directWriteThresholdBytes":  4194304,
                          "bufferBatchBytes":  4194304,
-                         "skipExistsCheckForOverwrite":  false
+                         "skipExistsCheckForOverwrite":  false,
+                         "matchedControl":  "StagedWriteBatch4MiB"
                      },
                      {
                          "name":  "StagedWriteBatch16MiB",
@@ -87,7 +152,8 @@
                          "desiredRunCount":  2,
                          "directWriteThresholdBytes":  0,
                          "bufferBatchBytes":  16777216,
-                         "skipExistsCheckForOverwrite":  false
+                         "skipExistsCheckForOverwrite":  false,
+                         "matchedControl":  "Control_BaselineAuto"
                      },
                      {
                          "name":  "DirectWriteBatch16MiB",
@@ -96,7 +162,8 @@
                          "desiredRunCount":  2,
                          "directWriteThresholdBytes":  4194304,
                          "bufferBatchBytes":  16777216,
-                         "skipExistsCheckForOverwrite":  false
+                         "skipExistsCheckForOverwrite":  false,
+                         "matchedControl":  "StagedWriteBatch16MiB"
                      },
                      {
                          "name":  "StagedWriteBatch64MiB",
@@ -105,7 +172,8 @@
                          "desiredRunCount":  2,
                          "directWriteThresholdBytes":  0,
                          "bufferBatchBytes":  67108864,
-                         "skipExistsCheckForOverwrite":  false
+                         "skipExistsCheckForOverwrite":  false,
+                         "matchedControl":  "Control_BaselineAuto"
                      },
                      {
                          "name":  "DirectWriteBatch64MiB",
@@ -114,7 +182,8 @@
                          "desiredRunCount":  2,
                          "directWriteThresholdBytes":  4194304,
                          "bufferBatchBytes":  67108864,
-                         "skipExistsCheckForOverwrite":  false
+                         "skipExistsCheckForOverwrite":  false,
+                         "matchedControl":  "StagedWriteBatch64MiB"
                      }
                  ]
 }

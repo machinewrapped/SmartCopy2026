@@ -116,6 +116,7 @@ static async Task RunAnalysisModeAsync(
 {
     var fileNames = FileNamesResolver.GetFileNames(selection.ConfigPath);
     var artifactDirectory = ResolveArtifactDirectory(workingDirectory, config.SourcePath, config.ArtifactPath);
+    var resultsPath = Path.Combine(artifactDirectory, fileNames.Results);
     var fileResultsPath = Path.Combine(artifactDirectory, fileNames.FileResults);
     var analysisPath = Path.Combine(artifactDirectory, fileNames.Analysis);
     var reportBuilder = new StringBuilder();
@@ -133,18 +134,25 @@ static async Task RunAnalysisModeAsync(
         await File.WriteAllTextAsync(analysisPath, reportBuilder.ToString(), ct);
     }
 
-    if (!File.Exists(fileResultsPath))
+    if (!File.Exists(fileResultsPath) && !File.Exists(resultsPath))
     {
+        Report($"No benchmark results found: {resultsPath}");
         Report($"No file-level results found: {fileResultsPath}");
-        Report("Run benchmark mode first to produce benchmark-file-results.ndjson.");
+        Report("Run benchmark mode first to produce benchmark-results.ndjson and benchmark-file-results.ndjson.");
         await FlushReportAsync();
         return;
     }
 
-    var allRecords = await ReadExistingRunsAsync<BenchmarkFileCopyRecord>(fileResultsPath, ct);
-    if (allRecords.Count == 0)
+    var allRuns = File.Exists(resultsPath)
+        ? await ReadExistingRunsAsync<BenchmarkRunRecord>(resultsPath, ct)
+        : [];
+    var allRecords = File.Exists(fileResultsPath)
+        ? await ReadExistingRunsAsync<BenchmarkFileCopyRecord>(fileResultsPath, ct)
+        : [];
+
+    if (allRuns.Count == 0 && allRecords.Count == 0)
     {
-        Report($"No records available in {fileResultsPath}.");
+        Report("No benchmark records available.");
         await FlushReportAsync();
         return;
     }
@@ -156,8 +164,9 @@ static async Task RunAnalysisModeAsync(
 
     if (scenariosToAnalyze.Count == 0)
     {
-        scenariosToAnalyze = allRecords
+        scenariosToAnalyze = allRuns
             .Select(r => r.ScenarioName)
+            .Concat(allRecords.Select(r => r.ScenarioName))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -170,15 +179,21 @@ static async Task RunAnalysisModeAsync(
                     string.Equals(r.VariantName, selection.VariantName, StringComparison.OrdinalIgnoreCase))
         .ToList();
 
-    if (filteredRecords.Count == 0)
+    var filteredRuns = allRuns
+        .Where(r => scenarioSet.Contains(r.ScenarioName))
+        .Where(r => string.IsNullOrWhiteSpace(selection.VariantName) ||
+                    string.Equals(r.VariantName, selection.VariantName, StringComparison.OrdinalIgnoreCase))
+        .ToList();
+
+    if (filteredRecords.Count == 0 && filteredRuns.Count == 0)
     {
         if (!string.IsNullOrWhiteSpace(selection.ScenarioName))
         {
-            Report($"No file-level records found for scenario '{selection.ScenarioName.Trim()}'.");
+            Report($"No records found for scenario '{selection.ScenarioName.Trim()}'.");
         }
         else
         {
-            Report("No file-level records found for the selected scenarios.");
+            Report("No records found for the selected scenarios.");
         }
 
         if (!string.IsNullOrWhiteSpace(selection.VariantName))
@@ -192,6 +207,7 @@ static async Task RunAnalysisModeAsync(
 
     var allVariants = filteredRecords
         .Select(r => r.VariantName)
+        .Concat(filteredRuns.Select(r => r.VariantName))
         .Distinct(StringComparer.OrdinalIgnoreCase)
         .OrderBy(v => v, new VariantNameComparer())
         .ToList();
@@ -201,20 +217,34 @@ static async Task RunAnalysisModeAsync(
     Report($"- **Source:** `{Path.GetFullPath(config.SourcePath)}`");
     Report($"- **Scenario filter:** `{(string.IsNullOrWhiteSpace(selection.ScenarioName) ? "all (configured order)" : selection.ScenarioName.Trim())}`");
     Report($"- **Scenario count:** `{scenariosToAnalyze.Count}`");
-    Report($"- **Records:** `{filteredRecords.Count}`");
+    Report($"- **Run records:** `{filteredRuns.Count}`");
+    Report($"- **File records:** `{filteredRecords.Count}`");
     Report($"- **Variants:** {string.Join(", ", allVariants.Select(v => $"`{v}`"))}");
-    Report($"- **Input:** `{fileResultsPath}`");
+    Report($"- **Run input:** `{resultsPath}`");
+    Report($"- **File input:** `{fileResultsPath}`");
+    Report("- **Verdicts:** `PASS` means the measured improvement exceeds both the gate and observed variance. `INCONCLUSIVE` means the delta is inside variance or a matched control is missing.");
     Report();
+
+    var buckets = config.DatasetPreparation?.Buckets?.Select(b => new FileSizeBucket(b.MinimumFileSizeBytes, b.MaximumFileSizeBytes, b.Name)).ToList()
+                  ?? FileSizeBuckets.All.ToList();
+
+    var matchedControlLookup = config.Variants
+        .Where(v => !string.IsNullOrWhiteSpace(v.MatchedControl))
+        .ToDictionary(v => v.Name, v => v.MatchedControl!, StringComparer.OrdinalIgnoreCase);
 
     foreach (var scenarioName in scenariosToAnalyze)
     {
         var records = filteredRecords
             .Where(r => string.Equals(r.ScenarioName, scenarioName, StringComparison.OrdinalIgnoreCase))
             .ToList();
+        var runs = filteredRuns
+            .Where(r => string.Equals(r.ScenarioName, scenarioName, StringComparison.OrdinalIgnoreCase))
+            .Where(IsTerminalRun)
+            .ToList();
 
         Report($"## Scenario: `{scenarioName}`");
 
-        if (records.Count == 0)
+        if (records.Count == 0 && runs.Count == 0)
         {
             Report("No records for this scenario.");
             Report();
@@ -223,132 +253,31 @@ static async Task RunAnalysisModeAsync(
 
         var variants = records
             .Select(r => r.VariantName)
+            .Concat(runs.Select(r => r.VariantName))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(v => v, new VariantNameComparer())
             .ToList();
 
-        Report($"- **Records:** `{records.Count}`");
+        Report($"- **Run records:** `{runs.Count}`");
+        Report($"- **File records:** `{records.Count}`");
         Report($"- **Variants:** {string.Join(", ", variants.Select(v => $"`{v}`"))}");
         Report();
 
-        Report("### Overall by variant");
-        Report("| Variant | Files | Avg MiB/s | P50 MiB/s | P95 MiB/s |");
-        Report("|---|---:|---:|---:|---:|");
+        var warnings = BuildMissingControlWarnings(variants, matchedControlLookup);
 
-        foreach (var variant in variants)
+        ReportRunEvidence(Report, runs, variants);
+        ReportBucketRecommendations(Report, records, buckets, variants, warnings, matchedControlLookup);
+        ReportBucketMetrics(Report, records, buckets, variants);
+        ReportBatchingIsolationEvidence(Report, records, buckets, variants);
+
+        if (warnings.Count > 0)
         {
-            var speeds = records
-                .Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase))
-                .Select(r => r.ThroughputMiBPerSecond)
-                .Where(v => v is not null)
-                .Select(v => v!.Value)
-                .OrderBy(v => v)
-                .ToList();
-
-            if (speeds.Count == 0)
+            Report("### Missing Matched Controls");
+            foreach (var warning in warnings)
             {
-                continue;
+                Report($"- {warning}");
             }
-
-            Report(
-                $"| {EscapeTable(variant)} | {speeds.Count} | {speeds.Average():0.00} | {Percentile(speeds, 0.50):0.00} | {Percentile(speeds, 0.95):0.00} |");
-        }
-
-        Report();
-        Report("### Size buckets (Avg MiB/s by variant)");
-        Report("| Size Bucket | Variant | Files | Avg MiB/s | P50 MiB/s | P95 MiB/s |");
-        Report("|---|---|---:|---:|---:|---:|");
-
-        var buckets = config.DatasetPreparation?.Buckets?.Select(b => new FileSizeBucket(b.MinimumFileSizeBytes, b.MaximumFileSizeBytes, b.Name)).ToList()
-                      ?? FileSizeBuckets.All.ToList();
-
-        foreach (var bucket in buckets)
-        {
-            var bucketRecords = records.Where(r => bucket.Contains(r.FileSizeBytes)).ToList();
-            if (bucketRecords.Count == 0)
-            {
-                continue;
-            }
-
-            foreach (var variant in variants)
-            {
-                var speeds = bucketRecords
-                    .Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase))
-                    .Select(r => r.ThroughputMiBPerSecond)
-                    .Where(v => v is not null)
-                    .Select(v => v!.Value)
-                    .OrderBy(v => v)
-                    .ToList();
-
-                if (speeds.Count == 0)
-                {
-                    continue;
-                }
-
-                Report(
-                    $"| {bucket.Label} | {EscapeTable(variant)} | {speeds.Count} | {speeds.Average():0.00} | {Percentile(speeds, 0.50):0.00} | {Percentile(speeds, 0.95):0.00} |");
-            }
-        }
-
-        Report();
-        Report("### Size Bucket Breakdown");
-        Report("| Size Bucket | Files | Total Bytes | % Bytes | Avg MiB/s | Est. Wall Time | % Wall Time |");
-        Report("|---|---:|---:|---:|---:|---:|---:|");
-
-        var uniqueFiles = records
-            .GroupBy(r => r.SourceRelativePath)
-            .Select(g => (g.Key, g.First().FileSizeBytes))
-            .ToList();
-
-        var totalBytesAll = (double)uniqueFiles.Sum(f => f.FileSizeBytes);
-
-        var bucketBreakdowns = new List<(FileSizeBucket Bucket, int FileCount, long Bytes, double AvgThroughput)>();
-
-        foreach (var bucket in buckets)
-        {
-            var bucketUniqueFiles = uniqueFiles
-                .Where(f => bucket.Contains(f.FileSizeBytes))
-                .ToList();
-
-            if (bucketUniqueFiles.Count == 0)
-            {
-                continue;
-            }
-
-            var bytesInBucket = bucketUniqueFiles.Sum(f => f.FileSizeBytes);
-
-            var bucketThroughputs = records
-                .Where(r => bucket.Contains(r.FileSizeBytes))
-                .Select(r => r.ThroughputMiBPerSecond)
-                .Where(v => v is not null)
-                .Select(v => v!.Value)
-                .ToList();
-
-            var avgThroughput = bucketThroughputs.Count > 0 ? bucketThroughputs.Average() : 0.0;
-
-            bucketBreakdowns.Add((bucket, bucketUniqueFiles.Count, bytesInBucket, avgThroughput));
-        }
-
-        var totalEstimatedWallSeconds = bucketBreakdowns
-            .Where(b => b.AvgThroughput > 0.0)
-            .Sum(b => b.Bytes / (b.AvgThroughput * 1024.0 * 1024.0));
-
-        foreach (var (bucket, fileCount, bytesInBucket, avgThroughput) in bucketBreakdowns)
-        {
-            var pctBytes = totalBytesAll > 0 ? bytesInBucket / totalBytesAll * 100.0 : 0.0;
-            var bytesStr = FormatBytesHuman(bytesInBucket);
-            var estWallSeconds = avgThroughput > 0.0
-                ? bytesInBucket / (avgThroughput * 1024.0 * 1024.0)
-                : double.NaN;
-            var pctWall = totalEstimatedWallSeconds > 0.0
-                ? estWallSeconds / totalEstimatedWallSeconds * 100.0
-                : 0.0;
-            var wallStr = double.IsNaN(estWallSeconds) || double.IsInfinity(estWallSeconds)
-                ? "—"
-                : FormatDurationHuman(estWallSeconds);
-
-            Report(
-                $"| {bucket.Label} | {fileCount} | {bytesStr} | {pctBytes:0.0}% | {avgThroughput:0.00} | {wallStr} | {(double.IsNaN(estWallSeconds) ? "—" : $"{pctWall:0.0}%")} |");
+            Report();
         }
 
         Report();
@@ -1023,6 +952,497 @@ static double Percentile(IReadOnlyList<double> sortedValuesAscending, double per
     return sortedValuesAscending[lower] + ((sortedValuesAscending[upper] - sortedValuesAscending[lower]) * weight);
 }
 
+static void ReportRunEvidence(
+    Action<string?> report,
+    IReadOnlyList<BenchmarkRunRecord> runs,
+    IReadOnlyList<string> variants)
+{
+    report("### Run-Level Evidence");
+    report(null);
+
+    if (runs.Count == 0)
+    {
+        report("No run-level records available. Whole-policy wall-clock verdicts cannot be produced.");
+        report(null);
+        return;
+    }
+
+    var baselineVariant = FindBaselineVariant(variants);
+    var baselineEvidence = baselineVariant is null
+        ? null
+        : BuildRunEvidence(runs, baselineVariant);
+
+    report("| Variant | Valid Runs | Invalid Runs | Median Execute | Mean Execute | Min | Max | Spread | Delta vs Control | Noise Floor | Verdict |");
+    report("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|");
+
+    foreach (var variant in variants)
+    {
+        var evidence = BuildRunEvidence(runs, variant);
+        if (evidence.TotalRuns == 0)
+        {
+            continue;
+        }
+
+        var control = baselineVariant is not null &&
+                      !string.Equals(variant, baselineVariant, StringComparison.OrdinalIgnoreCase)
+            ? baselineEvidence
+            : null;
+        var comparison = CompareRunEvidence(evidence, control);
+
+        report(
+            $"| {EscapeTable(variant)} | {evidence.ValidRuns} | {evidence.InvalidRuns} | " +
+            $"{FormatDurationHuman(evidence.MedianSeconds)} | {FormatDurationHuman(evidence.MeanSeconds)} | " +
+            $"{FormatDurationHuman(evidence.MinSeconds)} | {FormatDurationHuman(evidence.MaxSeconds)} | " +
+            $"{FormatDurationHuman(evidence.SpreadSeconds)} | {comparison.DeltaText} | {comparison.NoiseText} | {comparison.Verdict} |");
+    }
+
+    if (baselineVariant is null)
+    {
+        report(null);
+        report("Run-level verdicts are `INCONCLUSIVE`: no baseline/control variant was found.");
+    }
+
+    report(null);
+}
+
+static void ReportBucketRecommendations(
+    Action<string?> report,
+    IReadOnlyList<BenchmarkFileCopyRecord> records,
+    IReadOnlyList<FileSizeBucket> buckets,
+    IReadOnlyList<string> variants,
+    List<string> warnings,
+    IReadOnlyDictionary<string, string> matchedControls)
+{
+    report("### Bucket Strategy Evidence");
+    report(null);
+
+    if (records.Count == 0)
+    {
+        report("No file-level records available. Bucket strategy recommendations cannot be produced.");
+        report(null);
+        return;
+    }
+
+    report("| Bucket | Best Observed Variant | Matched Control | Median File Duration | Control Median | Delta | Noise Floor | Aggregate MiB/s | Verdict | Recommendation |");
+    report("|---|---|---|---:|---:|---:|---:|---:|---|---|");
+
+    foreach (var bucket in buckets)
+    {
+        var candidates = variants
+            .Select(v => BuildBucketEvidence(records, bucket, v))
+            .Where(e => e.RecordCount > 0)
+            .OrderBy(e => e.MedianDurationMilliseconds)
+            .ToList();
+
+        if (candidates.Count == 0)
+        {
+            continue;
+        }
+
+        var best = candidates[0];
+        var controlName = FindMatchedControlVariant(best.VariantName, variants, matchedControls);
+        BucketVariantEvidence? control = null;
+        if (controlName is not null)
+        {
+            control = BuildBucketEvidence(records, bucket, controlName);
+            if (control.RecordCount == 0)
+            {
+                warnings.Add($"`{best.VariantName}` in `{bucket.Label}` has matched control `{controlName}`, but that control has no file-level records in the bucket.");
+                control = null;
+            }
+        }
+
+        var comparison = CompareBucketEvidence(best, control);
+        var recommendation = comparison.Verdict == "PASS"
+            ? "Candidate for policy"
+            : IsBaselineVariant(best.VariantName)
+                ? "Keep control"
+                : "No supported change";
+
+        report(
+            $"| {bucket.Label} | {EscapeTable(best.VariantName)} | {EscapeTable(controlName ?? "-")} | " +
+            $"{best.MedianDurationMilliseconds:0.###} ms | {(control is null ? "-" : $"{control.MedianDurationMilliseconds:0.###} ms")} | " +
+            $"{comparison.DeltaText} | {comparison.NoiseText} | {best.AggregateThroughputMiBPerSecond:0.00} | " +
+            $"{comparison.Verdict} | {recommendation} |");
+    }
+
+    report(null);
+}
+
+static void ReportBucketMetrics(
+    Action<string?> report,
+    IReadOnlyList<BenchmarkFileCopyRecord> records,
+    IReadOnlyList<FileSizeBucket> buckets,
+    IReadOnlyList<string> variants)
+{
+    report("### Bucket Metrics");
+    report(null);
+
+    if (records.Count == 0)
+    {
+        report("No file-level records available.");
+        report(null);
+        return;
+    }
+
+    report("| Bucket | Variant | Records | Bytes | Median Duration | P95 Duration | Aggregate MiB/s | Mean MiB/s | P50 MiB/s | P95 MiB/s | Run-Median Spread |");
+    report("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+
+    foreach (var bucket in buckets)
+    {
+        foreach (var variant in variants)
+        {
+            var evidence = BuildBucketEvidence(records, bucket, variant);
+            if (evidence.RecordCount == 0)
+            {
+                continue;
+            }
+
+            report(
+                $"| {bucket.Label} | {EscapeTable(variant)} | {evidence.RecordCount} | {FormatBytesHuman(evidence.TotalBytes)} | " +
+                $"{evidence.MedianDurationMilliseconds:0.###} ms | {evidence.P95DurationMilliseconds:0.###} ms | " +
+                $"{evidence.AggregateThroughputMiBPerSecond:0.00} | {evidence.MeanThroughputMiBPerSecond:0.00} | " +
+                $"{evidence.P50ThroughputMiBPerSecond:0.00} | {evidence.P95ThroughputMiBPerSecond:0.00} | " +
+                $"{evidence.RunMedianSpreadMilliseconds:0.###} ms |");
+        }
+    }
+
+    report(null);
+}
+
+static void ReportBatchingIsolationEvidence(
+    Action<string?> report,
+    IReadOnlyList<BenchmarkFileCopyRecord> records,
+    IReadOnlyList<FileSizeBucket> buckets,
+    IReadOnlyList<string> variants)
+{
+    var directBatchVariants = variants
+        .Where(v => v.Contains("DirectWriteBatch", StringComparison.OrdinalIgnoreCase))
+        .OrderBy(v => v, new VariantNameComparer())
+        .ToList();
+
+    var unbatchedControl = variants.FirstOrDefault(v =>
+        v.Contains("UnbatchedDirectWrite", StringComparison.OrdinalIgnoreCase));
+
+    if (directBatchVariants.Count == 0 || unbatchedControl is null)
+    {
+        return;
+    }
+
+    report("### Batching Isolation Evidence");
+    report(null);
+    report($"Compares each `DirectWriteBatch*` variant against `{unbatchedControl}` to isolate the contribution of batching beyond direct write alone (Section 7.2.2).");
+    report(null);
+    report("| Bucket | Variant | Unbatched Control | Median Duration | Control Median | Delta | Noise Floor | Verdict |");
+    report("|---|---|---|---:|---:|---:|---:|---|");
+
+    foreach (var bucket in buckets)
+    {
+        var control = BuildBucketEvidence(records, bucket, unbatchedControl);
+        if (control.RecordCount == 0)
+        {
+            continue;
+        }
+
+        foreach (var variant in directBatchVariants)
+        {
+            var candidate = BuildBucketEvidence(records, bucket, variant);
+            if (candidate.RecordCount == 0)
+            {
+                continue;
+            }
+
+            var comparison = CompareBucketEvidence(candidate, control);
+            report(
+                $"| {bucket.Label} | {EscapeTable(variant)} | {EscapeTable(unbatchedControl)} | " +
+                $"{candidate.MedianDurationMilliseconds:0.###} ms | {control.MedianDurationMilliseconds:0.###} ms | " +
+                $"{comparison.DeltaText} | {comparison.NoiseText} | {comparison.Verdict} |");
+        }
+    }
+
+    report(null);
+}
+
+static List<string> BuildMissingControlWarnings(IReadOnlyList<string> variants, IReadOnlyDictionary<string, string> matchedControls)
+{
+    var warnings = new List<string>();
+    foreach (var variant in variants)
+    {
+        if (IsBaselineVariant(variant))
+        {
+            continue;
+        }
+
+        var control = FindMatchedControlVariant(variant, variants, matchedControls);
+        if (control is null)
+        {
+            warnings.Add($"`{variant}` has no matched control; causal effect cannot be isolated.");
+        }
+
+        if (variant.Contains("DirectWriteBatch", StringComparison.OrdinalIgnoreCase) &&
+            !variants.Any(v => v.Contains("UnbatchedDirectWrite", StringComparison.OrdinalIgnoreCase)))
+        {
+            warnings.Add($"`{variant}` has no `UnbatchedDirectWrite*` control; batching cannot be isolated from direct write alone.");
+        }
+    }
+
+    return warnings
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(w => w, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+}
+
+static RunVariantEvidence BuildRunEvidence(IReadOnlyList<BenchmarkRunRecord> runs, string variant)
+{
+    var variantRuns = runs
+        .Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase))
+        .ToList();
+    var validDurations = variantRuns
+        .Where(IsSuccessfulRun)
+        .Select(r => r.ExecuteDuration.TotalSeconds)
+        .OrderBy(v => v)
+        .ToList();
+
+    if (validDurations.Count == 0)
+    {
+        return new RunVariantEvidence(
+            variant,
+            variantRuns.Count,
+            0,
+            variantRuns.Count,
+            0,
+            0,
+            0,
+            0,
+            0);
+    }
+
+    var min = validDurations[0];
+    var max = validDurations[^1];
+    return new RunVariantEvidence(
+        variant,
+        variantRuns.Count,
+        validDurations.Count,
+        variantRuns.Count - validDurations.Count,
+        Percentile(validDurations, 0.50),
+        validDurations.Average(),
+        min,
+        max,
+        max - min);
+}
+
+static BucketVariantEvidence BuildBucketEvidence(
+    IReadOnlyList<BenchmarkFileCopyRecord> records,
+    FileSizeBucket bucket,
+    string variant)
+{
+    var bucketRecords = records
+        .Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase))
+        .Where(r => bucket.Contains(r.FileSizeBytes))
+        .ToList();
+
+    if (bucketRecords.Count == 0)
+    {
+        return BucketVariantEvidence.Empty(bucket.Label, variant);
+    }
+
+    var durations = bucketRecords
+        .Select(r => r.CopyDurationMilliseconds)
+        .Where(v => v > 0)
+        .OrderBy(v => v)
+        .ToList();
+    var throughputs = bucketRecords
+        .Select(r => r.ThroughputMiBPerSecond)
+        .Where(v => v is not null)
+        .Select(v => v!.Value)
+        .OrderBy(v => v)
+        .ToList();
+    var runMedians = bucketRecords
+        .GroupBy(r => (r.RunStartedUtc, r.RunIndex))
+        .Select(g => g
+            .Select(r => r.CopyDurationMilliseconds)
+            .Where(v => v > 0)
+            .OrderBy(v => v)
+            .ToList())
+        .Where(values => values.Count > 0)
+        .Select(values => Percentile(values, 0.50))
+        .OrderBy(v => v)
+        .ToList();
+
+    var totalBytes = bucketRecords.Sum(r => r.FileSizeBytes);
+    var totalSeconds = bucketRecords.Sum(r => r.CopyDurationMilliseconds) / 1000.0;
+    var aggregateThroughput = totalBytes > 0 && totalSeconds > 0
+        ? (totalBytes / 1048576.0) / totalSeconds
+        : 0.0;
+
+    return new BucketVariantEvidence(
+        bucket.Label,
+        variant,
+        bucketRecords.Count,
+        totalBytes,
+        durations.Count > 0 ? durations.Average() : 0.0,
+        durations.Count > 0 ? Percentile(durations, 0.50) : 0.0,
+        durations.Count > 0 ? Percentile(durations, 0.95) : 0.0,
+        aggregateThroughput,
+        throughputs.Count > 0 ? throughputs.Average() : 0.0,
+        throughputs.Count > 0 ? Percentile(throughputs, 0.50) : 0.0,
+        throughputs.Count > 0 ? Percentile(throughputs, 0.95) : 0.0,
+        runMedians.Count >= 2 ? runMedians[^1] - runMedians[0] : 0.0);
+}
+
+static EvidenceComparison CompareRunEvidence(RunVariantEvidence candidate, RunVariantEvidence? control)
+{
+    if (candidate.ValidRuns == 0)
+    {
+        return new EvidenceComparison("INVALID", "-", "-");
+    }
+
+    if (control is null)
+    {
+        return IsBaselineVariant(candidate.VariantName)
+            ? new EvidenceComparison("CONTROL", "-", "-")
+            : new EvidenceComparison("INCONCLUSIVE", "-", "-");
+    }
+
+    if (control.ValidRuns == 0)
+    {
+        return new EvidenceComparison("INCONCLUSIVE", "-", "-");
+    }
+
+    var deltaSeconds = control.MedianSeconds - candidate.MedianSeconds;
+    var deltaPercent = control.MedianSeconds > 0 ? deltaSeconds / control.MedianSeconds * 100.0 : 0.0;
+    var noiseFloor = Math.Max(control.SpreadSeconds, candidate.SpreadSeconds);
+    var verdict = GetDeltaVerdict(deltaSeconds, deltaPercent, noiseFloor, gatePercent: 10.0);
+    return new EvidenceComparison(
+        verdict,
+        $"{FormatSignedPercent(deltaPercent)} ({FormatSignedDurationSeconds(deltaSeconds)})",
+        FormatDurationHuman(noiseFloor));
+}
+
+static EvidenceComparison CompareBucketEvidence(BucketVariantEvidence candidate, BucketVariantEvidence? control)
+{
+    if (candidate.RecordCount == 0)
+    {
+        return new EvidenceComparison("INVALID", "-", "-");
+    }
+
+    if (control is null)
+    {
+        return IsBaselineVariant(candidate.VariantName)
+            ? new EvidenceComparison("CONTROL", "-", "-")
+            : new EvidenceComparison("INCONCLUSIVE", "-", "-");
+    }
+
+    if (control.RecordCount == 0)
+    {
+        return new EvidenceComparison("INCONCLUSIVE", "-", "-");
+    }
+
+    var deltaMilliseconds = control.MedianDurationMilliseconds - candidate.MedianDurationMilliseconds;
+    var deltaPercent = control.MedianDurationMilliseconds > 0
+        ? deltaMilliseconds / control.MedianDurationMilliseconds * 100.0
+        : 0.0;
+    var noiseFloor = Math.Max(control.RunMedianSpreadMilliseconds, candidate.RunMedianSpreadMilliseconds);
+    var verdict = GetDeltaVerdict(deltaMilliseconds, deltaPercent, noiseFloor, gatePercent: 10.0);
+    return new EvidenceComparison(
+        verdict,
+        $"{FormatSignedPercent(deltaPercent)} ({deltaMilliseconds:+0.###;-0.###;0} ms)",
+        $"{noiseFloor:0.###} ms");
+}
+
+static string GetDeltaVerdict(double delta, double deltaPercent, double noiseFloor, double gatePercent)
+{
+    if (delta < -noiseFloor)
+    {
+        return "REGRESSION";
+    }
+
+    if (delta <= noiseFloor)
+    {
+        return "INCONCLUSIVE";
+    }
+
+    return deltaPercent >= gatePercent ? "PASS" : "FAIL";
+}
+
+static string? FindMatchedControlVariant(string variant, IReadOnlyList<string> variants, IReadOnlyDictionary<string, string> matchedControls)
+{
+    if (IsBaselineVariant(variant))
+    {
+        return null;
+    }
+
+    if (matchedControls.TryGetValue(variant, out var configuredControl) && !string.IsNullOrWhiteSpace(configuredControl))
+    {
+        return variants.FirstOrDefault(v => string.Equals(v, configuredControl, StringComparison.OrdinalIgnoreCase));
+    }
+
+    if (variant.Contains("DirectWriteBatch", StringComparison.OrdinalIgnoreCase))
+    {
+        var buffer = ExtractBatchBufferLabel(variant);
+        if (buffer is not null)
+        {
+            var staged = variants.FirstOrDefault(v =>
+                v.Contains("StagedWriteBatch", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(ExtractBatchBufferLabel(v), buffer, StringComparison.OrdinalIgnoreCase));
+            if (staged is not null)
+            {
+                return staged;
+            }
+        }
+
+        return null;
+    }
+
+    return FindBaselineVariant(variants);
+}
+
+static string? ExtractBatchBufferLabel(string variant)
+{
+    var match = System.Text.RegularExpressions.Regex.Match(variant, @"Batch(?<size>\d+MiB)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    return match.Success ? match.Groups["size"].Value : null;
+}
+
+static string? FindBaselineVariant(IReadOnlyList<string> variants)
+{
+    var preferred = new[] { "Control_BaselineAuto", "BaselineAuto", "ScenarioDefaults" };
+    foreach (var name in preferred)
+    {
+        var match = variants.FirstOrDefault(v => string.Equals(v, name, StringComparison.OrdinalIgnoreCase));
+        if (match is not null)
+        {
+            return match;
+        }
+    }
+
+    return variants.FirstOrDefault(IsBaselineVariant);
+}
+
+static bool IsBaselineVariant(string variant) =>
+    variant.Contains("Baseline", StringComparison.OrdinalIgnoreCase) ||
+    string.Equals(variant, "ScenarioDefaults", StringComparison.OrdinalIgnoreCase);
+
+static bool IsSuccessfulRun(BenchmarkRunRecord run) =>
+    string.Equals(run.RunStatus, BenchmarkRunStatus.Completed, StringComparison.OrdinalIgnoreCase) &&
+    run.FailedFiles == 0 &&
+    run.ExceptionType is null;
+
+static string FormatSignedPercent(double value) =>
+    value switch
+    {
+        > 0 => $"+{value:0.0}%",
+        < 0 => $"{value:0.0}%",
+        _ => "0.0%",
+    };
+
+static string FormatSignedDurationSeconds(double seconds) =>
+    seconds switch
+    {
+        > 0 => $"+{FormatDurationHuman(seconds)}",
+        < 0 => $"-{FormatDurationHuman(Math.Abs(seconds))}",
+        _ => "0s",
+    };
+
 static void ValidatePaths(string sourcePath, string destinationPath)
 {
     if (!Directory.Exists(sourcePath))
@@ -1385,6 +1805,40 @@ internal sealed record FileSizeBucket(long MinBytesInclusive, long MaxBytesInclu
 {
     public bool Contains(long value) => value >= MinBytesInclusive && value <= MaxBytesInclusive;
 }
+
+internal sealed record RunVariantEvidence(
+    string VariantName,
+    int TotalRuns,
+    int ValidRuns,
+    int InvalidRuns,
+    double MedianSeconds,
+    double MeanSeconds,
+    double MinSeconds,
+    double MaxSeconds,
+    double SpreadSeconds);
+
+internal sealed record BucketVariantEvidence(
+    string BucketLabel,
+    string VariantName,
+    int RecordCount,
+    long TotalBytes,
+    double MeanDurationMilliseconds,
+    double MedianDurationMilliseconds,
+    double P95DurationMilliseconds,
+    double AggregateThroughputMiBPerSecond,
+    double MeanThroughputMiBPerSecond,
+    double P50ThroughputMiBPerSecond,
+    double P95ThroughputMiBPerSecond,
+    double RunMedianSpreadMilliseconds)
+{
+    public static BucketVariantEvidence Empty(string bucketLabel, string variantName) =>
+        new(bucketLabel, variantName, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+}
+
+internal sealed record EvidenceComparison(
+    string Verdict,
+    string DeltaText,
+    string NoiseText);
 
 internal static class FileSizeBuckets
 {
