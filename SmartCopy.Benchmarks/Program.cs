@@ -193,7 +193,7 @@ static async Task RunAnalysisModeAsync(
     var allVariants = filteredRecords
         .Select(r => r.VariantName)
         .Distinct(StringComparer.OrdinalIgnoreCase)
-        .OrderBy(v => v, StringComparer.OrdinalIgnoreCase)
+        .OrderBy(v => v, new VariantNameComparer())
         .ToList();
 
     Report("## Analysis Summary");
@@ -224,7 +224,7 @@ static async Task RunAnalysisModeAsync(
         var variants = records
             .Select(r => r.VariantName)
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(v => v, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(v => v, new VariantNameComparer())
             .ToList();
 
         Report($"- **Records:** `{records.Count}`");
@@ -352,6 +352,14 @@ static async Task RunAnalysisModeAsync(
         }
 
         Report();
+
+        var htmlPath = Path.ChangeExtension(analysisPath, ".html");
+        if (scenariosToAnalyze.Count > 1)
+        {
+            htmlPath = Path.Combine(Path.GetDirectoryName(htmlPath) ?? "", $"{Path.GetFileNameWithoutExtension(htmlPath)}-{scenarioName}.html");
+        }
+        
+        await BenchmarkHtmlReportGenerator.GenerateAsync(htmlPath, scenarioName, buckets, variants, records);
     }
 
     await FlushReportAsync();
@@ -591,6 +599,10 @@ static async Task RunBenchmarkModeAsync(
                 ?? scenario.DirectWriteThresholdBytes
                 ?? 0L;
 
+            var bufferBatchBytes = variant.BufferBatchBytes
+                ?? scenario.BufferBatchBytes
+                ?? 0L;
+
             var skipExistsCheckForOverwrite = variant.SkipExistsCheckForOverwrite
                 ?? scenario.SkipExistsCheckForOverwrite
                 ?? false;
@@ -600,7 +612,7 @@ static async Task RunBenchmarkModeAsync(
                 UpdateProgress($"Copying: {p.FilesCompleted}/{p.FilesTotal} files ({FormatSize(p.TotalBytesCompleted)}/{FormatSize(p.TotalBytes)}), ETR: {FormatDuration(p.EstimatedRemaining)}")))
             {
                 state.ExecuteStopwatch.Start();
-                if (directWriteThresholdBytes > 0)
+                if (directWriteThresholdBytes > 0 || bufferBatchBytes > 0)
                 {
                     state.Results = await BenchmarkCopyRunner.RunAsync(new PipelineJob
                     {
@@ -609,7 +621,7 @@ static async Task RunBenchmarkModeAsync(
                         ProviderRegistry = registry,
                         Progress = executeProgress,
                         CancellationToken = ct,
-                    }, destinationPath, overwriteMode, directWriteThresholdBytes, skipExistsCheckForOverwrite, providerOptions.CopyBufferSizeBytes, ct);
+                    }, destinationPath, overwriteMode, directWriteThresholdBytes, bufferBatchBytes, skipExistsCheckForOverwrite, providerOptions.CopyBufferSizeBytes, ct);
                 }
                 else
                 {
@@ -702,6 +714,12 @@ static async Task RunBenchmarkModeAsync(
             Console.WriteLine();
         }
     }
+
+    Console.WriteLine();
+    Console.WriteLine("-------------------------------------------------------------------");
+    Console.WriteLine("Benchmark runs complete. Generating analysis report automatically...");
+    Console.WriteLine("-------------------------------------------------------------------");
+    await RunAnalysisModeAsync(workingDirectory, config, selection, ct);
 }
 
 static async Task ArchiveResultsAsync(string artifactDirectory, string configPath, CancellationToken ct)
@@ -808,6 +826,8 @@ static Dictionary<string, string?> BuildBenchmarkJournalMetadata(
         ["providerWriteMode"] = providerOptions.WriteMode.ToString(),
         ["providerUseArrayPoolForManualLoop"] = providerOptions.UseArrayPoolForManualLoop.ToString(),
         ["providerPreallocateDestinationFile"] = providerOptions.PreallocateDestinationFile.ToString(),
+        ["bufferBatchBytes"] = (variant.BufferBatchBytes ?? scenario.BufferBatchBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        ["directWriteThresholdBytes"] = (variant.DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),
         ["scanDuration"] = state.ScanStopwatch.Elapsed.ToString("c"),
         ["executeDuration"] = state.ExecuteStopwatch.Elapsed.ToString("c"),
         ["copiedFiles"] = state.Results.Sum(r => r.NumberOfFilesAffected).ToString(System.Globalization.CultureInfo.InvariantCulture),
@@ -1370,13 +1390,14 @@ internal static class FileSizeBuckets
 {
     public static IReadOnlyList<FileSizeBucket> All { get; } =
     [
-        new FileSizeBucket(0, 64 * 1024, "0-64 KiB"),
-        new FileSizeBucket(64 * 1024 + 1, 512 * 1024, "64-512 KiB"),
-        new FileSizeBucket(512 * 1024 + 1, 4 * 1024 * 1024, "512 KiB-4 MiB"),
-        new FileSizeBucket(4 * 1024 * 1024 + 1, 32 * 1024 * 1024, "4-32 MiB"),
-        new FileSizeBucket(32 * 1024 * 1024 + 1, 256 * 1024 * 1024, "32-256 MiB"),
-        new FileSizeBucket(256 * 1024 * 1024 + 1, 2L * 1024 * 1024 * 1024, "256 MiB-2 GiB"),
-        new FileSizeBucket(2L * 1024 * 1024 * 1024 + 1, long.MaxValue, ">2 GiB"),
+        new FileSizeBucket(0, 4 * 1024, "Sub4KiB"),
+        new FileSizeBucket(4 * 1024 + 1, 16 * 1024, "Sub16KiB"),
+        new FileSizeBucket(16 * 1024 + 1, 64 * 1024, "Sub64KiB"),
+        new FileSizeBucket(64 * 1024 + 1, 256 * 1024, "Sub256KiB"),
+        new FileSizeBucket(256 * 1024 + 1, 512 * 1024, "Sub512KiB"),
+        new FileSizeBucket(512 * 1024 + 1, 1024 * 1024, "Sub1MiB"),
+        new FileSizeBucket(1024 * 1024 + 1, 4L * 1024 * 1024, "Sub4MiB"),
+        new FileSizeBucket(4L * 1024 * 1024 + 1, long.MaxValue, "Tail"),
     ];
 }
 
@@ -1409,5 +1430,30 @@ internal static class FileNamesResolver
         if (taskList == prefix + ".md") taskList = DefaultTaskList;
 
         return (results, fileResults, analysis, sizeScaling, taskList);
+    }
+}
+
+internal sealed class VariantNameComparer : IComparer<string>
+{
+    public int Compare(string? x, string? y)
+    {
+        if (x == y) return 0;
+        if (x == null) return -1;
+        if (y == null) return 1;
+
+        var matchX = System.Text.RegularExpressions.Regex.Match(x, @"\d+");
+        var matchY = System.Text.RegularExpressions.Regex.Match(y, @"\d+");
+        
+        long numX = matchX.Success ? long.Parse(matchX.Value) : -1;
+        long numY = matchY.Success ? long.Parse(matchY.Value) : -1;
+
+        // If both have numbers and the numbers differ, sort by the number
+        if (numX != -1 && numY != -1 && numX != numY)
+        {
+            return numX.CompareTo(numY);
+        }
+
+        // Fallback to string comparison
+        return string.Compare(x, y, StringComparison.OrdinalIgnoreCase);
     }
 }

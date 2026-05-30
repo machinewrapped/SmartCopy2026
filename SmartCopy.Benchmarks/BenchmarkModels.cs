@@ -262,7 +262,9 @@ internal sealed class BenchmarkScenario
     public bool? ProviderPreallocateDestinationFile { get; set; }
     public long? DirectWriteThresholdBytes { get; set; }
     public bool? SkipExistsCheckForOverwrite { get; set; }
+    public long? BufferBatchBytes { get; set; }
     public bool UsePathPool { get; set; }
+
 
     public void Normalize()
     {
@@ -304,6 +306,7 @@ internal sealed class BenchmarkVariant
     public bool? ProviderPreallocateDestinationFile { get; set; }
     public long? DirectWriteThresholdBytes { get; set; }
     public bool? SkipExistsCheckForOverwrite { get; set; }
+    public long? BufferBatchBytes { get; set; }
 
     public void Normalize()
     {
@@ -374,6 +377,7 @@ internal sealed class BenchmarkRunRecord
     public bool? ProviderPreallocateDestinationFile { get; init; }
     public long? DirectWriteThresholdBytes { get; init; }
     public bool? SkipExistsCheckForOverwrite { get; init; }
+    public long? BufferBatchBytes { get; init; }
     public required TimeSpan ScanDuration { get; init; }
     public required TimeSpan ExecuteDuration { get; init; }
     public required int CopiedFiles { get; init; }
@@ -418,6 +422,7 @@ internal sealed class BenchmarkRunRecord
             ProviderPreallocateDestinationFile = providerOptions.PreallocateDestinationFile,
             DirectWriteThresholdBytes = variant.DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes,
             SkipExistsCheckForOverwrite = variant.SkipExistsCheckForOverwrite ?? scenario.SkipExistsCheckForOverwrite,
+            BufferBatchBytes = variant.BufferBatchBytes ?? scenario.BufferBatchBytes,
             ScanDuration = TimeSpan.Zero,
             ExecuteDuration = TimeSpan.Zero,
             CopiedFiles = 0,
@@ -489,6 +494,7 @@ internal sealed class BenchmarkRunRecord
             ProviderPreallocateDestinationFile = providerOptions.PreallocateDestinationFile,
             DirectWriteThresholdBytes = variant.DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes,
             SkipExistsCheckForOverwrite = variant.SkipExistsCheckForOverwrite ?? scenario.SkipExistsCheckForOverwrite,
+            BufferBatchBytes = variant.BufferBatchBytes ?? scenario.BufferBatchBytes,
             ScanDuration = state.ScanStopwatch.Elapsed,
             ExecuteDuration = state.ExecuteStopwatch.Elapsed,
             CopiedFiles = state.Results.Sum(r => r.NumberOfFilesAffected),

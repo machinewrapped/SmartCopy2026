@@ -1,0 +1,120 @@
+{
+    "sourcePath":  "R:\\TestData\\SmallFileDataset",
+    "artifactPath":  null,
+    "includeHidden":  false,
+    "scenarios":  [
+                      {
+                          "name":  "SmallFileDataset-SSDtoSSD",
+                          "sourcePath":  "R:\\TestData\\SmallFileDataset",
+                          "destinationPath":  "D:\\TestData\\SmallFileDataset_SSDtoSSD",
+                          "enabled":  true,
+                          "clearDestinationBeforeRun":  true,
+                          "overwriteMode":  1,
+                          "usePathPool":  true
+                      },
+                      {
+                          "name":  "MixedDataset-SSDtoSSD",
+                          "sourcePath":  "R:\\TestData\\MixedDataset",
+                          "destinationPath":  "D:\\TestData\\MixedDataset_SSDtoSSD",
+                          "enabled":  false,
+                          "clearDestinationBeforeRun":  true,
+                          "overwriteMode":  1
+                      }
+                  ],
+    "scenarioExecutionOrder":  [
+                                   "SmallFileDataset-SSDtoSSD",
+                                   "MixedDataset-SSDtoSSD"
+                               ],
+    "variants":  [
+                     {
+                         "name":  "Control_BaselineAuto",
+                         "notes":  "Staged only. Existing heuristics.",
+                         "enabled":  true,
+                         "desiredRunCount":  2,
+                         "directWriteThresholdBytes":  0,
+                         "bufferBatchBytes":  0,
+                         "skipExistsCheckForOverwrite":  false
+                     },
+                     {
+                         "directWriteThresholdBytes":  4194304,
+                         "name":  "UnbatchedDirectWrite4MiB",
+                         "bufferBatchBytes":  0,
+                         "desiredRunCount":  2,
+                         "enabled":  true,
+                         "skipExistsCheckForOverwrite":  false,
+                         "notes":  "Unbatched direct write for everything \u003c= 4MiB."
+                     },
+                     {
+                         "name":  "StagedWriteBatch1MiB",
+                         "notes":  "Staged write with 1 MiB batching buffer.",
+                         "enabled":  true,
+                         "desiredRunCount":  2,
+                         "directWriteThresholdBytes":  0,
+                         "bufferBatchBytes":  1048576,
+                         "skipExistsCheckForOverwrite":  false
+                     },
+                     {
+                         "name":  "DirectWriteBatch1MiB",
+                         "notes":  "Direct write with 1 MiB batching buffer.",
+                         "enabled":  true,
+                         "desiredRunCount":  2,
+                         "directWriteThresholdBytes":  4194304,
+                         "bufferBatchBytes":  1048576,
+                         "skipExistsCheckForOverwrite":  false
+                     },
+                     {
+                         "name":  "StagedWriteBatch4MiB",
+                         "notes":  "Staged write with 4 MiB batching buffer.",
+                         "enabled":  true,
+                         "desiredRunCount":  2,
+                         "directWriteThresholdBytes":  0,
+                         "bufferBatchBytes":  4194304,
+                         "skipExistsCheckForOverwrite":  false
+                     },
+                     {
+                         "name":  "DirectWriteBatch4MiB",
+                         "notes":  "Direct write with 4 MiB batching buffer.",
+                         "enabled":  true,
+                         "desiredRunCount":  2,
+                         "directWriteThresholdBytes":  4194304,
+                         "bufferBatchBytes":  4194304,
+                         "skipExistsCheckForOverwrite":  false
+                     },
+                     {
+                         "name":  "StagedWriteBatch16MiB",
+                         "notes":  "Staged write with 16 MiB batching buffer.",
+                         "enabled":  true,
+                         "desiredRunCount":  2,
+                         "directWriteThresholdBytes":  0,
+                         "bufferBatchBytes":  16777216,
+                         "skipExistsCheckForOverwrite":  false
+                     },
+                     {
+                         "name":  "DirectWriteBatch16MiB",
+                         "notes":  "Direct write with 16 MiB batching buffer.",
+                         "enabled":  true,
+                         "desiredRunCount":  2,
+                         "directWriteThresholdBytes":  4194304,
+                         "bufferBatchBytes":  16777216,
+                         "skipExistsCheckForOverwrite":  false
+                     },
+                     {
+                         "name":  "StagedWriteBatch64MiB",
+                         "notes":  "Staged write with 64 MiB batching buffer.",
+                         "enabled":  true,
+                         "desiredRunCount":  2,
+                         "directWriteThresholdBytes":  0,
+                         "bufferBatchBytes":  67108864,
+                         "skipExistsCheckForOverwrite":  false
+                     },
+                     {
+                         "name":  "DirectWriteBatch64MiB",
+                         "notes":  "Direct write with 64 MiB batching buffer.",
+                         "enabled":  true,
+                         "desiredRunCount":  2,
+                         "directWriteThresholdBytes":  4194304,
+                         "bufferBatchBytes":  67108864,
+                         "skipExistsCheckForOverwrite":  false
+                     }
+                 ]
+}
