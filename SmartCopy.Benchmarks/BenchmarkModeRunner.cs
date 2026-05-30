@@ -18,7 +18,8 @@ internal static class BenchmarkModeRunner
         string workingDirectory,
         BenchmarkConfig config,
         BenchmarkCliOptions selection,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool autoArchiveOnComplete = true)
     {
         var fileNames = FileNamesResolver.GetFileNames(selection.ConfigPath);
         var artifactDirectory = BenchmarkHelpers.ResolveArtifactDirectory(workingDirectory, config.SourcePath, config.ArtifactPath);
@@ -48,7 +49,7 @@ internal static class BenchmarkModeRunner
                 if (hasPending) break;
             }
 
-            if (!hasPending)
+            if (!hasPending && autoArchiveOnComplete)
             {
                 Console.WriteLine();
                 Console.WriteLine("-------------------------------------------------------------------");
@@ -65,49 +66,9 @@ internal static class BenchmarkModeRunner
 
         await UpdateTaskListAsync(taskListPath, config, historicalRuns, ct);
 
-        var poolIndices = new List<int>();
-        if (config.Scenarios.Any(s => s.Enabled && s.UsePathPool))
-        {
-            var baseSource = Path.GetFullPath(config.SourcePath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            var parentDir = Path.GetDirectoryName(baseSource);
-            var baseName = Path.GetFileName(baseSource);
+        var poolState = await PoolStateHelpers.LoadOrCreatePoolStateAsync(
+            artifactDirectory, config, forceReshuffle: false, ct);
 
-            if (!string.IsNullOrEmpty(parentDir) && Directory.Exists(parentDir))
-            {
-                var prefix = baseName + "_";
-                foreach (var dir in Directory.EnumerateDirectories(parentDir))
-                {
-                    var dirName = Path.GetFileName(dir);
-                    if (dirName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
-                        int.TryParse(dirName.AsSpan(prefix.Length), out var index))
-                    {
-                        poolIndices.Add(index);
-                    }
-                }
-            }
-
-            if (poolIndices.Count == 0)
-            {
-                int totalPoolRunsNeeded = config.Scenarios.Count(s => s.Enabled && s.UsePathPool)
-                    * config.Variants.Where(v => v.Enabled).Sum(v => v.DesiredRunCount);
-                if (totalPoolRunsNeeded > 0)
-                {
-                    poolIndices = Enumerable.Range(1, totalPoolRunsNeeded).ToList();
-                }
-            }
-
-            if (poolIndices.Count > 0)
-            {
-                var rand = new Random();
-                for (var i = poolIndices.Count - 1; i > 0; i--)
-                {
-                    var j = rand.Next(i + 1);
-                    (poolIndices[i], poolIndices[j]) = (poolIndices[j], poolIndices[i]);
-                }
-            }
-        }
-
-        int poolAssignmentCounter = 0;
         BenchmarkScenario? lastScenario = null;
         while (true)
         {
@@ -140,10 +101,9 @@ internal static class BenchmarkModeRunner
             int? pathIndex = null;
             if (scenario.UsePathPool)
             {
-                if (poolIndices.Count > 0)
+                if (poolState is not null && poolState.ShuffledIndices.Count > 0)
                 {
-                    pathIndex = poolIndices[poolAssignmentCounter % poolIndices.Count];
-                    poolAssignmentCounter++;
+                    pathIndex = poolState.ShuffledIndices[poolState.NextPosition % poolState.ShuffledIndices.Count];
                     var suffix = $"_{pathIndex:D2}";
                     sourcePath = sourcePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + suffix;
                     destinationPath = destinationPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + suffix;
@@ -178,8 +138,8 @@ internal static class BenchmarkModeRunner
             Console.WriteLine("Mode:     benchmark");
             Console.WriteLine($"Scenario: {scenario.Name}");
             Console.WriteLine(pathIndex is null
-                ? $"Variant:  {variant.Name} (run {nextRunIndex}/{variant.DesiredRunCount})"
-                : $"Variant:  {variant.Name} (run {nextRunIndex}/{variant.DesiredRunCount}) [Folder Index: {pathIndex:D2}]");
+                ? $"Variant:  {variant.Name} (run {nextRunIndex}/{variant.OriginalDesiredRunCount})"
+                : $"Variant:  {variant.Name} (run {nextRunIndex}/{variant.OriginalDesiredRunCount}) [Folder Index: {pathIndex:D2}]");
             Console.WriteLine($"Source:   {sourcePath}");
             Console.WriteLine($"Target:   {destinationPath}");
             Console.WriteLine($"Artifacts:{artifactDirectory}");
@@ -309,6 +269,11 @@ internal static class BenchmarkModeRunner
                 historicalRuns.Add(record);
                 await UpdateTaskListAsync(taskListPath, config, historicalRuns, ct);
 
+                if (scenario.UsePathPool && poolState is not null)
+                {
+                    await PoolStateHelpers.AdvanceAndPersistAsync(poolState, artifactDirectory, ct);
+                }
+
                 Console.WriteLine($"Completed in {record.ExecuteDuration}.");
                 Console.WriteLine($"Copied files: {record.CopiedFiles}, failed: {record.FailedFiles}, skipped: {record.SkippedFiles}.");
                 Console.WriteLine($"Results: {resultsPath}");
@@ -337,6 +302,12 @@ internal static class BenchmarkModeRunner
 
                 historicalRuns.Add(record);
                 await UpdateTaskListAsync(taskListPath, config, historicalRuns, ct);
+
+                if (scenario.UsePathPool && poolState is not null)
+                {
+                    await PoolStateHelpers.AdvanceAndPersistAsync(poolState, artifactDirectory, ct);
+                }
+
                 throw;
             }
 
@@ -368,7 +339,7 @@ internal static class BenchmarkModeRunner
         await AnalysisRunner.RunAsync(workingDirectory, config, selection, ct);
     }
 
-    private static async Task ArchiveResultsAsync(string artifactDirectory, string configPath, CancellationToken ct)
+    internal static async Task ArchiveResultsAsync(string artifactDirectory, string configPath, CancellationToken ct)
     {
         var fileNames = FileNamesResolver.GetFileNames(configPath);
         var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
@@ -419,6 +390,9 @@ internal static class BenchmarkModeRunner
                 Console.Error.WriteLine($"Error archiving journals directory: {ex.Message}");
             }
         }
+
+        // Also archive/delete the pool state file
+        await PoolStateHelpers.DeletePoolStateAsync(artifactDirectory);
     }
 
     private static async Task<DirectoryNode> ScanTreeAsync(
@@ -484,7 +458,7 @@ internal static class BenchmarkModeRunner
         };
     }
 
-    private static BenchmarkSelection? SelectBenchmarkSelection(
+    internal static BenchmarkSelection? SelectBenchmarkSelection(
         BenchmarkConfig config,
         IReadOnlyList<BenchmarkRunRecord> historicalRuns,
         BenchmarkCliOptions selection)

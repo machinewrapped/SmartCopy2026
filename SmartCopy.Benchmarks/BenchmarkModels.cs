@@ -12,6 +12,7 @@ internal enum BenchmarkRunMode
     DatasetPreparation,
     Analysis,
     SizeScaling,
+    Converge,
 }
 
 internal sealed class BenchmarkCliOptions
@@ -23,6 +24,7 @@ internal sealed class BenchmarkCliOptions
     public string? VariantName { get; init; }
     public string? Notes { get; init; }
     public string ConfigPath { get; init; } = DefaultConfigFileName;
+    public bool FreshStart { get; init; }
 
     public static BenchmarkCliOptions Parse(string[] args)
     {
@@ -31,6 +33,8 @@ internal sealed class BenchmarkCliOptions
         string? variantName = null;
         string? notes = null;
         var configPath = DefaultConfigFileName;
+
+        var freshStart = false;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -54,6 +58,10 @@ internal sealed class BenchmarkCliOptions
             {
                 configPath = args[++i];
             }
+            else if (string.Equals(args[i], "--fresh", StringComparison.OrdinalIgnoreCase))
+            {
+                freshStart = true;
+            }
         }
 
         return new BenchmarkCliOptions
@@ -63,6 +71,7 @@ internal sealed class BenchmarkCliOptions
             VariantName = variantName,
             Notes = notes,
             ConfigPath = configPath,
+            FreshStart = freshStart,
         };
     }
 
@@ -91,7 +100,13 @@ internal sealed class BenchmarkCliOptions
             return BenchmarkRunMode.SizeScaling;
         }
 
-        throw new InvalidOperationException($"Unknown benchmark mode '{value}'. Expected 'benchmark', 'dataset-prep', 'analysis', or 'size-scaling'.");
+        if (string.Equals(value, "converge", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(value, "convergence", StringComparison.OrdinalIgnoreCase))
+        {
+            return BenchmarkRunMode.Converge;
+        }
+
+        throw new InvalidOperationException($"Unknown benchmark mode '{value}'. Expected 'benchmark', 'dataset-prep', 'analysis', 'size-scaling', or 'converge'.");
     }
 }
 
@@ -100,6 +115,8 @@ internal sealed class BenchmarkConfig
     public string SourcePath { get; set; } = @"R:\TestData\MixedDataset";
     public string? ArtifactPath { get; set; }
     public bool IncludeHidden { get; set; }
+    public double ConvergenceSpreadPercent { get; set; } = 3.0;
+    public int MaxRunsPerVariant { get; set; } = 5;
     public List<BenchmarkScenario> Scenarios { get; set; } = [];
     public List<string> ScenarioExecutionOrder { get; set; } = [];
     public List<BenchmarkVariant> Variants { get; set; } = [];
@@ -298,6 +315,7 @@ internal sealed class BenchmarkVariant
     public string? Notes { get; set; }
     public bool Enabled { get; set; } = true;
     public int DesiredRunCount { get; set; } = 3;
+    public int OriginalDesiredRunCount { get; set; }
     public OverwriteMode? OverwriteMode { get; set; }
     public int? ProviderCopyBufferSizeBytes { get; set; }
     public long? ProviderSmallFileProgressThresholdBytes { get; set; }
@@ -321,6 +339,8 @@ internal sealed class BenchmarkVariant
         {
             throw new InvalidOperationException($"benchmark variant '{Name}' must have desiredRunCount > 0.");
         }
+        
+        OriginalDesiredRunCount = DesiredRunCount;
     }
 
     public LocalFileSystemProviderOptions CreateProviderOptions(BenchmarkScenario scenario)
@@ -778,6 +798,7 @@ internal static class FileNamesResolver
     public const string DefaultAnalysis = "benchmark-analysis.md";
     public const string DefaultSizeScaling = "benchmark-size-scaling.md";
     public const string DefaultTaskList = "benchmark-tasklist.md";
+    public const string PoolStateFileName = "pool-state.json";
 
     public static (string Results, string FileResults, string Analysis, string SizeScaling, string TaskList) GetFileNames(string configPath)
     {
@@ -801,6 +822,12 @@ internal static class FileNamesResolver
 
         return (results, fileResults, analysis, sizeScaling, taskList);
     }
+}
+
+internal sealed class PoolState
+{
+    public List<int> ShuffledIndices { get; set; } = [];
+    public int NextPosition { get; set; }
 }
 
 internal sealed class VariantNameComparer : IComparer<string>

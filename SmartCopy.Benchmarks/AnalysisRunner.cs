@@ -468,7 +468,7 @@ internal static class AnalysisRunner
             validDurations.Average(),
             min,
             max,
-            max - min);
+            TightestPairSpread(validDurations));
     }
 
     private static BucketVariantEvidence BuildBucketEvidence(
@@ -527,7 +527,7 @@ internal static class AnalysisRunner
             throughputs.Count > 0 ? throughputs.Average() : 0.0,
             throughputs.Count > 0 ? BenchmarkHelpers.Percentile(throughputs, 0.50) : 0.0,
             throughputs.Count > 0 ? BenchmarkHelpers.Percentile(throughputs, 0.95) : 0.0,
-            runMedians.Count >= 2 ? runMedians[^1] - runMedians[0] : 0.0);
+            TightestPairSpread(runMedians));
     }
 
     private static EvidenceComparison CompareRunEvidence(RunVariantEvidence candidate, RunVariantEvidence? control)
@@ -551,7 +551,7 @@ internal static class AnalysisRunner
 
         var deltaSeconds = control.MedianSeconds - candidate.MedianSeconds;
         var deltaPercent = control.MedianSeconds > 0 ? deltaSeconds / control.MedianSeconds * 100.0 : 0.0;
-        var noiseFloor = Math.Max(control.SpreadSeconds, candidate.SpreadSeconds);
+        var noiseFloor = (control.SpreadSeconds + candidate.SpreadSeconds) / 2.0;
         var verdict = GetDeltaVerdict(deltaSeconds, deltaPercent, noiseFloor, gatePercent: 10.0);
         return new EvidenceComparison(
             verdict,
@@ -582,7 +582,7 @@ internal static class AnalysisRunner
         var deltaPercent = control.MedianDurationMilliseconds > 0
             ? deltaMilliseconds / control.MedianDurationMilliseconds * 100.0
             : 0.0;
-        var noiseFloor = Math.Max(control.RunMedianSpreadMilliseconds, candidate.RunMedianSpreadMilliseconds);
+        var noiseFloor = (control.RunMedianSpreadMilliseconds + candidate.RunMedianSpreadMilliseconds) / 2.0;
         var verdict = GetDeltaVerdict(deltaMilliseconds, deltaPercent, noiseFloor, gatePercent: 10.0);
         return new EvidenceComparison(
             verdict,
@@ -682,4 +682,15 @@ internal static class AnalysisRunner
             < 0 => $"-{BenchmarkHelpers.FormatDurationHuman(Math.Abs(seconds))}",
             _ => "0s",
         };
+
+    private static double TightestPairSpread(List<double> sorted)
+    {
+        if (sorted.Count < 2) return 0.0;
+        var minSpread = double.MaxValue;
+        for (int i = 1; i < sorted.Count; i++)
+        {
+            minSpread = Math.Min(minSpread, sorted[i] - sorted[i - 1]);
+        }
+        return minSpread;
+    }
 }

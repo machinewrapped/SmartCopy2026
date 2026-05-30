@@ -227,6 +227,137 @@ internal static class BenchmarkHelpers
         run.ExceptionType is null;
 }
 
+internal static class PoolStateHelpers
+{
+    /// <summary>
+    /// Loads an existing pool state from disk, or creates and persists a new shuffled state.
+    /// Returns null if no scenarios use path pooling.
+    /// </summary>
+    public static async Task<PoolState?> LoadOrCreatePoolStateAsync(
+        string artifactDirectory,
+        BenchmarkConfig config,
+        bool forceReshuffle,
+        CancellationToken ct)
+    {
+        if (!config.Scenarios.Any(s => s.Enabled && s.UsePathPool))
+        {
+            return null;
+        }
+
+        var poolStatePath = Path.Combine(artifactDirectory, FileNamesResolver.PoolStateFileName);
+
+        if (!forceReshuffle && File.Exists(poolStatePath))
+        {
+            try
+            {
+                var existing = await BenchmarkJson.ReadAsync<PoolState>(poolStatePath, ct);
+                if (existing is not null && existing.ShuffledIndices.Count > 0)
+                {
+                    Console.WriteLine($"Loaded pool state: {existing.ShuffledIndices.Count} indices, position {existing.NextPosition}.");
+                    return existing;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Warning: Could not read pool state file, creating new: {ex.Message}");
+            }
+        }
+
+        // Discover pool indices from the filesystem
+        var poolIndices = DiscoverPoolIndices(config);
+
+        if (poolIndices.Count == 0)
+        {
+            int totalPoolRunsNeeded = config.Scenarios.Count(s => s.Enabled && s.UsePathPool)
+                * config.Variants.Where(v => v.Enabled).Sum(v => v.DesiredRunCount);
+            if (totalPoolRunsNeeded > 0)
+            {
+                poolIndices = Enumerable.Range(1, totalPoolRunsNeeded).ToList();
+            }
+        }
+
+        if (poolIndices.Count == 0)
+        {
+            return null;
+        }
+
+        // Fisher-Yates shuffle
+        var rand = new Random();
+        for (var i = poolIndices.Count - 1; i > 0; i--)
+        {
+            var j = rand.Next(i + 1);
+            (poolIndices[i], poolIndices[j]) = (poolIndices[j], poolIndices[i]);
+        }
+
+        var state = new PoolState
+        {
+            ShuffledIndices = poolIndices,
+            NextPosition = 0,
+        };
+
+        await PersistAsync(state, artifactDirectory, ct);
+        Console.WriteLine($"Created new pool state: {state.ShuffledIndices.Count} indices.");
+        return state;
+    }
+
+    /// <summary>
+    /// Increments the pool position and writes the updated state to disk.
+    /// </summary>
+    public static async Task AdvanceAndPersistAsync(PoolState state, string artifactDirectory, CancellationToken ct)
+    {
+        state.NextPosition++;
+        await PersistAsync(state, artifactDirectory, ct);
+    }
+
+    /// <summary>
+    /// Deletes the pool state file if it exists.
+    /// </summary>
+    public static Task DeletePoolStateAsync(string artifactDirectory)
+    {
+        var poolStatePath = Path.Combine(artifactDirectory, FileNamesResolver.PoolStateFileName);
+        if (File.Exists(poolStatePath))
+        {
+            File.Delete(poolStatePath);
+            Console.WriteLine("Deleted pool state file.");
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static async Task PersistAsync(PoolState state, string artifactDirectory, CancellationToken ct)
+    {
+        var poolStatePath = Path.Combine(artifactDirectory, FileNamesResolver.PoolStateFileName);
+        await BenchmarkJson.WriteAsync(poolStatePath, state, ct);
+    }
+
+    private static List<int> DiscoverPoolIndices(BenchmarkConfig config)
+    {
+        var indices = new List<int>();
+        var baseSource = Path.GetFullPath(config.SourcePath)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var parentDir = Path.GetDirectoryName(baseSource);
+        var baseName = Path.GetFileName(baseSource);
+
+        if (string.IsNullOrEmpty(parentDir) || !Directory.Exists(parentDir))
+        {
+            return indices;
+        }
+
+        var prefix = baseName + "_";
+        foreach (var dir in Directory.EnumerateDirectories(parentDir))
+        {
+            var dirName = Path.GetFileName(dir);
+            if (dirName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
+                int.TryParse(dirName.AsSpan(prefix.Length), out var index))
+            {
+                indices.Add(index);
+            }
+        }
+
+        return indices;
+    }
+}
+
 internal sealed class ThrottledConsoleProgress<T> : IProgress<T>, IDisposable
 {
     private readonly Action<T> _handler;

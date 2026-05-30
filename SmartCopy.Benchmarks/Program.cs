@@ -38,6 +38,12 @@ if (selection.Mode == BenchmarkRunMode.SizeScaling)
     return 0;
 }
 
+if (selection.Mode == BenchmarkRunMode.Converge)
+{
+    await ConvergenceModeRunner.RunAsync(workingDirectory, config, selection, ct);
+    return 0;
+}
+
 await BenchmarkModeRunner.RunAsync(workingDirectory, config, selection, ct);
 
 return 0;
