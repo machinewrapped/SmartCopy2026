@@ -244,7 +244,7 @@ internal static class PoolStateHelpers
             return null;
         }
 
-        var poolStatePath = Path.Combine(artifactDirectory, FileNamesResolver.PoolStateFileName);
+        var poolStatePath = Path.Combine(artifactDirectory, FileNamesResolver.PathPoolState);
 
         if (!forceReshuffle && File.Exists(poolStatePath))
         {
@@ -314,7 +314,7 @@ internal static class PoolStateHelpers
     /// </summary>
     public static Task DeletePoolStateAsync(string artifactDirectory)
     {
-        var poolStatePath = Path.Combine(artifactDirectory, FileNamesResolver.PoolStateFileName);
+        var poolStatePath = Path.Combine(artifactDirectory, FileNamesResolver.PathPoolState);
         if (File.Exists(poolStatePath))
         {
             File.Delete(poolStatePath);
@@ -326,7 +326,7 @@ internal static class PoolStateHelpers
 
     private static async Task PersistAsync(PoolState state, string artifactDirectory, CancellationToken ct)
     {
-        var poolStatePath = Path.Combine(artifactDirectory, FileNamesResolver.PoolStateFileName);
+        var poolStatePath = Path.Combine(artifactDirectory, FileNamesResolver.PathPoolState);
         await BenchmarkJson.WriteAsync(poolStatePath, state, ct);
     }
 

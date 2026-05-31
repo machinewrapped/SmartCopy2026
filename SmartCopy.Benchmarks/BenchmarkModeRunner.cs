@@ -313,15 +313,15 @@ internal static class BenchmarkModeRunner
 
             lastScenario = scenario;
 
-            // Apply a 60-second cooldown if there are more benchmarks left in the queue
+            // Apply a cooldown if there are more benchmarks left in the queue
             var nextSelection = SelectBenchmarkSelection(config, historicalRuns, selection);
-            if (nextSelection is not null && nextSelection.SuccessfulRunCount < nextSelection.Variant.DesiredRunCount)
+            if (config.CooldownSeconds > 0 && nextSelection is not null && nextSelection.SuccessfulRunCount < nextSelection.Variant.DesiredRunCount)
             {
                 Console.WriteLine();
                 Console.WriteLine("-------------------------------------------------------------------");
-                Console.WriteLine("Applying 60-second cooldown to let the drive cache settle and cool...");
+                Console.WriteLine($"Applying {config.CooldownSeconds}-second cooldown to let the drive cache settle and cool...");
                 Console.WriteLine("-------------------------------------------------------------------");
-                for (int i = 60; i > 0; i--)
+                for (int i = config.CooldownSeconds; i > 0; i--)
                 {
                     if (ct.IsCancellationRequested) break;
                     Console.Write($"\rResuming next variant in {i} seconds...   ");

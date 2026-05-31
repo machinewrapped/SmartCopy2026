@@ -121,6 +121,7 @@ internal sealed class BenchmarkConfig
     public List<string> ScenarioExecutionOrder { get; set; } = [];
     public List<BenchmarkVariant> Variants { get; set; } = [];
     public DatasetPreparationConfig? DatasetPreparation { get; set; }
+    public int CooldownSeconds { get; set; } = 60;
 
     public static BenchmarkConfig CreateTemplate() =>
         new()
@@ -145,13 +146,13 @@ internal sealed class BenchmarkConfig
                 {
                     Name = "BaselineAuto",
                     Notes = "Current heuristic defaults.",
-                    DesiredRunCount = 2,
+                    DesiredRunCount = 5,
                 },
                 new BenchmarkVariant
                 {
                     Name = "CopyToAsync512KiB",
                     Notes = "Always uses Stream.CopyToAsync with a 512 KiB buffer.",
-                    DesiredRunCount = 2,
+                    DesiredRunCount = 3,
                     ProviderCopyBufferSizeBytes = 512 * 1024,
                     ProviderWriteMode = LocalFileSystemWriteMode.CopyToAsync,
                 },
@@ -159,7 +160,7 @@ internal sealed class BenchmarkConfig
                 {
                     Name = "ManualLoop512KiBArrayPool",
                     Notes = "Manual loop with a 512 KiB buffer and pooled buffers.",
-                    DesiredRunCount = 2,
+                    DesiredRunCount = 3,
                     ProviderCopyBufferSizeBytes = 512 * 1024,
                     ProviderWriteMode = LocalFileSystemWriteMode.ManualLoop,
                     ProviderUseArrayPoolForManualLoop = true,
@@ -168,7 +169,7 @@ internal sealed class BenchmarkConfig
                 {
                     Name = "ManualLoop1MiBPreallocate",
                     Notes = "Manual loop with a 1 MiB buffer and destination preallocation.",
-                    DesiredRunCount = 2,
+                    DesiredRunCount = 3,
                     ProviderCopyBufferSizeBytes = 1024 * 1024,
                     ProviderWriteMode = LocalFileSystemWriteMode.ManualLoop,
                     ProviderUseArrayPoolForManualLoop = true,
@@ -798,7 +799,7 @@ internal static class FileNamesResolver
     public const string DefaultAnalysis = "benchmark-analysis.md";
     public const string DefaultSizeScaling = "benchmark-size-scaling.md";
     public const string DefaultTaskList = "benchmark-tasklist.md";
-    public const string PoolStateFileName = "pool-state.json";
+    public const string PathPoolState = "path-pool-state.json";
 
     public static (string Results, string FileResults, string Analysis, string SizeScaling, string TaskList) GetFileNames(string configPath)
     {
