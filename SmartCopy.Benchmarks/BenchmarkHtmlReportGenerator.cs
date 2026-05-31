@@ -52,6 +52,10 @@ internal static class BenchmarkHtmlReportGenerator
         IReadOnlyList<BenchmarkFileCopyRecord> records,
         IReadOnlyList<BenchmarkRunRecord> runs)
     {
+        buckets = buckets
+            .Where(b => records.Any(r => b.Contains(r.FileSizeBytes)))
+            .ToList();
+
         var sb = new StringBuilder();
         sb.AppendLine("<!DOCTYPE html>");
         sb.AppendLine("<html>");
@@ -145,6 +149,88 @@ internal static class BenchmarkHtmlReportGenerator
             ");
             sb.AppendLine("</script>");
         }
+
+        // --- Throughput Trend by File Size (Line Chart) ---
+        sb.AppendLine($"<h2>Throughput Trend by File Size</h2>");
+        sb.AppendLine($"<div class=\"chart-container\">");
+        var trendCanvasId = $"chart_{Guid.NewGuid():N}";
+        sb.AppendLine($"<canvas id=\"{trendCanvasId}\"></canvas>");
+        sb.AppendLine("</div>");
+
+        var trendBucketLabelsJs = string.Join(", ", buckets.Select(b => $"'{b.Label}'"));
+        var trendDatasetsJs = new List<string>();
+        int trendColorIndex = 0;
+
+        foreach (var variant in variants)
+        {
+            var color = Palette[trendColorIndex % Palette.Length];
+            var borderColor = color.Replace("0.7", "1.0");
+            var backgroundColor = color.Replace("0.7", "0.1");
+            trendColorIndex++;
+
+            var dataAvg = new List<double>();
+            foreach (var bucket in buckets)
+            {
+                var bucketRecords = records.Where(r => bucket.Contains(r.FileSizeBytes)).ToList();
+                var speeds = bucketRecords
+                    .Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase))
+                    .Select(r => r.ThroughputMiBPerSecond)
+                    .Where(v => v is not null)
+                    .Select(v => v!.Value)
+                    .ToList();
+
+                var avg = speeds.Count > 0 ? speeds.Average() : 0.0;
+                dataAvg.Add(Math.Round(avg, 2));
+            }
+
+            var dataAvgStr = string.Join(", ", dataAvg.Select(d => d.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            trendDatasetsJs.Add($@"
+                {{
+                    label: '{variant}',
+                    data: [{dataAvgStr}],
+                    borderColor: {borderColor},
+                    backgroundColor: {backgroundColor},
+                    borderWidth: 2.5,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    tension: 0.15,
+                    fill: false
+                }}
+            ");
+        }
+
+        var allTrendDatasetsJs = string.Join(", ", trendDatasetsJs);
+
+        sb.AppendLine("<script>");
+        sb.AppendLine($@"
+            new Chart(document.getElementById('{trendCanvasId}'), {{
+                type: 'line',
+                data: {{
+                    labels: [{trendBucketLabelsJs}],
+                    datasets: [{allTrendDatasetsJs}]
+                }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {{
+                        x: {{ 
+                            ticks: {{ color: '#eee' }},
+                            grid: {{ color: '#333' }}
+                        }},
+                        y: {{ 
+                            beginAtZero: true, 
+                            title: {{ display: true, text: 'MiB/s', color: '#eee' }},
+                            ticks: {{ color: '#eee' }},
+                            grid: {{ color: '#333' }}
+                        }}
+                    }},
+                    plugins: {{
+                        legend: {{ display: true, position: 'top', labels: {{ color: '#eee' }} }}
+                    }}
+                }}
+            }});
+        ");
+        sb.AppendLine("</script>");
 
         var categories = variants.Select(GetBatchCategory).Distinct().ToList();
 
