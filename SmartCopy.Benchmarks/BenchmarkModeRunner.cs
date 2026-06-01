@@ -18,8 +18,7 @@ internal static class BenchmarkModeRunner
         string workingDirectory,
         BenchmarkConfig config,
         BenchmarkCliOptions selection,
-        CancellationToken ct,
-        bool autoArchiveOnComplete = true)
+        CancellationToken ct)
     {
         var fileNames = FileNamesResolver.GetFileNames(selection.ConfigPath);
         var artifactDirectory = BenchmarkHelpers.ResolveArtifactDirectory(workingDirectory, config.SourcePath, config.ArtifactPath);
@@ -32,15 +31,28 @@ internal static class BenchmarkModeRunner
 
         var historicalRuns = await BenchmarkHelpers.ReadExistingRunsAsync<BenchmarkRunRecord>(resultsPath, ct);
 
-        if (historicalRuns.Count > 0)
+        if (selection.FreshStart)
+        {
+            Console.WriteLine();
+            Console.WriteLine("-------------------------------------------------------------------");
+            Console.WriteLine("Fresh start requested via --fresh flag.");
+            Console.WriteLine("Archiving completed runs to a dated subfolder to start fresh...");
+            Console.WriteLine("-------------------------------------------------------------------");
+
+            await ArchiveResultsAsync(artifactDirectory, selection.ConfigPath, ct);
+
+            // Reload historical runs (should be empty now)
+            historicalRuns = await BenchmarkHelpers.ReadExistingRunsAsync<BenchmarkRunRecord>(resultsPath, ct);
+        }
+        else if (historicalRuns.Count > 0)
         {
             var hasPending = false;
             foreach (var scenario in config.Scenarios.Where(s => s.Enabled))
             {
                 foreach (var variant in config.Variants.Where(v => v.Enabled))
                 {
-                    var successfulRuns = historicalRuns.Count(r => BenchmarkHelpers.IsSuccessfulRunForScenarioVariant(r, scenario.Name, variant.Name));
-                    if (successfulRuns < variant.DesiredRunCount)
+                    var status = CheckConvergence(historicalRuns, scenario.Name, variant, config);
+                    if (status == ConvergenceStatus.NotConverged)
                     {
                         hasPending = true;
                         break;
@@ -49,11 +61,11 @@ internal static class BenchmarkModeRunner
                 if (hasPending) break;
             }
 
-            if (!hasPending && autoArchiveOnComplete)
+            if (!hasPending)
             {
                 Console.WriteLine();
                 Console.WriteLine("-------------------------------------------------------------------");
-                Console.WriteLine("All previous benchmark runs in the active scenarios are completed.");
+                Console.WriteLine("All previous benchmark runs in the active scenarios are completed/converged.");
                 Console.WriteLine("Archiving completed runs to a dated subfolder to start fresh...");
                 Console.WriteLine("-------------------------------------------------------------------");
 
@@ -66,16 +78,61 @@ internal static class BenchmarkModeRunner
 
         await UpdateTaskListAsync(taskListPath, config, historicalRuns, ct);
 
-        var poolState = await PoolStateHelpers.LoadOrCreatePoolStateAsync(
-            artifactDirectory, config, forceReshuffle: false, ct);
+        // Print Benchmark Queue & Convergence Status Report
+        var candidates = (
+            from scenario in config.Scenarios
+            where scenario.Enabled
+            from variant in config.Variants
+            where variant.Enabled
+            let successfulRuns = historicalRuns.Count(r => BenchmarkHelpers.IsSuccessfulRunForScenarioVariant(r, scenario.Name, variant.Name))
+            let totalRuns = historicalRuns.Count(r => BenchmarkHelpers.IsTerminalRunForScenarioVariant(r, scenario.Name, variant.Name))
+            let lastRunUtc = historicalRuns
+                .Where(r => BenchmarkHelpers.IsRunForScenarioVariant(r, scenario.Name, variant.Name))
+                .Select(r => r.RunStartedUtc)
+                .DefaultIfEmpty(DateTime.MinValue)
+                .Max()
+            let nextRunIndex = totalRuns + 1
+            select new BenchmarkSelection(scenario, variant, successfulRuns, totalRuns, lastRunUtc, nextRunIndex))
+            .ToList();
+
+        if (!string.IsNullOrWhiteSpace(selection.ScenarioName) || !string.IsNullOrWhiteSpace(selection.VariantName))
+        {
+            candidates = candidates
+                .Where(c =>
+                    (string.IsNullOrWhiteSpace(selection.ScenarioName) ||
+                     string.Equals(c.Scenario.Name, selection.ScenarioName, StringComparison.OrdinalIgnoreCase)) &&
+                    (string.IsNullOrWhiteSpace(selection.VariantName) ||
+                     string.Equals(c.Variant.Name, selection.VariantName, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("Benchmark Queue:");
+        var eligibleCount = 0;
+        foreach (var candidate in candidates)
+        {
+            var status = CheckConvergence(historicalRuns, candidate.Scenario.Name, candidate.Variant, config);
+            if (status == ConvergenceStatus.NotConverged)
+            {
+                var spread = GetCurrentSpreadPercent(historicalRuns, candidate.Scenario.Name, candidate.Variant, config);
+                var spreadText = double.IsNaN(spread) ? "N/A" : $"{spread:F2}%";
+                Console.WriteLine($"  • {candidate.Variant.Name} (Run {candidate.NextRunIndex}/{candidate.Variant.DesiredRunCount}, spread: {spreadText})");
+                eligibleCount++;
+            }
+        }
+        if (eligibleCount == 0)
+        {
+            Console.WriteLine("  No variants are eligible to run.");
+        }
+        Console.WriteLine();
 
         BenchmarkScenario? lastScenario = null;
         while (true)
         {
             var benchmarkSelection = SelectBenchmarkSelection(config, historicalRuns, selection);
-            if (benchmarkSelection is null || benchmarkSelection.SuccessfulRunCount >= benchmarkSelection.Variant.DesiredRunCount)
+            if (benchmarkSelection is null)
             {
-                Console.WriteLine("All eligible benchmark scenarios and variants have completed their desired runs.");
+                Console.WriteLine("All eligible benchmark scenarios and variants have completed/converged.");
                 break;
             }
 
@@ -101,16 +158,36 @@ internal static class BenchmarkModeRunner
             int? pathIndex = null;
             if (scenario.UsePathPool)
             {
-                if (poolState is not null && poolState.ShuffledIndices.Count > 0)
+                if (scenario.PathPool == null || scenario.PathPool.Count == 0)
                 {
-                    pathIndex = poolState.ShuffledIndices[poolState.NextPosition % poolState.ShuffledIndices.Count];
-                    var suffix = $"_{pathIndex:D2}";
-                    sourcePath = sourcePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + suffix;
-                    destinationPath = destinationPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + suffix;
+                    await BenchmarkHelpers.DiscoverAndShufflePoolAsync(config, scenario, selection.ConfigPath, ct);
+                }
+
+                if (scenario.PathPool is not null && scenario.PathPool.Count > 0)
+                {
+                    var scenarioTerminalRunCount = historicalRuns.Count(r =>
+                        string.Equals(r.ScenarioName, scenario.Name, StringComparison.OrdinalIgnoreCase) &&
+                        BenchmarkHelpers.IsTerminalRun(r));
+                    
+                    var poolPathIndex = scenarioTerminalRunCount % scenario.PathPool.Count;
+                    sourcePath = scenario.PathPool[poolPathIndex];
+
+                    var folderSuffix = Path.GetFileName(sourcePath);
+                    var indexPart = folderSuffix.Split('_').LastOrDefault();
+                    if (int.TryParse(indexPart, out var parsedIndex))
+                    {
+                        pathIndex = parsedIndex;
+                        var suffix = $"_{parsedIndex:D2}";
+                        destinationPath = destinationPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + suffix;
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException($"Could not extract index from path pool folder name: {folderSuffix}");
+                    }
                 }
                 else
                 {
-                    throw new InvalidOperationException("UsePathPool is enabled but no pool indices are available.");
+                    throw new InvalidOperationException("UsePathPool is enabled but PathPool is empty.");
                 }
             }
 
@@ -138,8 +215,8 @@ internal static class BenchmarkModeRunner
             Console.WriteLine("Mode:     benchmark");
             Console.WriteLine($"Scenario: {scenario.Name}");
             Console.WriteLine(pathIndex is null
-                ? $"Variant:  {variant.Name} (run {nextRunIndex}/{variant.OriginalDesiredRunCount})"
-                : $"Variant:  {variant.Name} (run {nextRunIndex}/{variant.OriginalDesiredRunCount}) [Folder Index: {pathIndex:D2}]");
+                ? $"Variant:  {variant.Name} (run {nextRunIndex})"
+                : $"Variant:  {variant.Name} (run {nextRunIndex}) [Folder Index: {pathIndex:D2}]");
             Console.WriteLine($"Source:   {sourcePath}");
             Console.WriteLine($"Target:   {destinationPath}");
             Console.WriteLine($"Artifacts:{artifactDirectory}");
@@ -269,16 +346,19 @@ internal static class BenchmarkModeRunner
                 historicalRuns.Add(record);
                 await UpdateTaskListAsync(taskListPath, config, historicalRuns, ct);
 
-                if (scenario.UsePathPool && poolState is not null)
-                {
-                    await PoolStateHelpers.AdvanceAndPersistAsync(poolState, artifactDirectory, ct);
-                }
-
                 Console.WriteLine($"Completed in {record.ExecuteDuration}.");
                 Console.WriteLine($"Copied files: {record.CopiedFiles}, failed: {record.FailedFiles}, skipped: {record.SkippedFiles}.");
                 Console.WriteLine($"Results: {resultsPath}");
                 Console.WriteLine($"File results: {fileResultsPath}");
                 Console.WriteLine($"Journal: {state.JournalPath}");
+
+                if (scenario.ClearDestinationAfterRun)
+                {
+                    Console.WriteLine("Clearing destination contents after benchmark (post-clear)...");
+                    using var clearProgress = new ThrottledConsoleProgress<string>(s => BenchmarkHelpers.UpdateProgress($"Clearing: {s}"));
+                    BenchmarkHelpers.ClearDirectoryContents(destinationPath, clearProgress);
+                    Console.WriteLine(); // Finalize progress line
+                }
             }
             catch (Exception ex)
             {
@@ -303,9 +383,19 @@ internal static class BenchmarkModeRunner
                 historicalRuns.Add(record);
                 await UpdateTaskListAsync(taskListPath, config, historicalRuns, ct);
 
-                if (scenario.UsePathPool && poolState is not null)
+                if (scenario.ClearDestinationAfterRun)
                 {
-                    await PoolStateHelpers.AdvanceAndPersistAsync(poolState, artifactDirectory, ct);
+                    try
+                    {
+                        Console.WriteLine("Clearing destination contents after failed benchmark (post-clear)...");
+                        using var clearProgress = new ThrottledConsoleProgress<string>(s => BenchmarkHelpers.UpdateProgress($"Clearing: {s}"));
+                        BenchmarkHelpers.ClearDirectoryContents(destinationPath, clearProgress);
+                        Console.WriteLine(); // Finalize progress line
+                    }
+                    catch (Exception clearEx)
+                    {
+                        Console.Error.WriteLine($"Warning: Failed to clear destination after benchmark failure: {clearEx.Message}");
+                    }
                 }
 
                 throw;
@@ -315,7 +405,7 @@ internal static class BenchmarkModeRunner
 
             // Apply a cooldown if there are more benchmarks left in the queue
             var nextSelection = SelectBenchmarkSelection(config, historicalRuns, selection);
-            if (config.CooldownSeconds > 0 && nextSelection is not null && nextSelection.SuccessfulRunCount < nextSelection.Variant.DesiredRunCount)
+            if (config.CooldownSeconds > 0 && nextSelection is not null)
             {
                 Console.WriteLine();
                 Console.WriteLine("-------------------------------------------------------------------");
@@ -391,8 +481,7 @@ internal static class BenchmarkModeRunner
             }
         }
 
-        // Also archive/delete the pool state file
-        await PoolStateHelpers.DeletePoolStateAsync(artifactDirectory);
+
     }
 
     private static async Task<DirectoryNode> ScanTreeAsync(
@@ -503,7 +592,7 @@ internal static class BenchmarkModeRunner
                     continue;
                 }
 
-                var hasPendingRuns = stageCandidates.Any(c => c.SuccessfulRunCount < c.Variant.DesiredRunCount);
+                var hasPendingRuns = stageCandidates.Any(c => CheckConvergence(historicalRuns, c.Scenario.Name, c.Variant, config) == ConvergenceStatus.NotConverged);
                 if (hasPendingRuns)
                 {
                     candidates = stageCandidates;
@@ -513,23 +602,146 @@ internal static class BenchmarkModeRunner
         }
 
         var pendingCandidates = candidates
-            .Where(c => c.SuccessfulRunCount < c.Variant.DesiredRunCount)
+            .Where(c => CheckConvergence(historicalRuns, c.Scenario.Name, c.Variant, config) == ConvergenceStatus.NotConverged)
             .ToList();
 
         if (pendingCandidates.Count > 0)
         {
             var rand = new Random();
-            return pendingCandidates[rand.Next(pendingCandidates.Count)];
+            for (var i = pendingCandidates.Count - 1; i > 0; i--)
+            {
+                var j = rand.Next(i + 1);
+                (pendingCandidates[i], pendingCandidates[j]) = (pendingCandidates[j], pendingCandidates[i]);
+            }
+            return pendingCandidates[0];
         }
 
-        var scenarioPriority = BuildScenarioPriority(config, candidates.Select(c => c.Scenario.Name));
+        return null;
+    }
 
-        return candidates
-            .OrderBy(c => c.SuccessfulRunCount >= c.Variant.DesiredRunCount ? 1 : 0)
-            .ThenBy(c => scenarioPriority[c.Scenario.Name])
-            .ThenBy(c => c.SuccessfulRunCount)
-            .ThenBy(c => c.LastRunUtc)
-            .FirstOrDefault();
+    internal enum ConvergenceStatus
+    {
+        NotConverged,
+        Converged,
+        GaveUp,
+    }
+
+    internal static ConvergenceStatus CheckConvergence(
+        IReadOnlyList<BenchmarkRunRecord> runs,
+        string scenarioName,
+        BenchmarkVariant variant,
+        BenchmarkConfig config)
+    {
+        var successfulRuns = runs
+            .Where(r => BenchmarkHelpers.IsSuccessfulRunForScenarioVariant(r, scenarioName, variant.Name))
+            .ToList();
+
+        if (successfulRuns.Count < variant.DesiredRunCount)
+        {
+            return successfulRuns.Count >= variant.DesiredRunCount + config.MaxConvergenceRuns
+                ? ConvergenceStatus.GaveUp
+                : ConvergenceStatus.NotConverged;
+        }
+
+        if (!config.Converge)
+        {
+            return ConvergenceStatus.Converged;
+        }
+
+        // Sort durations ascending
+        var durations = successfulRuns
+            .Select(r => r.ExecuteDuration.TotalSeconds)
+            .OrderBy(d => d)
+            .ToList();
+
+        // Slide window of size variant.DesiredRunCount
+        var W = variant.DesiredRunCount;
+        for (var i = 0; i <= durations.Count - W; i++)
+        {
+            var window = durations.Skip(i).Take(W).ToList();
+            var windowMin = window[0];
+            var windowMax = window[W - 1];
+            
+            // Calculate window median
+            double windowMedian;
+            if (W % 2 == 1)
+            {
+                windowMedian = window[W / 2];
+            }
+            else
+            {
+                windowMedian = (window[W / 2 - 1] + window[W / 2]) / 2.0;
+            }
+
+            var spreadPercent = windowMedian > 0 
+                ? ((windowMax - windowMin) / windowMedian) * 100.0 
+                : 0.0;
+
+            if (spreadPercent <= config.ConvergenceSpreadPercent)
+            {
+                return ConvergenceStatus.Converged;
+            }
+        }
+
+        return successfulRuns.Count >= variant.DesiredRunCount + config.MaxConvergenceRuns
+            ? ConvergenceStatus.GaveUp
+            : ConvergenceStatus.NotConverged;
+    }
+
+    internal static double GetCurrentSpreadPercent(
+        IReadOnlyList<BenchmarkRunRecord> runs,
+        string scenarioName,
+        BenchmarkVariant variant,
+        BenchmarkConfig config)
+    {
+        var successfulRuns = runs
+            .Where(r => BenchmarkHelpers.IsSuccessfulRunForScenarioVariant(r, scenarioName, variant.Name))
+            .ToList();
+
+        if (successfulRuns.Count < 2)
+        {
+            return double.NaN;
+        }
+
+        var durations = successfulRuns
+            .Select(r => r.ExecuteDuration.TotalSeconds)
+            .OrderBy(d => d)
+            .ToList();
+
+        var W = Math.Min(variant.DesiredRunCount, durations.Count);
+        if (W < 2)
+        {
+            return double.NaN;
+        }
+
+        var minSpreadPercent = double.MaxValue;
+        for (var i = 0; i <= durations.Count - W; i++)
+        {
+            var window = durations.Skip(i).Take(W).ToList();
+            var windowMin = window[0];
+            var windowMax = window[W - 1];
+
+            double windowMedian;
+            if (W % 2 == 1)
+            {
+                windowMedian = window[W / 2];
+            }
+            else
+            {
+                windowMedian = (window[W / 2 - 1] + window[W / 2]) / 2.0;
+            }
+
+            var spreadPercent = windowMedian > 0
+                ? ((windowMax - windowMin) / windowMedian) * 100.0
+                : 0.0;
+
+            if (spreadPercent < minSpreadPercent)
+            {
+                minSpreadPercent = spreadPercent;
+            }
+        }
+
+        return minSpreadPercent;
     }
 
     private static Dictionary<string, int> BuildScenarioPriority(BenchmarkConfig config, IEnumerable<string> scenarioNames)

@@ -12,7 +12,6 @@ internal enum BenchmarkRunMode
     DatasetPreparation,
     Analysis,
     SizeScaling,
-    Converge,
 }
 
 internal sealed class BenchmarkCliOptions
@@ -100,13 +99,7 @@ internal sealed class BenchmarkCliOptions
             return BenchmarkRunMode.SizeScaling;
         }
 
-        if (string.Equals(value, "converge", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(value, "convergence", StringComparison.OrdinalIgnoreCase))
-        {
-            return BenchmarkRunMode.Converge;
-        }
-
-        throw new InvalidOperationException($"Unknown benchmark mode '{value}'. Expected 'benchmark', 'dataset-prep', 'analysis', 'size-scaling', or 'converge'.");
+        throw new InvalidOperationException($"Unknown benchmark mode '{value}'. Expected 'benchmark', 'dataset-prep', 'analysis', or 'size-scaling'.");
     }
 }
 
@@ -116,7 +109,8 @@ internal sealed class BenchmarkConfig
     public string? ArtifactPath { get; set; }
     public bool IncludeHidden { get; set; }
     public double ConvergenceSpreadPercent { get; set; } = 3.0;
-    public int MaxRunsPerVariant { get; set; } = 5;
+    public int MaxConvergenceRuns { get; set; } = 5;
+    public bool Converge { get; set; } = true;
     public List<BenchmarkScenario> Scenarios { get; set; } = [];
     public List<string> ScenarioExecutionOrder { get; set; } = [];
     public List<BenchmarkVariant> Variants { get; set; } = [];
@@ -272,6 +266,7 @@ internal sealed class BenchmarkScenario
     public string? SourcePath { get; set; }
     public bool Enabled { get; set; } = true;
     public bool ClearDestinationBeforeRun { get; set; } = true;
+    public bool ClearDestinationAfterRun { get; set; } = true;
     public OverwriteMode OverwriteMode { get; set; } = OverwriteMode.Always;
     public int? ProviderCopyBufferSizeBytes { get; set; }
     public long? ProviderSmallFileProgressThresholdBytes { get; set; }
@@ -282,6 +277,7 @@ internal sealed class BenchmarkScenario
     public bool? SkipExistsCheckForOverwrite { get; set; }
     public long? BufferBatchBytes { get; set; }
     public bool UsePathPool { get; set; }
+    public List<string>? PathPool { get; set; }
 
 
     public void Normalize()
@@ -316,7 +312,6 @@ internal sealed class BenchmarkVariant
     public string? Notes { get; set; }
     public bool Enabled { get; set; } = true;
     public int DesiredRunCount { get; set; } = 3;
-    public int OriginalDesiredRunCount { get; set; }
     public OverwriteMode? OverwriteMode { get; set; }
     public int? ProviderCopyBufferSizeBytes { get; set; }
     public long? ProviderSmallFileProgressThresholdBytes { get; set; }
@@ -340,8 +335,6 @@ internal sealed class BenchmarkVariant
         {
             throw new InvalidOperationException($"benchmark variant '{Name}' must have desiredRunCount > 0.");
         }
-        
-        OriginalDesiredRunCount = DesiredRunCount;
     }
 
     public LocalFileSystemProviderOptions CreateProviderOptions(BenchmarkScenario scenario)
@@ -799,7 +792,6 @@ internal static class FileNamesResolver
     public const string DefaultAnalysis = "benchmark-analysis.md";
     public const string DefaultSizeScaling = "benchmark-size-scaling.md";
     public const string DefaultTaskList = "benchmark-tasklist.md";
-    public const string PathPoolState = "path-pool-state.json";
 
     public static (string Results, string FileResults, string Analysis, string SizeScaling, string TaskList) GetFileNames(string configPath)
     {
@@ -825,33 +817,40 @@ internal static class FileNamesResolver
     }
 }
 
-internal sealed class PoolState
-{
-    public List<int> ShuffledIndices { get; set; } = [];
-    public int NextPosition { get; set; }
-}
-
 internal sealed class VariantNameComparer : IComparer<string>
 {
+    private readonly IReadOnlyDictionary<string, long> _sizes;
+
+    public VariantNameComparer(IReadOnlyDictionary<string, long> sizes)
+    {
+        _sizes = sizes;
+    }
+
+    private static bool IsBaselineVariant(string variant) =>
+        variant.Contains("Baseline", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(variant, "ScenarioDefaults", StringComparison.OrdinalIgnoreCase) ||
+        variant.Contains("Control", StringComparison.OrdinalIgnoreCase);
+
     public int Compare(string? x, string? y)
     {
         if (x == y) return 0;
         if (x == null) return -1;
         if (y == null) return 1;
 
-        var matchX = System.Text.RegularExpressions.Regex.Match(x, @"\d+");
-        var matchY = System.Text.RegularExpressions.Regex.Match(y, @"\d+");
-        
-        long numX = matchX.Success ? long.Parse(matchX.Value) : -1;
-        long numY = matchY.Success ? long.Parse(matchY.Value) : -1;
+        bool xIsBaseline = IsBaselineVariant(x);
+        bool yIsBaseline = IsBaselineVariant(y);
 
-        // If both have numbers and the numbers differ, sort by the number
-        if (numX != -1 && numY != -1 && numX != numY)
+        if (xIsBaseline && !yIsBaseline) return -1;
+        if (yIsBaseline && !xIsBaseline) return 1;
+
+        _sizes.TryGetValue(x, out long sizeX);
+        _sizes.TryGetValue(y, out long sizeY);
+
+        if (sizeX > 0 && sizeY > 0 && sizeX != sizeY)
         {
-            return numX.CompareTo(numY);
+            return sizeX.CompareTo(sizeY);
         }
 
-        // Fallback to string comparison
         return string.Compare(x, y, StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -9,21 +9,7 @@ namespace SmartCopy.Benchmarks;
 
 internal static class BenchmarkHtmlReportGenerator
 {
-    private static string GetBatchCategory(string variantName)
-    {
-        if (variantName.Contains("Unbatched", StringComparison.OrdinalIgnoreCase) || 
-            variantName.Contains("Baseline", StringComparison.OrdinalIgnoreCase) || 
-            variantName.Contains("Control", StringComparison.OrdinalIgnoreCase))
-            return "Unbatched";
 
-        var match = System.Text.RegularExpressions.Regex.Match(variantName, @"\d+MiB");
-        if (match.Success)
-        {
-            return $"{match.Value} Buffer";
-        }
-
-        return "Other";
-    }
 
     private static string GetWriteMode(string variantName)
     {
@@ -55,6 +41,22 @@ internal static class BenchmarkHtmlReportGenerator
         buckets = buckets
             .Where(b => records.Any(r => b.Contains(r.FileSizeBytes)))
             .ToList();
+
+        // Map each variant to its batch category using the run data config
+        var variantCategories = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var variant in variants)
+        {
+            var runForVariant = runs.FirstOrDefault(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase));
+            if (runForVariant != null && runForVariant.BufferBatchBytes.HasValue && runForVariant.BufferBatchBytes.Value > 0)
+            {
+                var mib = runForVariant.BufferBatchBytes.Value / (1024.0 * 1024.0);
+                variantCategories[variant] = $"{mib:0.##}MiB Buffer";
+            }
+            else
+            {
+                variantCategories[variant] = "Unbatched";
+            }
+        }
 
         var sb = new StringBuilder();
         sb.AppendLine("<!DOCTYPE html>");
@@ -190,9 +192,9 @@ internal static class BenchmarkHtmlReportGenerator
                     data: [{dataAvgStr}],
                     borderColor: {borderColor},
                     backgroundColor: {backgroundColor},
-                    borderWidth: 2.5,
-                    pointRadius: 4,
-                    pointHoverRadius: 6,
+                    borderWidth: 1.5,
+                    pointRadius: 2,
+                    pointHoverRadius: 4,
                     tension: 0.15,
                     fill: false
                 }}
@@ -232,14 +234,19 @@ internal static class BenchmarkHtmlReportGenerator
         ");
         sb.AppendLine("</script>");
 
-        var categories = variants.Select(GetBatchCategory).Distinct().ToList();
+        var categories = variants
+            .Select(v => variantCategories.TryGetValue(v, out var cat) ? cat : "Unbatched")
+            .Distinct()
+            .ToList();
 
         // X-axis labels
         var bucketLabelsJs = string.Join(", ", buckets.Select(b => $"'{b.Label}'"));
 
         foreach (var category in categories)
         {
-            var categoryVariants = variants.Where(v => GetBatchCategory(v) == category).ToList();
+            var categoryVariants = variants
+                .Where(v => (variantCategories.TryGetValue(v, out var cat) ? cat : "Unbatched") == category)
+                .ToList();
             if (categoryVariants.Count == 0) continue;
 
             sb.AppendLine($"<h2>Batch Size: {category}</h2>");

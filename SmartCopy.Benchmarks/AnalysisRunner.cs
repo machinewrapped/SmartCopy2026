@@ -102,11 +102,22 @@ internal static class AnalysisRunner
             return;
         }
 
-        var allVariants = filteredRecords
+        var distinctVariants = filteredRecords
             .Select(r => r.VariantName)
             .Concat(filteredRuns.Select(r => r.VariantName))
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(v => v, new VariantNameComparer())
+            .ToList();
+
+        var variantSizes = distinctVariants.ToDictionary(
+            v => v,
+            v => GetVariantSize(v, config, allRuns),
+            StringComparer.OrdinalIgnoreCase
+        );
+
+        var variantComparer = new VariantNameComparer(variantSizes);
+
+        var allVariants = distinctVariants
+            .OrderBy(v => v, variantComparer)
             .ToList();
 
         Report("## Analysis Summary");
@@ -152,7 +163,7 @@ internal static class AnalysisRunner
                 .Select(r => r.VariantName)
                 .Concat(runs.Select(r => r.VariantName))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(v => v, new VariantNameComparer())
+                .OrderBy(v => v, variantComparer)
                 .ToList();
 
             Report($"- **Run records:** `{runs.Count}`");
@@ -165,7 +176,7 @@ internal static class AnalysisRunner
             ReportRunEvidence(Report, runs, variants);
             ReportBucketRecommendations(Report, records, buckets, variants, warnings, matchedControlLookup);
             ReportBucketMetrics(Report, records, buckets, variants);
-            ReportBatchingIsolationEvidence(Report, records, buckets, variants);
+            ReportBatchingIsolationEvidence(Report, records, buckets, variants, variantComparer);
 
             if (warnings.Count > 0)
             {
@@ -354,11 +365,12 @@ internal static class AnalysisRunner
         Action<string?> report,
         IReadOnlyList<BenchmarkFileCopyRecord> records,
         IReadOnlyList<FileSizeBucket> buckets,
-        IReadOnlyList<string> variants)
+        IReadOnlyList<string> variants,
+        IComparer<string> variantComparer)
     {
         var directBatchVariants = variants
             .Where(v => v.Contains("DirectWriteBatch", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(v => v, new VariantNameComparer())
+            .OrderBy(v => v, variantComparer)
             .ToList();
 
         var unbatchedControl = variants.FirstOrDefault(v =>
@@ -417,12 +429,6 @@ internal static class AnalysisRunner
             if (control is null)
             {
                 warnings.Add($"`{variant}` has no matched control; causal effect cannot be isolated.");
-            }
-
-            if (variant.Contains("DirectWriteBatch", StringComparison.OrdinalIgnoreCase) &&
-                !variants.Any(v => v.Contains("UnbatchedDirectWrite", StringComparison.OrdinalIgnoreCase)))
-            {
-                warnings.Add($"`{variant}` has no `UnbatchedDirectWrite*` control; batching cannot be isolated from direct write alone.");
             }
         }
 
@@ -692,5 +698,26 @@ internal static class AnalysisRunner
             minSpread = Math.Min(minSpread, sorted[i] - sorted[i - 1]);
         }
         return minSpread;
+    }
+
+    private static long GetVariantSize(string variantName, BenchmarkConfig config, IReadOnlyList<BenchmarkRunRecord> runs)
+    {
+        var cv = config.Variants.FirstOrDefault(x => string.Equals(x.Name, variantName, StringComparison.OrdinalIgnoreCase));
+        if (cv != null)
+        {
+            if (cv.BufferBatchBytes > 0) return cv.BufferBatchBytes.Value;
+            if (cv.DirectWriteThresholdBytes > 0) return cv.DirectWriteThresholdBytes.Value;
+            if (cv.ProviderCopyBufferSizeBytes > 0) return cv.ProviderCopyBufferSizeBytes.Value;
+        }
+
+        var run = runs.FirstOrDefault(x => string.Equals(x.VariantName, variantName, StringComparison.OrdinalIgnoreCase));
+        if (run != null)
+        {
+            if (run.BufferBatchBytes > 0) return run.BufferBatchBytes.Value;
+            if (run.DirectWriteThresholdBytes > 0) return run.DirectWriteThresholdBytes.Value;
+            if (run.ProviderCopyBufferSizeBytes > 0) return run.ProviderCopyBufferSizeBytes.Value;
+        }
+
+        return -1L;
     }
 }

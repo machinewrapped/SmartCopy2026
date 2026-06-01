@@ -9,7 +9,8 @@ internal static class DatasetPreparationRunner
         CancellationToken ct)
     {
         var preparation = config.DatasetPreparation
-            ?? throw new InvalidOperationException("benchmark-scenarios.json does not define datasetPreparation.");
+            ?? throw new InvalidOperationException("Benchmark Scenario does not define datasetPreparation.");
+
         var artifactDirectory = BenchmarkHelpers.ResolveArtifactDirectory(workingDirectory, preparation.SourcePath, config.ArtifactPath);
 
         Console.WriteLine("Mode:     dataset-prep");
