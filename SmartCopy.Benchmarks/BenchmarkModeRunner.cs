@@ -91,7 +91,7 @@ internal static class BenchmarkModeRunner
                 .Select(r => r.RunStartedUtc)
                 .DefaultIfEmpty(DateTime.MinValue)
                 .Max()
-            let nextRunIndex = totalRuns + 1
+            let nextRunIndex = successfulRuns + 1
             select new BenchmarkSelection(scenario, variant, successfulRuns, totalRuns, lastRunUtc, nextRunIndex))
             .ToList();
 
@@ -552,68 +552,49 @@ internal static class BenchmarkModeRunner
         IReadOnlyList<BenchmarkRunRecord> historicalRuns,
         BenchmarkCliOptions selection)
     {
-        var candidates = (
-            from scenario in config.Scenarios
-            where scenario.Enabled
-            from variant in config.Variants
-            where variant.Enabled
-            let successfulRuns = historicalRuns.Count(r => BenchmarkHelpers.IsSuccessfulRunForScenarioVariant(r, scenario.Name, variant.Name))
-            let totalRuns = historicalRuns.Count(r => BenchmarkHelpers.IsTerminalRunForScenarioVariant(r, scenario.Name, variant.Name))
-            let lastRunUtc = historicalRuns
-                .Where(r => BenchmarkHelpers.IsRunForScenarioVariant(r, scenario.Name, variant.Name))
-                .Select(r => r.RunStartedUtc)
-                .DefaultIfEmpty(DateTime.MinValue)
-                .Max()
-            let nextRunIndex = totalRuns + 1
-            select new BenchmarkSelection(scenario, variant, successfulRuns, totalRuns, lastRunUtc, nextRunIndex))
-            .ToList();
+        var scenarioOrder = BenchmarkHelpers.BuildScenarioOrder(config, config.Scenarios.Where(s => s.Enabled).Select(s => s.Name));
 
-        if (!string.IsNullOrWhiteSpace(selection.ScenarioName) || !string.IsNullOrWhiteSpace(selection.VariantName))
+        if (!string.IsNullOrWhiteSpace(selection.ScenarioName))
         {
-            candidates = candidates
-                .Where(c =>
-                    (string.IsNullOrWhiteSpace(selection.ScenarioName) ||
-                     string.Equals(c.Scenario.Name, selection.ScenarioName, StringComparison.OrdinalIgnoreCase)) &&
-                    (string.IsNullOrWhiteSpace(selection.VariantName) ||
-                     string.Equals(c.Variant.Name, selection.VariantName, StringComparison.OrdinalIgnoreCase)))
+            scenarioOrder = scenarioOrder
+                .Where(name => string.Equals(name, selection.ScenarioName, StringComparison.OrdinalIgnoreCase))
                 .ToList();
         }
 
-        if (string.IsNullOrWhiteSpace(selection.ScenarioName))
+        foreach (var scenarioName in scenarioOrder)
         {
-            var scenarioOrder = BenchmarkHelpers.BuildScenarioOrder(config, candidates.Select(c => c.Scenario.Name));
-            foreach (var scenarioName in scenarioOrder)
-            {
-                var stageCandidates = candidates
-                    .Where(c => string.Equals(c.Scenario.Name, scenarioName, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-                if (stageCandidates.Count == 0)
+            var scenario = config.Scenarios.First(s => string.Equals(s.Name, scenarioName, StringComparison.OrdinalIgnoreCase));
+
+            var candidates = config.Variants
+                .Where(v => v.Enabled && 
+                            (string.IsNullOrWhiteSpace(selection.VariantName) || 
+                             string.Equals(v.Name, selection.VariantName, StringComparison.OrdinalIgnoreCase)))
+                .Select(variant =>
                 {
-                    continue;
-                }
+                    var successfulRuns = historicalRuns.Count(r => BenchmarkHelpers.IsSuccessfulRunForScenarioVariant(r, scenario.Name, variant.Name));
+                    var totalRuns = historicalRuns.Count(r => BenchmarkHelpers.IsTerminalRunForScenarioVariant(r, scenario.Name, variant.Name));
+                    var lastRunUtc = historicalRuns
+                        .Where(r => BenchmarkHelpers.IsRunForScenarioVariant(r, scenario.Name, variant.Name))
+                        .Select(r => r.RunStartedUtc)
+                        .DefaultIfEmpty(DateTime.MinValue)
+                        .Max();
+                    var nextRunIndex = successfulRuns + 1;
+                    return new BenchmarkSelection(scenario, variant, successfulRuns, totalRuns, lastRunUtc, nextRunIndex);
+                })
+                .ToList();
 
-                var hasPendingRuns = stageCandidates.Any(c => CheckConvergence(historicalRuns, c.Scenario.Name, c.Variant, config) == ConvergenceStatus.NotConverged);
-                if (hasPendingRuns)
-                {
-                    candidates = stageCandidates;
-                    break;
-                }
-            }
-        }
+            var pending = candidates
+                .Where(c => CheckConvergence(historicalRuns, c.Scenario.Name, c.Variant, config) == ConvergenceStatus.NotConverged)
+                .ToList();
 
-        var pendingCandidates = candidates
-            .Where(c => CheckConvergence(historicalRuns, c.Scenario.Name, c.Variant, config) == ConvergenceStatus.NotConverged)
-            .ToList();
-
-        if (pendingCandidates.Count > 0)
-        {
-            var rand = new Random();
-            for (var i = pendingCandidates.Count - 1; i > 0; i--)
+            if (pending.Count > 0)
             {
-                var j = rand.Next(i + 1);
-                (pendingCandidates[i], pendingCandidates[j]) = (pendingCandidates[j], pendingCandidates[i]);
+                var minRunIndex = pending.Min(c => c.NextRunIndex);
+                var roundCandidates = pending.Where(c => c.NextRunIndex == minRunIndex).ToArray();
+
+                Random.Shared.Shuffle(roundCandidates);
+                return roundCandidates[0];
             }
-            return pendingCandidates[0];
         }
 
         return null;
