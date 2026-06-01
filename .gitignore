@@ -27,9 +27,11 @@ bld/
 project.lock.json
 project.fragment.lock.json
 artifacts/
+/winget-manifests
 
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt
+*.lscache
 
 # NuGet Packages
 *.nupkg
@@ -54,25 +56,17 @@ TestResult.xml
 nunit-*.xml
 
 # Agents
+.codex
 .claude/settings.local.json
+/.claude/worktrees
+
+# Utilities
 kill-dotnet-processes.ps1
 git-cleanup-gone.ps1
-/.claude/worktrees
 *.zip
-/winget-manifests
-/benchmark-journals
-benchmark-results.ndjson
-benchmark-tasklist.md
+
+# Benchmark reports
 dataset-prep-summary-*.json
-.codex
-benchmark-analysis.md
-benchmark-file-results.ndjson
 /.obsidian
-*.lscache
-benchmark-size-scaling.md
-benchmark-path-pool.json
-benchmark-file-results-phase2.ndjson
-benchmark-results-phase2.ndjson
-benchmark-tasklist-phase2.md
 /.benchmarks/
 /.antigravitycli

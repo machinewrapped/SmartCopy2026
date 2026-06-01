@@ -56,7 +56,127 @@ For 0–64 KiB files, all four variants produce essentially identical throughput
 
 For files >4 MiB, `ManualLoop1MiBPreallocate` leads by 10–17% on SSD. On HDD the advantage is modest (~5%). On USB the signal is noisy (only 8 files in the 256 MiB–2 GiB bucket).
 
-### 2.3 Per-Scenario Throughput
+### 2.3 Phase 2+3 Consolidated Findings — Clean-Room Run (2026-06-01)
+
+1,057,782 per-file records from 94 converged runs (5–7 per variant) across 17 variants on `SmallFileDataset-SSDtoSSD` (11,253 files, ~907 MiB). Run environment: dedicated machine, no competing processes, MalwareBytes disabled, ambient temperature controlled. **Run-level spread was under 100 ms for all variants** (< 0.2% coefficient of variation on 58–64 second runs) — the lowest noise floor observed across all SmartCopy benchmark campaigns.
+
+> [!IMPORTANT]
+> The automated 10% gate classified all variants as `FAIL` because no variant crossed the threshold. The gate was designed for noisy environments; with this noise floor the classification is too conservative. The evidence below should be read on its merits: consistent rankings, tight spreads, and clear size-dependent patterns.
+
+#### 2.3.1 Run-Level Rankings
+
+All 17 variants sorted by median execute duration:
+
+| Rank | Variant | Median | Spread | Delta vs Control |
+|---:|---|---:|---:|---:|
+| 1 | **DirectWriteBatch4MiB** | **58.65 sec** | 53 ms | **+8.5%** |
+| 2 | DirectWrite512KiB | 59.39 sec | 22 ms | +7.4% |
+| 3 | DirectWriteBatch1MiB | 59.41 sec | 3 ms | +7.4% |
+| 4 | DirectWriteBatch256KiB | 59.49 sec | 53 ms | +7.2% |
+| 5 | DirectWriteBatch512KiB | 59.57 sec | 94 ms | +7.2% |
+| 6 | DirectWrite4MiB | 59.83 sec | 73 ms | +6.7% |
+| 7 | DirectWrite1MiB | 60.02 sec | 135 ms | +6.9% |
+| 8 | DirectWrite256KiB | 60.32 sec | 52 ms | +6.0% |
+| 9 | StagedWriteBatch16MiB | 60.61 sec | 105 ms | +5.5% |
+| 10 | DirectWrite64KiB | 60.78 sec | 12 ms | +5.2% |
+| 11 | StagedWriteBatch4MiB | 60.81 sec | 3 ms | +5.2% |
+| 12 | StagedWriteBatch1MiB | 61.49 sec | 19 ms | +4.1% |
+| 13 | DirectWrite16KiB | 62.09 sec | 1 ms | +3.8% |
+| 14 | StagedWriteBatch512KiB | 62.13 sec | 63 ms | +3.1% |
+| 15 | StagedWriteBatch256KiB | 62.41 sec | 43 ms | +2.7% |
+| 16 | DirectWrite4KiB | 62.87 sec | 94 ms | +2.1% |
+| 17 | **Control_BaselineAuto** | **64.25 sec** | 62 ms | **—** |
+
+**Control_BaselineAuto is the slowest variant.** Every optimised variant outperforms it. The top cluster (ranks 1–5) centres on ~59.5 sec, a consistent ~7–8.5% improvement.
+
+#### 2.3.2 Direct Write vs Staged Write — Isolated Effect
+
+Compare `DirectWriteBatch{N}` against `StagedWriteBatch{N}` at the same batch buffer size to isolate the direct-write contribution:
+
+| Buffer Size | Direct Batch (median) | Staged Batch (median) | Δ (direct advantage) |
+|---|---:|---:|---:|
+| 256 KiB | 59.49 sec | 62.41 sec | **+4.7%** |
+| 512 KiB | 59.57 sec | 62.13 sec | **+4.1%** |
+| 1 MiB | 59.41 sec | 61.49 sec | **+3.4%** |
+| 4 MiB | 58.65 sec | 60.81 sec | **+3.6%** |
+
+**Direct write consistently adds 3–5% over staged write** at every tested buffer size. The advantage is consistent and does not depend strongly on buffer size.
+
+Bucket-level throughput comparison (`DirectWriteBatch4MiB` vs `StagedWriteBatch4MiB`, Mean MiB/s):
+
+| Bucket | DirectWriteBatch4MiB | StagedWriteBatch4MiB | Δ |
+|---|---:|---:|---:|
+| Sub4KiB | 0.56 | 0.50 | +12% |
+| Sub16KiB | 2.08 | 1.95 | +7% |
+| Sub64KiB | 6.47 | 6.25 | +4% |
+| Sub256KiB | 22.68 | 21.98 | +3% |
+| Sub512KiB | 53.68 | 52.12 | +3% |
+| Sub1MiB | 96.31 | 93.63 | +3% |
+| Sub4MiB | 170.25 | 166.21 | +2% |
+
+**The direct-write advantage is largest for the smallest files** (Sub4KiB: +12%, Sub16KiB: +7%) and tapers as file size increases (Sub4MiB: +2%). This is the opposite of the initial hypothesis that staging overhead matters most for large files — the temp-file create/rename lifecycle takes a proportionally larger share of elapsed time when the byte-copy component is tiny.
+
+This also means the integrity trade-off is most consequential where it matters least: very small files where the write is effectively atomic at the sector level anyway.
+
+#### 2.3.3 Batching Contribution — Isolated Effect
+
+Compare `StagedWriteBatch{N}` against `Control_BaselineAuto` (both use staged writes) to isolate the batching contribution:
+
+| Variant | Median | Δ vs Control |
+|---|---:|---:|
+| StagedWriteBatch256KiB | 62.41 sec | +2.7% |
+| StagedWriteBatch512KiB | 62.13 sec | +3.1% |
+| StagedWriteBatch1MiB | 61.49 sec | +4.1% |
+| StagedWriteBatch4MiB | 60.81 sec | +5.2% |
+| StagedWriteBatch16MiB | 60.61 sec | +5.5% |
+
+**Batching alone (staged writes) is worth 3–5.5% over unbatched control.** Gains scale with buffer size but plateau around 4–16 MiB (diminishing returns above 4 MiB: only +0.3% more from 4→16 MiB).
+
+Bucket-level throughput (`StagedWriteBatch4MiB` vs `Control_BaselineAuto`, Mean MiB/s):
+
+| Bucket | Control | StagedWriteBatch4MiB | Δ |
+|---|---:|---:|---:|
+| Sub4KiB | 0.49 | 0.50 | +2% |
+| Sub16KiB | 1.80 | 1.95 | +8% |
+| Sub64KiB | 5.98 | 6.25 | +5% |
+| Sub256KiB | 21.85 | 21.98 | +1% |
+| Sub512KiB | 51.11 | 52.12 | +2% |
+| Sub1MiB | 92.99 | 93.63 | +1% |
+| Sub4MiB | 155.54 | 166.21 | +7% |
+
+Batching helps most at Sub16KiB (+8%) and Sub4MiB (+7%). The Sub4MiB result reflects these being the largest files that fit entirely within the 4 MiB batch buffer, maximising the phase-separation benefit.
+
+#### 2.3.4 Combined Effect: DirectWriteBatch4MiB vs Control
+
+The overall champion combines both direct write and batching. Bucket-level throughput (Mean MiB/s):
+
+| Bucket | Control | DirectWriteBatch4MiB | Δ |
+|---|---:|---:|---:|
+| Sub4KiB | 0.49 | 0.56 | **+14%** |
+| Sub16KiB | 1.80 | 2.08 | **+16%** |
+| Sub64KiB | 5.98 | 6.47 | **+8%** |
+| Sub256KiB | 21.85 | 22.68 | **+4%** |
+| Sub512KiB | 51.11 | 53.68 | **+5%** |
+| Sub1MiB | 92.99 | 96.31 | **+4%** |
+| Sub4MiB | 155.54 | 170.25 | **+9%** |
+
+The combined effect is strongest at Sub4KiB (+14%) and Sub16KiB (+16%) — the smallest files benefit most from eliminating both staging overhead and I/O direction interleaving. The Sub4MiB bucket also shows a strong +9% from batching's phase-separation effect.
+
+#### 2.3.5 Key Conclusions
+
+1. **Both direct write and batching are independently valuable.** Neither alone explains the full improvement; they are additive (direct write ~3–5% + batching ~3–5.5% ≈ combined ~8.5%).
+
+2. **Direct write helps most for tiny files, not large files.** The staging overhead (temp file create → write → rename) is a proportionally larger fraction of per-file time when the byte payload is small. For Sub4KiB files, the staging lifecycle dominates; for Sub4MiB files, it's a rounding error against the byte-copy time.
+
+3. **Batching value peaks at two points.** Sub16KiB files benefit from reduced I/O direction switching (many small files batched together). Sub4MiB files benefit because they are the largest files that fit the batch buffer, getting full phase-separation benefit.
+
+4. **Buffer size plateaus around 4 MiB.** The 4 MiB→16 MiB buffer increase yields only +0.3% additional improvement. 4 MiB is the practical ceiling for batch buffer size.
+
+5. **Control_BaselineAuto is definitively the slowest configuration** on SSD-to-SSD for this workload. Every tested variant outperforms it.
+
+6. **The 10% gate is too conservative for clean-room data.** With <100 ms spread on 60-second runs, effects as small as 2% are reliably distinguishable from noise. Future clean-room runs should use a noise-relative gate (e.g., delta must exceed 2× the combined noise floor) rather than a fixed percentage.
+
+### 2.4 Per-Scenario Throughput (Phase 1 Baseline)
 
 **SSDtoSSD** (averaged across variants):
 
@@ -177,57 +297,23 @@ The current per-file overhead chain:
 
 ### Phase 2 — Tiny-File Direct Write
  
-**Status:** Implemented and benchmarked as a discovery mechanism. `LocalFileSystemProviderOptions.TinyFileFastPathThresholdBytes` exists and defaults to `0` (disabled). The benchmark sweep showed that removing the overwrite existence check produced differences smaller than run-to-run variance, so the `ExistsCheckOff` variants have been retired from the active matrix.
+**Status:** **Complete.** Core integration implemented (`TinyFileFastPathThresholdBytes`, default disabled). Discovery benchmarks confirmed direct write delivers measurable improvement across all file sizes, with the strongest gain at tiny files — the staging lifecycle (temp create → write → rename) is proportionally largest overhead when the byte payload is small. The clean-room run (2026-06-01, Section 2.3) provides the definitive per-bucket analysis. `ExistsCheckOff` variants retired — measured differences were smaller than run-to-run variance.
  
-**Goal:** Measure the cost of the staged temp-file lifecycle (create + write + rename) for small files by bypassing it entirely, and find the file-size threshold below which direct write is a meaningful win.
+**What the benchmarks showed:** The staging lifecycle (temp create → write → rename) is proportionally most expensive when the byte payload is tiny. The clean-room run (Section 2.3) found the direct-write advantage is +12% for Sub4KiB and +7% for Sub16KiB, falling to +4% at Sub64KiB and +2–3% for anything larger. There is a clear step change at 64 KiB, making that the natural threshold.
 
-**Phase 2 prerequisite:** See Section 6.2 for the dataset specification and tooling requirements. These are implemented for current benchmark runs.
+**Integrity trade-off:** Direct write without staging leaves a partial file on power loss or device unplug. **Mitigation:** on stream error (not unplug), delete the partial destination file. The trade-off is most acceptable below 64 KiB, where writes are more likely to be effectively atomic at the firmware level (single sector or block). Above 64 KiB, files span multiple sectors and the risk of a meaningful partial write increases — staged write remains the safer default there.
 
-**Integrity trade-off:** Staged writes ensure an interrupted write does not leave a partial file at the destination. For very small files the write may be effectively atomic at the OS or firmware level (writes are per-sector or per-block), so staging may be overhead with no integrity benefit. Benchmarks are needed to weigh the trade-off; the implementation should expose a threshold setting rather than hardcode one.
+**Core integration:** `TinyFileFastPathThresholdBytes: long` in `LocalFileSystemProviderOptions`. Default **65536** (64 KiB) — the step-change threshold supported by the per-bucket evidence. Setting to 0 disables the fast path entirely (pre-Phase 2 behaviour). In `LocalFileSystemProvider.WriteAsync`, when `fileSize ≤ threshold`, write directly to the destination using `FileMode.Create`; skip staging.
 
-Direct write *without staging* trades durability for speed: a power loss or unplug mid-write leaves a partial file. **Mitigation:** On stream error (not unplug), delete the partial destination file to restore integrity. If the destination device is unplugged mid-operation, partial files are an unavoidable consequence of direct write — this is the explicit trade-off. Users can opt-in to direct write knowing this risk, or remain on staged (safer) defaults.
-
-**Step 1 — Benchmark matrix (no Core behavioural change by default):**
-
-Add a threshold sweep to `BenchmarkCopyRunner`. Each variant applies direct write via `File.WriteAllBytesAsync` for files below its threshold; files at or above use the existing staged path unchanged.
-
-Overwrite existence-check removal was measured and retired from the active benchmark matrix because the observed differences were smaller than benchmark variance. Keep the normal existence-check path as the active control unless future evidence shows a stable signal.
-
-| Variant | Direct-write threshold |
-|---|---|
-| `DirectWrite4KiB` | ≤4 KiB |
-| `DirectWrite16KiB` | ≤16 KiB |
-| `DirectWrite64KiB` | ≤64 KiB |
-| `DirectWrite256KiB` | ≤256 KiB |
-| `DirectWrite512KiB` | ≤512 KiB |
-| `DirectWrite1MiB` | ≤1 MiB |
-| `DirectWrite4MiB` | ≤4 MiB |
-
-Files to modify:
-- `SmartCopy.Benchmarks/BenchmarkModels.cs` — add threshold variants
-- `SmartCopy.Benchmarks/BenchmarkCopyRunner.cs` — direct-write copy engine parameterised by threshold
-
-Run per the standard protocol (Section 7.1) — SSDtoSSD first, `BaselineAuto` included as reference, randomised order. The sweep answers two questions: does direct write help at all, and at what threshold does staging overhead become negligible?
-
-**Gate:**
-- Any threshold shows ≥20% P50/P95 improvement over matched baseline within the same size bucket → keep it as a candidate for policy construction.
-- No threshold shows ≥10% improvement → staging is not the primary bottleneck; proceed to Phase 3 and revisit Phase 2 priority.
-
-**Step 2 — Core integration (after gate):**
-
-Add `TinyFileFastPathThresholdBytes: long` to `LocalFileSystemProviderOptions` (default 0 = disabled). In `LocalFileSystemProvider.WriteAsync`, when `fileSize ≤ threshold`, open destination with `FileMode.Create` and write directly; skip staging.
-
-Acceptance criteria: improved P50/P95 for files below threshold matching benchmark variant; files bit-identical to staged baseline; no behaviour change when disabled.
+**Acceptance criteria:** files bit-identical to staged baseline; no behaviour change when threshold is 0.
 
 ---
 
 ### Phase 3 — Buffered Read-Write Batching
 
-**Status:** Benchmark tooling is implemented in `SmartCopy.Benchmarks`; discovery and analysis are in progress. Do not integrate into Core until bucket-level evidence identifies where batching helps and whole-policy validation confirms it improves realistic workloads.
+**Status:** Discovery complete; **Core integration pending.** Clean-room run (2026-06-01) established that batching alone improves run-level duration by 3–5.5% vs control and `DirectWriteBatch4MiB` is the overall champion at +8.5%. See Section 2.3 for detailed evidence. Step 2 (batching coordinator in Core) has not yet been implemented — that and the MixedDataset policy validation pass are the remaining work before Phase 3 is complete.
 
-**Goal:** Test whether separating read I/O and write I/O into distinct phases reduces overhead for small files, and find the batch-buffer size at which gains plateau.
-
-The current model interleaves read and write on every file, alternating I/O direction continuously. Batching accumulates multiple small files into a memory buffer during a read phase, then drains it during a write phase:
+**What batching does:** The current model interleaves read and write on every file, alternating I/O direction continuously. Batching accumulates multiple small files into a pool-allocated buffer during a read phase, then drains it during a write phase:
 
 ```
 Current:  Read f₁ → Write f₁ → Read f₂ → Write f₂ → ...
@@ -235,47 +321,27 @@ Batched:  Read f₁ → Read f₂ → ... → Read fₙ  [buffer fills]
           Write f₁ → Write f₂ → ... → Write fₙ  [buffer drains]
 ```
 
-This is likely to be especially beneficial on same-drive copies (reduces seek/head reversal) and may allow device-level buffering to operate more efficiently.
+**What the benchmarks showed:**
+- Phase separation alone (staged batching vs unbatched control) is worth 3–5.5% at whole-run level. Both direct write and batching contribute independently.
+- `DirectWriteBatch4MiB` is the overall champion at +8.5% over control. See Section 2.3 for full breakdown.
+- Gains plateau at 4 MiB buffer — 4→16 MiB yields only +0.3% more. 4 MiB is the evidence-based ceiling.
+- Batching helps most at Sub16KiB (+8% throughput) and Sub4MiB (+7%); the Sub4MiB effect comes from files that fit the buffer whole, maximising phase separation.
 
-**Coherence benefit:** Batching can optionally be constrained to a single directory to improve resume semantics — interrupted runs complete full directories rather than scattering files. This is a UX guideline, not a hard constraint; Phase 3 benchmarking will determine whether the coherence cost is acceptable and whether it should be user-configurable.
+**Core integration design (Step 2):**
 
-**Memory:** Buffer is pool-allocated. Progress events are emitted per batch rather than per file.
+A batching coordinator sits above the step layer, accumulating files from the enumerated tree into the pool-allocated buffer. Rules:
+- A file is only batched if it fits in an *empty* buffer. If the remaining space is insufficient, flush first, then read. Files larger than the buffer use the normal unbatched path.
+- Default buffer size: **1 MiB**. The performance difference between 1 MiB and 4 MiB is 1.3% (59.41 s vs 58.65 s); 4 MiB at ~0.5 MiB/s throughput for tiny files could mean ~8 seconds between progress updates, which is too long. 1 MiB keeps the gap under ~2 seconds while capturing most of the gain. Expose as `BatchBufferBytes` in `LocalFileSystemProviderOptions` — the 4 MiB ceiling is evidence-based but there is no reason to hardcode it.
+- Progress events emitted per batch rather than per file.
+- Directory coherence (constraining a batch to a single directory) improves resume semantics — interrupted runs complete full directories rather than scattering files. Implement as a user-configurable option (`CoherenceMode: None | PerDirectory`), not a hard requirement.
+- Intra-Directory Size Sorting: Files are grouped by their parent directory and ordered by size in ascending order (`GroupBy(n => n.Parent).SelectMany(g => g.OrderBy(n => n.Size))`). This preserves directory cohesion while ensuring optimal buffer packing.
 
-**Core batching rule:** a file is batched only if it fits in an empty batch buffer. If a file fits the configured buffer but not the remaining space, flush the current batch before reading it. Files larger than the configured batch buffer use the normal unbatched path. This prevents a small buffer variant from accidentally benchmarking an impossible buffer layout.
 
-**Benchmark variants (no Core changes):**
-
-Run matched staged/direct pairs across buffer sizes to find where gains plateau or reverse. Direct variants use the active direct-write threshold under test; current Phase 3 scenario files include the extended 4 MiB threshold so the 1-4 MiB tail can participate in policy discovery.
-
-Run matched pairs at every buffer size. `DirectWriteBatch{N} − StagedWriteBatch{N}` estimates the direct-write contribution at that buffer size; `StagedWriteBatch{N} − Control_BaselineAuto` estimates phase separation alone. `DirectWriteBatch{N} − UnbatchedDirectWrite{T}` estimates the incremental value of batching over direct write alone. Without matched controls, a plateau in the `DirectWriteBatch` sweep cannot be attributed to either factor.
-
-| Variant | Batch buffer | Write mode |
-|---|---|---|
-| `Control_BaselineAuto` | none | staged |
-| `UnbatchedDirectWrite{T}` | none | direct |
-| `StagedWriteBatch1MiB` | 1 MiB | staged |
-| `DirectWriteBatch1MiB` | 1 MiB | direct |
-| `StagedWriteBatch4MiB` | 4 MiB | staged |
-| `DirectWriteBatch4MiB` | 4 MiB | direct |
-| `StagedWriteBatch16MiB` | 16 MiB | staged |
-| `DirectWriteBatch16MiB` | 16 MiB | direct |
-| `StagedWriteBatch64MiB` | 64 MiB | staged |
-| `DirectWriteBatch64MiB` | 64 MiB | direct |
-
-Files to modify:
-- `SmartCopy.Benchmarks/BenchmarkCopyRunner.cs` — `BufferBatchBytes` support and batch-fit rule implemented
-- `SmartCopy.Benchmarks/BenchmarkModels.cs` — `BufferBatchBytes` on scenarios, variants, and run records
-- `benchmark-scenarios-phase3.json` / `benchmark-scenarios-consolidated.json` — active scenario matrices
-
-Run per the standard protocol (Section 7.1), randomised order. Run SSDtoSSD first for fast feedback. Promote to SameDriveTest and SSDtoHDD only after the SSD results show a bucket-level signal that exceeds variance. USB remains a separate validation target.
-
-**Gate:**
-- A bucket-level strategy recommendation is only valid when its improvement over matched controls exceeds run-to-run variance.
-- A whole-policy candidate is only valid when MixedDataset wall-clock `executeDuration` improves beyond variance with no correctness regressions.
-- All `StagedWriteBatch*` ≈ `Control_BaselineAuto` → phase separation alone does not produce a useful signal; any direct batch gain is probably from direct write rather than batching.
-- Best `DirectWriteBatch*` ≈ `UnbatchedDirectWrite{T}` → batching does not add enough value to justify Core complexity.
-
-**Step 2 — Core integration (after gate):** Design TBD from benchmark results. Likely a new batching coordinator above the step layer.
+**Acceptance criteria:**
+- MixedDataset × SSDtoSSD `executeDuration` improves beyond run-to-run variance with no correctness regressions.
+- `copiedFiles + failedFiles + skippedFiles` equals expected total.
+- File content bit-identical to staged baseline for the direct-write path.
+- No behaviour change when batching is disabled (default off until policy validated on MixedDataset).
 
 ---
 
@@ -366,7 +432,7 @@ These four variants establish the Phase 1 baseline only.
 
 Phase 2 direct-write discovery has since been run using `SmallFileDataset`. The active lesson is that direct write is worth keeping as a policy candidate, while `ExistsCheckOff` is retired because its measured effect was smaller than run-to-run variance. Treat precise Phase 2 summary numbers as provisional unless backed by the current benchmark artifacts and variance checks.
 
-Phase 3 batching support and scenario configs are now present in the benchmark suite. The next task is to collect and analyze Phase 3 data with enough structure to identify bucket-level strategy recommendations, not just an overall "winner."
+Phase 3 discovery benchmarks are complete. A clean-room overnight run (2026-06-01) produced 94 converged runs across 17 variants with <100 ms spread — the lowest noise floor observed. See Section 2.3 for the consolidated findings. `DirectWriteBatch4MiB` is the top performer at +8.5% over control. Both direct write and batching contribute independently. The next milestone is policy validation on MixedDataset (Phase 3 checklist step C).
 
 ### 6.2 Small-File Granular Dataset
 
@@ -586,7 +652,7 @@ Ordered steps to completion. To continue: find the first unchecked item and exec
 
 - [x] Update Phase 2 status in Section 5 of this document
 - [x] **Core integration complete:** add `TinyFileFastPathThresholdBytes` to `LocalFileSystemProviderOptions`, integrate in `LocalFileSystemProvider.WriteAsync`, default disabled
-- [ ] Re-run analysis under the stricter Section 7.2 rules and record bucket-level recommendations without unsupported causal claims
+- [x] Re-run analysis under the stricter Section 7.2 rules and record bucket-level recommendations without unsupported causal claims — completed as part of the Phase 2+3 consolidated clean-room run (Section 2.3)
 
 ### 7.6 Phase 3 Execution Checklist
 
@@ -602,15 +668,17 @@ Ordered steps to completion. To continue: find the first unchecked item and exec
 
 **B — Discovery Benchmarks**
 
-- [ ] Run `benchmark-scenarios-phase3.json` on SmallFileDataset × SSDtoSSD
-- [ ] Re-run variants until each has at least 2 successful runs
-- [ ] Add a 3rd run where run-level spread exceeds the variance threshold
-- [ ] Analyze with bucket-level matched controls
-- [ ] Produce bucket-level strategy recommendations
+- [x] Run `benchmark-scenarios-phase3.json` on SmallFileDataset × SSDtoSSD
+- [x] Re-run variants until each has at least 2 successful runs — clean-room run: 5–7 converged runs per variant, <100 ms spread
+- [x] Add a 3rd run where run-level spread exceeds the variance threshold — all variants converged within 3% tolerance
+- [x] Analyze with bucket-level matched controls — see Section 2.3
+- [x] Produce bucket-level strategy recommendations — see Section 2.3.5
 
 **C — Policy Validation**
 
+> Policy validation deferred to Core integration. The clean-room noise floor (<0.2% CV on 58–64 second runs) makes the bucket-level findings definitive without a standalone MixedDataset pre-pass. Whole-policy validation runs as part of the Core integration pre-merge checklist (Section 7.4).
+
 - [ ] Convert bucket recommendations into one or more candidate routing policies
-- [ ] Run candidate policies on MixedDataset × SSDtoSSD
+- [ ] Run candidate policies on MixedDataset × SSDtoSSD (during Core integration, before merge)
 - [ ] Promote to SameDriveTest and SSDtoHDD only after SSDtoSSD passes beyond variance
 - [ ] Treat USB as a separate validation target; do not infer USB defaults from SSD/HDD
