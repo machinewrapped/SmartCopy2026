@@ -33,8 +33,8 @@ internal sealed class FaultingProvider(IFileSystemProvider inner) : IFileSystemP
         return inner.OpenReadAsync(path, ct);
     }
 
-    public Task WriteAsync(string path, Stream data, IProgress<long>? progress, CancellationToken ct) =>
-        inner.WriteAsync(path, data, progress, ct);
+    public Task WriteAsync(string path, Stream data, IProgress<long>? progress, OperationalSettings? settings, CancellationToken ct) =>
+        inner.WriteAsync(path, data, progress, settings, ct);
 
     public Task DeleteAsync(string path, CancellationToken ct)
     {

@@ -97,6 +97,15 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     private bool _limitMemoryFileSystemCapacity = false;
+
+    [ObservableProperty]
+    private bool _allowCopyOptimisations = false;
+
+    [ObservableProperty]
+    private int _tinyFileFastPathKb = 64;
+
+    [ObservableProperty]
+    private int _batchBufferKb = 1024;
 #endif
 
     public string SourcePath
@@ -304,6 +313,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         EnableMemoryFileSystem = _settings.EnableMemoryFileSystem;
         AddArtificialDelay = _settings.AddArtificialDelay;
         LimitMemoryFileSystemCapacity = _settings.LimitMemoryFileSystemCapacity;
+        AllowCopyOptimisations = _settings.AllowCopyOptimisations;
+        TinyFileFastPathKb = _settings.TinyFileFastPathKb;
+        BatchBufferKb = _settings.BatchBufferKb;
 #endif
 
         SourcePathPicker.RefreshSettings();
@@ -512,6 +524,24 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             _memoryProvider.SimulatedCapacity = value ? 100_000_000_000 : null;
         }
         _settings.LimitMemoryFileSystemCapacity = value;
+        _ = SaveSettingsAsync();
+    }
+
+    partial void OnAllowCopyOptimisationsChanged(bool value)
+    {
+        _settings.AllowCopyOptimisations = value;
+        _ = SaveSettingsAsync();
+    }
+
+    partial void OnTinyFileFastPathKbChanged(int value)
+    {
+        _settings.TinyFileFastPathKb = value;
+        _ = SaveSettingsAsync();
+    }
+
+    partial void OnBatchBufferKbChanged(int value)
+    {
+        _settings.BatchBufferKb = value;
         _ = SaveSettingsAsync();
     }
 #endif
@@ -851,6 +881,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         EnableMemoryFileSystem = _settings.EnableMemoryFileSystem;
         AddArtificialDelay = _settings.AddArtificialDelay;
         LimitMemoryFileSystemCapacity = _settings.LimitMemoryFileSystemCapacity;
+        AllowCopyOptimisations = _settings.AllowCopyOptimisations;
+        TinyFileFastPathKb = _settings.TinyFileFastPathKb;
+        BatchBufferKb = _settings.BatchBufferKb;
 #endif
 
         SourcePathPicker.RefreshSettings();
@@ -1180,10 +1213,17 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         var runner = new PipelineRunner(pipeline);
         var job = new PipelineJob
         {
-            RootNode         = rootNode,
-            SourceProvider   = sourceProvider,
-            ProviderRegistry = _providerRegistry,
-            TrashService     = _trashService,
+            RootNode             = rootNode,
+            SourceProvider       = sourceProvider,
+            ProviderRegistry     = _providerRegistry,
+            TrashService         = _trashService,
+            OperationalSettings  = _settings.AllowCopyOptimisations
+                ? new OperationalSettings
+                  {
+                      TinyFileFastPathThresholdBytes = (long)_settings.TinyFileFastPathKb * 1024,
+                      BatchBufferBytes               = (long)_settings.BatchBufferKb * 1024,
+                  }.Normalize()
+                : new OperationalSettings(),
         };
 
         // Put the view into "preparing" state and open the dialog immediately
@@ -1276,10 +1316,17 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         var runner = new PipelineRunner(pipeline);
         var job = new PipelineJob
         {
-            RootNode         = rootNode,
-            SourceProvider   = sourceProvider,
-            ProviderRegistry = _providerRegistry,
-            TrashService     = _trashService,
+            RootNode             = rootNode,
+            SourceProvider       = sourceProvider,
+            ProviderRegistry     = _providerRegistry,
+            TrashService         = _trashService,
+            OperationalSettings  = _settings.AllowCopyOptimisations
+                ? new OperationalSettings
+                  {
+                      TinyFileFastPathThresholdBytes = (long)_settings.TinyFileFastPathKb * 1024,
+                      BatchBufferBytes               = (long)_settings.BatchBufferKb * 1024,
+                  }.Normalize()
+                : new OperationalSettings(),
         };
 
         await ExecutePipelineAsync(runner, job);

@@ -28,6 +28,7 @@ public sealed class MoveStepFallbackTests
         public bool ShowHiddenFiles { get; }
         public bool AllowDeleteReadOnly { get; }
         public ITrashService TrashService { get; } = new NullTrashService();
+        public OperationalSettings OperationalSettings { get; } = new();
 
         public MoveTestContext(DirectoryNode root, IFileSystemProvider source, IFileSystemProvider? target = null)
         {

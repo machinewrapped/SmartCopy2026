@@ -28,6 +28,7 @@ public sealed class SelectionStepsTests
         public bool ShowHiddenFiles { get; }
         public bool AllowDeleteReadOnly { get; }
         public ITrashService TrashService { get; } = new NullTrashService();
+        public OperationalSettings OperationalSettings { get; } = new();
 
         public TestStepContext(DirectoryNode root, IFileSystemProvider provider)
         {

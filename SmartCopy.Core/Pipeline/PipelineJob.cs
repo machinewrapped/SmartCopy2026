@@ -45,4 +45,7 @@ public sealed record PipelineJob
 
     /// <summary>Token for cancelling the pipeline.</summary>
     public CancellationToken CancellationToken { get; init; }
+
+    /// <summary>Execution-time tuning parameters for this pipeline run.</summary>
+    public OperationalSettings OperationalSettings { get; init; } = new();
 }

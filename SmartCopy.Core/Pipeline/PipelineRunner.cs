@@ -313,6 +313,7 @@ public sealed class PipelineRunner
         public bool ShowHiddenFiles { get; }
         public bool AllowDeleteReadOnly { get; }
         public ITrashService TrashService { get; }
+        public OperationalSettings OperationalSettings { get; }
 
         public StepContext(
             PipelineJob job,
@@ -324,6 +325,7 @@ public sealed class PipelineRunner
             ShowHiddenFiles = job.ShowHiddenFiles;
             AllowDeleteReadOnly = job.AllowDeleteReadOnly;
             TrashService = job.TrashService;
+            OperationalSettings = job.OperationalSettings;
             _fileTransferProgress = fileTransferProgress;
         }
 

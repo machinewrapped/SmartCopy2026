@@ -193,7 +193,7 @@ internal static class BenchmarkModeRunner
 
             BenchmarkHelpers.ValidatePaths(sourcePath, destinationPath);
 
-            var providerOptions = variant.CreateProviderOptions(scenario);
+            var providerOptions = variant.CreateOperationalSettings(scenario);
             var overwriteMode = variant.OverwriteMode ?? scenario.OverwriteMode;
             var state = new BenchmarkState();
 
@@ -239,8 +239,8 @@ internal static class BenchmarkModeRunner
 
                 Directory.CreateDirectory(journalDirectory);
 
-                var sourceProvider = new LocalFileSystemProvider(sourcePath, options: providerOptions);
-                var destinationProvider = new LocalFileSystemProvider(destinationPath, options: providerOptions);
+                var sourceProvider = new LocalFileSystemProvider(sourcePath);
+                var destinationProvider = new LocalFileSystemProvider(destinationPath);
                 var registry = new FileSystemProviderRegistry();
                 registry.Register(sourceProvider);
                 registry.Register(destinationProvider);
@@ -304,6 +304,7 @@ internal static class BenchmarkModeRunner
                             ProviderRegistry = registry,
                             Progress = executeProgress,
                             CancellationToken = ct,
+                            OperationalSettings = providerOptions,
                         }, destinationPath, overwriteMode, directWriteThresholdBytes, bufferBatchBytes, skipExistsCheckForOverwrite, providerOptions.CopyBufferSizeBytes, ct);
                     }
                     else
@@ -315,6 +316,7 @@ internal static class BenchmarkModeRunner
                             ProviderRegistry = registry,
                             Progress = executeProgress,
                             CancellationToken = ct,
+                            OperationalSettings = providerOptions,
                         }, ct);
                     }
                     state.ExecuteStopwatch.Stop();
@@ -513,7 +515,7 @@ internal static class BenchmarkModeRunner
         string? notes,
         int runIndex)
     {
-        var providerOptions = variant.CreateProviderOptions(scenario);
+        var providerOptions = variant.CreateOperationalSettings(scenario);
         return new Dictionary<string, string?>
         {
             ["recordType"] = "benchmarkRun",

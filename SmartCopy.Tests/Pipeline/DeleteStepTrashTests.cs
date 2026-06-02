@@ -36,6 +36,7 @@ public sealed class DeleteStepTrashTests
         public bool ShowHiddenFiles { get; }
         public bool AllowDeleteReadOnly { get; }
         public ITrashService TrashService { get; }
+        public OperationalSettings OperationalSettings { get; } = new();
 
         public TestStepContext(
             DirectoryNode root,

@@ -40,7 +40,7 @@ public interface IFileSystemProvider
     /// interrupted. When transactional commit is unavailable, implementations should
     /// still best-effort clean up partial output before returning an error.
     /// </summary>
-    Task WriteAsync(string path, Stream data, IProgress<long>? progress, CancellationToken ct);
+    Task WriteAsync(string path, Stream data, IProgress<long>? progress, OperationalSettings? settings, CancellationToken ct);
 
     /// <summary>
     /// Deletes a file or directory at <paramref name="path"/>.

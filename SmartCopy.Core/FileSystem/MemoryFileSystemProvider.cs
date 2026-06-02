@@ -104,7 +104,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         return Task.FromResult(stream);
     }
 
-    public async Task WriteAsync(string path, Stream data, IProgress<long>? progress, CancellationToken ct)
+    public async Task WriteAsync(string path, Stream data, IProgress<long>? progress, OperationalSettings? settings, CancellationToken ct)
     {
         var normalizedPath = Normalize(path);
 

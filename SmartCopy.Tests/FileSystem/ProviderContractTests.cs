@@ -72,7 +72,7 @@ public abstract class ProviderContractTests : IDisposable
         var dest = Provider.JoinPath(Provider.RootPath, ["roundtrip.txt"]);
         var payload = Encoding.UTF8.GetBytes("round-trip");
         await using var writeStream = new MemoryStream(payload);
-        await Provider.WriteAsync(dest, writeStream, progress: null, CancellationToken.None);
+        await Provider.WriteAsync(dest, writeStream, progress: null, settings: null, CancellationToken.None);
 
         await using var readStream = await Provider.OpenReadAsync(dest, CancellationToken.None);
         using var reader = new StreamReader(readStream);

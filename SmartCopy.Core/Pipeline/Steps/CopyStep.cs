@@ -144,6 +144,28 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
 
         await using var _ = targetProvider.BeginBulkWriteAsync();
 
+        var resolved = context.OperationalSettings
+            .WithProviderConstraints(context.SourceProvider.Capabilities, targetProvider.Capabilities);
+        var useBatch = resolved.BatchBufferBytes > 0;
+
+        if (useBatch)
+        {
+            await foreach (var result in ApplyBatchedAsync(context, targetProvider, resolved, ct))
+                yield return result;
+        }
+        else
+        {
+            await foreach (var result in ApplyUnbatchedAsync(context, targetProvider, resolved, ct))
+                yield return result;
+        }
+    }
+
+    private async IAsyncEnumerable<TransformResult> ApplyUnbatchedAsync(
+        IStepContext context,
+        IFileSystemProvider targetProvider,
+        OperationalSettings resolved,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
         foreach (var node in context.RootNode.GetSelectedDescendants())
         {
             ct.ThrowIfCancellationRequested();
@@ -151,72 +173,192 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
 
             if (node.IsDirectory)
             {
-                yield return new TransformResult(
-                    IsSuccess: true,
-                    SourceNode: node,
-                    SourceNodeResult: SourceResult.None);
+                yield return new TransformResult(IsSuccess: true, SourceNode: node, SourceNodeResult: SourceResult.None);
                 continue;
             }
 
             var nodeCtx = context.GetNodeContext(node);
-            var destination = targetProvider.JoinPath(DestinationPath, nodeCtx.PathSegments);
-
-            var destResult = DestinationResult.Written;
-            if (!SkipExistsCheckForOverwrite || OverwriteMode == OverwriteMode.Skip)
+            var destination = targetProvider.JoinPath(DestinationPath!, nodeCtx.PathSegments);
+            var destResult = await ResolveDestResultAsync(targetProvider, destination, ct);
+            if (destResult is null)
             {
-                var exists = await targetProvider.ExistsAsync(destination, ct);
-                if (exists && OverwriteMode == OverwriteMode.Skip)
-                {
-                    yield return new TransformResult(
-                        IsSuccess: true,
-                        SourceNode: node,
-                        SourceNodeResult: SourceResult.Skipped,
-                        DestinationPath: destination,
-                        NumberOfFilesSkipped: 1,
-                        InputBytes: node.Size);
-                    continue;
-                }
-                destResult = exists ? DestinationResult.Overwritten : DestinationResult.Created;
-            }
-
-            string? copyError = null;
-            try
-            {
-                IProgress<long>? writeProgress = null;
-                if (context is IFileTransferProgressSink progressSink)
-                {
-                    writeProgress = new DelegateProgress<long>(
-                        bytes => progressSink.ReportFileTransferBytes(node, bytes, node.Size));
-                }
-
-                await using var sourceStream = await context.SourceProvider.OpenReadAsync(node.FullPath, ct);
-                await targetProvider.WriteAsync(destination, sourceStream, writeProgress, ct);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                copyError = ex.Message;
-            }
-
-            if (copyError is not null)
-            {
-                context.MarkFailed(node);
-                yield return new TransformResult(
-                    IsSuccess: false,
-                    SourceNode: node,
-                    SourceNodeResult: SourceResult.Skipped,
-                    ErrorMessage: copyError);
+                yield return SkippedResult(node, destination);
                 continue;
             }
 
-            yield return new TransformResult(
-                IsSuccess: true,
-                SourceNode: node,
-                SourceNodeResult: SourceResult.Copied,
-                DestinationPath: destination,
-                DestinationResult: destResult,
-                NumberOfFilesAffected: 1,
-                InputBytes: node.Size,
-                OutputBytes: node.Size);
+            yield return await CopySingleFileAsync(context, node, destination, destResult.Value, targetProvider, resolved, ct);
         }
     }
+
+    private async IAsyncEnumerable<TransformResult> ApplyBatchedAsync(
+        IStepContext context,
+        IFileSystemProvider targetProvider,
+        OperationalSettings resolved,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        using var buffer = new BatchCopyBuffer(resolved.BatchBufferBytes);
+
+        foreach (var node in context.RootNode.GetSelectedDescendants())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (context.IsNodeFailed(node)) continue;
+
+            if (node.IsDirectory)
+            {
+                yield return new TransformResult(IsSuccess: true, SourceNode: node, SourceNodeResult: SourceResult.None);
+                continue;
+            }
+
+            var nodeCtx = context.GetNodeContext(node);
+            var destination = targetProvider.JoinPath(DestinationPath!, nodeCtx.PathSegments);
+            var destResult = await ResolveDestResultAsync(targetProvider, destination, ct);
+            if (destResult is null)
+            {
+                yield return SkippedResult(node, destination);
+                continue;
+            }
+
+            if (buffer.WouldFitEver(node.Size))
+            {
+                var fileSize = (int)node.Size;
+                if (!buffer.HasSpaceFor(fileSize))
+                {
+                    await foreach (var r in FlushBatchAsync(buffer, targetProvider, context, resolved, ct))
+                        yield return r;
+                }
+
+                string? readError = null;
+                try
+                {
+                    await using var src = await context.SourceProvider.OpenReadAsync(node.FullPath, ct);
+                    await buffer.AccumulateAsync(src, fileSize, destination, destResult.Value, node, ct);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    context.MarkFailed(node);
+                    readError = ex.Message;
+                }
+
+                if (readError is not null)
+                {
+                    yield return new TransformResult(IsSuccess: false, SourceNode: node,
+                        SourceNodeResult: SourceResult.Skipped, ErrorMessage: readError);
+                }
+            }
+            else
+            {
+                // File too large for any batch — flush pending entries then copy normally.
+                await foreach (var r in FlushBatchAsync(buffer, targetProvider, context, resolved, ct))
+                    yield return r;
+
+                yield return await CopySingleFileAsync(context, node, destination, destResult.Value, targetProvider, resolved, ct);
+            }
+        }
+
+        await foreach (var r in FlushBatchAsync(buffer, targetProvider, context, resolved, ct))
+            yield return r;
+    }
+
+    private static async IAsyncEnumerable<TransformResult> FlushBatchAsync(
+        BatchCopyBuffer buffer,
+        IFileSystemProvider targetProvider,
+        IStepContext context,
+        OperationalSettings resolved,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        if (!buffer.HasEntries)
+            yield break;
+
+        foreach (var entry in buffer.Entries)
+        {
+            IProgress<long>? progress = null;
+            if (context is IFileTransferProgressSink sink)
+                progress = new DelegateProgress<long>(b => sink.ReportFileTransferBytes(entry.Node, b, entry.Length));
+
+            string? error = null;
+            try
+            {
+                using var ms = buffer.OpenSegmentStream(entry);
+                await targetProvider.WriteAsync(entry.Destination, ms, progress, resolved, ct);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                context.MarkFailed(entry.Node);
+                error = ex.Message;
+            }
+
+            yield return error is null
+                ? new TransformResult(IsSuccess: true, SourceNode: entry.Node,
+                    SourceNodeResult: SourceResult.Copied, DestinationPath: entry.Destination,
+                    DestinationResult: entry.DestResult, NumberOfFilesAffected: 1,
+                    InputBytes: entry.Length, OutputBytes: entry.Length)
+                : new TransformResult(IsSuccess: false, SourceNode: entry.Node,
+                    SourceNodeResult: SourceResult.Skipped, ErrorMessage: error);
+        }
+
+        buffer.Reset();
+    }
+
+    private static async Task<TransformResult> CopySingleFileAsync(
+        IStepContext context,
+        DirectoryTreeNode node,
+        string destination,
+        DestinationResult destResult,
+        IFileSystemProvider targetProvider,
+        OperationalSettings resolved,
+        CancellationToken ct)
+    {
+        string? copyError = null;
+        try
+        {
+            IProgress<long>? writeProgress = null;
+            if (context is IFileTransferProgressSink progressSink)
+            {
+                writeProgress = new DelegateProgress<long>(
+                    bytes => progressSink.ReportFileTransferBytes(node, bytes, node.Size));
+            }
+
+            await using var sourceStream = await context.SourceProvider.OpenReadAsync(node.FullPath, ct);
+            await targetProvider.WriteAsync(destination, sourceStream, writeProgress, resolved, ct);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            copyError = ex.Message;
+        }
+
+        if (copyError is not null)
+        {
+            context.MarkFailed(node);
+            return new TransformResult(IsSuccess: false, SourceNode: node,
+                SourceNodeResult: SourceResult.Skipped, ErrorMessage: copyError);
+        }
+
+        return new TransformResult(IsSuccess: true, SourceNode: node,
+            SourceNodeResult: SourceResult.Copied, DestinationPath: destination,
+            DestinationResult: destResult, NumberOfFilesAffected: 1,
+            InputBytes: node.Size, OutputBytes: node.Size);
+    }
+
+    /// <summary>
+    /// Returns the <see cref="DestinationResult"/> for the file, or null if the file
+    /// should be skipped (OverwriteMode.Skip and destination exists).
+    /// </summary>
+    private async Task<DestinationResult?> ResolveDestResultAsync(
+        IFileSystemProvider targetProvider,
+        string destination,
+        CancellationToken ct)
+    {
+        if (SkipExistsCheckForOverwrite && OverwriteMode != OverwriteMode.Skip)
+            return DestinationResult.Written;
+
+        var exists = await targetProvider.ExistsAsync(destination, ct);
+        if (exists && OverwriteMode == OverwriteMode.Skip)
+            return null;
+
+        return exists ? DestinationResult.Overwritten : DestinationResult.Created;
+    }
+
+    private static TransformResult SkippedResult(DirectoryTreeNode node, string destination) =>
+        new(IsSuccess: true, SourceNode: node, SourceNodeResult: SourceResult.Skipped,
+            DestinationPath: destination, NumberOfFilesSkipped: 1, InputBytes: node.Size);
 }

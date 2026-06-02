@@ -69,6 +69,11 @@ public partial class MainWindow : Window
     private MenuItem? _enableMemoryFileSystemMenuItem;
     private MenuItem? _artificialDelayMenuItem;
     private MenuItem? _limitMemoryFileSystemCapacityMenuItem;
+
+    // Options menu — Performance
+    private MenuItem? _allowCopyOptimisationsMenuItem;
+    private MenuItem? _tinyFileThresholdMenu;
+    private MenuItem? _batchBufferMenu;
 #endif
 
     public MainWindow()
@@ -332,15 +337,16 @@ public partial class MainWindow : Window
         OptionsMenu.Items.Add(_fullPreScanMenuItem);
 
 #if DEBUG
-        // ── Section: Debug  ───────────────────────────────────────────────────
+        // ── Submenu: Debug ────────────────────────────────────────────────────
         OptionsMenu.Items.Add(new Separator());
-        OptionsMenu.Items.Add(SectionHeader("Debug"));
+        var debugMenu = new MenuItem { Header = "Debug" };
+        OptionsMenu.Items.Add(debugMenu);
 
         _enableMemoryFileSystemMenuItem = Toggle(
             "Enable Memory File System",
             _mainVm?.EnableMemoryFileSystem ?? false,
             () => { if (_mainVm is not null) _mainVm.EnableMemoryFileSystem = !_mainVm.EnableMemoryFileSystem; });
-        OptionsMenu.Items.Add(_enableMemoryFileSystemMenuItem);
+        debugMenu.Items.Add(_enableMemoryFileSystemMenuItem);
 
         _artificialDelayMenuItem = Toggle(
             "Add Artificial Delays to Mock Provider",
@@ -348,7 +354,7 @@ public partial class MainWindow : Window
             () => { if (_mainVm is not null) _mainVm.AddArtificialDelay = !_mainVm.AddArtificialDelay; },
             isEnabled: _mainVm?.EnableMemoryFileSystem ?? false
             );
-        OptionsMenu.Items.Add(_artificialDelayMenuItem);
+        debugMenu.Items.Add(_artificialDelayMenuItem);
 
         _limitMemoryFileSystemCapacityMenuItem = Toggle(
             "Limit Memory Filesystem Capacity",
@@ -356,7 +362,32 @@ public partial class MainWindow : Window
             () => { if (_mainVm is not null) _mainVm.LimitMemoryFileSystemCapacity = !_mainVm.LimitMemoryFileSystemCapacity; },
             isEnabled: _mainVm?.EnableMemoryFileSystem ?? false
             );
-        OptionsMenu.Items.Add(_limitMemoryFileSystemCapacityMenuItem);
+        debugMenu.Items.Add(_limitMemoryFileSystemCapacityMenuItem);
+
+        // ── Submenu: Performance ───────────────────────────────────────────
+        OptionsMenu.Items.Add(new Separator());
+        var performanceMenu = new MenuItem { Header = "Performance" };
+        OptionsMenu.Items.Add(performanceMenu);
+
+        _allowCopyOptimisationsMenuItem = Toggle(
+            "Allow Copy Optimisations",
+            _mainVm?.AllowCopyOptimisations ?? false,
+            () => { if (_mainVm is not null) _mainVm.AllowCopyOptimisations = !_mainVm.AllowCopyOptimisations; });
+        performanceMenu.Items.Add(_allowCopyOptimisationsMenuItem);
+
+        _tinyFileThresholdMenu = new MenuItem { Header = "Tiny File Threshold" };
+        PopulateByteSizeRadioMenu(_tinyFileThresholdMenu,
+            _mainVm?.TinyFileFastPathKb ?? 64,
+            [(0, "Disabled"), (16, "16 KiB"), (32, "32 KiB"), (64, "64 KiB"), (128, "128 KiB")],
+            kb => { if (_mainVm is not null) _mainVm.TinyFileFastPathKb = kb; });
+        performanceMenu.Items.Add(_tinyFileThresholdMenu);
+
+        _batchBufferMenu = new MenuItem { Header = "Batch Buffer Size" };
+        PopulateByteSizeRadioMenu(_batchBufferMenu,
+            _mainVm?.BatchBufferKb ?? 1024,
+            [(0, "Disabled"), (256, "256 KiB"), (512, "512 KiB"), (1024, "1 MiB"), (2048, "2 MiB"), (4096, "4 MiB")],
+            kb => { if (_mainVm is not null) _mainVm.BatchBufferKb = kb; });
+        performanceMenu.Items.Add(_batchBufferMenu);
 #endif
 
         return;
@@ -409,6 +440,32 @@ public partial class MainWindow : Window
                         if (child.Tag is TEnum t)
                             child.IsChecked = t.Equals(value);
                     }
+                };
+                parent.Items.Add(item);
+            }
+        }
+
+        static void PopulateByteSizeRadioMenu(
+            MenuItem parent, int currentKb,
+            (int Kb, string Label)[] options,
+            Action<int> onSelect)
+        {
+            parent.Items.Clear();
+            foreach (var (kb, label) in options)
+            {
+                var item = new MenuItem
+                {
+                    Header = label,
+                    Tag = kb,
+                    ToggleType = MenuItemToggleType.Radio,
+                    IsChecked = kb == currentKb,
+                };
+                item.Click += (_, _) =>
+                {
+                    onSelect(kb);
+                    foreach (var child in parent.Items.OfType<MenuItem>())
+                        if (child.Tag is int t)
+                            child.IsChecked = t == kb;
                 };
                 parent.Items.Add(item);
             }
@@ -540,6 +597,29 @@ public partial class MainWindow : Window
                 if (_limitMemoryFileSystemCapacityMenuItem is not null)
                     _limitMemoryFileSystemCapacityMenuItem.IsChecked = _mainVm?.LimitMemoryFileSystemCapacity ?? false;
 
+                break;
+
+            case nameof(MainViewModel.AllowCopyOptimisations):
+                if (_allowCopyOptimisationsMenuItem is not null)
+                    _allowCopyOptimisationsMenuItem.IsChecked = _mainVm?.AllowCopyOptimisations ?? false;
+                break;
+
+            case nameof(MainViewModel.TinyFileFastPathKb):
+                if (_tinyFileThresholdMenu is not null && _mainVm is not null)
+                {
+                    foreach (var child in _tinyFileThresholdMenu.Items.OfType<MenuItem>())
+                        if (child.Tag is int t)
+                            child.IsChecked = t == _mainVm.TinyFileFastPathKb;
+                }
+                break;
+
+            case nameof(MainViewModel.BatchBufferKb):
+                if (_batchBufferMenu is not null && _mainVm is not null)
+                {
+                    foreach (var child in _batchBufferMenu.Items.OfType<MenuItem>())
+                        if (child.Tag is int t)
+                            child.IsChecked = t == _mainVm.BatchBufferKb;
+                }
                 break;
 #endif
 

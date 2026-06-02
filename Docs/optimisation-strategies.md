@@ -303,7 +303,7 @@ The current per-file overhead chain:
 
 **Integrity trade-off:** Direct write without staging leaves a partial file on power loss or device unplug. **Mitigation:** on stream error (not unplug), delete the partial destination file. The trade-off is most acceptable below 64 KiB, where writes are more likely to be effectively atomic at the firmware level (single sector or block). Above 64 KiB, files span multiple sectors and the risk of a meaningful partial write increases — staged write remains the safer default there.
 
-**Core integration:** `TinyFileFastPathThresholdBytes: long` in `LocalFileSystemProviderOptions`. Default **65536** (64 KiB) — the step-change threshold supported by the per-bucket evidence. Setting to 0 disables the fast path entirely (pre-Phase 2 behaviour). In `LocalFileSystemProvider.WriteAsync`, when `fileSize ≤ threshold`, write directly to the destination using `FileMode.Create`; skip staging.
+**Core integration:** `TinyFileFastPathThresholdBytes: long` in `OperationalSettings`. Default **65536** (64 KiB) — the step-change threshold supported by the per-bucket evidence. Setting to 0 disables the fast path entirely (pre-Phase 2 behaviour). In `LocalFileSystemProvider.WriteAsync`, when `fileSize ≤ threshold`, write directly to the destination using `FileMode.Create`; skip staging.
 
 **Acceptance criteria:** files bit-identical to staged baseline; no behaviour change when threshold is 0.
 
@@ -331,7 +331,7 @@ Batched:  Read f₁ → Read f₂ → ... → Read fₙ  [buffer fills]
 
 A batching coordinator sits above the step layer, accumulating files from the enumerated tree into the pool-allocated buffer. Rules:
 - A file is only batched if it fits in an *empty* buffer. If the remaining space is insufficient, flush first, then read. Files larger than the buffer use the normal unbatched path.
-- Default buffer size: **1 MiB**. The performance difference between 1 MiB and 4 MiB is 1.3% (59.41 s vs 58.65 s); 4 MiB at ~0.5 MiB/s throughput for tiny files could mean ~8 seconds between progress updates, which is too long. 1 MiB keeps the gap under ~2 seconds while capturing most of the gain. Expose as `BatchBufferBytes` in `LocalFileSystemProviderOptions` — the 4 MiB ceiling is evidence-based but there is no reason to hardcode it.
+- Default buffer size: **1 MiB**. The performance difference between 1 MiB and 4 MiB is 1.3% (59.41 s vs 58.65 s); 4 MiB at ~0.5 MiB/s throughput for tiny files could mean ~8 seconds between progress updates, which is too long. 1 MiB keeps the gap under ~2 seconds while capturing most of the gain. `BatchBufferBytes` is already a field on `OperationalSettings` and flows through `PipelineJob.OperationalSettings` → `IStepContext.OperationalSettings` → `CopyStep` — no provider-level changes needed.
 - Progress events emitted per batch rather than per file.
 - Directory coherence (constraining a batch to a single directory) improves resume semantics — interrupted runs complete full directories rather than scattering files. Implement as a user-configurable option (`CoherenceMode: None | PerDirectory`), not a hard requirement.
 - Intra-Directory Size Sorting: Files are grouped by their parent directory and ordered by size in ascending order (`GroupBy(n => n.Parent).SelectMany(g => g.OrderBy(n => n.Size))`). This preserves directory cohesion while ensuring optimal buffer packing.
@@ -369,7 +369,7 @@ Acceptance criteria: progress UX remains clear and responsive during tiny-file b
 
 **Goal:** Apply appropriate strategy defaults per destination type so gains do not regress on HDD or USB.
 
-Detect SSD vs HDD vs USB via `DriveInfo` or platform APIs. Implement as a `DestinationProfile` enum and translate into strategy parameters (buffer size, staging threshold, progress throttle rate). Do not hardcode values — allow override via `LocalFileSystemProviderOptions`.
+Detect SSD vs HDD vs USB via `DriveInfo` or platform APIs. Implement as a `DestinationProfile` enum and translate into strategy parameters (buffer size, staging threshold, progress throttle rate). Do not hardcode values — surface them as fields on `OperationalSettings`, which is injected per-run via `PipelineJob`.
 
 Destination-specific notes:
 - **HDD:** conservative defaults; baseline data exists. Small-file strategies transfer directly; no concurrency until Phase 7.
@@ -596,7 +596,7 @@ Apply before each Core merge. Benchmark-only changes (no Core code) do not requi
 3. Benchmark run metadata recorded with cold/warm condition notes.
 4. Results appended to `benchmark-results.ndjson` and `benchmark-file-results.ndjson`.
 5. Architectural changes reflected in `Docs/Architecture.md`.
-6. New `LocalFileSystemProviderOptions` fields default to 0/disabled — no behaviour change without explicit opt-in.
+6. New `OperationalSettings` fields default to 0/disabled — no behaviour change without explicit opt-in.
 7. Small-file strategy changes validated on SmallFileDataset first; real-world validation pass on MixedDataset before promoting defaults. Buffer scaling changes validated on byte-volume-dominated dataset.
 8. `copiedFiles + failedFiles + skippedFiles` equals the expected total across all runs.
 9. Direct-write (non-staged) changes: spot-check file content bit-identity against staged baseline.
@@ -651,7 +651,7 @@ Ordered steps to completion. To continue: find the first unchecked item and exec
 **E — Gate decision**
 
 - [x] Update Phase 2 status in Section 5 of this document
-- [x] **Core integration complete:** add `TinyFileFastPathThresholdBytes` to `LocalFileSystemProviderOptions`, integrate in `LocalFileSystemProvider.WriteAsync`, default disabled
+- [x] **Core integration complete:** `TinyFileFastPathThresholdBytes` on `OperationalSettings`; injected per-run via `PipelineJob.OperationalSettings` → `IStepContext` → `LocalFileSystemProvider.WriteAsync`. Default 0 (disabled).
 - [x] Re-run analysis under the stricter Section 7.2 rules and record bucket-level recommendations without unsupported causal claims — completed as part of the Phase 2+3 consolidated clean-room run (Section 2.3)
 
 ### 7.6 Phase 3 Execution Checklist

@@ -41,6 +41,7 @@ public sealed class SelectionFileStepTests : IDisposable
         public bool ShowHiddenFiles => false;
         public bool AllowDeleteReadOnly => false;
         public ITrashService TrashService { get; } = new NullTrashService();
+        public OperationalSettings OperationalSettings { get; } = new();
 
         public TestStepContext(DirectoryNode root, IFileSystemProvider provider)
         {

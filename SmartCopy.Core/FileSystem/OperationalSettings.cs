@@ -7,18 +7,17 @@ public enum LocalFileSystemWriteMode
     CopyToAsync,
 }
 
-public sealed class LocalFileSystemProviderOptions
+public sealed record OperationalSettings
 {
-    public static LocalFileSystemProviderOptions Default { get; set; } = new();
-
     public int CopyBufferSizeBytes { get; init; } = 256 * 1024;
     public long SmallFileProgressThresholdBytes { get; init; } = 10L * 1024 * 1024;
     public LocalFileSystemWriteMode WriteMode { get; init; } = LocalFileSystemWriteMode.Auto;
     public bool UseArrayPoolForManualLoop { get; init; }
     public bool PreallocateDestinationFile { get; init; }
     public long TinyFileFastPathThresholdBytes { get; init; }
+    public long BatchBufferBytes { get; init; }
 
-    public LocalFileSystemProviderOptions Normalize()
+    public OperationalSettings Normalize()
     {
         if (CopyBufferSizeBytes <= 0)
         {
@@ -44,6 +43,26 @@ public sealed class LocalFileSystemProviderOptions
                 "Tiny-file fast-path threshold must be zero or greater.");
         }
 
+        if (BatchBufferBytes < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(BatchBufferBytes),
+                "Batch buffer size must be zero or greater.");
+        }
+
         return this;
+    }
+
+    /// <summary>
+    /// Returns a copy of these settings clamped to the capabilities of the source and target providers.
+    /// Disables batching if either provider does not support it, or if both impose a max buffer limit.
+    /// </summary>
+    public OperationalSettings WithProviderConstraints(ProviderCapabilities source, ProviderCapabilities target)
+    {
+        var batchBytes = BatchBufferBytes;
+        if (source.MaxBatchBufferBytes > 0) batchBytes = Math.Min(batchBytes, source.MaxBatchBufferBytes);
+        if (target.MaxBatchBufferBytes > 0) batchBytes = Math.Min(batchBytes, target.MaxBatchBufferBytes);
+        if (!source.AllowBatchRead || !target.AllowBatchWrite) batchBytes = 0;
+        return this with { BatchBufferBytes = batchBytes };
     }
 }

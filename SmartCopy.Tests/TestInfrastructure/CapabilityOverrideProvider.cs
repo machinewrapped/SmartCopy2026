@@ -18,8 +18,8 @@ internal sealed class CapabilityOverrideProvider(IFileSystemProvider inner, Prov
         inner.GetNodeAsync(path, ct);
     public Task<Stream> OpenReadAsync(string path, CancellationToken ct) =>
         inner.OpenReadAsync(path, ct);
-    public Task WriteAsync(string path, Stream data, IProgress<long>? progress, CancellationToken ct) =>
-        inner.WriteAsync(path, data, progress, ct);
+    public Task WriteAsync(string path, Stream data, IProgress<long>? progress, OperationalSettings? settings, CancellationToken ct) =>
+        inner.WriteAsync(path, data, progress, settings, ct);
     public Task DeleteAsync(string path, CancellationToken ct) =>
         inner.DeleteAsync(path, ct);
     public Task MoveAsync(string sourcePath, string destPath, CancellationToken ct) =>

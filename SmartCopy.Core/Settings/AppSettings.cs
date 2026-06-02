@@ -22,7 +22,12 @@ public sealed class AppSettings
     public bool FollowSymlinks { get; set; }
     public bool EnableFilesystemWatcher { get; set; } = true;
     public int CopyChunkSizeKb { get; set; } = 256;
-    
+
+    // Performance optimisations — tunable in DEBUG builds, always serialised.
+    public bool AllowCopyOptimisations { get; set; } = false;
+    public int TinyFileFastPathKb { get; set; } = 64;   // 64 KiB step-change threshold
+    public int BatchBufferKb { get; set; } = 1024;        // 1 MiB default buffer
+
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public OverwriteMode DefaultOverwriteMode { get; set; } = OverwriteMode.Skip;
 

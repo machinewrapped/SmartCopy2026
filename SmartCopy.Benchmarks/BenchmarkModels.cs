@@ -290,18 +290,19 @@ internal sealed class BenchmarkScenario
         }
     }
 
-    public LocalFileSystemProviderOptions CreateProviderOptions()
+    public OperationalSettings CreateOperationalSettings()
     {
-        return new LocalFileSystemProviderOptions
+        var defaults = new OperationalSettings();
+        return new OperationalSettings
         {
-            CopyBufferSizeBytes = ProviderCopyBufferSizeBytes ?? LocalFileSystemProviderOptions.Default.CopyBufferSizeBytes,
+            CopyBufferSizeBytes = ProviderCopyBufferSizeBytes ?? defaults.CopyBufferSizeBytes,
             SmallFileProgressThresholdBytes = ProviderSmallFileProgressThresholdBytes
-                ?? LocalFileSystemProviderOptions.Default.SmallFileProgressThresholdBytes,
-            WriteMode = ProviderWriteMode ?? LocalFileSystemProviderOptions.Default.WriteMode,
+                ?? defaults.SmallFileProgressThresholdBytes,
+            WriteMode = ProviderWriteMode ?? defaults.WriteMode,
             UseArrayPoolForManualLoop = ProviderUseArrayPoolForManualLoop
-                ?? LocalFileSystemProviderOptions.Default.UseArrayPoolForManualLoop,
+                ?? defaults.UseArrayPoolForManualLoop,
             PreallocateDestinationFile = ProviderPreallocateDestinationFile
-                ?? LocalFileSystemProviderOptions.Default.PreallocateDestinationFile,
+                ?? defaults.PreallocateDestinationFile,
         }.Normalize();
     }
 }
@@ -337,25 +338,26 @@ internal sealed class BenchmarkVariant
         }
     }
 
-    public LocalFileSystemProviderOptions CreateProviderOptions(BenchmarkScenario scenario)
+    public OperationalSettings CreateOperationalSettings(BenchmarkScenario scenario)
     {
-        return new LocalFileSystemProviderOptions
+        var defaults = new OperationalSettings();
+        return new OperationalSettings
         {
             CopyBufferSizeBytes = ProviderCopyBufferSizeBytes
                 ?? scenario.ProviderCopyBufferSizeBytes
-                ?? LocalFileSystemProviderOptions.Default.CopyBufferSizeBytes,
+                ?? defaults.CopyBufferSizeBytes,
             SmallFileProgressThresholdBytes = ProviderSmallFileProgressThresholdBytes
                 ?? scenario.ProviderSmallFileProgressThresholdBytes
-                ?? LocalFileSystemProviderOptions.Default.SmallFileProgressThresholdBytes,
+                ?? defaults.SmallFileProgressThresholdBytes,
             WriteMode = ProviderWriteMode
                 ?? scenario.ProviderWriteMode
-                ?? LocalFileSystemProviderOptions.Default.WriteMode,
+                ?? defaults.WriteMode,
             UseArrayPoolForManualLoop = ProviderUseArrayPoolForManualLoop
                 ?? scenario.ProviderUseArrayPoolForManualLoop
-                ?? LocalFileSystemProviderOptions.Default.UseArrayPoolForManualLoop,
+                ?? defaults.UseArrayPoolForManualLoop,
             PreallocateDestinationFile = ProviderPreallocateDestinationFile
                 ?? scenario.ProviderPreallocateDestinationFile
-                ?? LocalFileSystemProviderOptions.Default.PreallocateDestinationFile,
+                ?? defaults.PreallocateDestinationFile,
         }.Normalize();
     }
 }
@@ -415,7 +417,7 @@ internal sealed class BenchmarkRunRecord
         string? notes,
         int runIndex)
     {
-        var providerOptions = variant.CreateProviderOptions(scenario);
+        var providerOptions = variant.CreateOperationalSettings(scenario);
         return new BenchmarkRunRecord
         {
             RunStatus = BenchmarkRunStatus.InProgress,
@@ -487,7 +489,7 @@ internal sealed class BenchmarkRunRecord
         int runIndex,
         Exception? ex)
     {
-        var providerOptions = variant.CreateProviderOptions(scenario);
+        var providerOptions = variant.CreateOperationalSettings(scenario);
         return new BenchmarkRunRecord
         {
             RunStatus = ex is null ? BenchmarkRunStatus.Completed : BenchmarkRunStatus.Failed,

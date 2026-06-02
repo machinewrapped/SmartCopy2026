@@ -309,9 +309,11 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
                             bytes => progressSink.ReportFileTransferBytes(file, bytes, file.Size));
                     }
 
+                    var resolved = context.OperationalSettings
+                        .WithProviderConstraints(context.SourceProvider.Capabilities, targetProvider.Capabilities);
                     await using (var stream = await context.SourceProvider.OpenReadAsync(file.FullPath, ct))
                     {
-                        await targetProvider.WriteAsync(fileDest, stream, writeProgress, ct);
+                        await targetProvider.WriteAsync(fileDest, stream, writeProgress, resolved, ct);
                     }
                     copied = true;
                     await context.SourceProvider.DeleteAsync(file.FullPath, ct);

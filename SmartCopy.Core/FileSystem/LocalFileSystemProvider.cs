@@ -12,19 +12,17 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     private const string StagedFileSuffix = ".smartcopy.tmp.";
     private const string CompactStagedFilePrefix = ".smartcopy.staging.";
     private const int GuidNLength = 32;
+    private const int DefaultBufferSize = 256 * 1024;
 
     private readonly bool _isNetworkPath;
     private readonly ProviderCapabilities _capabilities;
-    private readonly LocalFileSystemProviderOptions _options;
     private string? _lastCreatedDirectory;
 
     public LocalFileSystemProvider(
         string rootPath,
-        Func<string>? readLinuxMountInfo = null,
-        LocalFileSystemProviderOptions? options = null)
+        Func<string>? readLinuxMountInfo = null)
     {
         RootPath = NormalizePath(rootPath);
-        _options = (options ?? LocalFileSystemProviderOptions.Default).Normalize();
         _isNetworkPath = LocalPathNetworkClassifier.IsNetworkPath(RootPath, readLinuxMountInfo);
         _capabilities = new ProviderCapabilities(
             CanSeek: true,
@@ -108,14 +106,20 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                     Mode = FileMode.Open,
                     Access = FileAccess.Read,
                     Share = FileShare.Read,
-                    BufferSize = _options.CopyBufferSizeBytes,
+                    BufferSize = DefaultBufferSize,
                     Options = FileOptions.Asynchronous | FileOptions.SequentialScan
                 });
         }, ct);
     }
 
-    public async Task WriteAsync(string path, Stream data, IProgress<long>? progress, CancellationToken ct)
+    public async Task WriteAsync(
+        string path, 
+        Stream data, 
+        IProgress<long>? progress, 
+        OperationalSettings? settings, 
+        CancellationToken ct)
     {
+        var opts = settings ?? new OperationalSettings();
         var fullPath = Resolve(path);
         var directory = Path.GetDirectoryName(fullPath);
         if (!string.IsNullOrEmpty(directory) && directory != _lastCreatedDirectory)
@@ -132,9 +136,9 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
             : null;
 
         // Tiny-file fast-path (Direct Write)
-        if (_options.TinyFileFastPathThresholdBytes > 0 &&
+        if (opts.TinyFileFastPathThresholdBytes > 0 &&
             remainingBytes is long fileSize &&
-            fileSize <= _options.TinyFileFastPathThresholdBytes)
+            fileSize <= opts.TinyFileFastPathThresholdBytes)
         {
             var fileOpened = false;
             try
@@ -146,12 +150,12 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                         Mode = FileMode.Create,
                         Access = FileAccess.Write,
                         Share = FileShare.None,
-                        BufferSize = _options.CopyBufferSizeBytes,
+                        BufferSize = opts.CopyBufferSizeBytes,
                         Options = FileOptions.Asynchronous | FileOptions.SequentialScan
                     }))
                 {
                     fileOpened = true;
-                    await CopyStreamWithProgressAsync(data, output, fileSize, progress, ct);
+                    await CopyStreamWithProgressAsync(data, output, fileSize, progress, opts, ct);
                 }
             }
             catch
@@ -174,11 +178,11 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         {
             await using (var output = CreateStagedWriteStream(
                 fullPath,
-                _options.CopyBufferSizeBytes,
+                opts.CopyBufferSizeBytes,
                 out tempPath,
                 out stagedOutsideDestinationDirectory))
             {
-                await CopyStreamWithProgressAsync(data, output, remainingBytes, progress, ct);
+                await CopyStreamWithProgressAsync(data, output, remainingBytes, progress, opts, ct);
             }
 
             CommitStagedWrite(tempPath, fullPath, stagedOutsideDestinationDirectory);
@@ -193,36 +197,37 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         }
     }
 
-    private async Task CopyStreamWithProgressAsync(
+    private static async Task CopyStreamWithProgressAsync(
         Stream source,
         Stream destination,
         long? remainingBytes,
         IProgress<long>? progress,
+        OperationalSettings opts,
         CancellationToken ct)
     {
         if (remainingBytes is long bytesRemaining &&
-            _options.PreallocateDestinationFile &&
+            opts.PreallocateDestinationFile &&
             bytesRemaining > 0)
         {
             destination.SetLength(bytesRemaining);
         }
 
-        var writeMode = DetermineWriteMode(progress, remainingBytes);
+        var writeMode = DetermineWriteMode(progress, remainingBytes, opts);
 
         if (writeMode == LocalFileSystemWriteMode.CopyToAsync)
         {
             // CopyToAsync mode: wraps the source in a ProgressReportingReadStream so the
             // framework's internal buffer loop reports progress without a manual loop here.
-            await CopyViaCopyToAsync(source, destination, progress, ct);
+            await CopyViaCopyToAsync(source, destination, progress, opts, ct);
         }
         else if (writeMode == LocalFileSystemWriteMode.Auto &&
                  remainingBytes is long autoBytesRemaining &&
-                 autoBytesRemaining <= _options.SmallFileProgressThresholdBytes)
+                 autoBytesRemaining <= opts.SmallFileProgressThresholdBytes)
         {
             // Small-file optimisation: for files whose full size fits in memory we know
             // exactly how many bytes will be written, so we let the framework copy without
             // overhead and report progress in one shot at the end instead of per-chunk.
-            await source.CopyToAsync(destination, _options.CopyBufferSizeBytes, ct);
+            await source.CopyToAsync(destination, opts.CopyBufferSizeBytes, ct);
             if (progress is not null && autoBytesRemaining > 0)
             {
                 progress.Report(autoBytesRemaining);
@@ -232,7 +237,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         {
             // Large files and unknown-length streams: manual loop reports progress per chunk,
             // which keeps UI responsive during long transfers without adding a stream wrapper.
-            await CopyWithManualLoopAsync(source, destination, progress, ct);
+            await CopyWithManualLoopAsync(source, destination, progress, opts, ct);
         }
 
         await destination.FlushAsync(ct);
@@ -240,10 +245,13 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 
     // Write strategy — private helpers for WriteAsync above.
 
-    private LocalFileSystemWriteMode DetermineWriteMode(IProgress<long>? progress, long? remainingBytes)
+    private static LocalFileSystemWriteMode DetermineWriteMode(
+        IProgress<long>? progress, 
+        long? remainingBytes, 
+        OperationalSettings opts)
     {
-        if (_options.WriteMode != LocalFileSystemWriteMode.Auto)
-            return _options.WriteMode;
+        if (opts.WriteMode != LocalFileSystemWriteMode.Auto)
+            return opts.WriteMode;
         // No progress handler: CopyToAsync with no wrapper is the fastest path.
         if (progress is null)
             return LocalFileSystemWriteMode.CopyToAsync;
@@ -254,10 +262,11 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         return LocalFileSystemWriteMode.Auto;
     }
 
-    private async Task CopyViaCopyToAsync(
+    private static async Task CopyViaCopyToAsync(
         Stream data,
         Stream output,
         IProgress<long>? progress,
+        OperationalSettings opts,
         CancellationToken ct)
     {
         Stream source = data;
@@ -266,18 +275,19 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
             source = new ProgressReportingReadStream(data, progress);
         }
 
-        await source.CopyToAsync(output, _options.CopyBufferSizeBytes, ct);
+        await source.CopyToAsync(output, opts.CopyBufferSizeBytes, ct);
     }
 
-    private async Task CopyWithManualLoopAsync(
+    private static async Task CopyWithManualLoopAsync(
         Stream data,
         Stream output,
         IProgress<long>? progress,
+        OperationalSettings opts,
         CancellationToken ct)
     {
-        if (_options.UseArrayPoolForManualLoop)
+        if (opts.UseArrayPoolForManualLoop)
         {
-            var rentedBuffer = System.Buffers.ArrayPool<byte>.Shared.Rent(_options.CopyBufferSizeBytes);
+            var rentedBuffer = System.Buffers.ArrayPool<byte>.Shared.Rent(opts.CopyBufferSizeBytes);
             try
             {
                 await CopyWithManualLoopCoreAsync(data, output, rentedBuffer, progress, ct);
@@ -290,7 +300,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
             return;
         }
 
-        var buffer = new byte[_options.CopyBufferSizeBytes];
+        var buffer = new byte[opts.CopyBufferSizeBytes];
         await CopyWithManualLoopCoreAsync(data, output, buffer, progress, ct);
     }
 
