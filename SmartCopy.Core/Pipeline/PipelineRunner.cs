@@ -1,14 +1,12 @@
-using System.Diagnostics;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Pipeline.Validation;
-using SmartCopy.Core.Progress;
 using SmartCopy.Core.Trash;
 
 namespace SmartCopy.Core.Pipeline;
 
-public sealed class PipelineRunner
+public sealed partial class PipelineRunner
 {
     private readonly TransformPipeline _pipeline;
 
@@ -122,6 +120,51 @@ public sealed class PipelineRunner
 
     public async Task<IReadOnlyList<TransformResult>> ExecuteAsync(PipelineJob job, CancellationToken ct = default)
     {
+        await PrepareExecutionAsync(job, ct);
+
+        var results = new List<TransformResult>();
+        var progress = new ExecutionProgressReporter(job);
+        int stepIndex = 0;
+        var context = new StepContext(job, progress.ReportTransferBytes);
+
+        foreach (var step in _pipeline.Steps)
+        {
+            job.CancellationToken.ThrowIfCancellationRequested();
+            job.StepStarted?.Invoke(stepIndex);
+
+            if (step.IsExecutable)
+            {
+                progress.BeginExecutableStep();
+            }
+
+            var lastResultElapsed = progress.Elapsed;
+            await foreach (var rawResult in step.ApplyAsync(context, job.CancellationToken))
+            {
+                var currentElapsed = progress.Elapsed;
+                var perResultDuration = currentElapsed - lastResultElapsed;
+                var result = rawResult.ExecutionDuration is null
+                    ? rawResult with { ExecutionDuration = perResultDuration }
+                    : rawResult;
+
+                if (job.PauseToken is not null)
+                    await job.PauseToken.WaitIfPausedAsync(job.CancellationToken);
+
+                results.Add(result);
+                job.NodeProgress?.Report(result);
+
+                progress.CompleteResult(result, step.IsExecutable, currentElapsed);
+
+                lastResultElapsed = currentElapsed;
+            }
+
+            stepIndex++;
+        }
+
+        return results;
+    }
+
+    private async Task PrepareExecutionAsync(PipelineJob job, CancellationToken ct)
+    {
         // Make sure selection stats are up to date
         job.RootNode.BuildStats();
 
@@ -145,144 +188,6 @@ public sealed class PipelineRunner
             throw new InvalidOperationException(
                 "Pipelines containing a DeleteStep must be previewed before execution.");
         }
-
-        var results = new List<TransformResult>();
-
-        var stopwatch = Stopwatch.StartNew();
-        long totalBytes = 0;
-        int totalFiles = 0;
-        long completedBytes = 0;
-        int filesCompleted = 0;
-        DirectoryTreeNode? inFlightNode = null;
-        long inFlightNodeBytes = 0;
-        long inFlightNodeTotalBytes = 0;
-        var inFlightProgressMinIntervalTicks = Stopwatch.Frequency / 10; // ~10 Hz
-        long lastInFlightProgressReportTick = 0;
-        int stepIndex = 0;
-        var context = new StepContext(job, ReportTransferBytes);
-
-        void ReportTransferBytes(DirectoryTreeNode node, long bytesDelta, long fileTotalBytes)
-        {
-            if (totalBytes <= 0)
-            {
-                return;
-            }
-
-            if (!ReferenceEquals(inFlightNode, node))
-            {
-                inFlightNode = node;
-                inFlightNodeBytes = 0;
-                inFlightNodeTotalBytes = Math.Max(0, fileTotalBytes);
-                lastInFlightProgressReportTick = 0;
-            }
-
-            if (bytesDelta <= 0)
-            {
-                return;
-            }
-
-            inFlightNodeBytes += bytesDelta;
-            if (inFlightNodeTotalBytes > 0 && inFlightNodeBytes > inFlightNodeTotalBytes)
-            {
-                inFlightNodeBytes = inFlightNodeTotalBytes;
-            }
-
-            var completedWithTransfer = completedBytes + inFlightNodeBytes;
-            if (completedWithTransfer > totalBytes)
-            {
-                completedWithTransfer = totalBytes;
-            }
-
-            var elapsed = stopwatch.Elapsed;
-            var remaining = EstimateRemaining(elapsed, completedWithTransfer, totalBytes);
-            var nowTick = Stopwatch.GetTimestamp();
-            var fileTransferComplete = inFlightNodeTotalBytes > 0 && inFlightNodeBytes >= inFlightNodeTotalBytes;
-            if (!fileTransferComplete &&
-                lastInFlightProgressReportTick != 0 &&
-                nowTick - lastInFlightProgressReportTick < inFlightProgressMinIntervalTicks)
-            {
-                return;
-            }
-
-            lastInFlightProgressReportTick = nowTick;
-            job.Progress?.Report(new OperationProgress(
-                CurrentFile: node.CanonicalRelativePath,
-                CurrentFileBytes: inFlightNodeBytes,
-                CurrentFileTotalBytes: inFlightNodeTotalBytes,
-                FilesCompleted: filesCompleted,
-                FilesTotal: totalFiles,
-                TotalBytesCompleted: completedWithTransfer,
-                TotalBytes: totalBytes,
-                Elapsed: elapsed,
-                EstimatedRemaining: remaining));
-        }
-
-        foreach (var step in _pipeline.Steps)
-        {
-            job.CancellationToken.ThrowIfCancellationRequested();
-            job.StepStarted?.Invoke(stepIndex);
-
-            if (step.IsExecutable)
-            {
-                totalBytes = job.RootNode.TotalSelectedBytes;
-                totalFiles = job.RootNode.NumSelectedFiles;
-                completedBytes = 0;
-                filesCompleted = 0;
-                inFlightNode = null;
-                inFlightNodeBytes = 0;
-                inFlightNodeTotalBytes = 0;
-                lastInFlightProgressReportTick = 0;
-                stopwatch.Restart();
-            }
-
-            var lastResultElapsed = stopwatch.Elapsed;
-            await foreach (var rawResult in step.ApplyAsync(context, job.CancellationToken))
-            {
-                var currentElapsed = stopwatch.Elapsed;
-                var perResultDuration = currentElapsed - lastResultElapsed;
-                var result = rawResult.ExecutionDuration is null
-                    ? rawResult with { ExecutionDuration = perResultDuration }
-                    : rawResult;
-
-                if (job.PauseToken is not null)
-                    await job.PauseToken.WaitIfPausedAsync(job.CancellationToken);
-
-                results.Add(result);
-                job.NodeProgress?.Report(result);
-
-                if (ReferenceEquals(inFlightNode, result.SourceNode))
-                {
-                    inFlightNode = null;
-                    inFlightNodeBytes = 0;
-                    inFlightNodeTotalBytes = 0;
-                    lastInFlightProgressReportTick = 0;
-                }
-
-                if (result.IsSuccess && result.SourceNodeResult != SourceResult.None && step.IsExecutable)
-                {
-                    filesCompleted += result.NumberOfFilesAffected;
-                    completedBytes += result.InputBytes;
-                    var remaining = EstimateRemaining(currentElapsed, completedBytes, totalBytes);
-
-                    job.Progress?.Report(new OperationProgress(
-                        CurrentFile: result.SourceNode.CanonicalRelativePath,
-                        CurrentFileBytes: result.InputBytes,
-                        CurrentFileTotalBytes: result.InputBytes,
-                        FilesCompleted: filesCompleted,
-                        FilesTotal: totalFiles,
-                        TotalBytesCompleted: completedBytes,
-                        TotalBytes: totalBytes,
-                        Elapsed: currentElapsed,
-                        EstimatedRemaining: remaining));
-                }
-
-                lastResultElapsed = currentElapsed;
-            }
-
-            stepIndex++;
-        }
-
-        return results;
     }
 
     private static TimeSpan EstimateRemaining(TimeSpan elapsed, long completed, long total)

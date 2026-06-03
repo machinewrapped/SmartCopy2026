@@ -16,6 +16,10 @@ public sealed record OperationalSettings
     public bool PreallocateDestinationFile { get; init; }
     public long TinyFileFastPathThresholdBytes { get; init; }
     public long BatchBufferBytes { get; init; }
+    /// <summary>Minimum interval between completion-progress reports, in milliseconds. 0 disables the time gate.</summary>
+    public int CompletionProgressIntervalMs { get; init; } = 100;
+    /// <summary>Minimum number of files between completion-progress reports. 0 disables the file-count gate.</summary>
+    public int CompletionProgressBatchFiles { get; init; } = 100;
 
     public OperationalSettings Normalize()
     {
@@ -48,6 +52,20 @@ public sealed record OperationalSettings
             throw new ArgumentOutOfRangeException(
                 nameof(BatchBufferBytes),
                 "Batch buffer size must be zero or greater.");
+        }
+
+        if (CompletionProgressIntervalMs < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(CompletionProgressIntervalMs),
+                "Completion progress interval must be zero or greater.");
+        }
+
+        if (CompletionProgressBatchFiles < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(CompletionProgressBatchFiles),
+                "Completion progress batch size must be zero or greater.");
         }
 
         return this;
