@@ -264,7 +264,7 @@ Evidence flow:
 
 ## 5. Phases
 
-Ordered by **increasing complexity and risk**. Do not begin a phase before the previous one has been benchmarked and a gate decision made. Phase 6 (buffer scaling) is independent and can run alongside Phases 4–5. Phase 7 (parallelism) is the last resort — it is listed last because it should be tried last.
+Ordered by **increasing complexity and risk**. Do not begin a phase before the previous one has been benchmarked and a gate decision made. Phase 5 (buffer scaling) is independent and can run alongside Phases 4 and 6. Phase 7 (parallelism) is the last resort — it is listed last because it should be tried last.
 
 ---
 
@@ -285,8 +285,8 @@ The current per-file overhead chain:
 
 - **`LocalFileSystemProvider.OpenReadAsync`** — remove the `File.Exists` pre-check. Let `FileStream` throw `FileNotFoundException` directly (already caught by the error handler). No observable behaviour change.
 - **`CopyStep.ApplyAsync`** — test removing the `ExistsAsync` pre-check `OverwriteMode.Overwrite`. This costs us information, i.e. the ability to record whether the destination file was created or overwritten, so it should be gated on a switch and disabled if the performance gain is not significant.
-- **`LocalFileSystemProvider.WriteAsync`** — Track created directories and avoid redundant calls to create the same directory again. invalidate the entry on `IOException` so the next attempt retries.
-- **`LocalFileSystemProvider.WriteAsync`** A directory that was just created by definition contains no files so we can skip the Exists check on the target for files in a directory we just created.
+- **`LocalFileSystemProvider.WriteAsync`** — Track the last created directory (`_lastCreatedDirectory`) and skip the `CreateDirectory` call when the target directory matches. Invalidate on `IOException` so the next attempt retries.
+- **`LocalFileSystemProvider.WriteAsync`** — A directory that was just created by definition contains no files, so skip the Exists check on the target for files in a directory we just created.
 
 **Acceptance criteria:**
 - All existing unit tests pass unchanged.
@@ -303,7 +303,7 @@ The current per-file overhead chain:
 
 **Integrity trade-off:** Direct write without staging leaves a partial file on power loss or device unplug. **Mitigation:** on stream error (not unplug), delete the partial destination file. The trade-off is most acceptable below 64 KiB, where writes are more likely to be effectively atomic at the firmware level (single sector or block). Above 64 KiB, files span multiple sectors and the risk of a meaningful partial write increases — staged write remains the safer default there.
 
-**Core integration:** `TinyFileFastPathThresholdBytes: long` in `OperationalSettings`. Default **65536** (64 KiB) — the step-change threshold supported by the per-bucket evidence. Setting to 0 disables the fast path entirely (pre-Phase 2 behaviour). In `LocalFileSystemProvider.WriteAsync`, when `fileSize ≤ threshold`, write directly to the destination using `FileMode.Create`; skip staging.
+**Core integration:** `TinyFileFastPathThresholdBytes: long` in `OperationalSettings`; the struct field has no initializer (C# default **0**, so unset benchmark/test contexts do not accidentally enable the fast path). App default via `AppSettings.TinyFileFastPathKb = 64` passes **65536** (64 KiB) to every production job — the step-change threshold supported by the per-bucket evidence. Setting to 0 disables the fast path entirely (pre-Phase 2 behaviour). In `LocalFileSystemProvider.WriteAsync`, when `fileSize ≤ threshold`, write directly to the destination using `FileMode.Create`; skip staging.
 
 **Acceptance criteria:** files bit-identical to staged baseline; no behaviour change when threshold is 0.
 
@@ -311,7 +311,7 @@ The current per-file overhead chain:
 
 ### Phase 3 — Buffered Read-Write Batching
 
-**Status:** Discovery complete; **Core integration pending.** Clean-room run (2026-06-01) established that batching alone improves run-level duration by 3–5.5% vs control and `DirectWriteBatch4MiB` is the overall champion at +8.5%. See Section 2.3 for detailed evidence. Step 2 (batching coordinator in Core) has not yet been implemented — that and the MixedDataset policy validation pass are the remaining work before Phase 3 is complete.
+**Status:** **Core integration complete; policy validation pending.** Clean-room run (2026-06-01) established that batching alone improves run-level duration by 3–5.5% vs control and `DirectWriteBatch4MiB` is the overall champion at +8.5%. See Section 2.3 for detailed evidence. The batching coordinator is implemented in `CopyStep` (`ApplyBatchedAsync` / `ApplyUnbatchedAsync` paths with `BatchCopyBuffer`). The remaining work is the MixedDataset policy validation pass (Section 7.6 checklist C) before defaults are promoted.
 
 **What batching does:** The current model interleaves read and write on every file, alternating I/O direction continuously. Batching accumulates multiple small files into a pool-allocated buffer during a read phase, then drains it during a write phase:
 
@@ -347,44 +347,28 @@ A batching coordinator sits above the step layer, accumulating files from the en
 
 ### Phase 4 — Progress Throttling
 
-**Status:** After Phases 1–3.
+**Status:** **Complete.**
 
 **Goal:** Reduce per-file progress-reporting overhead during tiny-file bursts.
 
 PipelineRunner emits per-file progress for every file. For 13,000+ tiny files copying in under 1 ms each, this is a meaningful overhead source and a source of UI thread pressure.
 
-**Changes:**
-- Batch file-completion progress events: emit at most once per 100 ms or per 50 files, whichever comes first.
-- Byte-level progress (~10 Hz cap) already exists; no change needed there.
+**What was implemented:** Progress reporting was extracted from `PipelineRunner` into a dedicated `ExecutionProgressReporter` class with a dual-gate throttle:
 
-Files to modify: `SmartCopy.Core/Pipeline/PipelineRunner.cs`
+- **Completion events** (file-completion notifications): reported on first completion, last completion, or whenever 100 ms has elapsed or 100 files have accumulated — whichever triggers first. Controlled via `CompletionProgressIntervalMs` and `CompletionProgressBatchFiles` on `OperationalSettings`.
+- **In-flight progress** (byte-level transfer updates): throttled to ~2 Hz (~500 ms intervals) using a `Stopwatch.Frequency / 2` gate. Files that complete in a single write bypass this entirely.
 
-Acceptance criteria: progress UX remains clear and responsive during tiny-file bursts; no perceived regression in granularity for large files.
+First and last completions are always reported unconditionally, so progress visibility is preserved at the start and end of every job.
 
----
+**Files changed:** `SmartCopy.Core/Pipeline/ExecutionProgressReporter.cs` (new), `SmartCopy.Core/Pipeline/PipelineRunner.cs` (refactored), `SmartCopy.Core/FileSystem/OperationalSettings.cs` (two new settings).
 
-### Phase 5 — Destination-Sensitive Defaults
-
-**Status:** After Phases 1–3. Requires the byte-volume-dominated dataset to be baselined before USB large-file defaults are promoted.
-
-**Goal:** Apply appropriate strategy defaults per destination type so gains do not regress on HDD or USB.
-
-Detect SSD vs HDD vs USB via `DriveInfo` or platform APIs. Implement as a `DestinationProfile` enum and translate into strategy parameters (buffer size, staging threshold, progress throttle rate). Do not hardcode values — surface them as fields on `OperationalSettings`, which is injected per-run via `PipelineJob`.
-
-Destination-specific notes:
-- **HDD:** conservative defaults; baseline data exists. Small-file strategies transfer directly; no concurrency until Phase 7.
-- **USB:** wall time splits roughly equally between the 0–64 KiB and 256 MiB–2 GiB buckets. Both small-file overhead and large-file streaming must be addressed. Large-file USB buffer defaults remain provisional until validated against the byte-volume-dominated dataset.
-- **SameDrive:** do not collapse into SSDtoSSD. Small files behave similarly; large files are contention-limited.
-
-Files to modify: `SmartCopy.Core/FileSystem/LocalFileSystemProvider.cs`, `ProviderCapabilities`
-
-Benchmark gate: run the full scenario matrix (SSDtoSSD → SameDriveTest → SSDtoHDD → SSDtoUSBFlash). Promote defaults only after all scenarios pass.
+**Acceptance criteria:** Progress UX remains clear and responsive during tiny-file bursts; no perceived regression in granularity for large files. Both throttle gates default to values that meet this criterion and are configurable via `OperationalSettings`.
 
 ---
 
-### Phase 6 — Buffer Size Scaling *(independent track)*
+### Phase 5 — Buffer Size Scaling *(independent track)*
 
-**Status:** Can run alongside Phases 4–5. Requires the byte-volume-dominated dataset (see Section 6).
+**Status:** Can run alongside Phases 4 and 6. Requires the byte-volume-dominated dataset (see Section 6).
 
 **Goal:** Find the optimal buffer size for large-file streaming. The MixedDataset cannot isolate this — buffer changes are lost in the noise of 13,000 tiny files.
 
@@ -400,7 +384,26 @@ Run the best buffer size from Step 1 with and without `PreallocateDestinationFil
 
 Gate: <3% benefit → disable preallocation by default to avoid unnecessary `SetLength` calls.
 
-**Retire:** `CopyToAsync512KiB` and `ManualLoop512KiBArrayPool` provide no unique signal beyond the Phase 6 sweep variants and the existing baseline. Remove from future runs.
+**Retire:** `CopyToAsync512KiB` and `ManualLoop512KiBArrayPool` provide no unique signal beyond the Phase 5 sweep variants and the existing baseline. Remove from future runs.
+
+---
+
+### Phase 6 — Destination-Sensitive Defaults
+
+**Status:** After Phases 1–3. Requires the byte-volume-dominated dataset to be baselined before USB large-file defaults are promoted.
+
+**Goal:** Apply appropriate strategy defaults per destination type so gains do not regress on HDD or USB.
+
+Detect SSD vs HDD vs USB via `DriveInfo` or platform APIs. Implement as a `DestinationProfile` enum and translate into strategy parameters (buffer size, staging threshold, progress throttle rate). Do not hardcode values — surface them as fields on `OperationalSettings`, which is injected per-run via `PipelineJob`.
+
+Destination-specific notes:
+- **HDD:** conservative defaults; baseline data exists. Small-file strategies transfer directly; no concurrency until Phase 7.
+- **USB:** wall time splits roughly equally between the 0–64 KiB and 256 MiB–2 GiB buckets. Both small-file overhead and large-file streaming must be addressed. Large-file USB buffer defaults remain provisional until validated against the byte-volume-dominated dataset.
+- **SameDrive:** do not collapse into SSDtoSSD. Small files behave similarly; large files are contention-limited.
+
+Files to modify: `SmartCopy.Core/FileSystem/LocalFileSystemProvider.cs`, `ProviderCapabilities`
+
+Benchmark gate: run the full scenario matrix (SSDtoSSD → SameDriveTest → SSDtoHDD → SSDtoUSBFlash). Promote defaults only after all scenarios pass.
 
 ---
 
