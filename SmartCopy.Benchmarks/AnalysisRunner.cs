@@ -173,10 +173,10 @@ internal static class AnalysisRunner
 
             var warnings = BuildMissingControlWarnings(variants, matchedControlLookup);
 
-            ReportRunEvidence(Report, runs, variants);
-            ReportBucketRecommendations(Report, records, buckets, variants, warnings, matchedControlLookup);
+            ReportRunEvidence(Report, runs, variants, config.GatePercent);
+            ReportBucketRecommendations(Report, records, buckets, variants, warnings, matchedControlLookup, config.GatePercent);
             ReportBucketMetrics(Report, records, buckets, variants);
-            ReportBatchingIsolationEvidence(Report, records, buckets, variants, variantComparer);
+            ReportBatchingIsolationEvidence(Report, records, buckets, variants, variantComparer, config.GatePercent);
 
             if (warnings.Count > 0)
             {
@@ -206,7 +206,8 @@ internal static class AnalysisRunner
     private static void ReportRunEvidence(
         Action<string?> report,
         IReadOnlyList<BenchmarkRunRecord> runs,
-        IReadOnlyList<string> variants)
+        IReadOnlyList<string> variants,
+        double gatePercent)
     {
         report("### Run-Level Evidence");
         report(null);
@@ -238,7 +239,7 @@ internal static class AnalysisRunner
                           !string.Equals(variant, baselineVariant, StringComparison.OrdinalIgnoreCase)
                 ? baselineEvidence
                 : null;
-            var comparison = CompareRunEvidence(evidence, control);
+            var comparison = CompareRunEvidence(evidence, control, gatePercent);
 
             report(
                 $"| {BenchmarkHelpers.EscapeTable(variant)} | {evidence.ValidRuns} | {evidence.InvalidRuns} | " +
@@ -262,7 +263,8 @@ internal static class AnalysisRunner
         IReadOnlyList<FileSizeBucket> buckets,
         IReadOnlyList<string> variants,
         List<string> warnings,
-        IReadOnlyDictionary<string, string> matchedControls)
+        IReadOnlyDictionary<string, string> matchedControls,
+        double gatePercent)
     {
         report("### Bucket Strategy Evidence");
         report(null);
@@ -303,7 +305,7 @@ internal static class AnalysisRunner
                 }
             }
 
-            var comparison = CompareBucketEvidence(best, control);
+            var comparison = CompareBucketEvidence(best, control, gatePercent);
             var recommendation = comparison.Verdict == "PASS"
                 ? "Candidate for policy"
                 : IsBaselineVariant(best.VariantName)
@@ -366,7 +368,8 @@ internal static class AnalysisRunner
         IReadOnlyList<BenchmarkFileCopyRecord> records,
         IReadOnlyList<FileSizeBucket> buckets,
         IReadOnlyList<string> variants,
-        IComparer<string> variantComparer)
+        IComparer<string> variantComparer,
+        double gatePercent)
     {
         var directBatchVariants = variants
             .Where(v => v.Contains("DirectWriteBatch", StringComparison.OrdinalIgnoreCase))
@@ -404,7 +407,7 @@ internal static class AnalysisRunner
                     continue;
                 }
 
-                var comparison = CompareBucketEvidence(candidate, control);
+                var comparison = CompareBucketEvidence(candidate, control, gatePercent);
                 report(
                     $"| {bucket.Label} | {BenchmarkHelpers.EscapeTable(variant)} | {BenchmarkHelpers.EscapeTable(unbatchedControl)} | " +
                     $"{candidate.MedianDurationMilliseconds:0.###} ms | {control.MedianDurationMilliseconds:0.###} ms | " +
@@ -536,7 +539,7 @@ internal static class AnalysisRunner
             TightestPairSpread(runMedians));
     }
 
-    private static EvidenceComparison CompareRunEvidence(RunVariantEvidence candidate, RunVariantEvidence? control)
+    private static EvidenceComparison CompareRunEvidence(RunVariantEvidence candidate, RunVariantEvidence? control, double gatePercent)
     {
         if (candidate.ValidRuns == 0)
         {
@@ -558,14 +561,14 @@ internal static class AnalysisRunner
         var deltaSeconds = control.MedianSeconds - candidate.MedianSeconds;
         var deltaPercent = control.MedianSeconds > 0 ? deltaSeconds / control.MedianSeconds * 100.0 : 0.0;
         var noiseFloor = (control.SpreadSeconds + candidate.SpreadSeconds) / 2.0;
-        var verdict = GetDeltaVerdict(deltaSeconds, deltaPercent, noiseFloor, gatePercent: 10.0);
+        var verdict = GetDeltaVerdict(deltaSeconds, deltaPercent, noiseFloor, gatePercent);
         return new EvidenceComparison(
             verdict,
             $"{FormatSignedPercent(deltaPercent)} ({FormatSignedDurationSeconds(deltaSeconds)})",
             BenchmarkHelpers.FormatDurationHuman(noiseFloor));
     }
 
-    private static EvidenceComparison CompareBucketEvidence(BucketVariantEvidence candidate, BucketVariantEvidence? control)
+    private static EvidenceComparison CompareBucketEvidence(BucketVariantEvidence candidate, BucketVariantEvidence? control, double gatePercent)
     {
         if (candidate.RecordCount == 0)
         {
@@ -589,7 +592,7 @@ internal static class AnalysisRunner
             ? deltaMilliseconds / control.MedianDurationMilliseconds * 100.0
             : 0.0;
         var noiseFloor = (control.RunMedianSpreadMilliseconds + candidate.RunMedianSpreadMilliseconds) / 2.0;
-        var verdict = GetDeltaVerdict(deltaMilliseconds, deltaPercent, noiseFloor, gatePercent: 10.0);
+        var verdict = GetDeltaVerdict(deltaMilliseconds, deltaPercent, noiseFloor, gatePercent);
         return new EvidenceComparison(
             verdict,
             $"{FormatSignedPercent(deltaPercent)} ({deltaMilliseconds:+0.###;-0.###;0} ms)",
