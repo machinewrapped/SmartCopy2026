@@ -24,6 +24,7 @@ internal sealed class BenchmarkCliOptions
     public string? Notes { get; init; }
     public string ConfigPath { get; init; } = DefaultConfigFileName;
     public bool FreshStart { get; init; }
+    public bool Help { get; init; }
 
     public static BenchmarkCliOptions Parse(string[] args)
     {
@@ -34,6 +35,7 @@ internal sealed class BenchmarkCliOptions
         var configPath = DefaultConfigFileName;
 
         var freshStart = false;
+        var help = false;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -61,6 +63,12 @@ internal sealed class BenchmarkCliOptions
             {
                 freshStart = true;
             }
+            else if (string.Equals(args[i], "--help", StringComparison.OrdinalIgnoreCase) || 
+                     string.Equals(args[i], "-h", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(args[i], "-?", StringComparison.OrdinalIgnoreCase))
+            {
+                help = true;
+            }
         }
 
         return new BenchmarkCliOptions
@@ -71,6 +79,7 @@ internal sealed class BenchmarkCliOptions
             Notes = notes,
             ConfigPath = configPath,
             FreshStart = freshStart,
+            Help = help,
         };
     }
 
@@ -109,6 +118,7 @@ internal sealed class BenchmarkConfig
     public string? ArtifactPath { get; set; }
     public bool IncludeHidden { get; set; }
     public double ConvergenceSpreadPercent { get; set; } = 3.0;
+    public double GatePercent { get; set; } = 3.0;
     public int MaxConvergenceRuns { get; set; } = 5;
     public bool Converge { get; set; } = true;
     public List<BenchmarkScenario> Scenarios { get; set; } = [];
@@ -552,6 +562,7 @@ internal sealed class DatasetPreparationConfig
     public string SourcePath { get; set; } = string.Empty;
     public string DestinationPath { get; set; } = string.Empty;
     public bool OrganizeByBucket { get; set; }
+    public int PoolCloneCount { get; set; }
     public List<DatasetPreparationBucketConfig> Buckets { get; set; } = [];
 
     public void Normalize()
@@ -572,6 +583,11 @@ internal sealed class DatasetPreparationConfig
         if (Buckets.Count == 0)
         {
             throw new InvalidOperationException("datasetPreparation.buckets must contain at least one bucket.");
+        }
+
+        if (PoolCloneCount < 0)
+        {
+            throw new InvalidOperationException("datasetPreparation.poolCloneCount cannot be negative.");
         }
 
         foreach (var bucket in Buckets)

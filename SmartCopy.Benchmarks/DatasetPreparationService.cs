@@ -125,7 +125,52 @@ internal sealed class DatasetPreparationService
         };
 
         await BenchmarkJson.WriteAsync(summaryPath, summary, ct);
+
+        EnsurePoolClones(config.DestinationPath, config.PoolCloneCount, ct);
+
         return summary;
+    }
+
+    private static void EnsurePoolClones(string sourceDir, int cloneCount, CancellationToken ct)
+    {
+        if (cloneCount <= 0)
+        {
+            return;
+        }
+
+        Console.WriteLine($"\nEnsuring {cloneCount} dataset clones exist for pool rotation...");
+        var normalizedSource = Path.GetFullPath(sourceDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        for (var i = 1; i <= cloneCount; i++)
+        {
+            var cloneDir = $"{normalizedSource}_{i}";
+            Console.WriteLine($"  Verifying clone {i} of {cloneCount}: {cloneDir}...");
+            CloneDirectoryIncremental(normalizedSource, cloneDir, ct);
+        }
+    }
+
+    private static void CloneDirectoryIncremental(string sourceDir, string destinationDir, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        Directory.CreateDirectory(destinationDir);
+
+        foreach (var file in Directory.GetFiles(sourceDir))
+        {
+            ct.ThrowIfCancellationRequested();
+            var destFile = Path.Combine(destinationDir, Path.GetFileName(file));
+            var sourceInfo = new FileInfo(file);
+            var destInfo = new FileInfo(destFile);
+
+            if (!destInfo.Exists || destInfo.Length != sourceInfo.Length)
+            {
+                File.Copy(file, destFile, overwrite: true);
+            }
+        }
+
+        foreach (var directory in Directory.GetDirectories(sourceDir))
+        {
+            var destDir = Path.Combine(destinationDir, Path.GetFileName(directory));
+            CloneDirectoryIncremental(directory, destDir, ct);
+        }
     }
 
     private static async Task CopyFileAsync(string sourcePath, string destinationPath, CancellationToken ct)

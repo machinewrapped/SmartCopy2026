@@ -7,6 +7,21 @@ var configPath = Path.IsPathFullyQualified(selection.ConfigPath)
     ? selection.ConfigPath
     : Path.Combine(workingDirectory, selection.ConfigPath);
 
+if (selection.Help)
+{
+    Console.WriteLine("SmartCopy Benchmarks");
+    Console.WriteLine();
+    Console.WriteLine("Options:");
+    Console.WriteLine("  --help, -h, -?       Show this help message and exit");
+    Console.WriteLine("  --config <path>      Path to benchmark configuration file (default: benchmark-scenarios.json)");
+    Console.WriteLine("  --mode <mode>        Execution mode: benchmark, dataset-prep, analysis, size-scaling");
+    Console.WriteLine("  --scenario <name>    Filter execution to a specific scenario name");
+    Console.WriteLine("  --variant <name>     Filter execution to a specific variant name");
+    Console.WriteLine("  --notes <text>       Add notes to the run");
+    Console.WriteLine("  --fresh              Start fresh, ignoring any existing results");
+    return 0;
+}
+
 if (!File.Exists(configPath))
 {
     var template = BenchmarkConfig.CreateTemplate();
