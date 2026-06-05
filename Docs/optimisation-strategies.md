@@ -374,7 +374,7 @@ First and last completions are always reported unconditionally, so progress visi
 
 **Step 1 — Buffer size sweep:**
 
-Run `ManualLoop512KiB`, `ManualLoop1MiB`, `ManualLoop2MiB`, `ManualLoop4MiB`, `ManualLoop8MiB` — all with `ManualLoop` mode, `PreallocateDestinationFile = false` — against the byte-volume-dominated dataset on SSDtoSSD, per the standard protocol (Section 7.1), randomised order. Measure throughput at each buffer size for buckets 4 MiB+.
+Run `ManualLoop128KiB`, `ManualLoop256KiB`, `ManualLoop512KiB`, `ManualLoop1MiB`, `ManualLoop2MiB`, `ManualLoop4MiB`, `ManualLoop8MiB` — all with `ManualLoop` mode, `PreallocateDestinationFile = false` — against the byte-volume-dominated dataset on SSDtoSSD, per the standard protocol (Section 7.1), randomised order. Measure throughput at each buffer size for buckets 4 MiB+.
 
 Gate: buffer >1 MiB shows ≥5% P50 improvement over 1 MiB → promote as new large-file default.
 
