@@ -331,4 +331,257 @@ internal static class BenchmarkHtmlReportGenerator
 
         await File.WriteAllTextAsync(outputPath, sb.ToString(), Encoding.UTF8);
     }
+
+    public static async Task GenerateSummaryAsync(
+        string outputPath,
+        IReadOnlyList<FileSizeBucket> buckets,
+        IReadOnlyList<string> variants,
+        IReadOnlyList<BenchmarkFileCopyRecord> records,
+        IReadOnlyList<BenchmarkRunRecord> runs,
+        IReadOnlyList<string> scenarios)
+    {
+        buckets = buckets
+            .Where(b => records.Any(r => b.Contains(r.FileSizeBytes)))
+            .ToList();
+
+        var sb = new StringBuilder();
+        sb.AppendLine("<!DOCTYPE html>");
+        sb.AppendLine("<html>");
+        sb.AppendLine("<head>");
+        sb.AppendLine($"<title>Benchmark Analysis - All Scenarios Summary</title>");
+        sb.AppendLine("<script src=\"https://cdn.jsdelivr.net/npm/chart.js\"></script>");
+        sb.AppendLine("<style>");
+        sb.AppendLine("body { font-family: sans-serif; margin: 2rem; background: #121212; color: #eee; }");
+        sb.AppendLine(".chart-container { width: 1000px; height: 500px; margin-bottom: 3rem; background: #1e1e1e; padding: 1rem; border-radius: 8px; }");
+        sb.AppendLine("</style>");
+        sb.AppendLine("</head>");
+        sb.AppendLine("<body>");
+        sb.AppendLine($"<h1>All Scenarios Summary</h1>");
+
+        var variantLabelsJs = string.Join(", ", variants.Select(v => $"'{v}'"));
+
+        // --- Run-Level Median Throughput Line Chart ---
+        sb.AppendLine($"<h2>Run-Level Median Throughput</h2>");
+        sb.AppendLine($"<div class=\"chart-container\">");
+        var lineCanvasId = $"chart_{Guid.NewGuid():N}";
+        sb.AppendLine($"<canvas id=\"{lineCanvasId}\"></canvas>");
+        sb.AppendLine("</div>");
+
+        var lineDatasetsJs = new List<string>();
+        int colorIndex = 0;
+        foreach (var scenario in scenarios)
+        {
+            var color = Palette[colorIndex % Palette.Length];
+            var borderColor = color.Replace("0.7", "1.0");
+            var backgroundColor = color.Replace("0.7", "0.1");
+            colorIndex++;
+            var dataList = new List<double>();
+            
+            var scenarioRecords = records.Where(r => string.Equals(r.ScenarioName, scenario, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            foreach (var variant in variants)
+            {
+                var variantRecords = scenarioRecords
+                    .Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                if (variantRecords.Count > 0)
+                {
+                    var throughputs = variantRecords
+                        .GroupBy(r => r.RunIndex)
+                        .Select(g => 
+                        {
+                            var runBytes = g.Sum(r => r.FileSizeBytes);
+                            var runSeconds = g.Sum(r => r.CopyDurationMilliseconds) / 1000.0;
+                            return runBytes > 0 && runSeconds > 0 ? (runBytes / 1048576.0) / runSeconds : 0.0;
+                        })
+                        .OrderBy(t => t)
+                        .ToList();
+                    var p50Throughput = throughputs.Count > 0 ? BenchmarkHelpers.Percentile(throughputs, 0.50) : 0.0;
+                    dataList.Add(Math.Round(p50Throughput, 2));
+                }
+                else
+                {
+                    dataList.Add(0.0);
+                }
+            }
+
+            lineDatasetsJs.Add($@"
+                {{
+                    label: '{scenario}',
+                    data: [{string.Join(", ", dataList)}],
+                    borderColor: {borderColor},
+                    backgroundColor: {backgroundColor},
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    tension: 0.15,
+                    fill: false
+                }}");
+        }
+
+        sb.AppendLine("<script>");
+        sb.AppendLine($@"
+            new Chart(document.getElementById('{lineCanvasId}'), {{
+                type: 'line',
+                data: {{
+                    labels: [{variantLabelsJs}],
+                    datasets: [{string.Join(", ", lineDatasetsJs)}]
+                }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {{
+                        x: {{ ticks: {{ color: '#eee' }}, grid: {{ color: '#333' }} }},
+                        y: {{ beginAtZero: true, title: {{ display: true, text: 'MiB/s', color: '#eee' }}, ticks: {{ color: '#eee' }}, grid: {{ color: '#333' }} }}
+                    }},
+                    plugins: {{ legend: {{ display: true, position: 'top', labels: {{ color: '#eee' }} }} }}
+                }}
+            }});
+        ");
+        sb.AppendLine("</script>");
+
+        // --- Run-Level Median Duration Grouped Bar Chart ---
+        sb.AppendLine($"<h2>Run-Level Median Duration</h2>");
+        sb.AppendLine($"<div class=\"chart-container\">");
+        var runCanvasId = $"chart_{Guid.NewGuid():N}";
+        sb.AppendLine($"<canvas id=\"{runCanvasId}\"></canvas>");
+        sb.AppendLine("</div>");
+
+        var runDatasetsJs = new List<string>();
+        colorIndex = 0;
+        foreach (var scenario in scenarios)
+        {
+            var color = Palette[colorIndex % Palette.Length];
+            colorIndex++;
+            var dataList = new List<double>();
+            
+            var scenarioRuns = runs.Where(r => string.Equals(r.ScenarioName, scenario, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            foreach (var variant in variants)
+            {
+                var variantRuns = scenarioRuns
+                    .Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase) && string.Equals(r.RunStatus, "Completed", StringComparison.OrdinalIgnoreCase) && r.FailedFiles == 0 && r.ExceptionType == null)
+                    .Select(r => r.ExecuteDuration.TotalSeconds)
+                    .OrderBy(v => v)
+                    .ToList();
+
+                if (variantRuns.Count > 0)
+                {
+                    dataList.Add(Math.Round(BenchmarkHelpers.Percentile(variantRuns, 0.50), 2));
+                }
+                else
+                {
+                    dataList.Add(0.0);
+                }
+            }
+
+            runDatasetsJs.Add($@"
+                {{
+                    label: '{scenario}',
+                    data: [{string.Join(", ", dataList)}],
+                    backgroundColor: {color},
+                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                    borderWidth: 1
+                }}");
+        }
+
+        sb.AppendLine("<script>");
+        sb.AppendLine($@"
+            new Chart(document.getElementById('{runCanvasId}'), {{
+                type: 'bar',
+                data: {{
+                    labels: [{variantLabelsJs}],
+                    datasets: [{string.Join(", ", runDatasetsJs)}]
+                }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {{
+                        x: {{ ticks: {{ color: '#eee' }}, grid: {{ color: '#333' }} }},
+                        y: {{ beginAtZero: true, title: {{ display: true, text: 'Seconds', color: '#eee' }}, ticks: {{ color: '#eee' }}, grid: {{ color: '#333' }} }}
+                    }},
+                    plugins: {{ legend: {{ display: true, position: 'top', labels: {{ color: '#eee' }} }} }}
+                }}
+            }});
+        ");
+        sb.AppendLine("</script>");
+
+        // --- Bucket Throughput Grouped Bar Charts ---
+        foreach (var bucket in buckets)
+        {
+            sb.AppendLine($"<h2>Bucket Throughput (MiB/s): {bucket.Label}</h2>");
+            sb.AppendLine($"<div class=\"chart-container\">");
+            var bucketCanvasId = $"chart_{Guid.NewGuid():N}";
+            sb.AppendLine($"<canvas id=\"{bucketCanvasId}\"></canvas>");
+            sb.AppendLine("</div>");
+
+            var bucketDatasetsJs = new List<string>();
+            colorIndex = 0;
+            
+            foreach (var scenario in scenarios)
+            {
+                var color = Palette[colorIndex % Palette.Length];
+                colorIndex++;
+                var dataList = new List<double>();
+                var scenarioRecords = records.Where(r => string.Equals(r.ScenarioName, scenario, StringComparison.OrdinalIgnoreCase)).ToList();
+
+                foreach (var variant in variants)
+                {
+                    var bucketRecords = scenarioRecords
+                        .Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase) && bucket.Contains(r.FileSizeBytes))
+                        .ToList();
+
+                    if (bucketRecords.Count > 0)
+                    {
+                        var totalBytes = bucketRecords.Sum(r => r.FileSizeBytes);
+                        var totalSeconds = bucketRecords.Sum(r => r.CopyDurationMilliseconds) / 1000.0;
+                        var aggregateThroughput = totalBytes > 0 && totalSeconds > 0
+                            ? (totalBytes / 1048576.0) / totalSeconds
+                            : 0.0;
+                        dataList.Add(Math.Round(aggregateThroughput, 2));
+                    }
+                    else
+                    {
+                        dataList.Add(0.0);
+                    }
+                }
+
+                bucketDatasetsJs.Add($@"
+                    {{
+                        label: '{scenario}',
+                        data: [{string.Join(", ", dataList)}],
+                        backgroundColor: {color},
+                        borderColor: 'rgba(255, 255, 255, 0.2)',
+                        borderWidth: 1
+                    }}");
+            }
+
+            sb.AppendLine("<script>");
+            sb.AppendLine($@"
+                new Chart(document.getElementById('{bucketCanvasId}'), {{
+                    type: 'bar',
+                    data: {{
+                        labels: [{variantLabelsJs}],
+                        datasets: [{string.Join(", ", bucketDatasetsJs)}]
+                    }},
+                    options: {{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {{
+                            x: {{ ticks: {{ color: '#eee' }}, grid: {{ color: '#333' }} }},
+                            y: {{ beginAtZero: true, title: {{ display: true, text: 'MiB/s', color: '#eee' }}, ticks: {{ color: '#eee' }}, grid: {{ color: '#333' }} }}
+                        }},
+                        plugins: {{ legend: {{ display: true, position: 'top', labels: {{ color: '#eee' }} }} }}
+                    }}
+                }});
+            ");
+            sb.AppendLine("</script>");
+        }
+
+        sb.AppendLine("</body>");
+        sb.AppendLine("</html>");
+
+        await File.WriteAllTextAsync(outputPath, sb.ToString(), Encoding.UTF8);
+    }
 }

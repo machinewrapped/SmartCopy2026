@@ -199,6 +199,14 @@ internal static class AnalysisRunner
             await BenchmarkHtmlReportGenerator.GenerateAsync(htmlPath, scenarioName, buckets, variants, records, runs);
         }
 
+        if (scenariosToAnalyze.Count > 1)
+        {
+            ReportCrossScenarioSummary(Report, filteredRuns, filteredRecords, buckets, allVariants, scenariosToAnalyze, variantComparer);
+            
+            var summaryHtmlPath = Path.Combine(Path.GetDirectoryName(analysisPath) ?? "", $"{Path.GetFileNameWithoutExtension(analysisPath)}-summary.html");
+            await BenchmarkHtmlReportGenerator.GenerateSummaryAsync(summaryHtmlPath, buckets, allVariants, filteredRecords, filteredRuns, scenariosToAnalyze);
+        }
+
         await FlushReportAsync();
         Console.WriteLine($"Analysis: {analysisPath}");
     }
@@ -276,7 +284,7 @@ internal static class AnalysisRunner
             return;
         }
 
-        report("| Bucket | Best Observed Variant | Matched Control | Median File Duration | Control Median | Delta | Noise Floor | Aggregate MiB/s | Verdict | Recommendation |");
+        report("| Bucket | Best Observed Variant | Matched Control | Median File Duration | Control Median | Delta | Noise Floor | Run-Median MiB/s | Verdict | Recommendation |");
         report("|---|---|---|---:|---:|---:|---:|---:|---|---|");
 
         foreach (var bucket in buckets)
@@ -518,11 +526,22 @@ internal static class AnalysisRunner
             .OrderBy(v => v)
             .ToList();
 
-        var totalBytes = bucketRecords.Sum(r => r.FileSizeBytes);
-        var totalSeconds = bucketRecords.Sum(r => r.CopyDurationMilliseconds) / 1000.0;
-        var aggregateThroughput = totalBytes > 0 && totalSeconds > 0
-            ? (totalBytes / 1048576.0) / totalSeconds
+        var runThroughputs = bucketRecords
+            .GroupBy(r => r.RunIndex)
+            .Select(g => 
+            {
+                var runBytes = g.Sum(r => r.FileSizeBytes);
+                var runSeconds = g.Sum(r => r.CopyDurationMilliseconds) / 1000.0;
+                return runBytes > 0 && runSeconds > 0 ? (runBytes / 1048576.0) / runSeconds : 0.0;
+            })
+            .OrderBy(t => t)
+            .ToList();
+
+        var aggregateThroughput = runThroughputs.Count > 0 
+            ? BenchmarkHelpers.Percentile(runThroughputs, 0.50) 
             : 0.0;
+
+        var totalBytes = bucketRecords.Sum(r => r.FileSizeBytes);
 
         return new BucketVariantEvidence(
             bucket.Label,
@@ -722,5 +741,87 @@ internal static class AnalysisRunner
         }
 
         return -1L;
+    }
+
+    private static void ReportCrossScenarioSummary(
+        Action<string?> report,
+        IReadOnlyList<BenchmarkRunRecord> runs,
+        IReadOnlyList<BenchmarkFileCopyRecord> records,
+        IReadOnlyList<FileSizeBucket> buckets,
+        IReadOnlyList<string> variants,
+        IReadOnlyList<string> scenarios,
+        IComparer<string> variantComparer)
+    {
+        report("## All Scenarios Summary");
+        report(null);
+        report("Cross-scenario summary matrix displaying median execute durations (for entire runs) and run-median aggregate throughput (MiB/s) per bucket.");
+        report(null);
+        
+        report("### Run-Level Median Duration");
+        report(null);
+        
+        var header = "| Variant | " + string.Join(" | ", scenarios.Select(BenchmarkHelpers.EscapeTable)) + " |";
+        var divider = "|---|" + string.Join("|", scenarios.Select(_ => "---:")) + "|";
+        report(header);
+        report(divider);
+        
+        foreach (var variant in variants)
+        {
+            var row = new List<string> { BenchmarkHelpers.EscapeTable(variant) };
+            foreach (var scenario in scenarios)
+            {
+                var scenarioRuns = runs.Where(r => string.Equals(r.ScenarioName, scenario, StringComparison.OrdinalIgnoreCase)).ToList();
+                var evidence = BuildRunEvidence(scenarioRuns, variant);
+                if (evidence.TotalRuns == 0)
+                {
+                    row.Add("-");
+                }
+                else
+                {
+                    row.Add(BenchmarkHelpers.FormatDurationHuman(evidence.MedianSeconds));
+                }
+            }
+            
+            if (row.Count > 1 && row.Skip(1).Any(c => c != "-"))
+            {
+                report("| " + string.Join(" | ", row) + " |");
+            }
+        }
+        report(null);
+        
+        foreach (var bucket in buckets)
+        {
+            var hasAnyDataForBucket = records.Any(r => bucket.Contains(r.FileSizeBytes));
+            if (!hasAnyDataForBucket) continue;
+            
+            report($"### Bucket Throughput (MiB/s): {bucket.Label}");
+            report(null);
+            report(header);
+            report(divider);
+            
+            foreach (var variant in variants)
+            {
+                var row = new List<string> { BenchmarkHelpers.EscapeTable(variant) };
+                foreach (var scenario in scenarios)
+                {
+                    var scenarioRecords = records.Where(r => string.Equals(r.ScenarioName, scenario, StringComparison.OrdinalIgnoreCase)).ToList();
+                    var evidence = BuildBucketEvidence(scenarioRecords, bucket, variant);
+                    if (evidence.RecordCount == 0)
+                    {
+                        row.Add("-");
+                    }
+                    else
+                    {
+                        row.Add($"{evidence.AggregateThroughputMiBPerSecond:0.00}");
+                    }
+                }
+                
+                if (row.Count > 1 && row.Skip(1).Any(c => c != "-"))
+                {
+                    report("| " + string.Join(" | ", row) + " |");
+                }
+            }
+            report(null);
+        }
     }
 }

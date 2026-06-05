@@ -31,18 +31,31 @@ internal static class BenchmarkModeRunner
 
         var historicalRuns = await BenchmarkHelpers.ReadExistingRunsAsync<BenchmarkRunRecord>(resultsPath, ct);
 
+        var isFiltered = !string.IsNullOrWhiteSpace(selection.ScenarioName) || !string.IsNullOrWhiteSpace(selection.VariantName);
+
         if (selection.FreshStart)
         {
-            Console.WriteLine();
-            Console.WriteLine("-------------------------------------------------------------------");
-            Console.WriteLine("Fresh start requested via --fresh flag.");
-            Console.WriteLine("Archiving completed runs to a dated subfolder to start fresh...");
-            Console.WriteLine("-------------------------------------------------------------------");
+            if (isFiltered)
+            {
+                Console.WriteLine();
+                Console.WriteLine("-------------------------------------------------------------------");
+                Console.WriteLine("Fresh start requested via --fresh flag with a scenario/variant filter.");
+                Console.WriteLine("Bypassing archive to preserve existing runs. Will force an additional run.");
+                Console.WriteLine("-------------------------------------------------------------------");
+            }
+            else
+            {
+                Console.WriteLine();
+                Console.WriteLine("-------------------------------------------------------------------");
+                Console.WriteLine("Fresh start requested via --fresh flag.");
+                Console.WriteLine("Archiving completed runs to a dated subfolder to start fresh...");
+                Console.WriteLine("-------------------------------------------------------------------");
 
-            await ArchiveResultsAsync(artifactDirectory, selection.ConfigPath, ct);
+                await ArchiveResultsAsync(artifactDirectory, selection.ConfigPath, ct);
 
-            // Reload historical runs (should be empty now)
-            historicalRuns = await BenchmarkHelpers.ReadExistingRunsAsync<BenchmarkRunRecord>(resultsPath, ct);
+                // Reload historical runs (should be empty now)
+                historicalRuns = await BenchmarkHelpers.ReadExistingRunsAsync<BenchmarkRunRecord>(resultsPath, ct);
+            }
         }
         else if (historicalRuns.Count > 0)
         {
@@ -61,7 +74,7 @@ internal static class BenchmarkModeRunner
                 if (hasPending) break;
             }
 
-            if (!hasPending)
+            if (!hasPending && !isFiltered)
             {
                 Console.WriteLine();
                 Console.WriteLine("-------------------------------------------------------------------");
@@ -126,10 +139,17 @@ internal static class BenchmarkModeRunner
         }
         Console.WriteLine();
 
+        var startupSuccessfulRuns = new Dictionary<string, int>();
+        foreach (var candidate in candidates)
+        {
+            var key = $"{candidate.Scenario.Name}|{candidate.Variant.Name}";
+            startupSuccessfulRuns[key] = historicalRuns.Count(r => BenchmarkHelpers.IsSuccessfulRunForScenarioVariant(r, candidate.Scenario.Name, candidate.Variant.Name));
+        }
+
         BenchmarkScenario? lastScenario = null;
         while (true)
         {
-            var benchmarkSelection = SelectBenchmarkSelection(config, historicalRuns, selection);
+            var benchmarkSelection = SelectBenchmarkSelection(config, historicalRuns, selection, startupSuccessfulRuns);
             if (benchmarkSelection is null)
             {
                 Console.WriteLine("All eligible benchmark scenarios and variants have completed/converged.");
@@ -406,7 +426,7 @@ internal static class BenchmarkModeRunner
             lastScenario = scenario;
 
             // Apply a cooldown if there are more benchmarks left in the queue
-            var nextSelection = SelectBenchmarkSelection(config, historicalRuns, selection);
+            var nextSelection = SelectBenchmarkSelection(config, historicalRuns, selection, startupSuccessfulRuns);
             if (config.CooldownSeconds > 0 && nextSelection is not null)
             {
                 Console.WriteLine();
@@ -465,6 +485,23 @@ internal static class BenchmarkModeRunner
                 {
                     Console.Error.WriteLine($"Error archiving {fileName}: {ex.Message}");
                 }
+            }
+        }
+
+        var baseAnalysisName = Path.GetFileNameWithoutExtension(fileNames.Analysis);
+        var htmlFiles = Directory.GetFiles(artifactDirectory, $"{baseAnalysisName}*.html");
+        foreach (var htmlFile in htmlFiles)
+        {
+            var fileName = Path.GetFileName(htmlFile);
+            var dest = Path.Combine(archiveDirectory, fileName);
+            try
+            {
+                File.Move(htmlFile, dest, overwrite: true);
+                Console.WriteLine($"Archived file: {fileName}");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error archiving {fileName}: {ex.Message}");
             }
         }
 
@@ -552,7 +589,8 @@ internal static class BenchmarkModeRunner
     internal static BenchmarkSelection? SelectBenchmarkSelection(
         BenchmarkConfig config,
         IReadOnlyList<BenchmarkRunRecord> historicalRuns,
-        BenchmarkCliOptions selection)
+        BenchmarkCliOptions selection,
+        IReadOnlyDictionary<string, int> startupSuccessfulRuns)
     {
         var scenarioOrder = BenchmarkHelpers.BuildScenarioOrder(config, config.Scenarios.Where(s => s.Enabled).Select(s => s.Name));
 
@@ -586,7 +624,25 @@ internal static class BenchmarkModeRunner
                 .ToList();
 
             var pending = candidates
-                .Where(c => CheckConvergence(historicalRuns, c.Scenario.Name, c.Variant, config) == ConvergenceStatus.NotConverged)
+                .Where(c => 
+                {
+                    if (CheckConvergence(historicalRuns, c.Scenario.Name, c.Variant, config) == ConvergenceStatus.NotConverged)
+                        return true;
+                        
+                    if (!string.IsNullOrWhiteSpace(selection.ScenarioName) || !string.IsNullOrWhiteSpace(selection.VariantName))
+                    {
+                        var key = $"{c.Scenario.Name}|{c.Variant.Name}";
+                        if (startupSuccessfulRuns.TryGetValue(key, out var initialRuns))
+                        {
+                            var currentRuns = historicalRuns.Count(r => BenchmarkHelpers.IsSuccessfulRunForScenarioVariant(r, c.Scenario.Name, c.Variant.Name));
+                            if (currentRuns < initialRuns + 1)
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                    return false;
+                })
                 .ToList();
 
             if (pending.Count > 0)
