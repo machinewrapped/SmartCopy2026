@@ -201,7 +201,9 @@ internal static class AnalysisRunner
 
         if (scenariosToAnalyze.Count > 1)
         {
-            ReportCrossScenarioSummary(Report, filteredRuns, filteredRecords, buckets, allVariants, scenariosToAnalyze, variantComparer);
+            var allVariantsFiltered = filteredRecords.Select(r => r.VariantName).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            allVariantsFiltered.Sort(variantComparer);
+            ReportCrossScenarioSummary(Report, config, filteredRuns, filteredRecords, buckets, allVariantsFiltered, scenariosToAnalyze, variantComparer);
             
             var summaryHtmlPath = Path.Combine(Path.GetDirectoryName(analysisPath) ?? "", $"{Path.GetFileNameWithoutExtension(analysisPath)}-summary.html");
             await BenchmarkHtmlReportGenerator.GenerateSummaryAsync(summaryHtmlPath, buckets, allVariants, filteredRecords, filteredRuns, scenariosToAnalyze);
@@ -490,17 +492,17 @@ internal static class AnalysisRunner
 
     private static BucketVariantEvidence BuildBucketEvidence(
         IReadOnlyList<BenchmarkFileCopyRecord> records,
-        FileSizeBucket bucket,
+        FileSizeBucket? bucket,
         string variant)
     {
         var bucketRecords = records
             .Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase))
-            .Where(r => bucket.Contains(r.FileSizeBytes))
+            .Where(r => bucket is null || bucket.Contains(r.FileSizeBytes))
             .ToList();
 
         if (bucketRecords.Count == 0)
         {
-            return BucketVariantEvidence.Empty(bucket.Label, variant);
+            return BucketVariantEvidence.Empty(bucket?.Label ?? "Scenario", variant);
         }
 
         var durations = bucketRecords
@@ -544,7 +546,7 @@ internal static class AnalysisRunner
         var totalBytes = bucketRecords.Sum(r => r.FileSizeBytes);
 
         return new BucketVariantEvidence(
-            bucket.Label,
+            bucket?.Label ?? "Scenario",
             variant,
             bucketRecords.Count,
             totalBytes,
@@ -745,6 +747,7 @@ internal static class AnalysisRunner
 
     private static void ReportCrossScenarioSummary(
         Action<string?> report,
+        BenchmarkConfig config,
         IReadOnlyList<BenchmarkRunRecord> runs,
         IReadOnlyList<BenchmarkFileCopyRecord> records,
         IReadOnlyList<FileSizeBucket> buckets,
@@ -772,13 +775,30 @@ internal static class AnalysisRunner
             {
                 var scenarioRuns = runs.Where(r => string.Equals(r.ScenarioName, scenario, StringComparison.OrdinalIgnoreCase)).ToList();
                 var evidence = BuildRunEvidence(scenarioRuns, variant);
+                var variantConfig = config.Variants.FirstOrDefault(v => string.Equals(v.Name, variant, StringComparison.OrdinalIgnoreCase));
+                var matchedControlName = variantConfig?.MatchedControl;
+
                 if (evidence.TotalRuns == 0)
                 {
                     row.Add("-");
                 }
-                else
+                else if (string.IsNullOrEmpty(matchedControlName))
                 {
                     row.Add(BenchmarkHelpers.FormatDurationHuman(evidence.MedianSeconds));
+                }
+                else
+                {
+                    var controlEvidence = BuildRunEvidence(scenarioRuns, matchedControlName);
+                    if (controlEvidence.TotalRuns > 0 && controlEvidence.MedianSeconds > 0)
+                    {
+                        var deltaPercent = (evidence.MedianSeconds - controlEvidence.MedianSeconds) / controlEvidence.MedianSeconds * 100.0;
+                        var sign = deltaPercent > 0 ? "+" : "";
+                        row.Add($"{BenchmarkHelpers.FormatDurationHuman(evidence.MedianSeconds)} ({sign}{deltaPercent:0.0}%)");
+                    }
+                    else
+                    {
+                        row.Add(BenchmarkHelpers.FormatDurationHuman(evidence.MedianSeconds));
+                    }
                 }
             }
             
@@ -788,7 +808,53 @@ internal static class AnalysisRunner
             }
         }
         report(null);
-        
+
+        report("### Scenario-Level Median Throughput (MiB/s)");
+        report(null);
+        report(header);
+        report(divider);
+
+        foreach (var variant in variants)
+        {
+            var row = new List<string> { BenchmarkHelpers.EscapeTable(variant) };
+            foreach (var scenario in scenarios)
+            {
+                var scenarioRecords = records.Where(r => string.Equals(r.ScenarioName, scenario, StringComparison.OrdinalIgnoreCase)).ToList();
+                var evidence = BuildBucketEvidence(scenarioRecords, null, variant);
+                var variantConfig = config.Variants.FirstOrDefault(v => string.Equals(v.Name, variant, StringComparison.OrdinalIgnoreCase));
+                var matchedControlName = variantConfig?.MatchedControl;
+
+                if (evidence.RecordCount == 0)
+                {
+                    row.Add("-");
+                }
+                else if (string.IsNullOrEmpty(matchedControlName))
+                {
+                    row.Add($"{evidence.AggregateThroughputMiBPerSecond:0.00}");
+                }
+                else
+                {
+                    var controlEvidence = BuildBucketEvidence(scenarioRecords, null, matchedControlName);
+                    if (controlEvidence.RecordCount > 0 && controlEvidence.AggregateThroughputMiBPerSecond > 0)
+                    {
+                        var deltaPercent = (evidence.AggregateThroughputMiBPerSecond - controlEvidence.AggregateThroughputMiBPerSecond) / controlEvidence.AggregateThroughputMiBPerSecond * 100.0;
+                        var sign = deltaPercent > 0 ? "+" : "";
+                        row.Add($"{evidence.AggregateThroughputMiBPerSecond:0.00} ({sign}{deltaPercent:0.0}%)");
+                    }
+                    else
+                    {
+                        row.Add($"{evidence.AggregateThroughputMiBPerSecond:0.00}");
+                    }
+                }
+            }
+
+            if (row.Count > 1 && row.Skip(1).Any(c => c != "-"))
+            {
+                report("| " + string.Join(" | ", row) + " |");
+            }
+        }
+        report(null);
+
         foreach (var bucket in buckets)
         {
             var hasAnyDataForBucket = records.Any(r => bucket.Contains(r.FileSizeBytes));
@@ -806,13 +872,30 @@ internal static class AnalysisRunner
                 {
                     var scenarioRecords = records.Where(r => string.Equals(r.ScenarioName, scenario, StringComparison.OrdinalIgnoreCase)).ToList();
                     var evidence = BuildBucketEvidence(scenarioRecords, bucket, variant);
+                    var variantConfig = config.Variants.FirstOrDefault(v => string.Equals(v.Name, variant, StringComparison.OrdinalIgnoreCase));
+                    var matchedControlName = variantConfig?.MatchedControl;
+
                     if (evidence.RecordCount == 0)
                     {
                         row.Add("-");
                     }
-                    else
+                    else if (string.IsNullOrEmpty(matchedControlName))
                     {
                         row.Add($"{evidence.AggregateThroughputMiBPerSecond:0.00}");
+                    }
+                    else
+                    {
+                        var controlEvidence = BuildBucketEvidence(scenarioRecords, bucket, matchedControlName);
+                        if (controlEvidence.RecordCount > 0 && controlEvidence.AggregateThroughputMiBPerSecond > 0)
+                        {
+                            var deltaPercent = (evidence.AggregateThroughputMiBPerSecond - controlEvidence.AggregateThroughputMiBPerSecond) / controlEvidence.AggregateThroughputMiBPerSecond * 100.0;
+                            var sign = deltaPercent > 0 ? "+" : "";
+                            row.Add($"{evidence.AggregateThroughputMiBPerSecond:0.00} ({sign}{deltaPercent:0.0}%)");
+                        }
+                        else
+                        {
+                            row.Add($"{evidence.AggregateThroughputMiBPerSecond:0.00}");
+                        }
                     }
                 }
                 
