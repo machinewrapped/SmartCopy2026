@@ -35,6 +35,9 @@ dotnet test --filter "FullyQualifiedName~TestClassName" | Out-String
 dotnet publish -c Release --self-contained true -p:PublishSingleFile=true | Out-String
 
 # Run benchmark suite (results written to .benchmarks/)
+# CRITICAL RULE: NEVER launch benchmarks without EXPLICIT user permission.
+# Benchmarks require a stable system state (no background tasks, controlled temperature).
+# Always prepare the configuration and ask the user for permission before running this command.
 dotnet run --project .\SmartCopy.Benchmarks
 
 # Analyze benchmark results without re-running copies
