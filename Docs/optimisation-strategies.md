@@ -176,7 +176,26 @@ The combined effect is strongest at Sub4KiB (+14%) and Sub16KiB (+16%) — the s
 
 6. **The 10% gate is too conservative for clean-room data.** With <100 ms spread on 60-second runs, effects as small as 2% are reliably distinguishable from noise. Future clean-room runs should use a noise-relative gate (e.g., delta must exceed 2× the combined noise floor) rather than a fixed percentage.
 
-### 2.4 Per-Scenario Throughput (Phase 1 Baseline)
+### 2.4 Initial Phase 5 Findings — LargeFileDataset Buffer Sweep (2026-06-05)
+
+Initial Phase 5 evidence came from `LargeFileDataset` (50,255 file records, 230 run records) across `SSDtoSSD`, `SSDtoSSD-SameDrive`, `SSDtoHDD`, and `HDDtoHDD-SameDrive`. The run is useful but **not final policy evidence**: it was run in configured/reverse order rather than fully randomised, and all `ManualLoop{N}` variants had `PreallocateDestinationFile = true`. Therefore it measures the combined effect of manual loop + ArrayPool + buffer size + preallocation, not buffer size alone.
+
+Read the result as a candidate-shaping run:
+
+| Scenario | Strongest supported range | Notes |
+|---|---|---|
+| `SSDtoSSD` | 512 KiB–1 MiB, with 1 MiB strongest by bucket median | Larger buffers are close, but do not clearly beat 1 MiB enough to justify a global default change. |
+| `SSDtoSSD-SameDrive` | Larger buffers may help, especially 4–8 MiB at run level | Signal is plausible but unpromoted: it may depend on OS cache behaviour, SSD controller behaviour, preallocation, and run order. |
+| `SSDtoHDD` | 512 KiB–1 MiB | 4 MiB and 8 MiB regress; HDD destinations should be capped conservatively. |
+| `HDDtoHDD-SameDrive` | Keep baseline / no supported change | Larger buffers mostly regress or fall inside variance; this path is contention-limited and noisy. |
+
+**Provisional conclusion:** `1 MiB` is the safest cross-device large-file default candidate. It is close to the top of the pack on SSD, performs well on HDD, and avoids the major regressions seen with 4–8 MiB on HDD scenarios. `512 KiB` remains a defensible conservative fallback, especially where destination type is unknown or memory/progress latency matters.
+
+**SameDrive caveat:** Same-drive SSD copies show a signal for larger buffers, even though the usual HDD head-movement intuition does not apply. The likely mechanism is broader phase separation through the OS/filesystem/cache stack rather than mechanical seek avoidance. Because reliable SSD-vs-HDD classification is not guaranteed across platforms and because SSD behaviour can vary by device, do not promote a larger SameDrive buffer without an isolated rerun.
+
+**Next required evidence:** rerun the sweep in randomised order with `PreallocateDestinationFile = false`, focused on `512 KiB`, `1 MiB`, `2 MiB`, and `4 MiB` (plus `8 MiB` for SameDriveSSD only if desired). Then run the winning buffer with and without preallocation to isolate the `SetLength` contribution.
+
+### 2.5 Per-Scenario Throughput (Phase 1 Baseline)
 
 **SSDtoSSD** (averaged across variants):
 
@@ -368,21 +387,29 @@ First and last completions are always reported unconditionally, so progress visi
 
 ### Phase 5 — Buffer Size Scaling *(independent track)*
 
-**Status:** Can run alongside Phases 4 and 6. Requires the byte-volume-dominated dataset (see Section 6).
+**Status:** Initial LargeFileDataset run complete; interpretation is provisional. The first run used preallocation on every manual-loop variant and was not fully randomised, so it shaped candidates but did not isolate buffer size or preallocation. Requires a clean rerun before default promotion.
 
 **Goal:** Find the optimal buffer size for large-file streaming. The MixedDataset cannot isolate this — buffer changes are lost in the noise of 13,000 tiny files.
 
 **Step 1 — Buffer size sweep:**
 
-Run `ManualLoop128KiB`, `ManualLoop256KiB`, `ManualLoop512KiB`, `ManualLoop1MiB`, `ManualLoop2MiB`, `ManualLoop4MiB`, `ManualLoop8MiB` — all with `ManualLoop` mode, `PreallocateDestinationFile = false` — against the byte-volume-dominated dataset on SSDtoSSD, per the standard protocol (Section 7.1), randomised order. Measure throughput at each buffer size for buckets 4 MiB+.
+Run `ManualLoop512KiB`, `ManualLoop1MiB`, `ManualLoop2MiB`, and `ManualLoop4MiB` — all with `ManualLoop` mode, `ArrayPool` enabled, and `PreallocateDestinationFile = false` — against the byte-volume-dominated dataset on SSDtoSSD and SSDtoHDD, per the standard protocol (Section 7.1), randomised order. Measure throughput at each buffer size for buckets 4 MiB+.
+
+`ManualLoop128KiB` and `ManualLoop256KiB` are low-value rerun candidates: the initial run already showed 128 KiB regressing and 256 KiB failing to provide meaningful improvement over control. `ManualLoop8MiB` is a SameDriveSSD-only follow-up candidate because it regressed on HDD destinations.
 
 Gate: buffer >1 MiB shows ≥5% P50 improvement over 1 MiB → promote as new large-file default.
+
+Current provisional default candidate: **1 MiB**. It is close to the best observed SSD throughput, avoids HDD regressions, and is safer than larger buffers when destination media cannot be classified reliably. `512 KiB` remains the conservative fallback if the clean rerun shows 1 MiB is not consistently better beyond variance.
 
 **Step 2 — Preallocation:**
 
 Run the best buffer size from Step 1 with and without `PreallocateDestinationFile` to isolate its contribution independently (previously confounded in `ManualLoop1MiBPreallocate`), per the standard protocol (Section 7.1), randomised.
 
 Gate: <3% benefit → disable preallocation by default to avoid unnecessary `SetLength` calls.
+
+**Step 3 — SameDriveSSD larger-buffer probe:**
+
+Only after Step 1 confirms the safe cross-device default, run `ManualLoop1MiB`, `ManualLoop2MiB`, `ManualLoop4MiB`, and optionally `ManualLoop8MiB` on SameDrive SSD with and without preallocation, randomised. Treat this as an optional specialised profile, not a general SameDrive default. If drive type cannot be classified confidently, fall back to the safe 512 KiB–1 MiB range.
 
 **Retire:** `CopyToAsync512KiB` and `ManualLoop512KiBArrayPool` provide no unique signal beyond the Phase 5 sweep variants and the existing baseline. Remove from future runs.
 
@@ -394,12 +421,14 @@ Gate: <3% benefit → disable preallocation by default to avoid unnecessary `Set
 
 **Goal:** Apply appropriate strategy defaults per destination type so gains do not regress on HDD or USB.
 
-Detect SSD vs HDD vs USB via `DriveInfo` or platform APIs. Implement as a `DestinationProfile` enum and translate into strategy parameters (buffer size, staging threshold, progress throttle rate). Do not hardcode values — surface them as fields on `OperationalSettings`, which is injected per-run via `PipelineJob`.
+Detect SSD vs HDD vs USB where reliable platform APIs are available, but assume classification can fail or be ambiguous. Implement as a `DestinationProfile` enum and translate into strategy parameters (buffer size, staging threshold, progress throttle rate). Do not hardcode values — surface them as fields on `OperationalSettings`, which is injected per-run via `PipelineJob`. Unknown or ambiguous destinations must use the conservative profile.
 
 Destination-specific notes:
-- **HDD:** conservative defaults; baseline data exists. Small-file strategies transfer directly; no concurrency until Phase 7.
+- **Unknown / ambiguous:** conservative large-file buffer default in the 512 KiB–1 MiB range; current provisional candidate is 1 MiB. Do not assume SSD behaviour.
+- **SSD:** 1 MiB is the provisional large-file default candidate pending the clean Phase 5 rerun.
+- **HDD:** conservative defaults; cap large-file buffers at 1 MiB unless clean evidence supports a larger value. Small-file strategies transfer directly; no concurrency until Phase 7.
 - **USB:** wall time splits roughly equally between the 0–64 KiB and 256 MiB–2 GiB buckets. Both small-file overhead and large-file streaming must be addressed. Large-file USB buffer defaults remain provisional until validated against the byte-volume-dominated dataset.
-- **SameDrive:** do not collapse into SSDtoSSD. Small files behave similarly; large files are contention-limited.
+- **SameDrive:** do not collapse into SSDtoSSD. Small files behave similarly; large files are contention-limited. SameDriveSSD may benefit from larger buffers (4–8 MiB in the initial Phase 5 run), but this is device- and cache-sensitive and must not be used when SSD/HDD classification is uncertain.
 
 Files to modify: `SmartCopy.Core/FileSystem/LocalFileSystemProvider.cs`, `ProviderCapabilities`
 
@@ -484,16 +513,16 @@ Total: ~1 GiB. File counts depend on the available source corpus. If the primary
 
 ---
 
-### 6.3 Pending: Byte-Volume-Dominated Dataset
+### 6.3 Byte-Volume-Dominated Dataset
 
-**Required before Phases 5 and 6 can be completed.**
+**Initial LargeFileDataset run complete; clean isolation rerun required before Phases 5 and 6 can be completed.**
 
-The MixedDataset cannot isolate large-file throughput — tiny-file overhead dominates every aggregate metric. A second dataset is needed where large files dominate by byte volume:
+The MixedDataset cannot isolate large-file throughput — tiny-file overhead dominates every aggregate metric. A second dataset is needed where large files dominate by byte volume. `LargeFileDataset` now provides this role for initial Phase 5 analysis (Section 2.4).
 
 - Example: 100 files × 100 MiB = 10 GiB total
 - Or: 50–100 files in the 64 MiB–2 GiB range from `CandidateData`
 
-Run at minimum `ManualLoop512KiB`, `ManualLoop1MiB`, `ManualLoop2MiB`, `ManualLoop4MiB` on SSDtoSSD, ≥3 runs per variant, randomised. This validates that buffer scaling and preallocation produce measurable gains in real-world large-file scenarios before promoting any defaults.
+Next run at minimum `ManualLoop512KiB`, `ManualLoop1MiB`, `ManualLoop2MiB`, `ManualLoop4MiB` on SSDtoSSD and SSDtoHDD, ≥3 runs per variant, randomised, with `PreallocateDestinationFile = false`. This validates buffer scaling independently. Then rerun the winning buffer with and without preallocation to isolate whether `SetLength` should be part of the production default. SameDriveSSD larger-buffer candidates are a separate optional probe, not a substitute for the safe cross-device rerun.
 
 ### 6.4 Pending: Policy Validation Datasets
 
