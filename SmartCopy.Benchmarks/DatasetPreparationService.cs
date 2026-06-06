@@ -173,6 +173,44 @@ internal sealed class DatasetPreparationService
         }
     }
 
+    /// <summary>
+    /// Replicates pool clones from the primary dataset location to each target path.
+    /// Only clones (_1 through _N) are copied — the base dataset is not replicated
+    /// since it is not included in path pools. Uses incremental cloning so
+    /// interrupted runs can be safely resumed.
+    /// </summary>
+    internal static void ReplicatePoolClonesToTargets(
+        string primaryBaseDir,
+        int poolCloneCount,
+        IReadOnlyList<string> targets,
+        CancellationToken ct)
+    {
+        if (targets.Count == 0 || poolCloneCount <= 0)
+            return;
+
+        var normalizedPrimary = Path.GetFullPath(primaryBaseDir)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        Console.WriteLine();
+        Console.WriteLine($"Replicating {poolCloneCount} pool clone(s) to {targets.Count} target drive(s)...");
+
+        foreach (var target in targets)
+        {
+            ct.ThrowIfCancellationRequested();
+            var normalizedTarget = Path.GetFullPath(target)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+            for (var i = 1; i <= poolCloneCount; i++)
+            {
+                var targetClone = $"{normalizedTarget}_{i}";
+                Console.WriteLine($"  [{normalizedTarget}] Cloning pool {i}/{poolCloneCount}...");
+                CloneDirectoryIncremental(normalizedPrimary, targetClone, ct);
+            }
+        }
+
+        Console.WriteLine("Pool clone replication complete.");
+    }
+
     private static async Task CopyFileAsync(string sourcePath, string destinationPath, CancellationToken ct)
     {
         var destinationDirectory = Path.GetDirectoryName(destinationPath);

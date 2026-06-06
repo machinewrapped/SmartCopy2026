@@ -40,53 +40,25 @@ internal static class DatasetPreparationRunner
                 $"now {bucket.AfterFileCount} files / {bucket.AfterTotalBytes} bytes ({status}).");
         }
 
-        int totalRunsNeeded = config.Scenarios.Count(s => s.Enabled && s.UsePathPool)
-            * config.Variants.Where(v => v.Enabled).Sum(v => v.DesiredRunCount);
-        if (totalRunsNeeded > 0)
+        // Deduce replication targets from scenario source paths.
+        // Any path-pool scenario whose effective source differs from the primary
+        // dataset location needs pool clones replicated to that drive.
+        if (preparation.PoolCloneCount > 0)
         {
-            Console.WriteLine();
-            Console.WriteLine($"Duplicating dataset {totalRunsNeeded} times for caching resistance...");
-            var baseDest = preparation.DestinationPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            for (int i = 1; i <= totalRunsNeeded; i++)
-            {
-                var targetPath = $"{baseDest}_{i:D2}";
-                Console.WriteLine($"[{i:D2}/{totalRunsNeeded:D2}] Copying base dataset to {targetPath}...");
-                DuplicateDirectory(baseDest, targetPath);
-            }
-            Console.WriteLine("Dataset duplication complete.");
-        }
-    }
+            var primaryBase = Path.GetFullPath(preparation.DestinationPath)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
-    private static void DuplicateDirectory(string sourceDir, string destDir)
-    {
-        var source = new DirectoryInfo(sourceDir);
-        if (!source.Exists)
-        {
-            throw new DirectoryNotFoundException($"Source directory not found: {sourceDir}");
-        }
+            var replicationTargets = config.Scenarios
+                .Where(s => s.Enabled && s.UsePathPool)
+                .Select(s => Path.GetFullPath(
+                    !string.IsNullOrWhiteSpace(s.SourcePath) ? s.SourcePath : config.SourcePath)
+                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+                .Where(p => !string.Equals(p, primaryBase, StringComparison.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
-        if (Directory.Exists(destDir))
-        {
-            var fullDest = Path.GetFullPath(destDir);
-            if (Path.GetPathRoot(fullDest)?.Equals(fullDest, StringComparison.OrdinalIgnoreCase) != true)
-            {
-                Directory.Delete(fullDest, recursive: true);
-            }
-        }
-
-        Directory.CreateDirectory(destDir);
-
-        foreach (var dir in source.GetDirectories("*", SearchOption.AllDirectories))
-        {
-            var relativePath = Path.GetRelativePath(sourceDir, dir.FullName);
-            Directory.CreateDirectory(Path.Combine(destDir, relativePath));
-        }
-
-        foreach (var file in source.GetFiles("*", SearchOption.AllDirectories))
-        {
-            var relativePath = Path.GetRelativePath(sourceDir, file.FullName);
-            var destFile = Path.Combine(destDir, relativePath);
-            file.CopyTo(destFile, overwrite: true);
+            DatasetPreparationService.ReplicatePoolClonesToTargets(
+                primaryBase, preparation.PoolCloneCount, replicationTargets, ct);
         }
     }
 }

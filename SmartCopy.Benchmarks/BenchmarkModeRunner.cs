@@ -129,7 +129,7 @@ internal static class BenchmarkModeRunner
             {
                 var spread = GetCurrentSpreadPercent(historicalRuns, candidate.Scenario.Name, candidate.Variant, config);
                 var spreadText = double.IsNaN(spread) ? "N/A" : $"{spread:F2}%";
-                Console.WriteLine($"  • {candidate.Variant.Name} (Run {candidate.NextRunIndex}/{candidate.Variant.DesiredRunCount}, spread: {spreadText})");
+                Console.WriteLine($"  • [{candidate.Scenario.Name}] {candidate.Variant.Name} (Run {candidate.NextRunIndex}/{candidate.Variant.DesiredRunCount}, spread: {spreadText})");
                 eligibleCount++;
             }
         }
@@ -586,6 +586,12 @@ internal static class BenchmarkModeRunner
         };
     }
 
+    /// <summary>
+    /// Selects the next (scenario, variant) pair to run using interleaved execution.
+    /// All scenarios complete run N before any starts run N+1. Within a run round,
+    /// scenarios are visited in the configured execution order (rotating based on
+    /// the last completed run) to maximise drive separation between consecutive copies.
+    /// </summary>
     internal static BenchmarkSelection? SelectBenchmarkSelection(
         BenchmarkConfig config,
         IReadOnlyList<BenchmarkRunRecord> historicalRuns,
@@ -601,13 +607,15 @@ internal static class BenchmarkModeRunner
                 .ToList();
         }
 
+        // Collect ALL pending (scenario, variant) pairs across all scenarios
+        var allPending = new List<BenchmarkSelection>();
         foreach (var scenarioName in scenarioOrder)
         {
             var scenario = config.Scenarios.First(s => string.Equals(s.Name, scenarioName, StringComparison.OrdinalIgnoreCase));
 
             var candidates = config.Variants
-                .Where(v => v.Enabled && 
-                            (string.IsNullOrWhiteSpace(selection.VariantName) || 
+                .Where(v => v.Enabled &&
+                            (string.IsNullOrWhiteSpace(selection.VariantName) ||
                              string.Equals(v.Name, selection.VariantName, StringComparison.OrdinalIgnoreCase)))
                 .Select(variant =>
                 {
@@ -621,14 +629,11 @@ internal static class BenchmarkModeRunner
                     var nextRunIndex = successfulRuns + 1;
                     return new BenchmarkSelection(scenario, variant, successfulRuns, totalRuns, lastRunUtc, nextRunIndex);
                 })
-                .ToList();
-
-            var pending = candidates
-                .Where(c => 
+                .Where(c =>
                 {
                     if (CheckConvergence(historicalRuns, c.Scenario.Name, c.Variant, config) == ConvergenceStatus.NotConverged)
                         return true;
-                        
+
                     if (!string.IsNullOrWhiteSpace(selection.ScenarioName) || !string.IsNullOrWhiteSpace(selection.VariantName))
                     {
                         var key = $"{c.Scenario.Name}|{c.Variant.Name}";
@@ -636,26 +641,68 @@ internal static class BenchmarkModeRunner
                         {
                             var currentRuns = historicalRuns.Count(r => BenchmarkHelpers.IsSuccessfulRunForScenarioVariant(r, c.Scenario.Name, c.Variant.Name));
                             if (currentRuns < initialRuns + 1)
-                            {
                                 return true;
-                            }
                         }
                     }
                     return false;
-                })
-                .ToList();
+                });
 
-            if (pending.Count > 0)
+            allPending.AddRange(candidates);
+        }
+
+        if (allPending.Count == 0)
+            return null;
+
+        // Global minimum run index — all scenarios at this index complete before advancing
+        var minRunIndex = allPending.Min(c => c.NextRunIndex);
+        var roundCandidates = allPending.Where(c => c.NextRunIndex == minRunIndex).ToList();
+
+        // Determine the next scenario in the execution order rotation.
+        // Find the most recently completed run to know where we are in the cycle.
+        var lastTerminalRun = historicalRuns
+            .Where(BenchmarkHelpers.IsTerminalRun)
+            .MaxBy(r => r.RunStartedUtc);
+
+        var scenariosInRound = roundCandidates
+            .Select(c => c.Scenario.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        string? nextScenarioName = null;
+
+        if (lastTerminalRun is not null)
+        {
+            var lastIdx = scenarioOrder.FindIndex(s =>
+                string.Equals(s, lastTerminalRun.ScenarioName, StringComparison.OrdinalIgnoreCase));
+
+            if (lastIdx >= 0)
             {
-                var minRunIndex = pending.Min(c => c.NextRunIndex);
-                var roundCandidates = pending.Where(c => c.NextRunIndex == minRunIndex).ToArray();
-
-                Random.Shared.Shuffle(roundCandidates);
-                return roundCandidates[0];
+                // Walk forward from the position after the last run's scenario
+                for (var i = 1; i <= scenarioOrder.Count; i++)
+                {
+                    var candidateName = scenarioOrder[(lastIdx + i) % scenarioOrder.Count];
+                    if (scenariosInRound.Contains(candidateName))
+                    {
+                        nextScenarioName = candidateName;
+                        break;
+                    }
+                }
             }
         }
 
-        return null;
+        // Fallback: pick the first scenario in execution order that has candidates
+        nextScenarioName ??= scenarioOrder.FirstOrDefault(s => scenariosInRound.Contains(s));
+
+        if (nextScenarioName is null)
+            return null;
+
+        // Among candidates for this scenario at this run index, shuffle and pick one
+        var scenarioCandidates = roundCandidates
+            .Where(c => string.Equals(c.Scenario.Name, nextScenarioName, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        Random.Shared.Shuffle(scenarioCandidates);
+        return scenarioCandidates[0];
     }
 
     internal enum ConvergenceStatus

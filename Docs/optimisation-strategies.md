@@ -176,24 +176,27 @@ The combined effect is strongest at Sub4KiB (+14%) and Sub16KiB (+16%) — the s
 
 6. **The 10% gate is too conservative for clean-room data.** With <100 ms spread on 60-second runs, effects as small as 2% are reliably distinguishable from noise. Future clean-room runs should use a noise-relative gate (e.g., delta must exceed 2× the combined noise floor) rather than a fixed percentage.
 
-### 2.4 Initial Phase 5 Findings — LargeFileDataset Buffer Sweep (2026-06-05)
+### 2.4 Final Phase 5 Findings — Buffer Sweep & Pre-allocation (2026-06-06)
 
-Initial Phase 5 evidence came from `LargeFileDataset` (50,255 file records, 230 run records) across `SSDtoSSD`, `SSDtoSSD-SameDrive`, `SSDtoHDD`, and `HDDtoHDD-SameDrive`. The run is useful but **not final policy evidence**: it was run in configured/reverse order rather than fully randomised, and all `ManualLoop{N}` variants had `PreallocateDestinationFile = true`. Therefore it measures the combined effect of manual loop + ArrayPool + buffer size + preallocation, not buffer size alone.
+Phase 5 was run against the `LargeFileDataset` using a fully converged sweep across `SSDtoSSD`, `SameDriveSSD`, `SSDtoHDD`, `SameDriveHDD`, and `HDDtoHDD`.
 
-Read the result as a candidate-shaping run:
+| Scenario | Strongest supported buffer | Pre-allocation effect | Notes |
+|---|---|---|---|
+| `SSDtoSSD` | 1 MiB – 2 MiB | Regresses (up to -4.1%) | Larger buffers (1-2 MiB) provide ~22% boost. Pre-allocation acts as a blocking tax and should be avoided. |
+| `SameDriveSSD` | 1 MiB – 8 MiB | Flat / Noise | Similar to cross-drive SSD. 8 MiB shows a peak at the run level, but 1-2 MiB is safer. Pre-allocation does nothing. |
+| `SSDtoHDD` | 512 KiB – 1 MiB | +11.6% | Buffer size alone does not improve throughput and actively regresses at 4-8 MiB. Pre-allocation is highly effective here, unlocking a ~12-20% throughput increase. |
+| `SameDriveHDD` | 512 KiB – 1 MiB | Regresses (~ -1.5%) | Both buffer size scaling and pre-allocation regress throughput. Remain conservative. |
+| `HDDtoHDD` | 512 KiB – 1 MiB | Flat / Noise | Buffer size and pre-allocation both fall within statistical noise (±1%). Throughput is mechanically constrained. |
 
-| Scenario | Strongest supported range | Notes |
-|---|---|---|
-| `SSDtoSSD` | 512 KiB–1 MiB, with 1 MiB strongest by bucket median | Larger buffers are close, but do not clearly beat 1 MiB enough to justify a global default change. |
-| `SSDtoSSD-SameDrive` | Larger buffers may help, especially 4–8 MiB at run level | Signal is plausible but unpromoted: it may depend on OS cache behaviour, SSD controller behaviour, preallocation, and run order. |
-| `SSDtoHDD` | 512 KiB–1 MiB | 4 MiB and 8 MiB regress; HDD destinations should be capped conservatively. |
-| `HDDtoHDD-SameDrive` | Keep baseline / no supported change | Larger buffers mostly regress or fall inside variance; this path is contention-limited and noisy. |
+**Provisional Conclusion:**
+We have weak evidence for a destination-sensitive routing policy (Phase 6):
+1.  **Fast Destinations (SSD-to-SSD, SameDriveSSD):** Use `1 MiB` or `2 MiB` buffer. Pre-allocation **OFF**.
+2.  **Slow Destinations (SSD-to-HDD):** Use `512 KiB` or `1 MiB` buffer. Pre-allocation **ON**.
+3.  **Contended HDD (SameDriveHDD, HDDtoHDD):** Use `1 MiB` buffer. Pre-allocation **OFF**.
 
-**Provisional conclusion:** `1 MiB` is the safest cross-device large-file default candidate. It is close to the top of the pack on SSD, performs well on HDD, and avoids the major regressions seen with 4–8 MiB on HDD scenarios. `512 KiB` remains a defensible conservative fallback, especially where destination type is unknown or memory/progress latency matters.
+`1 MiB` is the safest cross-device large-file default candidate. It is close to the top of the pack on SSD, performs well on HDD, and avoids the major regressions seen with 4–8 MiB on HDD scenarios. `512 KiB` remains a defensible conservative fallback where destination type is unknown or progress reporting frequency needs to be more frequent.
 
-**SameDrive caveat:** Same-drive SSD copies show a signal for larger buffers, even though the usual HDD head-movement intuition does not apply. The likely mechanism is broader phase separation through the OS/filesystem/cache stack rather than mechanical seek avoidance. Because reliable SSD-vs-HDD classification is not guaranteed across platforms and because SSD behaviour can vary by device, do not promote a larger SameDrive buffer without an isolated rerun.
-
-**Next required evidence:** rerun the sweep in randomised order with `PreallocateDestinationFile = false`, focused on `512 KiB`, `1 MiB`, `2 MiB`, and `4 MiB` (plus `8 MiB` for SameDriveSSD only if desired). Then run the winning buffer with and without preallocation to isolate the `SetLength` contribution.
+**SameDrive caveat:** Same-drive SSD copies show a signal for larger buffers, even though mechanical seek overhead does not apply. The mechanism is unknown, and reliable SSD-vs-HDD classification is probably not guaranteed across platforms, so we would need more evidence  too promote a larger SameDrive buffer.
 
 ### 2.5 Per-Scenario Throughput (Phase 1 Baseline)
 
