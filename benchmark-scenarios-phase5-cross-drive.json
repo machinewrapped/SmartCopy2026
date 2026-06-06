@@ -1,6 +1,6 @@
 {
   "sourcePath": "R:\\TestData\\LargeFileDataset",
-  "artifactPath": "R:\\TestData\\LargeFileDataset-benchmark-artifacts",
+  "artifactPath": "C:\\benchmark-artifacts",
   "includeHidden": false,
   "convergenceSpreadPercent": 3,
   "gatePercent": 3,
@@ -151,13 +151,63 @@
         "O:\\TestData\\LargeFileDataset_1",
         "O:\\TestData\\LargeFileDataset_3"
       ]
+    },
+    {
+      "name": "HDD_E_to_HDD_M",
+      "destinationPath": "M:\\TestData\\HDD_E_to_HDD_M",
+      "sourcePath": "E:\\TestData\\LargeFileDataset",
+      "enabled": true,
+      "clearDestinationBeforeRun": true,
+      "clearDestinationAfterRun": true,
+      "overwriteMode": 1,
+      "providerCopyBufferSizeBytes": null,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": null,
+      "skipExistsCheckForOverwrite": null,
+      "bufferBatchBytes": null,
+      "usePathPool": true,
+      "pathPool": [
+        "E:\\TestData\\LargeFileDataset_1",
+        "E:\\TestData\\LargeFileDataset_3",
+        "E:\\TestData\\LargeFileDataset_2",
+        "E:\\TestData\\LargeFileDataset_4"
+      ]
+    },
+    {
+      "name": "HDD_M_to_HDD_E",
+      "destinationPath": "E:\\TestData\\HDD_M_to_HDD_E",
+      "sourcePath": "M:\\TestData\\LargeFileDataset",
+      "enabled": true,
+      "clearDestinationBeforeRun": true,
+      "clearDestinationAfterRun": true,
+      "overwriteMode": 1,
+      "providerCopyBufferSizeBytes": null,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": null,
+      "skipExistsCheckForOverwrite": null,
+      "bufferBatchBytes": null,
+      "usePathPool": true,
+      "pathPool": [
+        "M:\\TestData\\LargeFileDataset_2",
+        "M:\\TestData\\LargeFileDataset_4",
+        "M:\\TestData\\LargeFileDataset_1",
+        "M:\\TestData\\LargeFileDataset_3"
+      ]
     }
   ],
   "scenarioExecutionOrder": [
     "SSD_R_to_SSD_D",
     "HDD_E_to_HDD_O",
+    "HDD_M_to_HDD_E",
     "SSD_D_to_SSD_R",
     "HDD_O_to_HDD_E",
+    "HDD_E_to_HDD_M",
     "SSD_R_to_HDD_E",
     "SSD_D_to_HDD_O"
   ],

@@ -1,6 +1,6 @@
 {
   "sourcePath": "R:\\TestData\\MixedDataset",
-  "artifactPath": null,
+  "artifactPath": "C:\\benchmark-artifacts",
   "includeHidden": false,
   "convergenceSpreadPercent": 3,
   "maxRunsPerVariant": 5,

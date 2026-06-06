@@ -1,6 +1,6 @@
 {
   "sourcePath": "R:\\TestData\\LargeFileDataset",
-  "artifactPath": "R:\\TestData\\LargeFileDataset-benchmark-artifacts",
+  "artifactPath": "C:\\benchmark-artifacts",
   "includeHidden": false,
   "convergenceSpreadPercent": 3,
   "gatePercent": 3,
