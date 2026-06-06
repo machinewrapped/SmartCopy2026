@@ -81,8 +81,8 @@
     },
 
     {
-      "name": "SSD_D_to_HDD_O",
-      "destinationPath": "O:\\TestData\\SSD_D_to_HDD_O",
+      "name": "SSD_D_to_SSD_O",
+      "destinationPath": "O:\\TestData\\SSD_D_to_SSD_O",
       "sourcePath": "D:\\TestData\\LargeFileDataset",
       "enabled": true,
       "clearDestinationBeforeRun": true,
@@ -105,8 +105,8 @@
       ]
     },
     {
-      "name": "HDD_E_to_HDD_O",
-      "destinationPath": "O:\\TestData\\HDD_E_to_HDD_O",
+      "name": "HDD_E_to_SSD_O",
+      "destinationPath": "O:\\TestData\\HDD_E_to_SSD_O",
       "sourcePath": "E:\\TestData\\LargeFileDataset",
       "enabled": true,
       "clearDestinationBeforeRun": true,
@@ -129,8 +129,8 @@
       ]
     },
     {
-      "name": "HDD_O_to_HDD_E",
-      "destinationPath": "E:\\TestData\\HDD_O_to_HDD_E",
+      "name": "SSD_O_to_HDD_E",
+      "destinationPath": "E:\\TestData\\SSD_O_to_HDD_E",
       "sourcePath": "O:\\TestData\\LargeFileDataset",
       "enabled": true,
       "clearDestinationBeforeRun": true,
@@ -203,13 +203,13 @@
   ],
   "scenarioExecutionOrder": [
     "SSD_R_to_SSD_D",
-    "HDD_E_to_HDD_O",
+    "HDD_E_to_SSD_O",
     "HDD_M_to_HDD_E",
     "SSD_D_to_SSD_R",
-    "HDD_O_to_HDD_E",
+    "SSD_O_to_HDD_E",
     "HDD_E_to_HDD_M",
     "SSD_R_to_HDD_E",
-    "SSD_D_to_HDD_O"
+    "SSD_D_to_SSD_O"
   ],
   "variants": [
     {
