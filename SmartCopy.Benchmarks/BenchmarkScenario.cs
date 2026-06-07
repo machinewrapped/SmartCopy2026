@@ -21,7 +21,6 @@ internal sealed class BenchmarkScenario
     public bool? SkipExistsCheckForOverwrite { get; set; }
     public long? BufferBatchBytes { get; set; }
     public bool UsePathPool { get; set; }
-    public List<string>? PathPool { get; set; }
 
 
     public void Normalize()

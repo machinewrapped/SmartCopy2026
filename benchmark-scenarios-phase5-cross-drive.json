@@ -23,13 +23,7 @@
       "directWriteThresholdBytes": null,
       "skipExistsCheckForOverwrite": null,
       "bufferBatchBytes": null,
-      "usePathPool": true,
-      "pathPool": [
-        "R:\\TestData\\LargeFileDataset_2",
-        "R:\\TestData\\LargeFileDataset_4",
-        "R:\\TestData\\LargeFileDataset_1",
-        "R:\\TestData\\LargeFileDataset_3"
-      ]
+      "usePathPool": true
     },
     {
       "name": "SSD_D_to_SSD_R",
@@ -47,13 +41,7 @@
       "directWriteThresholdBytes": null,
       "skipExistsCheckForOverwrite": null,
       "bufferBatchBytes": null,
-      "usePathPool": true,
-      "pathPool": [
-        "D:\\TestData\\LargeFileDataset_1",
-        "D:\\TestData\\LargeFileDataset_3",
-        "D:\\TestData\\LargeFileDataset_2",
-        "D:\\TestData\\LargeFileDataset_4"
-      ]
+      "usePathPool": true
     },
     {
       "name": "SSD_R_to_HDD_E",
@@ -71,15 +59,8 @@
       "directWriteThresholdBytes": null,
       "skipExistsCheckForOverwrite": null,
       "bufferBatchBytes": null,
-      "usePathPool": true,
-      "pathPool": [
-        "R:\\TestData\\LargeFileDataset_3",
-        "R:\\TestData\\LargeFileDataset_1",
-        "R:\\TestData\\LargeFileDataset_4",
-        "R:\\TestData\\LargeFileDataset_2"
-      ]
+      "usePathPool": true
     },
-
     {
       "name": "SSD_D_to_SSD_O",
       "destinationPath": "O:\\TestData\\SSD_D_to_SSD_O",
@@ -96,13 +77,7 @@
       "directWriteThresholdBytes": null,
       "skipExistsCheckForOverwrite": null,
       "bufferBatchBytes": null,
-      "usePathPool": true,
-      "pathPool": [
-        "D:\\TestData\\LargeFileDataset_2",
-        "D:\\TestData\\LargeFileDataset_4",
-        "D:\\TestData\\LargeFileDataset_1",
-        "D:\\TestData\\LargeFileDataset_3"
-      ]
+      "usePathPool": true
     },
     {
       "name": "HDD_E_to_SSD_O",
@@ -120,13 +95,7 @@
       "directWriteThresholdBytes": null,
       "skipExistsCheckForOverwrite": null,
       "bufferBatchBytes": null,
-      "usePathPool": true,
-      "pathPool": [
-        "E:\\TestData\\LargeFileDataset_3",
-        "E:\\TestData\\LargeFileDataset_1",
-        "E:\\TestData\\LargeFileDataset_4",
-        "E:\\TestData\\LargeFileDataset_2"
-      ]
+      "usePathPool": true
     },
     {
       "name": "SSD_O_to_HDD_E",
@@ -144,13 +113,7 @@
       "directWriteThresholdBytes": null,
       "skipExistsCheckForOverwrite": null,
       "bufferBatchBytes": null,
-      "usePathPool": true,
-      "pathPool": [
-        "O:\\TestData\\LargeFileDataset_2",
-        "O:\\TestData\\LargeFileDataset_4",
-        "O:\\TestData\\LargeFileDataset_1",
-        "O:\\TestData\\LargeFileDataset_3"
-      ]
+      "usePathPool": true
     },
     {
       "name": "HDD_E_to_HDD_M",
@@ -168,13 +131,7 @@
       "directWriteThresholdBytes": null,
       "skipExistsCheckForOverwrite": null,
       "bufferBatchBytes": null,
-      "usePathPool": true,
-      "pathPool": [
-        "E:\\TestData\\LargeFileDataset_1",
-        "E:\\TestData\\LargeFileDataset_3",
-        "E:\\TestData\\LargeFileDataset_2",
-        "E:\\TestData\\LargeFileDataset_4"
-      ]
+      "usePathPool": true
     },
     {
       "name": "HDD_M_to_HDD_E",
@@ -192,13 +149,7 @@
       "directWriteThresholdBytes": null,
       "skipExistsCheckForOverwrite": null,
       "bufferBatchBytes": null,
-      "usePathPool": true,
-      "pathPool": [
-        "M:\\TestData\\LargeFileDataset_2",
-        "M:\\TestData\\LargeFileDataset_4",
-        "M:\\TestData\\LargeFileDataset_1",
-        "M:\\TestData\\LargeFileDataset_3"
-      ]
+      "usePathPool": true
     }
   ],
   "scenarioExecutionOrder": [
@@ -357,5 +308,39 @@
       }
     ]
   },
-  "cooldownSeconds": 60
+  "cooldownSeconds": 60,
+  "sourcePools": {
+    "R:\\TestData\\LargeFileDataset": [
+      "R:\\TestData\\LargeFileDataset_2",
+      "R:\\TestData\\LargeFileDataset_4",
+      "R:\\TestData\\LargeFileDataset_3",
+      "R:\\TestData\\LargeFileDataset_1",
+      "R:\\TestData\\LargeFileDataset_5"
+    ],
+    "E:\\TestData\\LargeFileDataset": [
+      "E:\\TestData\\LargeFileDataset_4",
+      "E:\\TestData\\LargeFileDataset_2",
+      "E:\\TestData\\LargeFileDataset_1",
+      "E:\\TestData\\LargeFileDataset_3",
+      "E:\\TestData\\LargeFileDataset_5"
+    ],
+    "D:\\TestData\\LargeFileDataset": [
+      "D:\\TestData\\LargeFileDataset_1",
+      "D:\\TestData\\LargeFileDataset_3",
+      "D:\\TestData\\LargeFileDataset_2",
+      "D:\\TestData\\LargeFileDataset_4"
+    ],
+    "O:\\TestData\\LargeFileDataset": [
+      "O:\\TestData\\LargeFileDataset_1",
+      "O:\\TestData\\LargeFileDataset_3",
+      "O:\\TestData\\LargeFileDataset_4",
+      "O:\\TestData\\LargeFileDataset_2"
+    ],
+    "M:\\TestData\\LargeFileDataset": [
+      "M:\\TestData\\LargeFileDataset_1",
+      "M:\\TestData\\LargeFileDataset_2",
+      "M:\\TestData\\LargeFileDataset_3",
+      "M:\\TestData\\LargeFileDataset_4"
+    ]
+  }
 }

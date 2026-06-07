@@ -220,22 +220,31 @@ internal static class BenchmarkHelpers
         IsRunForScenarioVariant(run, scenarioName, variantName) &&
         IsTerminalRun(run);
 
-    public static bool IsSuccessfulRunForScenarioVariant(BenchmarkRunRecord run, string scenarioName, string variantName) =>
-        IsRunForScenarioVariant(run, scenarioName, variantName) &&
+    public static bool IsSuccessfulRun(BenchmarkRunRecord run) =>
         string.Equals(run.RunStatus, BenchmarkRunStatus.Completed, StringComparison.OrdinalIgnoreCase) &&
         run.FailedFiles == 0 &&
         run.ExceptionType is null;
 
-    public static async Task<List<string>> DiscoverAndShufflePoolAsync(
+    public static bool IsSuccessfulRunForScenarioVariant(BenchmarkRunRecord run, string scenarioName, string variantName) =>
+        IsRunForScenarioVariant(run, scenarioName, variantName) &&
+        IsSuccessfulRun(run);
+
+    /// <summary>
+    /// Discovers sibling pool directories for <paramref name="baseSourcePath"/> (e.g.
+    /// <c>R:\Data\Set_00</c>, <c>_01</c>, ...), shuffles them for bias avoidance, saves
+    /// the result to <see cref="BenchmarkConfig.SourcePools"/>, and persists the config.
+    /// Pools are keyed by source path so all scenarios sharing the same source share one pool.
+    /// </summary>
+    public static async Task<List<string>> DiscoverAndOrderPoolAsync(
         BenchmarkConfig config,
-        BenchmarkScenario scenario,
+        string baseSourcePath,
         string configPath,
         CancellationToken ct)
     {
-        var baseSource = Path.GetFullPath(!string.IsNullOrWhiteSpace(scenario.SourcePath) ? scenario.SourcePath : config.SourcePath)
+        var normalizedBase = Path.GetFullPath(baseSourcePath)
             .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var parentDir = Path.GetDirectoryName(baseSource);
-        var baseName = Path.GetFileName(baseSource);
+        var parentDir = Path.GetDirectoryName(normalizedBase);
+        var baseName = Path.GetFileName(normalizedBase);
 
         var poolPaths = new List<string>();
         if (!string.IsNullOrEmpty(parentDir) && Directory.Exists(parentDir))
@@ -252,23 +261,18 @@ internal static class BenchmarkHelpers
             }
         }
 
-        if (poolPaths.Count > 0)
-        {
-            var rand = new Random();
-            for (var i = poolPaths.Count - 1; i > 0; i--)
-            {
-                var j = rand.Next(i + 1);
-                (poolPaths[i], poolPaths[j]) = (poolPaths[j], poolPaths[i]);
-            }
-        }
-        else
-        {
-            throw new InvalidOperationException($"No sibling directories found in '{parentDir}' matching '{baseName}_\\d+' to populate the path pool.");
-        }
+        if (poolPaths.Count == 0)
+            throw new InvalidOperationException(
+                $"No sibling directories found in '{parentDir}' matching '{baseName}_\\d+' to populate the path pool.");
 
-        scenario.PathPool = poolPaths;
+        // Shuffle once for positional-bias avoidance; order is then fixed and persisted.
+        var arr = poolPaths.ToArray();
+        Random.Shared.Shuffle(arr);
+        poolPaths = [.. arr];
+
+        config.SourcePools[normalizedBase] = poolPaths;
         await BenchmarkJson.WriteAsync(configPath, config, ct);
-        Console.WriteLine($"Discovered and shuffled {poolPaths.Count} paths for scenario '{scenario.Name}', saved to config.");
+        Console.WriteLine($"Discovered and shuffled {poolPaths.Count} pool paths for '{normalizedBase}', saved to config.");
         return poolPaths;
     }
 }

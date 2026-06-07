@@ -1,0 +1,439 @@
+using System.Text;
+using System.Text.Json;
+using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.Pipeline;
+using SmartCopy.Core.Pipeline.Steps;
+using SmartCopy.Core.Scanning;
+using SmartCopy.Core.Selection;
+using SmartCopy.Core.Progress;
+using SmartCopy.Core.DirectoryTree;
+
+namespace SmartCopy.Benchmarks;
+
+internal sealed class BenchmarkTask
+{
+    private readonly BenchmarkScenario _scenario;
+    private readonly BenchmarkVariant _variant;
+    private readonly int _nextRunIndex;
+    private readonly BenchmarkConfig _config;
+    private readonly BenchmarkCliOptions _cliOptions;
+    private readonly SessionPaths _paths;
+    private readonly List<BenchmarkRunRecord> _historicalRuns;
+    private readonly Func<Task> _onTaskListUpdate;
+    private readonly CancellationToken _ct;
+
+    private readonly BenchmarkState _state = new();
+    private string _sourcePath = "";
+    private string _destinationPath = "";
+    private int? _pathIndex;
+    private LocalFileSystemProvider? _sourceProvider;
+    private FileSystemProviderRegistry? _registry;
+
+    internal BenchmarkTask(
+        BenchmarkSelection selection,
+        BenchmarkConfig config,
+        BenchmarkCliOptions cliOptions,
+        SessionPaths paths,
+        List<BenchmarkRunRecord> historicalRuns,
+        Func<Task> onTaskListUpdate,
+        CancellationToken ct)
+    {
+        _scenario = selection.Scenario;
+        _variant = selection.Variant;
+        _nextRunIndex = selection.NextRunIndex;
+        _config = config;
+        _cliOptions = cliOptions;
+        _paths = paths;
+        _historicalRuns = historicalRuns;
+        _onTaskListUpdate = onTaskListUpdate;
+        _ct = ct;
+    }
+
+    internal async Task ExecuteAsync(BenchmarkScenario? lastScenario)
+    {
+        CheckColdCacheBoundary(lastScenario);
+        await ResolvePathsAsync();
+        BenchmarkHelpers.ValidatePaths(_sourcePath, _destinationPath);
+        var runStartedUtc = DateTime.UtcNow;
+        PrintHeader();
+        await WriteInProgressRecordAsync(runStartedUtc);
+
+        try
+        {
+            if (_scenario.ClearDestinationBeforeRun)
+                ClearDestination("Clearing destination contents before benchmark...");
+
+            SetupProviders();
+            await ScanAsync();
+            await RunCopyAsync();
+            await WriteJournalAsync(runStartedUtc);
+            await WriteSuccessRecordAsync(runStartedUtc);
+
+            if (_scenario.ClearDestinationAfterRun)
+                ClearDestination("Clearing destination contents after benchmark (post-clear)...");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine();
+            Console.Error.WriteLine($"Error during benchmark run: {ex.Message}");
+            await WriteFailureRecordAsync(runStartedUtc, ex);
+
+            if (_scenario.ClearDestinationAfterRun)
+                TryClearDestination();
+
+            throw;
+        }
+    }
+
+    private void CheckColdCacheBoundary(BenchmarkScenario? lastScenario)
+    {
+        if (lastScenario is null || lastScenario.UsePathPool == _scenario.UsePathPool)
+            return;
+
+        Console.WriteLine();
+        Console.WriteLine($"--- Cold cache boundary before {_scenario.Name} ---");
+        Console.WriteLine(_scenario.UsePathPool
+            ? "Returning to path-pool runs. Reboot to clear the OS file cache, then press any key..."
+            : "Switching to a non-pool run. Reboot to clear the OS file cache, then press any key...");
+        Console.ReadKey(intercept: true);
+        Console.WriteLine();
+    }
+
+    private async Task ResolvePathsAsync()
+    {
+        var baseSourcePath = Path.GetFullPath(
+            !string.IsNullOrWhiteSpace(_scenario.SourcePath) ? _scenario.SourcePath : _config.SourcePath);
+        _sourcePath = baseSourcePath;
+        _destinationPath = Path.GetFullPath(_scenario.DestinationPath);
+        _pathIndex = null;
+
+        if (!_scenario.UsePathPool)
+            return;
+
+        var normalizedBase = baseSourcePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (!_config.SourcePools.TryGetValue(normalizedBase, out var pool) || pool.Count == 0)
+            pool = await BenchmarkHelpers.DiscoverAndOrderPoolAsync(_config, baseSourcePath, _cliOptions.ConfigPath, _ct);
+
+        var usedCount = _historicalRuns.Count(r =>
+            BenchmarkHelpers.IsTerminalRun(r) &&
+            pool.Contains(r.SourcePath, StringComparer.OrdinalIgnoreCase));
+        _sourcePath = pool[usedCount % pool.Count];
+
+        var folderName = Path.GetFileName(_sourcePath);
+        var underscorePos = folderName.LastIndexOf('_');
+        if (underscorePos >= 0 && int.TryParse(folderName.AsSpan(underscorePos + 1), out var parsedIndex))
+        {
+            _pathIndex = parsedIndex;
+            _destinationPath = _destinationPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                + $"_{parsedIndex:D2}";
+        }
+        else
+        {
+            throw new InvalidOperationException($"Could not extract numeric index from path pool folder name: {folderName}");
+        }
+    }
+
+    private void PrintHeader()
+    {
+        var providerOptions = _variant.CreateOperationalSettings(_scenario);
+        Console.WriteLine();
+        Console.WriteLine("-------------------------------------------------------------------");
+        Console.WriteLine($"Scenario: {_scenario.Name}");
+        Console.WriteLine($"Variant:  {_variant.Name} (run {_nextRunIndex})");
+        Console.WriteLine("-------------------------------------------------------------------");
+        
+        var sourceDisplay = _pathIndex is null 
+            ? _sourcePath 
+            : $"{_sourcePath} [Folder Index: {_pathIndex:D2}]";
+
+        Console.WriteLine($"Source:   {sourceDisplay}");
+        Console.WriteLine($"Target:   {_destinationPath}");
+        Console.WriteLine(
+            $"Provider: buffer={providerOptions.CopyBufferSizeBytes} bytes, " +
+            $"small-file-threshold={providerOptions.SmallFileProgressThresholdBytes} bytes, " +
+            $"write-mode={providerOptions.WriteMode}, " +
+            $"array-pool={providerOptions.UseArrayPoolForManualLoop}, " +
+            $"preallocate={providerOptions.PreallocateDestinationFile}");
+    }
+
+    private async Task WriteInProgressRecordAsync(DateTime runStartedUtc)
+    {
+        var record = BenchmarkRunRecord.CreateInProgress(
+            _scenario, _variant, _sourcePath, _destinationPath,
+            _paths.ArtifactDirectory, runStartedUtc, _cliOptions.Notes, _nextRunIndex);
+
+        await AppendJsonLineAsync(_paths.ResultsPath, record, _ct);
+        _historicalRuns.Add(record);
+        await _onTaskListUpdate();
+    }
+
+    private void SetupProviders()
+    {
+        _sourceProvider = new LocalFileSystemProvider(_sourcePath);
+        var destinationProvider = new LocalFileSystemProvider(_destinationPath);
+        _registry = new FileSystemProviderRegistry();
+        _registry.Register(_sourceProvider);
+        _registry.Register(destinationProvider);
+    }
+
+    private async Task ScanAsync()
+    {
+        var scanOptions = new ScanOptions
+        {
+            IncludeHidden = _config.IncludeHidden,
+            FullPreScan = true,
+            LazyExpand = false,
+            FollowSymlinks = false,
+        };
+
+        _state.ScanStopwatch.Start();
+        BenchmarkHelpers.UpdateProgress("Scanning source...");
+        using (var scanProgress = new ThrottledConsoleProgress<ScanProgress>(p => BenchmarkHelpers.UpdateProgress($"Scanning source: {p.NodesDiscovered} nodes, {p.DirectoriesScanned} dirs")))
+        {
+            _state.Root = await ScanTreeAsync(_sourceProvider!, _sourcePath, scanOptions, scanProgress, _ct);
+        }
+        BenchmarkHelpers.UpdateProgress("");
+        _state.ScanStopwatch.Stop();
+
+        new SelectionManager().SelectAll(_state.Root);
+        _state.Root.BuildStats();
+    }
+
+    private async Task RunCopyAsync()
+    {
+        var resolvedDestinationProvider = _registry!.ResolveProvider(_destinationPath)
+            ?? throw new InvalidOperationException($"No destination provider for {_destinationPath}.");
+
+        _state.FreeSpaceBefore = await resolvedDestinationProvider.GetAvailableFreeSpaceAsync(_ct);
+
+        var providerOptions = _variant.CreateOperationalSettings(_scenario);
+        var overwriteMode = _variant.OverwriteMode ?? _scenario.OverwriteMode;
+        var copyStep = new CopyStep(_destinationPath, overwriteMode)
+        {
+            SkipExistsCheckForOverwrite = _variant.SkipExistsCheckForOverwrite ?? _scenario.SkipExistsCheckForOverwrite ?? false
+        };
+        var pipelineRunner = new PipelineRunner(new TransformPipeline([copyStep]));
+
+        var directWriteThresholdBytes = _variant.DirectWriteThresholdBytes ?? _scenario.DirectWriteThresholdBytes ?? 0L;
+        var bufferBatchBytes = _variant.BufferBatchBytes ?? _scenario.BufferBatchBytes ?? 0L;
+        var skipExistsCheckForOverwrite = _variant.SkipExistsCheckForOverwrite ?? _scenario.SkipExistsCheckForOverwrite ?? false;
+
+        BenchmarkHelpers.UpdateProgress("Preparing copy...");
+        using (var executeProgress = new ThrottledConsoleProgress<OperationProgress>(p =>
+            BenchmarkHelpers.UpdateProgress($"Copying: {p.FilesCompleted}/{p.FilesTotal} files ({BenchmarkHelpers.FormatSize(p.TotalBytesCompleted)}/{BenchmarkHelpers.FormatSize(p.TotalBytes)}), ETR: {BenchmarkHelpers.FormatDuration(p.EstimatedRemaining)}")))
+        {
+            _state.ExecuteStopwatch.Start();
+            if (directWriteThresholdBytes > 0 || bufferBatchBytes > 0)
+            {
+                _state.Results = await BenchmarkCopyRunner.RunAsync(new PipelineJob
+                {
+                    RootNode = _state.Root!,
+                    SourceProvider = _sourceProvider!,
+                    ProviderRegistry = _registry!,
+                    Progress = executeProgress,
+                    CancellationToken = _ct,
+                    OperationalSettings = providerOptions,
+                }, _destinationPath, overwriteMode, directWriteThresholdBytes, bufferBatchBytes, skipExistsCheckForOverwrite, providerOptions.CopyBufferSizeBytes, _ct);
+            }
+            else
+            {
+                _state.Results = await pipelineRunner.ExecuteAsync(new PipelineJob
+                {
+                    RootNode = _state.Root!,
+                    SourceProvider = _sourceProvider!,
+                    ProviderRegistry = _registry!,
+                    Progress = executeProgress,
+                    CancellationToken = _ct,
+                    OperationalSettings = providerOptions,
+                }, _ct);
+            }
+            _state.ExecuteStopwatch.Stop();
+        }
+        BenchmarkHelpers.UpdateProgress("");
+
+        _state.FreeSpaceAfter = await resolvedDestinationProvider.GetAvailableFreeSpaceAsync(_ct);
+    }
+
+    private async Task WriteJournalAsync(DateTime runStartedUtc)
+    {
+        Directory.CreateDirectory(_paths.JournalDirectory);
+        var journal = new OperationJournal(_paths.JournalDirectory);
+        _state.JournalPath = await journal.WriteAsync(
+            _state.Results.Where(r => r.SourceNodeResult != SourceResult.None),
+            BuildBenchmarkJournalMetadata(runStartedUtc),
+            _ct);
+    }
+
+    private async Task WriteSuccessRecordAsync(DateTime runStartedUtc)
+    {
+        var record = BenchmarkRunRecord.CreateSuccess(
+            _scenario, _variant, _sourcePath, _destinationPath,
+            _paths.ArtifactDirectory, runStartedUtc, _state, _cliOptions.Notes, _nextRunIndex);
+
+        await AppendJsonLineAsync(_paths.ResultsPath, record, _ct);
+        await AppendFileCopyRecordsAsync(_paths.FileResultsPath, record, _state.Results, _ct);
+        _historicalRuns.Add(record);
+        await _onTaskListUpdate();
+
+        var totalBytes = _state.Results.Sum(r => r.OutputBytes);
+        Console.WriteLine($"Copied {record.CopiedFiles} files ({BenchmarkHelpers.FormatSize(totalBytes)}) in {BenchmarkHelpers.FormatDurationHuman(record.ExecuteDuration.TotalSeconds)}.");
+        if (record.FailedFiles > 0 || record.SkippedFiles > 0)
+        {
+            Console.WriteLine($"Failed: {record.FailedFiles}, Skipped: {record.SkippedFiles}");
+        }
+        
+        Console.WriteLine($"Results: {_paths.ResultsPath}");
+        Console.WriteLine($"File results: {_paths.FileResultsPath}");
+        Console.WriteLine($"Journal: {_state.JournalPath}");
+
+        var convergenceStatus = BenchmarkConvergence.Check(_historicalRuns, _scenario.Name, _variant, _config);
+        var spread = BenchmarkConvergence.GetCurrentSpreadPercent(_historicalRuns, _scenario.Name, _variant, _config);
+        
+        if (convergenceStatus == BenchmarkConvergence.Status.Converged)
+        {
+            Console.WriteLine();
+            Console.WriteLine($"**** Scenario {_scenario.Name} Variant {_variant.Name} has converged with spread {spread:F2}% ****");
+        }
+        else if (!double.IsNaN(spread))
+        {
+            Console.WriteLine($"Current spread: {spread:F2}%");
+        }
+    }
+
+    private async Task WriteFailureRecordAsync(DateTime runStartedUtc, Exception ex)
+    {
+        var record = BenchmarkRunRecord.CreateFailure(
+            _scenario, _variant, _sourcePath, _destinationPath,
+            _paths.ArtifactDirectory, runStartedUtc, _state, _cliOptions.Notes, _nextRunIndex, ex);
+
+        await AppendJsonLineAsync(_paths.ResultsPath, record, _ct);
+        await AppendFileCopyRecordsAsync(_paths.FileResultsPath, record, _state.Results, _ct);
+        _historicalRuns.Add(record);
+        await _onTaskListUpdate();
+    }
+
+    private void ClearDestination(string message)
+    {
+        BenchmarkHelpers.UpdateProgress(message);
+        using var clearProgress = new ThrottledConsoleProgress<string>(s => BenchmarkHelpers.UpdateProgress($"Clearing: {s}"));
+        BenchmarkHelpers.ClearDirectoryContents(_destinationPath, clearProgress);
+        BenchmarkHelpers.UpdateProgress("");
+    }
+
+    private void TryClearDestination()
+    {
+        try
+        {
+            ClearDestination("Clearing destination contents after failed benchmark (post-clear)...");
+        }
+        catch (Exception clearEx)
+        {
+            Console.Error.WriteLine($"Warning: Failed to clear destination after benchmark failure: {clearEx.Message}");
+        }
+    }
+
+    private Dictionary<string, string?> BuildBenchmarkJournalMetadata(DateTime runStartedUtc)
+    {
+        var providerOptions = _variant.CreateOperationalSettings(_scenario);
+        return new Dictionary<string, string?>
+        {
+            ["recordType"] = "benchmarkRun",
+            ["runStatus"] = BenchmarkRunStatus.Completed,
+            ["scenarioName"] = _scenario.Name,
+            ["variantName"] = _variant.Name,
+            ["sourcePath"] = _sourcePath,
+            ["destinationPath"] = _destinationPath,
+            ["artifactPath"] = _paths.ArtifactDirectory,
+            ["runStartedUtc"] = runStartedUtc.ToString("O"),
+            ["hostName"] = Environment.MachineName,
+            ["osDescription"] = System.Runtime.InteropServices.RuntimeInformation.OSDescription,
+            ["frameworkDescription"] = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
+            ["notes"] = _cliOptions.Notes,
+            ["runIndex"] = _nextRunIndex.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["providerCopyBufferSizeBytes"] = providerOptions.CopyBufferSizeBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["providerSmallFileProgressThresholdBytes"] = providerOptions.SmallFileProgressThresholdBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["providerWriteMode"] = providerOptions.WriteMode.ToString(),
+            ["providerUseArrayPoolForManualLoop"] = providerOptions.UseArrayPoolForManualLoop.ToString(),
+            ["providerPreallocateDestinationFile"] = providerOptions.PreallocateDestinationFile.ToString(),
+            ["bufferBatchBytes"] = (_variant.BufferBatchBytes ?? _scenario.BufferBatchBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["directWriteThresholdBytes"] = (_variant.DirectWriteThresholdBytes ?? _scenario.DirectWriteThresholdBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["scanDuration"] = _state.ScanStopwatch.Elapsed.ToString("c"),
+            ["executeDuration"] = _state.ExecuteStopwatch.Elapsed.ToString("c"),
+            ["copiedFiles"] = _state.Results.Sum(r => r.NumberOfFilesAffected).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["skippedFiles"] = _state.Results.Sum(r => r.NumberOfFilesSkipped).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["failedFiles"] = _state.Results.Count(r => !r.IsSuccess).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["outputBytes"] = _state.Results.Sum(r => r.OutputBytes).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["destinationFreeSpaceBeforeBytes"] = _state.FreeSpaceBefore?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["destinationFreeSpaceAfterBytes"] = _state.FreeSpaceAfter?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        };
+    }
+
+    private static async Task<DirectoryNode> ScanTreeAsync(
+        IFileSystemProvider sourceProvider,
+        string sourcePath,
+        ScanOptions scanOptions,
+        IProgress<ScanProgress>? progress,
+        CancellationToken ct)
+    {
+        var scanner = new DirectoryScanner(sourceProvider);
+        DirectoryNode? root = null;
+
+        await foreach (var node in scanner.ScanAsync(sourcePath, scanOptions, progress, ct))
+        {
+            root ??= node as DirectoryNode;
+        }
+
+        return root ?? throw new InvalidOperationException($"Scan did not produce a directory root for {sourcePath}.");
+    }
+
+    private static async Task AppendJsonLineAsync<T>(string path, T value, CancellationToken ct)
+    {
+        var line = JsonSerializer.Serialize(value, JsonOptions.Default);
+        await File.AppendAllTextAsync(path, line + Environment.NewLine, Encoding.UTF8, ct);
+    }
+
+    private static async Task AppendFileCopyRecordsAsync(
+        string path,
+        BenchmarkRunRecord run,
+        IReadOnlyList<TransformResult> results,
+        CancellationToken ct)
+    {
+        var copiedResults = results.Where(r =>
+            r.IsSuccess &&
+            r.SourceNodeResult == SourceResult.Copied &&
+            r.NumberOfFilesAffected > 0 &&
+            r.ExecutionDuration is TimeSpan duration &&
+            duration > TimeSpan.Zero);
+
+        await using var stream = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.Read);
+        await using var writer = new StreamWriter(stream, Encoding.UTF8);
+
+        foreach (var result in copiedResults)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var duration = result.ExecutionDuration!.Value;
+            var sizeBytes = result.InputBytes;
+            double? throughputMiBPerSecond = sizeBytes > 0 && duration.TotalSeconds > 0
+                ? (sizeBytes / 1048576d) / duration.TotalSeconds
+                : null;
+
+            var fileRecord = new BenchmarkFileCopyRecord
+            {
+                RunStartedUtc = run.RunStartedUtc,
+                RunIndex = run.RunIndex,
+                ScenarioName = run.ScenarioName,
+                VariantName = run.VariantName,
+                SourceRelativePath = result.SourceNode.CanonicalRelativePath ?? string.Empty,
+                DestinationPath = result.DestinationPath ?? string.Empty,
+                FileSizeBytes = sizeBytes,
+                CopyDurationMilliseconds = duration.TotalMilliseconds,
+                ThroughputMiBPerSecond = throughputMiBPerSecond,
+            };
+
+            await writer.WriteLineAsync(JsonSerializer.Serialize(fileRecord, JsonOptions.Default));
+        }
+
+        await writer.FlushAsync(ct);
+    }
+}

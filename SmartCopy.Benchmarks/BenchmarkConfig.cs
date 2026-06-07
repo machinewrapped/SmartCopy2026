@@ -17,6 +17,13 @@ internal sealed class BenchmarkConfig
     public DatasetPreparationConfig? DatasetPreparation { get; set; }
     public int CooldownSeconds { get; set; } = 60;
 
+    /// <summary>
+    /// Keyed by normalized base source path. Each value is the (shuffled) list of pool
+    /// paths for that source root, shared across all scenarios that use that source.
+    /// Populated on first benchmark run; persisted to the config file.
+    /// </summary>
+    public Dictionary<string, List<string>> SourcePools { get; set; } = new();
+
     public static BenchmarkConfig CreateTemplate() =>
         new()
         {

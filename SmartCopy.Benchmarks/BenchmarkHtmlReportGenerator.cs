@@ -4,21 +4,12 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.Benchmarks;
 
 internal static class BenchmarkHtmlReportGenerator
 {
-
-
-    private static string GetWriteMode(string variantName)
-    {
-        if (variantName.Contains("Direct", StringComparison.OrdinalIgnoreCase)) return "Direct Write";
-        if (variantName.Contains("Staged", StringComparison.OrdinalIgnoreCase)) return "Staged Write";
-        if (variantName.Contains("Baseline", StringComparison.OrdinalIgnoreCase)) return "Staged Write (Baseline)";
-        return "Unknown";
-    }
-
     private static readonly string[] Palette = new[] 
     { 
         "'rgba(54, 162, 235, 0.7)'",   // Blue
@@ -36,7 +27,8 @@ internal static class BenchmarkHtmlReportGenerator
         IReadOnlyList<FileSizeBucket> buckets,
         IReadOnlyList<string> variants,
         IReadOnlyList<BenchmarkFileCopyRecord> records,
-        IReadOnlyList<BenchmarkRunRecord> runs)
+        IReadOnlyList<BenchmarkRunRecord> runs,
+        IReadOnlyDictionary<string, string> matchedControlLookup)
     {
         buckets = buckets
             .Where(b => records.Any(r => b.Contains(r.FileSizeBytes)))
@@ -44,6 +36,7 @@ internal static class BenchmarkHtmlReportGenerator
 
         // Map each variant to its batch category using the run data config
         var variantCategories = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var variantWriteModes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var variant in variants)
         {
             var runForVariant = runs.FirstOrDefault(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase));
@@ -56,6 +49,14 @@ internal static class BenchmarkHtmlReportGenerator
             {
                 variantCategories[variant] = "Unbatched";
             }
+
+            variantWriteModes[variant] = runForVariant?.ProviderWriteMode switch
+            {
+                LocalFileSystemWriteMode.ManualLoop => "Manual Loop",
+                LocalFileSystemWriteMode.CopyToAsync => "Stream Copy",
+                LocalFileSystemWriteMode.Auto => "Auto",
+                _ => variant,
+            };
         }
 
         var sb = new StringBuilder();
@@ -95,7 +96,7 @@ internal static class BenchmarkHtmlReportGenerator
 
             if (variantRuns.Count > 0)
             {
-                var medianSeconds = variantRuns[variantRuns.Count / 2];
+                var medianSeconds = BenchmarkHelpers.Percentile(variantRuns, 0.50);
                 runItems.Add((variant, medianSeconds, Palette[variantIndex % Palette.Length]));
             }
             variantIndex++;
@@ -173,16 +174,8 @@ internal static class BenchmarkHtmlReportGenerator
             var dataAvg = new List<double>();
             foreach (var bucket in buckets)
             {
-                var bucketRecords = records.Where(r => bucket.Contains(r.FileSizeBytes)).ToList();
-                var speeds = bucketRecords
-                    .Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase))
-                    .Select(r => r.ThroughputMiBPerSecond)
-                    .Where(v => v is not null)
-                    .Select(v => v!.Value)
-                    .ToList();
-
-                var avg = speeds.Count > 0 ? speeds.Average() : 0.0;
-                dataAvg.Add(Math.Round(avg, 2));
+                var evidence = BenchmarkStatistics.BuildBucketEvidence(records, bucket, variant);
+                dataAvg.Add(Math.Round(evidence.AggregateThroughputMiBPerSecond, 2));
             }
 
             var dataAvgStr = string.Join(", ", dataAvg.Select(d => d.ToString(System.Globalization.CultureInfo.InvariantCulture)));
@@ -234,6 +227,120 @@ internal static class BenchmarkHtmlReportGenerator
         ");
         sb.AppendLine("</script>");
 
+        // --- Variant % vs Control (Bar Chart) ---
+        sb.AppendLine($"<h2>Variant vs Control (%)</h2>");
+        sb.AppendLine($"<div class=\"chart-container\">");
+        var diffCanvasId = $"chart_{Guid.NewGuid():N}";
+        sb.AppendLine($"<canvas id=\"{diffCanvasId}\"></canvas>");
+        sb.AppendLine("</div>");
+
+        var diffDatasetsJs = new List<string>();
+        int diffColorIndex = 0;
+        double maxAbsDiff = 0.0;
+
+        foreach (var variant in variants)
+        {
+            if (!matchedControlLookup.TryGetValue(variant, out var controlVariant) || string.IsNullOrWhiteSpace(controlVariant))
+                continue;
+
+            // Only plot if the variant isn't its own control
+            if (string.Equals(variant, controlVariant, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var color = Palette[diffColorIndex % Palette.Length];
+            diffColorIndex++;
+
+            var dataDiff = new List<double>();
+            foreach (var bucket in buckets)
+            {
+                var bucketRecords = records.Where(r => bucket.Contains(r.FileSizeBytes)).ToList();
+                
+                var variantRecords = bucketRecords
+                    .Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                
+                var controlRecords = bucketRecords
+                    .Where(r => string.Equals(r.VariantName, controlVariant, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                var variantTotalBytes = variantRecords.Sum(r => r.FileSizeBytes);
+                var variantTotalSeconds = variantRecords.Sum(r => r.CopyDurationMilliseconds) / 1000.0;
+                var variantAvg = variantTotalBytes > 0 && variantTotalSeconds > 0 ? (variantTotalBytes / 1048576.0) / variantTotalSeconds : 0.0;
+
+                var controlTotalBytes = controlRecords.Sum(r => r.FileSizeBytes);
+                var controlTotalSeconds = controlRecords.Sum(r => r.CopyDurationMilliseconds) / 1000.0;
+                var controlAvg = controlTotalBytes > 0 && controlTotalSeconds > 0 ? (controlTotalBytes / 1048576.0) / controlTotalSeconds : 0.0;
+
+                if (controlAvg > 0 && variantAvg > 0)
+                {
+                    var diffPercent = ((variantAvg - controlAvg) / controlAvg) * 100.0;
+                    dataDiff.Add(Math.Round(diffPercent, 2));
+                    if (Math.Abs(diffPercent) > maxAbsDiff) maxAbsDiff = Math.Abs(diffPercent);
+                }
+                else
+                {
+                    dataDiff.Add(0.0);
+                }
+            }
+
+            var dataDiffStr = string.Join(", ", dataDiff.Select(d => d.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            var borderColor = color.Replace("0.7", "1.0");
+            var backgroundColor = color.Replace("0.7", "0.1");
+
+            diffDatasetsJs.Add($@"
+                {{
+                    label: '{variant} vs {controlVariant}',
+                    data: [{dataDiffStr}],
+                    borderColor: {borderColor},
+                    backgroundColor: {backgroundColor},
+                    borderWidth: 1.5,
+                    pointRadius: 2,
+                    pointHoverRadius: 4,
+                    tension: 0.15,
+                    fill: false
+                }}
+            ");
+        }
+
+        if (diffDatasetsJs.Count > 0)
+        {
+            var allDiffDatasetsJs = string.Join(", ", diffDatasetsJs);
+
+            var maxAbsDiffCeil = Math.Max(10.0, Math.Ceiling(maxAbsDiff / 10.0) * 10.0);
+
+            sb.AppendLine("<script>");
+            sb.AppendLine($@"
+                new Chart(document.getElementById('{diffCanvasId}'), {{
+                    type: 'line',
+                    data: {{
+                        labels: [{trendBucketLabelsJs}],
+                        datasets: [{allDiffDatasetsJs}]
+                    }},
+                    options: {{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {{
+                            x: {{ 
+                                ticks: {{ color: '#eee' }},
+                                grid: {{ color: '#333' }}
+                            }},
+                            y: {{ 
+                                title: {{ display: true, text: '% Difference vs Control', color: '#eee' }},
+                                min: {-maxAbsDiffCeil},
+                                max: {maxAbsDiffCeil},
+                                ticks: {{ color: '#eee' }},
+                                grid: {{ color: '#333' }}
+                            }}
+                        }},
+                        plugins: {{
+                            legend: {{ display: true, position: 'top', labels: {{ color: '#eee' }} }}
+                        }}
+                    }}
+                }});
+            ");
+            sb.AppendLine("</script>");
+        }
+
         var categories = variants
             .Select(v => variantCategories.TryGetValue(v, out var cat) ? cat : "Unbatched")
             .Distinct()
@@ -260,7 +367,7 @@ internal static class BenchmarkHtmlReportGenerator
 
             foreach (var variant in categoryVariants)
             {
-                var mode = GetWriteMode(variant);
+                var mode = variantWriteModes.TryGetValue(variant, out var wm) ? wm : variant;
                 var color = Palette[colorIndex % Palette.Length];
                 colorIndex++;
                 var dataAvg = new List<double>();
@@ -338,7 +445,8 @@ internal static class BenchmarkHtmlReportGenerator
         IReadOnlyList<string> variants,
         IReadOnlyList<BenchmarkFileCopyRecord> records,
         IReadOnlyList<BenchmarkRunRecord> runs,
-        IReadOnlyList<string> scenarios)
+        IReadOnlyList<string> scenarios,
+        IReadOnlyDictionary<string, string> matchedControlLookup)
     {
         buckets = buckets
             .Where(b => records.Any(r => b.Contains(r.FileSizeBytes)))
@@ -357,6 +465,132 @@ internal static class BenchmarkHtmlReportGenerator
         sb.AppendLine("</head>");
         sb.AppendLine("<body>");
         sb.AppendLine($"<h1>All Scenarios Summary</h1>");
+
+        var validVariants = variants
+            .Where(v => matchedControlLookup.TryGetValue(v, out var c) && !string.Equals(v, c, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var validVariantLabelsJs = string.Join(", ", validVariants.Select(v => $"'{v}'"));
+
+        sb.AppendLine("<h2>Variant vs Control (%) Across Scenarios</h2>");
+        sb.AppendLine("<div style=\"margin-bottom: 1rem;\">");
+        sb.AppendLine("<label for=\"bucketSelector\" style=\"margin-right: 1rem; font-weight: bold;\">Filter by Bucket Size:</label>");
+        sb.AppendLine("<select id=\"bucketSelector\" style=\"padding: 0.5rem; background: #333; color: #eee; border: 1px solid #555; border-radius: 4px;\">");
+        sb.AppendLine("<option value=\"Aggregate\">Aggregate (All Buckets)</option>");
+        foreach (var bucket in buckets)
+        {
+            sb.AppendLine($"<option value=\"{bucket.Label}\">{bucket.Label}</option>");
+        }
+        sb.AppendLine("</select>");
+        sb.AppendLine("</div>");
+
+        sb.AppendLine($"<div class=\"chart-container\">");
+        var interactiveCanvasId = $"chart_{Guid.NewGuid():N}";
+        sb.AppendLine($"<canvas id=\"{interactiveCanvasId}\"></canvas>");
+        sb.AppendLine("</div>");
+
+        sb.AppendLine("<script>");
+        sb.AppendLine("var diffDatasetsByBucket = {};");
+
+        var bucketOptions = new List<FileSizeBucket?> { null };
+        bucketOptions.AddRange(buckets);
+        double globalMaxAbsDiff = 0.0;
+
+        foreach (var bucketOption in bucketOptions)
+        {
+            var bucketKey = bucketOption?.Label ?? "Aggregate";
+            sb.AppendLine($"diffDatasetsByBucket['{bucketKey}'] = [");
+
+            int scenarioColorIndex = 0;
+            foreach (var scenario in scenarios)
+            {
+                var color = Palette[scenarioColorIndex % Palette.Length];
+                var borderColor = color.Replace("0.7", "1.0");
+                var backgroundColor = color.Replace("0.7", "0.1");
+                scenarioColorIndex++;
+
+                var dataDiffs = new List<double>();
+                foreach (var variant in validVariants)
+                {
+                    var controlVariant = matchedControlLookup[variant];
+                    var recordsForBucket = records
+                        .Where(r => string.Equals(r.ScenarioName, scenario, StringComparison.OrdinalIgnoreCase))
+                        .Where(r => bucketOption == null || bucketOption.Contains(r.FileSizeBytes))
+                        .ToList();
+
+                    var variantRecords = recordsForBucket.Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase)).ToList();
+                    var controlRecords = recordsForBucket.Where(r => string.Equals(r.VariantName, controlVariant, StringComparison.OrdinalIgnoreCase)).ToList();
+
+                    var variantTotalBytes = variantRecords.Sum(r => r.FileSizeBytes);
+                    var variantTotalSeconds = variantRecords.Sum(r => r.CopyDurationMilliseconds) / 1000.0;
+                    var variantAvg = variantTotalBytes > 0 && variantTotalSeconds > 0 ? (variantTotalBytes / 1048576.0) / variantTotalSeconds : 0.0;
+
+                    var controlTotalBytes = controlRecords.Sum(r => r.FileSizeBytes);
+                    var controlTotalSeconds = controlRecords.Sum(r => r.CopyDurationMilliseconds) / 1000.0;
+                    var controlAvg = controlTotalBytes > 0 && controlTotalSeconds > 0 ? (controlTotalBytes / 1048576.0) / controlTotalSeconds : 0.0;
+
+                    if (controlAvg > 0 && variantAvg > 0)
+                    {
+                        var diffPercent = ((variantAvg - controlAvg) / controlAvg) * 100.0;
+                        dataDiffs.Add(Math.Round(diffPercent, 2));
+                        if (Math.Abs(diffPercent) > globalMaxAbsDiff) globalMaxAbsDiff = Math.Abs(diffPercent);
+                    }
+                    else
+                    {
+                        dataDiffs.Add(0.0);
+                    }
+                }
+
+                var dataDiffStr = string.Join(", ", dataDiffs.Select(d => d.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+                sb.AppendLine($@"
+                    {{
+                        label: '{scenario}',
+                        data: [{dataDiffStr}],
+                        borderColor: {borderColor},
+                        backgroundColor: {backgroundColor},
+                        borderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        tension: 0.15,
+                        fill: false
+                    }},");
+            }
+            sb.AppendLine("];");
+        }
+
+        var maxAbsDiffCeilSummary = Math.Max(10.0, Math.Ceiling(globalMaxAbsDiff / 10.0) * 10.0);
+
+        sb.AppendLine($@"
+            var ctxInteractive = document.getElementById('{interactiveCanvasId}');
+            var interactiveChart = new Chart(ctxInteractive, {{
+                type: 'line',
+                data: {{
+                    labels: [{validVariantLabelsJs}],
+                    datasets: diffDatasetsByBucket['Aggregate']
+                }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {{
+                        x: {{ ticks: {{ color: '#eee' }}, grid: {{ color: '#333' }} }},
+                        y: {{ 
+                            title: {{ display: true, text: '% Difference vs Control', color: '#eee' }},
+                            min: {-maxAbsDiffCeilSummary},
+                            max: {maxAbsDiffCeilSummary},
+                            ticks: {{ color: '#eee' }}, 
+                            grid: {{ color: '#333' }} 
+                        }}
+                    }},
+                    plugins: {{ legend: {{ display: true, position: 'top', labels: {{ color: '#eee' }} }} }}
+                }}
+            }});
+
+            document.getElementById('bucketSelector').addEventListener('change', function(e) {{
+                var selectedBucket = e.target.value;
+                interactiveChart.data.datasets = diffDatasetsByBucket[selectedBucket];
+                interactiveChart.update();
+            }});
+        ");
+        sb.AppendLine("</script>");
 
         var variantLabelsJs = string.Join(", ", variants.Select(v => $"'{v}'"));
 

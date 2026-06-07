@@ -82,21 +82,20 @@ internal static class AnalysisRunner
                         string.Equals(r.VariantName, selection.VariantName, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
+        scenariosToAnalyze = scenariosToAnalyze
+            .Where(s => filteredRecords.Any(r => string.Equals(r.ScenarioName, s, StringComparison.OrdinalIgnoreCase)) ||
+                        filteredRuns.Any(r => string.Equals(r.ScenarioName, s, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
         if (filteredRecords.Count == 0 && filteredRuns.Count == 0)
         {
             if (!string.IsNullOrWhiteSpace(selection.ScenarioName))
-            {
                 Report($"No records found for scenario '{selection.ScenarioName.Trim()}'.");
-            }
             else
-            {
                 Report("No records found for the selected scenarios.");
-            }
 
             if (!string.IsNullOrWhiteSpace(selection.VariantName))
-            {
                 Report($"Variant filter: '{selection.VariantName}'.");
-            }
 
             await FlushReportAsync();
             return;
@@ -108,16 +107,14 @@ internal static class AnalysisRunner
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var variantSizes = distinctVariants.ToDictionary(
-            v => v,
-            v => GetVariantSize(v, config, allRuns),
-            StringComparer.OrdinalIgnoreCase
-        );
-
-        var variantComparer = new VariantNameComparer(variantSizes);
+        // Order variants by config definition order; unknowns go last alphabetically.
+        var variantIndexMap = config.Variants
+            .Select((v, i) => (v.Name, i))
+            .ToDictionary(t => t.Name, t => t.i, StringComparer.OrdinalIgnoreCase);
 
         var allVariants = distinctVariants
-            .OrderBy(v => v, variantComparer)
+            .OrderBy(v => variantIndexMap.GetValueOrDefault(v, int.MaxValue))
+            .ThenBy(v => v, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         Report("## Analysis Summary");
@@ -136,9 +133,13 @@ internal static class AnalysisRunner
         var buckets = config.DatasetPreparation?.Buckets?.Select(b => new FileSizeBucket(b.MinimumFileSizeBytes, b.MaximumFileSizeBytes, b.Name)).ToList()
                       ?? FileSizeBuckets.All.ToList();
 
+        // Keyed by variant name → its explicit matched control name (only non-control variants present).
         var matchedControlLookup = config.Variants
             .Where(v => !string.IsNullOrWhiteSpace(v.MatchedControl))
             .ToDictionary(v => v.Name, v => v.MatchedControl!, StringComparer.OrdinalIgnoreCase);
+
+        var allConvergedRuns = new List<BenchmarkRunRecord>();
+        var allConvergedRecords = new List<BenchmarkFileCopyRecord>();
 
         foreach (var scenarioName in scenariosToAnalyze)
         {
@@ -163,7 +164,8 @@ internal static class AnalysisRunner
                 .Select(r => r.VariantName)
                 .Concat(runs.Select(r => r.VariantName))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(v => v, variantComparer)
+                .OrderBy(v => variantIndexMap.GetValueOrDefault(v, int.MaxValue))
+                .ThenBy(v => v, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
             Report($"- **Run records:** `{runs.Count}`");
@@ -173,18 +175,41 @@ internal static class AnalysisRunner
 
             var warnings = BuildMissingControlWarnings(variants, matchedControlLookup);
 
-            ReportRunEvidence(Report, runs, variants, config.GatePercent);
-            ReportBucketRecommendations(Report, records, buckets, variants, warnings, matchedControlLookup, config.GatePercent);
-            ReportBucketMetrics(Report, records, buckets, variants);
-            ReportBatchingIsolationEvidence(Report, records, buckets, variants, variantComparer, config.GatePercent);
+            var convergedIndexesByVariant = variants.ToDictionary(
+                v => v,
+                v =>
+                {
+                    var successful = runs
+                        .Where(r => string.Equals(r.VariantName, v, StringComparison.OrdinalIgnoreCase))
+                        .Where(BenchmarkHelpers.IsSuccessfulRun)
+                        .ToList();
+                    return BenchmarkConvergence.GetConvergedRunIndexes(
+                        successful,
+                        BenchmarkConvergence.GetDesiredRunCount(config, v),
+                        config.ConvergenceSpreadPercent);
+                },
+                StringComparer.OrdinalIgnoreCase);
+
+            var convergedRuns = runs
+                .Where(r => convergedIndexesByVariant.TryGetValue(r.VariantName, out var idx) && idx.Contains(r.RunIndex))
+                .ToList();
+            var convergedRecords = records
+                .Where(r => convergedIndexesByVariant.TryGetValue(r.VariantName, out var idx) && idx.Contains(r.RunIndex))
+                .ToList();
+
+            ReportRunEvidence(Report, convergedRuns, variants, config.GatePercent, matchedControlLookup);
+            ReportBucketRecommendations(Report, convergedRecords, buckets, variants, warnings, matchedControlLookup, config.GatePercent);
+            ReportBucketMetrics(Report, convergedRecords, buckets, variants);
+            ReportBatchingIsolationEvidence(Report, convergedRecords, buckets, variants, config.GatePercent);
+
+            allConvergedRuns.AddRange(convergedRuns);
+            allConvergedRecords.AddRange(convergedRecords);
 
             if (warnings.Count > 0)
             {
                 Report("### Missing Matched Controls");
                 foreach (var warning in warnings)
-                {
                     Report($"- {warning}");
-                }
                 Report();
             }
 
@@ -192,21 +217,17 @@ internal static class AnalysisRunner
 
             var htmlPath = Path.ChangeExtension(analysisPath, ".html");
             if (scenariosToAnalyze.Count > 1)
-            {
                 htmlPath = Path.Combine(Path.GetDirectoryName(htmlPath) ?? "", $"{Path.GetFileNameWithoutExtension(htmlPath)}-{scenarioName}.html");
-            }
-            
-            await BenchmarkHtmlReportGenerator.GenerateAsync(htmlPath, scenarioName, buckets, variants, records, runs);
+
+            await BenchmarkHtmlReportGenerator.GenerateAsync(htmlPath, scenarioName, buckets, variants, convergedRecords, convergedRuns, matchedControlLookup);
         }
 
         if (scenariosToAnalyze.Count > 1)
         {
-            var allVariantsFiltered = filteredRecords.Select(r => r.VariantName).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            allVariantsFiltered.Sort(variantComparer);
-            ReportCrossScenarioSummary(Report, config, filteredRuns, filteredRecords, buckets, allVariantsFiltered, scenariosToAnalyze, variantComparer);
-            
+            ReportCrossScenarioSummary(Report, config, allConvergedRuns, allConvergedRecords, buckets, allVariants, scenariosToAnalyze);
+
             var summaryHtmlPath = Path.Combine(Path.GetDirectoryName(analysisPath) ?? "", $"{Path.GetFileNameWithoutExtension(analysisPath)}-summary.html");
-            await BenchmarkHtmlReportGenerator.GenerateSummaryAsync(summaryHtmlPath, buckets, allVariants, filteredRecords, filteredRuns, scenariosToAnalyze);
+            await BenchmarkHtmlReportGenerator.GenerateSummaryAsync(summaryHtmlPath, buckets, allVariants, allConvergedRecords, allConvergedRuns, scenariosToAnalyze, matchedControlLookup);
         }
 
         await FlushReportAsync();
@@ -217,7 +238,8 @@ internal static class AnalysisRunner
         Action<string?> report,
         IReadOnlyList<BenchmarkRunRecord> runs,
         IReadOnlyList<string> variants,
-        double gatePercent)
+        double gatePercent,
+        IReadOnlyDictionary<string, string> matchedControls)
     {
         report("### Run-Level Evidence");
         report(null);
@@ -229,39 +251,30 @@ internal static class AnalysisRunner
             return;
         }
 
-        var baselineVariant = FindBaselineVariant(variants);
-        var baselineEvidence = baselineVariant is null
-            ? null
-            : BuildRunEvidence(runs, baselineVariant);
-
         report("| Variant | Valid Runs | Invalid Runs | Median Execute | Mean Execute | Min | Max | Spread | Delta vs Control | Noise Floor | Verdict |");
         report("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|");
 
         foreach (var variant in variants)
         {
-            var evidence = BuildRunEvidence(runs, variant);
+            var evidence = BenchmarkStatistics.BuildRunEvidence(runs, variant);
             if (evidence.TotalRuns == 0)
-            {
                 continue;
+
+            var isControl = !matchedControls.ContainsKey(variant);
+            RunVariantEvidence? controlEvidence = null;
+            if (!isControl && matchedControls.TryGetValue(variant, out var controlName))
+            {
+                var ce = BenchmarkStatistics.BuildRunEvidence(runs, controlName);
+                if (ce.TotalRuns > 0) controlEvidence = ce;
             }
 
-            var control = baselineVariant is not null &&
-                          !string.Equals(variant, baselineVariant, StringComparison.OrdinalIgnoreCase)
-                ? baselineEvidence
-                : null;
-            var comparison = CompareRunEvidence(evidence, control, gatePercent);
+            var comparison = CompareRunEvidence(evidence, controlEvidence, gatePercent, isControl);
 
             report(
                 $"| {BenchmarkHelpers.EscapeTable(variant)} | {evidence.ValidRuns} | {evidence.InvalidRuns} | " +
                 $"{BenchmarkHelpers.FormatDurationHuman(evidence.MedianSeconds)} | {BenchmarkHelpers.FormatDurationHuman(evidence.MeanSeconds)} | " +
                 $"{BenchmarkHelpers.FormatDurationHuman(evidence.MinSeconds)} | {BenchmarkHelpers.FormatDurationHuman(evidence.MaxSeconds)} | " +
                 $"{BenchmarkHelpers.FormatDurationHuman(evidence.SpreadSeconds)} | {comparison.DeltaText} | {comparison.NoiseText} | {comparison.Verdict} |");
-        }
-
-        if (baselineVariant is null)
-        {
-            report(null);
-            report("Run-level verdicts are `INCONCLUSIVE`: no baseline/control variant was found.");
         }
 
         report(null);
@@ -292,22 +305,20 @@ internal static class AnalysisRunner
         foreach (var bucket in buckets)
         {
             var candidates = variants
-                .Select(v => BuildBucketEvidence(records, bucket, v))
+                .Select(v => BenchmarkStatistics.BuildBucketEvidence(records, bucket, v))
                 .Where(e => e.RecordCount > 0)
                 .OrderBy(e => e.MedianDurationMilliseconds)
                 .ToList();
 
             if (candidates.Count == 0)
-            {
                 continue;
-            }
 
             var best = candidates[0];
             var controlName = FindMatchedControlVariant(best.VariantName, variants, matchedControls);
             BucketVariantEvidence? control = null;
             if (controlName is not null)
             {
-                control = BuildBucketEvidence(records, bucket, controlName);
+                control = BenchmarkStatistics.BuildBucketEvidence(records, bucket, controlName);
                 if (control.RecordCount == 0)
                 {
                     warnings.Add($"`{best.VariantName}` in `{bucket.Label}` has matched control `{controlName}`, but that control has no file-level records in the bucket.");
@@ -315,10 +326,11 @@ internal static class AnalysisRunner
                 }
             }
 
-            var comparison = CompareBucketEvidence(best, control, gatePercent);
+            var isControl = !matchedControls.ContainsKey(best.VariantName);
+            var comparison = CompareBucketEvidence(best, control, gatePercent, isControl);
             var recommendation = comparison.Verdict == "PASS"
                 ? "Candidate for policy"
-                : IsBaselineVariant(best.VariantName)
+                : isControl
                     ? "Keep control"
                     : "No supported change";
 
@@ -355,11 +367,9 @@ internal static class AnalysisRunner
         {
             foreach (var variant in variants)
             {
-                var evidence = BuildBucketEvidence(records, bucket, variant);
+                var evidence = BenchmarkStatistics.BuildBucketEvidence(records, bucket, variant);
                 if (evidence.RecordCount == 0)
-                {
                     continue;
-                }
 
                 report(
                     $"| {bucket.Label} | {BenchmarkHelpers.EscapeTable(variant)} | {evidence.RecordCount} | {BenchmarkHelpers.FormatBytesHuman(evidence.TotalBytes)} | " +
@@ -378,21 +388,18 @@ internal static class AnalysisRunner
         IReadOnlyList<BenchmarkFileCopyRecord> records,
         IReadOnlyList<FileSizeBucket> buckets,
         IReadOnlyList<string> variants,
-        IComparer<string> variantComparer,
         double gatePercent)
     {
+        // variants is already in config order; filter in-place to preserve it
         var directBatchVariants = variants
             .Where(v => v.Contains("DirectWriteBatch", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(v => v, variantComparer)
             .ToList();
 
         var unbatchedControl = variants.FirstOrDefault(v =>
             v.Contains("UnbatchedDirectWrite", StringComparison.OrdinalIgnoreCase));
 
         if (directBatchVariants.Count == 0 || unbatchedControl is null)
-        {
             return;
-        }
 
         report("### Batching Isolation Evidence");
         report(null);
@@ -403,21 +410,17 @@ internal static class AnalysisRunner
 
         foreach (var bucket in buckets)
         {
-            var control = BuildBucketEvidence(records, bucket, unbatchedControl);
+            var control = BenchmarkStatistics.BuildBucketEvidence(records, bucket, unbatchedControl);
             if (control.RecordCount == 0)
-            {
                 continue;
-            }
 
             foreach (var variant in directBatchVariants)
             {
-                var candidate = BuildBucketEvidence(records, bucket, variant);
+                var candidate = BenchmarkStatistics.BuildBucketEvidence(records, bucket, variant);
                 if (candidate.RecordCount == 0)
-                {
                     continue;
-                }
 
-                var comparison = CompareBucketEvidence(candidate, control, gatePercent);
+                var comparison = CompareBucketEvidence(candidate, control, gatePercent, isControl: false);
                 report(
                     $"| {bucket.Label} | {BenchmarkHelpers.EscapeTable(variant)} | {BenchmarkHelpers.EscapeTable(unbatchedControl)} | " +
                     $"{candidate.MedianDurationMilliseconds:0.###} ms | {control.MedianDurationMilliseconds:0.###} ms | " +
@@ -428,21 +431,20 @@ internal static class AnalysisRunner
         report(null);
     }
 
-    private static List<string> BuildMissingControlWarnings(IReadOnlyList<string> variants, IReadOnlyDictionary<string, string> matchedControls)
+    private static List<string> BuildMissingControlWarnings(
+        IReadOnlyList<string> variants,
+        IReadOnlyDictionary<string, string> matchedControls)
     {
         var warnings = new List<string>();
         foreach (var variant in variants)
         {
-            if (IsBaselineVariant(variant))
-            {
+            // Control variants (no matched control) are the reference — skip them.
+            if (!matchedControls.ContainsKey(variant))
                 continue;
-            }
 
             var control = FindMatchedControlVariant(variant, variants, matchedControls);
             if (control is null)
-            {
                 warnings.Add($"`{variant}` has no matched control; causal effect cannot be isolated.");
-            }
         }
 
         return warnings
@@ -451,133 +453,22 @@ internal static class AnalysisRunner
             .ToList();
     }
 
-    private static RunVariantEvidence BuildRunEvidence(IReadOnlyList<BenchmarkRunRecord> runs, string variant)
-    {
-        var variantRuns = runs
-            .Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        var validDurations = variantRuns
-            .Where(IsSuccessfulRun)
-            .Select(r => r.ExecuteDuration.TotalSeconds)
-            .OrderBy(v => v)
-            .ToList();
-
-        if (validDurations.Count == 0)
-        {
-            return new RunVariantEvidence(
-                variant,
-                variantRuns.Count,
-                0,
-                variantRuns.Count,
-                0,
-                0,
-                0,
-                0,
-                0);
-        }
-
-        var min = validDurations[0];
-        var max = validDurations[^1];
-        return new RunVariantEvidence(
-            variant,
-            variantRuns.Count,
-            validDurations.Count,
-            variantRuns.Count - validDurations.Count,
-            BenchmarkHelpers.Percentile(validDurations, 0.50),
-            validDurations.Average(),
-            min,
-            max,
-            TightestPairSpread(validDurations));
-    }
-
-    private static BucketVariantEvidence BuildBucketEvidence(
-        IReadOnlyList<BenchmarkFileCopyRecord> records,
-        FileSizeBucket? bucket,
-        string variant)
-    {
-        var bucketRecords = records
-            .Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase))
-            .Where(r => bucket is null || bucket.Contains(r.FileSizeBytes))
-            .ToList();
-
-        if (bucketRecords.Count == 0)
-        {
-            return BucketVariantEvidence.Empty(bucket?.Label ?? "Scenario", variant);
-        }
-
-        var durations = bucketRecords
-            .Select(r => r.CopyDurationMilliseconds)
-            .Where(v => v > 0)
-            .OrderBy(v => v)
-            .ToList();
-        var throughputs = bucketRecords
-            .Select(r => r.ThroughputMiBPerSecond)
-            .Where(v => v is not null)
-            .Select(v => v!.Value)
-            .OrderBy(v => v)
-            .ToList();
-        var runMedians = bucketRecords
-            .GroupBy(r => (r.RunStartedUtc, r.RunIndex))
-            .Select(g => g
-                .Select(r => r.CopyDurationMilliseconds)
-                .Where(v => v > 0)
-                .OrderBy(v => v)
-                .ToList())
-            .Where(values => values.Count > 0)
-            .Select(values => BenchmarkHelpers.Percentile(values, 0.50))
-            .OrderBy(v => v)
-            .ToList();
-
-        var runThroughputs = bucketRecords
-            .GroupBy(r => r.RunIndex)
-            .Select(g => 
-            {
-                var runBytes = g.Sum(r => r.FileSizeBytes);
-                var runSeconds = g.Sum(r => r.CopyDurationMilliseconds) / 1000.0;
-                return runBytes > 0 && runSeconds > 0 ? (runBytes / 1048576.0) / runSeconds : 0.0;
-            })
-            .OrderBy(t => t)
-            .ToList();
-
-        var aggregateThroughput = runThroughputs.Count > 0 
-            ? BenchmarkHelpers.Percentile(runThroughputs, 0.50) 
-            : 0.0;
-
-        var totalBytes = bucketRecords.Sum(r => r.FileSizeBytes);
-
-        return new BucketVariantEvidence(
-            bucket?.Label ?? "Scenario",
-            variant,
-            bucketRecords.Count,
-            totalBytes,
-            durations.Count > 0 ? durations.Average() : 0.0,
-            durations.Count > 0 ? BenchmarkHelpers.Percentile(durations, 0.50) : 0.0,
-            durations.Count > 0 ? BenchmarkHelpers.Percentile(durations, 0.95) : 0.0,
-            aggregateThroughput,
-            throughputs.Count > 0 ? throughputs.Average() : 0.0,
-            throughputs.Count > 0 ? BenchmarkHelpers.Percentile(throughputs, 0.50) : 0.0,
-            throughputs.Count > 0 ? BenchmarkHelpers.Percentile(throughputs, 0.95) : 0.0,
-            TightestPairSpread(runMedians));
-    }
-
-    private static EvidenceComparison CompareRunEvidence(RunVariantEvidence candidate, RunVariantEvidence? control, double gatePercent)
+    private static EvidenceComparison CompareRunEvidence(
+        RunVariantEvidence candidate,
+        RunVariantEvidence? control,
+        double gatePercent,
+        bool isControl)
     {
         if (candidate.ValidRuns == 0)
-        {
             return new EvidenceComparison("INVALID", "-", "-");
-        }
 
         if (control is null)
-        {
-            return IsBaselineVariant(candidate.VariantName)
+            return isControl
                 ? new EvidenceComparison("CONTROL", "-", "-")
                 : new EvidenceComparison("INCONCLUSIVE", "-", "-");
-        }
 
         if (control.ValidRuns == 0)
-        {
             return new EvidenceComparison("INCONCLUSIVE", "-", "-");
-        }
 
         var deltaSeconds = control.MedianSeconds - candidate.MedianSeconds;
         var deltaPercent = control.MedianSeconds > 0 ? deltaSeconds / control.MedianSeconds * 100.0 : 0.0;
@@ -589,24 +480,22 @@ internal static class AnalysisRunner
             BenchmarkHelpers.FormatDurationHuman(noiseFloor));
     }
 
-    private static EvidenceComparison CompareBucketEvidence(BucketVariantEvidence candidate, BucketVariantEvidence? control, double gatePercent)
+    private static EvidenceComparison CompareBucketEvidence(
+        BucketVariantEvidence candidate,
+        BucketVariantEvidence? control,
+        double gatePercent,
+        bool isControl)
     {
         if (candidate.RecordCount == 0)
-        {
             return new EvidenceComparison("INVALID", "-", "-");
-        }
 
         if (control is null)
-        {
-            return IsBaselineVariant(candidate.VariantName)
+            return isControl
                 ? new EvidenceComparison("CONTROL", "-", "-")
                 : new EvidenceComparison("INCONCLUSIVE", "-", "-");
-        }
 
         if (control.RecordCount == 0)
-        {
             return new EvidenceComparison("INCONCLUSIVE", "-", "-");
-        }
 
         var deltaMilliseconds = control.MedianDurationMilliseconds - candidate.MedianDurationMilliseconds;
         var deltaPercent = control.MedianDurationMilliseconds > 0
@@ -623,79 +512,26 @@ internal static class AnalysisRunner
     private static string GetDeltaVerdict(double delta, double deltaPercent, double noiseFloor, double gatePercent)
     {
         if (delta < -noiseFloor)
-        {
             return "REGRESSION";
-        }
-
         if (delta <= noiseFloor)
-        {
             return "INCONCLUSIVE";
-        }
-
         return deltaPercent >= gatePercent ? "PASS" : "FAIL";
     }
 
-    private static string? FindMatchedControlVariant(string variant, IReadOnlyList<string> variants, IReadOnlyDictionary<string, string> matchedControls)
+    /// <summary>
+    /// Returns the matched control variant name for <paramref name="variant"/> if it appears
+    /// in <paramref name="variants"/>. Returns <c>null</c> for control variants (no entry in
+    /// <paramref name="matchedControls"/>) or when the control is not present in the scenario.
+    /// </summary>
+    private static string? FindMatchedControlVariant(
+        string variant,
+        IReadOnlyList<string> variants,
+        IReadOnlyDictionary<string, string> matchedControls)
     {
-        if (IsBaselineVariant(variant))
-        {
+        if (!matchedControls.TryGetValue(variant, out var controlName) || string.IsNullOrWhiteSpace(controlName))
             return null;
-        }
-
-        if (matchedControls.TryGetValue(variant, out var configuredControl) && !string.IsNullOrWhiteSpace(configuredControl))
-        {
-            return variants.FirstOrDefault(v => string.Equals(v, configuredControl, StringComparison.OrdinalIgnoreCase));
-        }
-
-        if (variant.Contains("DirectWriteBatch", StringComparison.OrdinalIgnoreCase))
-        {
-            var buffer = ExtractBatchBufferLabel(variant);
-            if (buffer is not null)
-            {
-                var staged = variants.FirstOrDefault(v =>
-                    v.Contains("StagedWriteBatch", StringComparison.OrdinalIgnoreCase) &&
-                    string.Equals(ExtractBatchBufferLabel(v), buffer, StringComparison.OrdinalIgnoreCase));
-                if (staged is not null)
-                {
-                    return staged;
-                }
-            }
-
-            return null;
-        }
-
-        return FindBaselineVariant(variants);
+        return variants.FirstOrDefault(v => string.Equals(v, controlName, StringComparison.OrdinalIgnoreCase));
     }
-
-    private static string? ExtractBatchBufferLabel(string variant)
-    {
-        var match = System.Text.RegularExpressions.Regex.Match(variant, @"Batch(?<size>\d+MiB)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        return match.Success ? match.Groups["size"].Value : null;
-    }
-
-    private static string? FindBaselineVariant(IReadOnlyList<string> variants)
-    {
-        var preferred = new[] { "Control_BaselineAuto", "BaselineAuto", "ScenarioDefaults" };
-        foreach (var name in preferred)
-        {
-            var match = variants.FirstOrDefault(v => string.Equals(v, name, StringComparison.OrdinalIgnoreCase));
-            if (match is not null)
-            {
-                return match;
-            }
-        }
-
-        return variants.FirstOrDefault(IsBaselineVariant);
-    }
-
-    private static bool IsBaselineVariant(string variant) =>
-        variant.Contains("Baseline", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(variant, "ScenarioDefaults", StringComparison.OrdinalIgnoreCase);
-
-    private static bool IsSuccessfulRun(BenchmarkRunRecord run) =>
-        string.Equals(run.RunStatus, BenchmarkRunStatus.Completed, StringComparison.OrdinalIgnoreCase) &&
-        run.FailedFiles == 0 &&
-        run.ExceptionType is null;
 
     private static string FormatSignedPercent(double value) =>
         value switch
@@ -713,38 +549,6 @@ internal static class AnalysisRunner
             _ => "0s",
         };
 
-    private static double TightestPairSpread(List<double> sorted)
-    {
-        if (sorted.Count < 2) return 0.0;
-        var minSpread = double.MaxValue;
-        for (int i = 1; i < sorted.Count; i++)
-        {
-            minSpread = Math.Min(minSpread, sorted[i] - sorted[i - 1]);
-        }
-        return minSpread;
-    }
-
-    private static long GetVariantSize(string variantName, BenchmarkConfig config, IReadOnlyList<BenchmarkRunRecord> runs)
-    {
-        var cv = config.Variants.FirstOrDefault(x => string.Equals(x.Name, variantName, StringComparison.OrdinalIgnoreCase));
-        if (cv != null)
-        {
-            if (cv.BufferBatchBytes > 0) return cv.BufferBatchBytes.Value;
-            if (cv.DirectWriteThresholdBytes > 0) return cv.DirectWriteThresholdBytes.Value;
-            if (cv.ProviderCopyBufferSizeBytes > 0) return cv.ProviderCopyBufferSizeBytes.Value;
-        }
-
-        var run = runs.FirstOrDefault(x => string.Equals(x.VariantName, variantName, StringComparison.OrdinalIgnoreCase));
-        if (run != null)
-        {
-            if (run.BufferBatchBytes > 0) return run.BufferBatchBytes.Value;
-            if (run.DirectWriteThresholdBytes > 0) return run.DirectWriteThresholdBytes.Value;
-            if (run.ProviderCopyBufferSizeBytes > 0) return run.ProviderCopyBufferSizeBytes.Value;
-        }
-
-        return -1L;
-    }
-
     private static void ReportCrossScenarioSummary(
         Action<string?> report,
         BenchmarkConfig config,
@@ -752,32 +556,43 @@ internal static class AnalysisRunner
         IReadOnlyList<BenchmarkFileCopyRecord> records,
         IReadOnlyList<FileSizeBucket> buckets,
         IReadOnlyList<string> variants,
-        IReadOnlyList<string> scenarios,
-        IComparer<string> variantComparer)
+        IReadOnlyList<string> scenarios)
     {
+        // runs and records are already filtered to converged windows per scenario/variant.
+        static IReadOnlyList<BenchmarkRunRecord> ScenarioVariantRuns(
+            IReadOnlyList<BenchmarkRunRecord> allRuns, string scenario, string variant) =>
+            allRuns.Where(r =>
+                string.Equals(r.ScenarioName, scenario, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        static IReadOnlyList<BenchmarkFileCopyRecord> ScenarioVariantRecords(
+            IReadOnlyList<BenchmarkFileCopyRecord> allRecords, string scenario, string variant) =>
+            allRecords.Where(r =>
+                string.Equals(r.ScenarioName, scenario, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase)).ToList();
+
         report("## All Scenarios Summary");
         report(null);
         report("Cross-scenario summary matrix displaying median execute durations (for entire runs) and run-median aggregate throughput (MiB/s) per bucket.");
         report(null);
-        
+
         report("### Run-Level Median Duration");
         report(null);
-        
+
         var header = "| Variant | " + string.Join(" | ", scenarios.Select(BenchmarkHelpers.EscapeTable)) + " |";
         var divider = "|---|" + string.Join("|", scenarios.Select(_ => "---:")) + "|";
         report(header);
         report(divider);
-        
+
         foreach (var variant in variants)
         {
             var row = new List<string> { BenchmarkHelpers.EscapeTable(variant) };
+            var variantConfig = config.Variants.FirstOrDefault(v => string.Equals(v.Name, variant, StringComparison.OrdinalIgnoreCase));
+            var matchedControlName = variantConfig?.MatchedControl;
+
             foreach (var scenario in scenarios)
             {
-                var scenarioRuns = runs.Where(r => string.Equals(r.ScenarioName, scenario, StringComparison.OrdinalIgnoreCase)).ToList();
-                var evidence = BuildRunEvidence(scenarioRuns, variant);
-                var variantConfig = config.Variants.FirstOrDefault(v => string.Equals(v.Name, variant, StringComparison.OrdinalIgnoreCase));
-                var matchedControlName = variantConfig?.MatchedControl;
-
+                var evidence = BenchmarkStatistics.BuildRunEvidence(ScenarioVariantRuns(runs, scenario, variant), variant);
                 if (evidence.TotalRuns == 0)
                 {
                     row.Add("-");
@@ -788,7 +603,7 @@ internal static class AnalysisRunner
                 }
                 else
                 {
-                    var controlEvidence = BuildRunEvidence(scenarioRuns, matchedControlName);
+                    var controlEvidence = BenchmarkStatistics.BuildRunEvidence(ScenarioVariantRuns(runs, scenario, matchedControlName), matchedControlName);
                     if (controlEvidence.TotalRuns > 0 && controlEvidence.MedianSeconds > 0)
                     {
                         var deltaPercent = (evidence.MedianSeconds - controlEvidence.MedianSeconds) / controlEvidence.MedianSeconds * 100.0;
@@ -801,11 +616,9 @@ internal static class AnalysisRunner
                     }
                 }
             }
-            
+
             if (row.Count > 1 && row.Skip(1).Any(c => c != "-"))
-            {
                 report("| " + string.Join(" | ", row) + " |");
-            }
         }
         report(null);
 
@@ -817,13 +630,12 @@ internal static class AnalysisRunner
         foreach (var variant in variants)
         {
             var row = new List<string> { BenchmarkHelpers.EscapeTable(variant) };
+            var variantConfig = config.Variants.FirstOrDefault(v => string.Equals(v.Name, variant, StringComparison.OrdinalIgnoreCase));
+            var matchedControlName = variantConfig?.MatchedControl;
+
             foreach (var scenario in scenarios)
             {
-                var scenarioRecords = records.Where(r => string.Equals(r.ScenarioName, scenario, StringComparison.OrdinalIgnoreCase)).ToList();
-                var evidence = BuildBucketEvidence(scenarioRecords, null, variant);
-                var variantConfig = config.Variants.FirstOrDefault(v => string.Equals(v.Name, variant, StringComparison.OrdinalIgnoreCase));
-                var matchedControlName = variantConfig?.MatchedControl;
-
+                var evidence = BenchmarkStatistics.BuildBucketEvidence(ScenarioVariantRecords(records, scenario, variant), null, variant);
                 if (evidence.RecordCount == 0)
                 {
                     row.Add("-");
@@ -834,7 +646,7 @@ internal static class AnalysisRunner
                 }
                 else
                 {
-                    var controlEvidence = BuildBucketEvidence(scenarioRecords, null, matchedControlName);
+                    var controlEvidence = BenchmarkStatistics.BuildBucketEvidence(ScenarioVariantRecords(records, scenario, matchedControlName), null, matchedControlName);
                     if (controlEvidence.RecordCount > 0 && controlEvidence.AggregateThroughputMiBPerSecond > 0)
                     {
                         var deltaPercent = (evidence.AggregateThroughputMiBPerSecond - controlEvidence.AggregateThroughputMiBPerSecond) / controlEvidence.AggregateThroughputMiBPerSecond * 100.0;
@@ -849,9 +661,7 @@ internal static class AnalysisRunner
             }
 
             if (row.Count > 1 && row.Skip(1).Any(c => c != "-"))
-            {
                 report("| " + string.Join(" | ", row) + " |");
-            }
         }
         report(null);
 
@@ -859,22 +669,21 @@ internal static class AnalysisRunner
         {
             var hasAnyDataForBucket = records.Any(r => bucket.Contains(r.FileSizeBytes));
             if (!hasAnyDataForBucket) continue;
-            
+
             report($"### Bucket Throughput (MiB/s): {bucket.Label}");
             report(null);
             report(header);
             report(divider);
-            
+
             foreach (var variant in variants)
             {
                 var row = new List<string> { BenchmarkHelpers.EscapeTable(variant) };
+                var variantConfig = config.Variants.FirstOrDefault(v => string.Equals(v.Name, variant, StringComparison.OrdinalIgnoreCase));
+                var matchedControlName = variantConfig?.MatchedControl;
+
                 foreach (var scenario in scenarios)
                 {
-                    var scenarioRecords = records.Where(r => string.Equals(r.ScenarioName, scenario, StringComparison.OrdinalIgnoreCase)).ToList();
-                    var evidence = BuildBucketEvidence(scenarioRecords, bucket, variant);
-                    var variantConfig = config.Variants.FirstOrDefault(v => string.Equals(v.Name, variant, StringComparison.OrdinalIgnoreCase));
-                    var matchedControlName = variantConfig?.MatchedControl;
-
+                    var evidence = BenchmarkStatistics.BuildBucketEvidence(ScenarioVariantRecords(records, scenario, variant), bucket, variant);
                     if (evidence.RecordCount == 0)
                     {
                         row.Add("-");
@@ -885,7 +694,7 @@ internal static class AnalysisRunner
                     }
                     else
                     {
-                        var controlEvidence = BuildBucketEvidence(scenarioRecords, bucket, matchedControlName);
+                        var controlEvidence = BenchmarkStatistics.BuildBucketEvidence(ScenarioVariantRecords(records, scenario, matchedControlName), bucket, matchedControlName);
                         if (controlEvidence.RecordCount > 0 && controlEvidence.AggregateThroughputMiBPerSecond > 0)
                         {
                             var deltaPercent = (evidence.AggregateThroughputMiBPerSecond - controlEvidence.AggregateThroughputMiBPerSecond) / controlEvidence.AggregateThroughputMiBPerSecond * 100.0;
@@ -898,11 +707,9 @@ internal static class AnalysisRunner
                         }
                     }
                 }
-                
+
                 if (row.Count > 1 && row.Skip(1).Any(c => c != "-"))
-                {
                     report("| " + string.Join(" | ", row) + " |");
-                }
             }
             report(null);
         }

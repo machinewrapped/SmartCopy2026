@@ -234,6 +234,10 @@ internal static class BenchmarkJson
     }
 }
 
+internal sealed record BenchmarkScenarioGroup(
+    BenchmarkScenario Scenario,
+    IReadOnlyList<BenchmarkSelection> Variants);
+
 internal sealed record BenchmarkSelection(
     BenchmarkScenario Scenario,
     BenchmarkVariant Variant,
@@ -296,6 +300,13 @@ internal static class FileSizeBuckets
     ];
 }
 
+internal sealed record SessionPaths(
+    string ArtifactDirectory,
+    string ResultsPath,
+    string FileResultsPath,
+    string TaskListPath,
+    string JournalDirectory);
+
 internal static class FileNamesResolver
 {
     public const string DefaultResults = "benchmark-results.ndjson";
@@ -328,41 +339,4 @@ internal static class FileNamesResolver
     }
 }
 
-internal sealed class VariantNameComparer : IComparer<string>
-{
-    private readonly IReadOnlyDictionary<string, long> _sizes;
-
-    public VariantNameComparer(IReadOnlyDictionary<string, long> sizes)
-    {
-        _sizes = sizes;
-    }
-
-    private static bool IsBaselineVariant(string variant) =>
-        variant.Contains("Baseline", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(variant, "ScenarioDefaults", StringComparison.OrdinalIgnoreCase) ||
-        variant.Contains("Control", StringComparison.OrdinalIgnoreCase);
-
-    public int Compare(string? x, string? y)
-    {
-        if (x == y) return 0;
-        if (x == null) return -1;
-        if (y == null) return 1;
-
-        bool xIsBaseline = IsBaselineVariant(x);
-        bool yIsBaseline = IsBaselineVariant(y);
-
-        if (xIsBaseline && !yIsBaseline) return -1;
-        if (yIsBaseline && !xIsBaseline) return 1;
-
-        _sizes.TryGetValue(x, out long sizeX);
-        _sizes.TryGetValue(y, out long sizeY);
-
-        if (sizeX > 0 && sizeY > 0 && sizeX != sizeY)
-        {
-            return sizeX.CompareTo(sizeY);
-        }
-
-        return string.Compare(x, y, StringComparison.OrdinalIgnoreCase);
-    }
-}
 

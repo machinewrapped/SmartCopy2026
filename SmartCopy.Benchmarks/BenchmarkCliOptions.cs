@@ -11,6 +11,7 @@ internal sealed class BenchmarkCliOptions
     public string ConfigPath { get; init; } = DefaultConfigFileName;
     public bool FreshStart { get; init; }
     public bool Help { get; init; }
+    public int? Runs { get; init; }
 
     public static BenchmarkCliOptions Parse(string[] args)
     {
@@ -19,6 +20,7 @@ internal sealed class BenchmarkCliOptions
         string? variantName = null;
         string? notes = null;
         var configPath = DefaultConfigFileName;
+        int? runs = null;
 
         var freshStart = false;
         var help = false;
@@ -45,6 +47,13 @@ internal sealed class BenchmarkCliOptions
             {
                 configPath = args[++i];
             }
+            else if (string.Equals(args[i], "--runs", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            {
+                var raw = args[++i];
+                if (!int.TryParse(raw, out var parsedRuns) || parsedRuns < 1)
+                    throw new InvalidOperationException($"--runs must be a positive integer, got '{raw}'.");
+                runs = parsedRuns;
+            }
             else if (string.Equals(args[i], "--fresh", StringComparison.OrdinalIgnoreCase))
             {
                 freshStart = true;
@@ -66,6 +75,7 @@ internal sealed class BenchmarkCliOptions
             ConfigPath = configPath,
             FreshStart = freshStart,
             Help = help,
+            Runs = runs,
         };
     }
 
