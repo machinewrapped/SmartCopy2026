@@ -4,8 +4,10 @@
   "includeHidden": false,
   "convergenceSpreadPercent": 3,
   "gatePercent": 3,
-  "maxConvergenceRuns": 5,
+  "maxConvergenceRuns": 7,
   "converge": true,
+  "clearCacheBetweenRuns": true,
+  "ramMapPath": "D:\\Development\\Github\\SmartCopy2026\\Tools\\RAMMap\\RAMMap64.exe",  
   "scenarios": [
     {
       "name": "SSD_R_to_SSD_D",
