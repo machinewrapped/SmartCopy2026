@@ -153,6 +153,34 @@ internal static class BenchmarkHelpers
         }
     }
 
+    public static void ClearOsFileCache(string? ramMapPath)
+    {
+        if (string.IsNullOrWhiteSpace(ramMapPath) || !File.Exists(ramMapPath))
+            return;
+
+        UpdateProgress("");
+        Console.WriteLine("Clearing OS file cache via RAMMap...");
+
+        var psi = new ProcessStartInfo
+        {
+            FileName = ramMapPath,
+            Arguments = "-Ew -Es -Em -E0 -AcceptEula",
+            UseShellExecute = true,
+            Verb = "runas"
+        };
+
+        try
+        {
+            using var process = Process.Start(psi);
+            process?.WaitForExit();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine();
+            Console.Error.WriteLine($"Warning: Failed to invoke RAMMap to clear file cache: {ex.Message}");
+        }
+    }
+
     public static async Task<List<T>> ReadExistingRunsAsync<T>(string resultsPath, CancellationToken ct)
     {
         var runs = new List<T>();

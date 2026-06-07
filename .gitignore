@@ -70,3 +70,4 @@ dataset-prep-summary-*.json
 /.obsidian
 /.benchmarks/
 /.antigravitycli
+/Tools

@@ -35,6 +35,11 @@ internal sealed class BenchmarkRound
 
             foreach (var selection in shuffled)
             {
+                if (_config.ClearCacheBetweenRuns)
+                {
+                    BenchmarkHelpers.ClearOsFileCache(_config.RamMapPath);
+                }
+
                 var skipCooldown = taskIndex == 0 && isFirstRound;
                 if (!skipCooldown && _config.CooldownSeconds > 0)
                     await ApplyCooldownAsync();
