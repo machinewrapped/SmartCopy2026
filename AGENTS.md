@@ -99,3 +99,9 @@ Do not add new NuGet dependencies without explicit user approval. If a task requ
 ## Task Completion Requirements
 
 **Always Verify Compilation:** "The code compiles" is a strict pre-requisite for declaring any coding task done. Before presenting a solution or asking for user review on code changes, you must run `dotnet build` and ensure there are 0 errors. Never declare a task complete if the code is in a broken state.
+
+## How to be a good agent
+- Ignore LSP diagnostics whilst writing code, run the build when the code is complete to get accurate errors or warnings
+- Ask the user for clarification and assistance when something is ambiguous, or there is a doubt
+- Ask the user where to look for information rather than blindly searching for it
+- Surface trade-offs to the user and ask them to make a call on what matters
