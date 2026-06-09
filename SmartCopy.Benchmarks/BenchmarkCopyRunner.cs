@@ -24,6 +24,7 @@ internal static class BenchmarkCopyRunner
         OverwriteMode overwriteMode,
         long directWriteThresholdBytes,
         long bufferBatchBytes,
+        long batchEligibilityThresholdBytes,
         bool skipExistsCheckForOverwrite,
         int copyBufferSizeBytes,
         CancellationToken ct)
@@ -60,7 +61,7 @@ internal static class BenchmarkCopyRunner
         long currentBatchBytes = 0;
         byte[]? sharedBatchBuffer = null;
         int currentBatchOffset = 0;
-        const long BatchEligibilityThresholdBytes = 4194304; // 4 MiB
+        long effectiveEligibilityThreshold = batchEligibilityThresholdBytes == 0 ? bufferBatchBytes : batchEligibilityThresholdBytes;
         var hasUsableBatchBuffer = bufferBatchBytes > 0 && bufferBatchBytes <= int.MaxValue;
 
         async Task FlushBatchAsync(List<BatchedFile> batch, byte[] sharedBuffer)
@@ -251,7 +252,7 @@ internal static class BenchmarkCopyRunner
             var isBatchable =
                 hasUsableBatchBuffer &&
                 node.Size <= bufferBatchBytes &&
-                node.Size <= BatchEligibilityThresholdBytes;
+                node.Size <= effectiveEligibilityThreshold;
 
             if (isBatchable)
             {

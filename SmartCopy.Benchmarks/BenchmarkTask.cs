@@ -69,6 +69,8 @@ internal sealed class BenchmarkTask
             await WriteJournalAsync(runStartedUtc);
             await WriteSuccessRecordAsync(runStartedUtc);
 
+            Console.WriteLine();
+
             if (_scenario.ClearDestinationAfterRun)
                 ClearDestination("Clearing destination contents after benchmark (post-clear)...");
         }
@@ -92,10 +94,18 @@ internal sealed class BenchmarkTask
 
         Console.WriteLine();
         Console.WriteLine($"--- Cold cache boundary before {_scenario.Name} ---");
-        Console.WriteLine(_scenario.UsePathPool
-            ? "Returning to path-pool runs. Reboot to clear the OS file cache, then press any key..."
-            : "Switching to a non-pool run. Reboot to clear the OS file cache, then press any key...");
-        Console.ReadKey(intercept: true);
+        
+        if (!string.IsNullOrWhiteSpace(_config.RamMapPath) && File.Exists(_config.RamMapPath))
+        {
+            BenchmarkHelpers.ClearOsFileCache(_config.RamMapPath);
+        }
+        else
+        {
+            Console.WriteLine(_scenario.UsePathPool
+                ? "Returning to path-pool runs. Reboot to clear the OS file cache, then run again..."
+                : "Switching to a non-pool run. Reboot to clear the OS file cache, then run again...");
+            Console.ReadKey(intercept: true);
+        }
         Console.WriteLine();
     }
 
@@ -216,6 +226,7 @@ internal sealed class BenchmarkTask
 
         var directWriteThresholdBytes = _variant.DirectWriteThresholdBytes ?? _scenario.DirectWriteThresholdBytes ?? 0L;
         var bufferBatchBytes = _variant.BufferBatchBytes ?? _scenario.BufferBatchBytes ?? 0L;
+        var batchEligibilityThresholdBytes = _variant.BatchEligibilityThresholdBytes ?? _scenario.BatchEligibilityThresholdBytes ?? 0L;
         var skipExistsCheckForOverwrite = _variant.SkipExistsCheckForOverwrite ?? _scenario.SkipExistsCheckForOverwrite ?? false;
 
         BenchmarkHelpers.UpdateProgress("Preparing copy...");
@@ -233,7 +244,7 @@ internal sealed class BenchmarkTask
                     Progress = executeProgress,
                     CancellationToken = _ct,
                     OperationalSettings = providerOptions,
-                }, _destinationPath, overwriteMode, directWriteThresholdBytes, bufferBatchBytes, skipExistsCheckForOverwrite, providerOptions.CopyBufferSizeBytes, _ct);
+                }, _destinationPath, overwriteMode, directWriteThresholdBytes, bufferBatchBytes, batchEligibilityThresholdBytes, skipExistsCheckForOverwrite, providerOptions.CopyBufferSizeBytes, _ct);
             }
             else
             {
@@ -356,6 +367,7 @@ internal sealed class BenchmarkTask
             ["providerUseArrayPoolForManualLoop"] = providerOptions.UseArrayPoolForManualLoop.ToString(),
             ["providerPreallocateDestinationFile"] = providerOptions.PreallocateDestinationFile.ToString(),
             ["bufferBatchBytes"] = (_variant.BufferBatchBytes ?? _scenario.BufferBatchBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["batchEligibilityThresholdBytes"] = (_variant.BatchEligibilityThresholdBytes ?? _scenario.BatchEligibilityThresholdBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["directWriteThresholdBytes"] = (_variant.DirectWriteThresholdBytes ?? _scenario.DirectWriteThresholdBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["scanDuration"] = _state.ScanStopwatch.Elapsed.ToString("c"),
             ["executeDuration"] = _state.ExecuteStopwatch.Elapsed.ToString("c"),

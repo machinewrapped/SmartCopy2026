@@ -130,6 +130,9 @@ internal sealed class BenchmarkPass
             var variants = new List<BenchmarkSelection>();
             foreach (var variant in _config.Variants.Where(v => v.Enabled))
             {
+                if (scenario.Variants is { Count: > 0 } && !scenario.Variants.Contains(variant.Name, StringComparer.OrdinalIgnoreCase))
+                    continue;
+
                 if (!string.IsNullOrWhiteSpace(_selection.VariantName) &&
                     !string.Equals(variant.Name, _selection.VariantName, StringComparison.OrdinalIgnoreCase))
                     continue;

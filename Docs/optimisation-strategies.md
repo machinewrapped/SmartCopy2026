@@ -144,7 +144,7 @@ Bucket-level throughput (`StagedWriteBatch4MiB` vs `Control_BaselineAuto`, Mean 
 | Sub1MiB | 92.99 | 93.63 | +1% |
 | Sub4MiB | 155.54 | 166.21 | +7% |
 
-Batching helps most at Sub16KiB (+8%) and Sub4MiB (+7%). The Sub4MiB result reflects these being the largest files that fit entirely within the 4 MiB batch buffer, maximising the phase-separation benefit.
+Batching helps most at Sub16KiB (+8%) and Sub4MiB (+7%). The Sub16KiB result is genuine phase separation — many small files share each flush. The Sub4MiB result is a different mechanism: files in that range fill most or all of the batch buffer alone, so there is no second file sharing the flush. The gain comes from reading the whole file in one shot rather than in 4 KiB chunks — a large-buffer effect, not a batching effect. This improvement is contingent on the 4 KiB baseline and does not carry forward once 512 KiB is the floor. Files above 512 KiB should route to the ManualLoop copy path (Phase 5), not the batch path.
 
 #### 2.3.4 Combined Effect: DirectWriteBatch4MiB vs Control
 
@@ -160,21 +160,23 @@ The overall champion combines both direct write and batching. Bucket-level throu
 | Sub1MiB | 92.99 | 96.31 | **+4%** |
 | Sub4MiB | 155.54 | 170.25 | **+9%** |
 
-The combined effect is strongest at Sub4KiB (+14%) and Sub16KiB (+16%) — the smallest files benefit most from eliminating both staging overhead and I/O direction interleaving. The Sub4MiB bucket also shows a strong +9% from batching's phase-separation effect.
+The combined effect is strongest at Sub4KiB (+14%) and Sub16KiB (+16%) — the smallest files benefit most from eliminating both staging overhead and I/O direction interleaving. The Sub4MiB bucket shows +9%, but this is a large-buffer effect (reading the whole file at once vs 4 KiB chunks), not phase separation — see Section 2.3.3.
 
 #### 2.3.5 Key Conclusions
 
-1. **Both direct write and batching are independently valuable.** Neither alone explains the full improvement; they are additive (direct write ~3–5% + batching ~3–5.5% ≈ combined ~8.5%).
+1. **The 8.5% headline improvement is mostly chunk-size, not phase separation.** `DirectWrite512KiB` (unbatched, 512 KiB buffer, no staging) scores +7.4% over the 4 KiB control — almost all the gain comes from replacing 4 KiB chunks with 512 KiB chunks. `DirectWriteBatch4MiB` adds only a further ~1.3% above `DirectWrite512KiB`. The true phase-separation contribution, above a 512 KiB baseline, is 1–2% at run level, concentrated in the Sub16KiB range where many files genuinely share each flush.
 
 2. **Direct write helps most for tiny files, not large files.** The staging overhead (temp file create → write → rename) is a proportionally larger fraction of per-file time when the byte payload is small. For Sub4KiB files, the staging lifecycle dominates; for Sub4MiB files, it's a rounding error against the byte-copy time.
 
-3. **Batching value peaks at two points.** Sub16KiB files benefit from reduced I/O direction switching (many small files batched together). Sub4MiB files benefit because they are the largest files that fit the batch buffer, getting full phase-separation benefit.
+3. **Sub4MiB batch improvement is a large-buffer effect, not phase separation.** Files in that range fill the batch buffer alone — there is no second file sharing the flush. The gain is from reading the whole file in one shot rather than 4 KiB chunks. This does not carry forward once 512 KiB is the floor, and those files should route to the ManualLoop path rather than the batch path.
 
-4. **Buffer size plateaus around 4 MiB.** The 4 MiB→16 MiB buffer increase yields only +0.3% additional improvement. 4 MiB is the practical ceiling for batch buffer size.
+4. **Genuine phase separation requires ≥2 files per flush, which constrains the batch eligibility threshold.** With a 4 MiB batch buffer, the effective batch eligibility ceiling is **512 KiB** — this guarantees at least 8 files per flush and ensures phase separation is always the operating mechanism. Files above 512 KiB bypass the batch path and route to ManualLoop (Phase 5 parameters).
 
-5. **Control_BaselineAuto is definitively the slowest configuration** on SSD-to-SSD for this workload. Every tested variant outperforms it.
+5. **Batch buffer size plateaus around 4 MiB.** The 4 MiB→16 MiB buffer increase yields only +0.3% additional improvement. 4 MiB is the practical ceiling.
 
-6. **The 10% gate is too conservative for clean-room data.** With <100 ms spread on 60-second runs, effects as small as 2% are reliably distinguishable from noise. Future clean-room runs should use a noise-relative gate (e.g., delta must exceed 2× the combined noise floor) rather than a fixed percentage.
+6. **The 4 KiB baseline (Control_BaselineAuto) is excluded from Phase 5/6 buffer-sizing benchmarks** — definitively suboptimal, it would flatten the comparison scale. It is retained in the MixedDataset policy validation run as a legacy anchor: the gain from old default → adaptive policy on realistic data is the headline result. Future buffer-sizing benchmarks use `ManualLoop512KiB` as the control.
+
+7. **The 10% gate is too conservative for clean-room data.** With <100 ms spread on 60-second runs, effects as small as 2% are reliably distinguishable from noise. Future clean-room runs should use a noise-relative gate (e.g., delta must exceed 2× the combined noise floor) rather than a fixed percentage.
 
 ### 2.4 Final Phase 5 Findings — Buffer Sweep & Pre-allocation (2026-06-06)
 
@@ -198,7 +200,105 @@ We have weak evidence for a destination-sensitive routing policy (Phase 6):
 
 **SameDrive caveat:** Same-drive SSD copies show a signal for larger buffers, even though mechanical seek overhead does not apply. The mechanism is unknown, and reliable SSD-vs-HDD classification is probably not guaranteed across platforms, so we would need more evidence  too promote a larger SameDrive buffer.
 
-### 2.5 Per-Scenario Throughput (Phase 1 Baseline)
+> [!NOTE]
+> **Revised 2026-06-07 — Cross-Drive Validation (Section 2.5):** The SSD-to-HDD preallocation finding (+11.6%) has been retracted. Two independent cross-drive SSD-to-HDD drive pairs both show preallocation regresses (-2% to -4% at run level). The prior finding was specific to a single drive pair and does not generalise. The SSD-to-HDD default is revised to **512 KiB buffer, preallocation OFF**. All other Section 2.4 conclusions remain directionally valid.
+
+### 2.5 Phase 5 Cross-Drive Validation (2026-06-07)
+
+519 runs from 8 cross-drive scenarios on `LargeFileDataset`, covering all four drive-pair directions across three physical SSDs (D, O, R) and three HDDs (E, M, additional). 3 runs per variant per scenario, randomised order. Variants: `BaselineAuto256KiB`, `ManualLoop512KiBArrayPool/Preallocate`, `ManualLoop1MiBArrayPool/Preallocate`, `ManualLoop4MiBArrayPool/Preallocate`.
+
+#### 2.5.1 Run-Level Summary Matrix
+
+| Scenario | 512 KiB | 512 KiB + Pre | 1 MiB | 1 MiB + Pre | 4 MiB | 4 MiB + Pre |
+|---|---|---|---|---|---|---|
+| SSD_R_to_SSD_D | PASS +10% | INCONCLUSIVE | PASS +14% | INCONCLUSIVE | PASS +19% | FAIL |
+| SSD_D_to_SSD_R | FAIL | INCONCLUSIVE | FAIL | PASS +3% | PASS +5.5% | REGRESSION |
+| SSD_D_to_SSD_O | FAIL | FAIL | PASS +3.7% | INCONCLUSIVE | FAIL | FAIL |
+| SSD_O_to_HDD_E | PASS +3.2% | REGRESSION | FAIL | FAIL | PASS +3.3% | REGRESSION |
+| SSD_R_to_HDD_E | INCONCLUSIVE | REGRESSION | REGRESSION | REGRESSION | INCONCLUSIVE | REGRESSION |
+| HDD_E_to_SSD_O | REGRESSION | REGRESSION | REGRESSION | PASS†  | REGRESSION | REGRESSION |
+| HDD_M_to_HDD_E | REGRESSION | FAIL | REGRESSION | INCONCLUSIVE | REGRESSION | FAIL |
+| HDD_E_to_HDD_M | INCONCLUSIVE | REGRESSION | INCONCLUSIVE | REGRESSION | REGRESSION | REGRESSION |
+
+† Suspicious: the non-prealloc 1 MiB variant regresses -6.1% in the same scenario. This PASS is likely variance, not a real effect.
+
+#### 2.5.2 Key Findings
+
+1. **Preallocation is retracted universally.** Section 2.4 identified +11.6% preallocation benefit for SSD-to-HDD from a single drive pair. Two independent cross-drive SSD-to-HDD scenarios both show preallocation regresses at run level (-2% to -4%). No other scenario shows a reliable positive preallocation effect. The SSD-to-HDD finding does not generalise; it was specific to one drive pair. Preallocation should default OFF for all destination types.
+
+2. **"SSD" is not a uniform device class — buffer scaling is drive-pair specific.** SSD_R→SSD_D shows a strong monotonic curve (PASS at all three buffer sizes; peak +19% at 4 MiB). The same two drives reversed (D→R) show only +5.5% at 4 MiB. A third SSD pair (D→O) shows only +3.7% at 1 MiB. Prior phases used SSD_R→SSD_D as the primary SSD directional indicator; this drive pair represents a best-case NVMe scenario and over-estimates the general SSD opportunity. **1 MiB is the buffer size that passes in 2 of 3 SSD-to-SSD scenarios and is the safe universal SSD promotion.**
+
+3. **Buffer scaling for SSD-to-HDD is small and inconsistent.** SSD_O→HDD_E shows +3.2% at 512 KiB and +3.3% at 4 MiB without preallocation. SSD_R→HDD_E shows nothing passes. The HDD write head is the bottleneck; application buffer size above 512 KiB does not reliably improve throughput. **512 KiB is the defensible SSD-to-HDD choice.**
+
+4. **HDD read speed caps all HDD-source scenarios.** HDD_E→SSD_O, HDD_M→HDD_E, and HDD_E→HDD_M all show regression or inconclusive results across every tested variant. The disk's mechanical read throughput is the constraint regardless of application buffer size. The 256 KiB baseline is as effective as any larger variant; applying larger buffers actively regresses in some pairs.
+
+5. **SSD_R_to_SSD_D over-represented the SSD opportunity in prior phases.** It is a real data point for high-throughput NVMe-to-NVMe pairs, but reversing the same two drives halves the observed gain (19% → 5.5%), and a third SSD pair shows only 3.7%. The strong curve seen in earlier phases was partially a property of that specific drive pair, not a general SSD characteristic.
+
+#### 2.5.3 Revised Provisional Policy
+
+| Destination Profile | Buffer | Preallocation | Notes |
+|---|---|---|---|
+| SSD destination | 1 MiB | **OFF** | 4 MiB may benefit on fast NVMe pairs but cannot be classified from software |
+| HDD destination | 512 KiB | **OFF** | 1 MiB provides no consistent benefit; regresses on some HDD pairs |
+| Unknown / ambiguous | 512 KiB | **OFF** | Conservative; does not assume SSD behaviour |
+
+**Preallocation is OFF universally.** No drive pair or scenario in this suite shows a reliable positive preallocation effect at run level. Do not re-enable preallocation without a controlled rerun that isolates the `SetLength` contribution for a specific destination type.
+
+> [!NOTE]
+> **USB validation (2026-06-08):** See Section 2.6 for USB findings. USB has a distinct non-monotonic buffer-size response not predictable from SSD/HDD data; the Phase 5 cross-drive conclusions above do not apply to USB.
+
+### 2.6 Phase 5+6 USB Validation (2026-06-08)
+
+86 runs from 2 scenarios: `LargeFileDataset` (Phase 5, 4 variants) and `SmallestFileDataset` (Phase 6, 4 variants), sourced from O: (SSD) to T: (USB flash). 3 converged runs per variant at `convergenceSpreadPercent: 10` — significantly looser than the 5% used for cross-drive. Even at 10% the convergence threshold tripped repeatedly.
+
+> [!CAUTION]
+> The test drive (T:) is a very small USB flash drive and an extreme case. The wide variance (baseline spread: 4m 42s on a 47-minute run) means most bucket-level findings and the batching run-level results are INCONCLUSIVE regardless of the measured delta. The exception is ManualLoop1MiB on LFD, which shows an unusually tight spread (56s) alongside a large improvement (+29.5%). **The primary lesson from this data is not a USB copy strategy — it is that USB variance is too high for a static destination-type profile to be reliable.** See the Phase 6 design note for the direction this implies.
+
+#### 2.6.1 Phase 5 — LFD Buffer Sizing on USB
+
+| Variant | Median | Spread | Delta vs Control | Verdict |
+|---|---:|---:|---:|---|
+| BaselineAuto256KiB | 47m 21s | 4m 42s | — | CONTROL |
+| ManualLoop512KiBArrayPool | 50m 8s | 33.8s | -5.9% | REGRESSION |
+| ManualLoop1MiBArrayPool | 33m 23s | 56.5s | **+29.5%** | **PASS** |
+| ManualLoop4MiBArrayPool | 51m 38s | 5m 12s | -9.0% | INCONCLUSIVE |
+
+**ManualLoop1MiB is the decisive USB winner.** The 29.5% improvement is the largest single-variant gain observed across all Phase 5 scenarios. Notably, it is also the *most stable* variant — 56s spread on a 33-minute run (<3% CV) versus the baseline's 4m 42s spread (~10% CV). Larger aligned writes appear to let the USB controller operate within its preferred transfer granularity.
+
+The curve is strongly non-monotonic and USB-specific:
+
+1. **ManualLoop512KiB regresses (-5.9%, REGRESSION).** This is the only destination type where 512KiB ManualLoop is slower than the 256KiB CopyToAsync baseline. USB controller I/O characteristics differ fundamentally from SSD/HDD; cross-drive findings do not transfer.
+2. **ManualLoop4MiB shows the highest variance** (5m 12s spread, INCONCLUSIVE). This is the thermal throttling signature: large write chunks sustain the drive at full load, triggering intermittent pauses. Avoid 4 MiB on USB.
+3. **1 MiB is uniquely effective** — it hits the USB controller's sweet spot for bulk transfer efficiency without triggering sustained thermal load.
+
+#### 2.6.2 Phase 6 — Batching on USB (SmallestFileDataset)
+
+| Variant | Median | Spread | Delta vs Control | Verdict |
+|---|---:|---:|---:|---|
+| BaselineAuto256KiB | 6m 46s | 34.0s | — | CONTROL |
+| Batch256KiB | 7m 36s | 34.9s | -12.4% | REGRESSION |
+| Batch1MiB | 6m 31s | 13.2s | +3.6% | INCONCLUSIVE |
+| Batch2MiB | 6m 24s | 34.7s | +5.3% | INCONCLUSIVE |
+
+The SSD Phase 3 batching gains (3–5.5%) do not replicate on USB. Batch1MiB and Batch2MiB are INCONCLUSIVE. Batch256KiB actively regresses.
+
+Sub-bucket decomposition reveals a split:
+
+- **Sub4KiB, Sub16KiB, Sub64KiB:** Small positive effects from 1MiB and 2MiB batch buffers (+9–14%), but all within the noise floor individually — inconclusive.
+- **Sub256KiB:** All batch variants are slower than baseline (Batch256KiB: -23.2%, Batch1MiB: -9.4%, Batch2MiB: -7.6%). Files in this range exceed the 64KiB direct-write threshold, so both baseline and batch use staged writes — the write path is identical. The only thing batching adds for this size range is phase separation, and it is net negative on USB. The mechanism is unclear from this data; phase separation may simply provide no benefit when USB writes are slow enough that reads always complete far ahead of writes regardless.
+- **Sub512KiB:** Batch256KiB wins (+16.8%, PASS), but this is a ManualLoop effect, not batching — Sub512KiB files (262–512KiB) exceed the 256KiB buffer ceiling and route to ManualLoop512KiB instead. Consistent with Phase 5 finding that larger sequential writes help on USB.
+
+The Sub256KiB regression under batching is the key Phase 6 USB finding: on USB, batch-path overhead exceeds the phase-separation benefit for medium-small files (64–256KiB). This is the opposite of SSD/HDD behaviour (Section 2.3.3).
+
+#### 2.6.3 USB Policy Addition
+
+| Destination Profile | Buffer | Batching | Notes |
+|---|---|---|---|
+| USB flash | **1 MiB** (prior) | **OFF** | The LFD 1 MiB result is the strongest signal in this dataset (tight spread, large delta). All other USB results are dominated by noise. Use 1 MiB as the starting prior; treat it as a default to be overridden by per-device learning rather than a settled finding. |
+
+The Section 2.5.3 provisional policy for SSD, HDD, and Unknown profiles is unchanged.
+
+### 2.7 Per-Scenario Throughput (Phase 1 Baseline)
 
 **SSDtoSSD** (averaged across variants):
 
@@ -268,10 +368,11 @@ The pipeline knows every file's size before execution begins. The target archite
 
 | File Size | Code Path |
 |---|---|
-| ≤T (tiny) | No staging, buffered read/write batching |
-| T–S | Staging, buffered read/write batching |
-| S–M | Staging, unbuffered, throttled progress updates |
-| >M | Staged write, granular progress |
+| ≤ 64 KiB | Direct write (no staging), batch-eligible — Phase 2+3 |
+| 64 KiB – 512 KiB | Staged write, batch-eligible — Phase 3 |
+| > 512 KiB | ManualLoop, 512 KiB–1 MiB copy buffer, destination-sensitive — Phase 5+6 |
+
+The 512 KiB boundary is the batch eligibility ceiling: files above it bypass the batch path and route directly to ManualLoop. **Evidence gap:** the 512 KiB – ~8 MiB range has no direct ManualLoop measurements (Phase 3 tested files in that range via the batch path; Phase 5 measured files above ~8 MiB). The 512 KiB copy buffer is the defensible default for that range — proven better than 4 KiB, and consistent with Phase 5 findings that 512 KiB is safe on all destination types.
 
 This should be a routing function operating on already-known data (`node.Size`, `overwriteMode`, `providerCapabilities`) — no I/O in the hot path.
 
@@ -333,7 +434,7 @@ The current per-file overhead chain:
 
 ### Phase 3 — Buffered Read-Write Batching
 
-**Status:** **Core integration complete; policy validation pending.** Clean-room run (2026-06-01) established that batching alone improves run-level duration by 3–5.5% vs control and `DirectWriteBatch4MiB` is the overall champion at +8.5%. See Section 2.3 for detailed evidence. The batching coordinator is implemented in `CopyStep` (`ApplyBatchedAsync` / `ApplyUnbatchedAsync` paths with `BatchCopyBuffer`). The remaining work is the MixedDataset policy validation pass (Section 7.6 checklist C) before defaults are promoted.
+**Status:** **Core integration complete; policy validation pending.** Clean-room run (2026-06-01) established that batching adds 1–2% above a 512 KiB baseline (the headline +8.5% vs `Control_BaselineAuto` is mostly chunk-size improvement — see Section 2.3.5). See Section 2.3 for detailed evidence. The batching coordinator is implemented in `CopyStep` (`ApplyBatchedAsync` / `ApplyUnbatchedAsync` paths with `BatchCopyBuffer`). The remaining work is the MixedDataset policy validation pass (Section 7.6 checklist C) before defaults are promoted.
 
 **What batching does:** The current model interleaves read and write on every file, alternating I/O direction continuously. Batching accumulates multiple small files into a pool-allocated buffer during a read phase, then drains it during a write phase:
 
@@ -345,15 +446,15 @@ Batched:  Read f₁ → Read f₂ → ... → Read fₙ  [buffer fills]
 
 **What the benchmarks showed:**
 - Phase separation alone (staged batching vs unbatched control) is worth 3–5.5% at whole-run level. Both direct write and batching contribute independently.
-- `DirectWriteBatch4MiB` is the overall champion at +8.5% over control. See Section 2.3 for full breakdown.
+- `DirectWriteBatch4MiB` is the overall champion at +8.5% over the 4 KiB control — of which ~7.4% is chunk-size improvement and ~1–2% is genuine phase separation. See Section 2.3 for full breakdown.
 - Gains plateau at 4 MiB buffer — 4→16 MiB yields only +0.3% more. 4 MiB is the evidence-based ceiling.
-- Batching helps most at Sub16KiB (+8% throughput) and Sub4MiB (+7%); the Sub4MiB effect comes from files that fit the buffer whole, maximising phase separation.
+- Genuine phase separation is concentrated in Sub16KiB (+8% throughput). Sub4MiB (+7%) is a large-buffer effect, not phase separation — those files fill the buffer alone.
 
 **Core integration design (Step 2):**
 
 A batching coordinator sits above the step layer, accumulating files from the enumerated tree into the pool-allocated buffer. Rules:
-- A file is only batched if it fits in an *empty* buffer. If the remaining space is insufficient, flush first, then read. Files larger than the buffer use the normal unbatched path.
-- Default buffer size: **1 MiB**. The performance difference between 1 MiB and 4 MiB is 1.3% (59.41 s vs 58.65 s); 4 MiB at ~0.5 MiB/s throughput for tiny files could mean ~8 seconds between progress updates, which is too long. 1 MiB keeps the gap under ~2 seconds while capturing most of the gain. `BatchBufferBytes` is already a field on `OperationalSettings` and flows through `PipelineJob.OperationalSettings` → `IStepContext.OperationalSettings` → `CopyStep` — no provider-level changes needed.
+- **Batch eligibility ceiling: 512 KiB.** Files above 512 KiB bypass the batch path entirely and route to ManualLoop (Phase 5 copy buffer). This ensures genuine phase separation: with a 1 MiB buffer, at least 2 files share every flush; with 4 MiB, at least 8. The old "fits in empty buffer" rule allowed files up to 4 MiB, producing solo-file flushes where no phase-separation benefit was possible — the "improvement" was just a large-buffer effect on a single file.
+- Default buffer size: **1 MiB**. One progress event is emitted per buffer flush regardless of file count in that flush. Flush frequency is determined by `(tiny-file accumulation rate) × (buffer size)` — not by the eligibility ceiling. A 1 MiB buffer flushes 4× more often than 4 MiB, giving finer wall-time progress resolution at a 1.3% throughput cost (59.41 s vs 58.65 s). The 4 MiB option is available for max-throughput workloads via `BatchBufferBytes` on `OperationalSettings`, which flows through `PipelineJob.OperationalSettings` → `IStepContext.OperationalSettings` → `CopyStep` — no provider-level changes needed.
 - Progress events emitted per batch rather than per file.
 - Directory coherence (constraining a batch to a single directory) improves resume semantics — interrupted runs complete full directories rather than scattering files. Implement as a user-configurable option (`CoherenceMode: None | PerDirectory`), not a hard requirement.
 - Intra-Directory Size Sorting: Files are grouped by their parent directory and ordered by size in ascending order (`GroupBy(n => n.Parent).SelectMany(g => g.OrderBy(n => n.Size))`). This preserves directory cohesion while ensuring optimal buffer packing.
@@ -390,7 +491,7 @@ First and last completions are always reported unconditionally, so progress visi
 
 ### Phase 5 — Buffer Size Scaling *(independent track)*
 
-**Status:** Initial LargeFileDataset run complete; interpretation is provisional. The first run used preallocation on every manual-loop variant and was not fully randomised, so it shaped candidates but did not isolate buffer size or preallocation. Requires a clean rerun before default promotion.
+**Status:** Cross-drive validation complete (2026-06-07, 8 scenarios, 519 runs); USB validation complete (2026-06-08, Section 2.6). The cross-drive suite confirmed: preallocation retracted universally; 1 MiB for SSD; 512 KiB for HDD and unknown. USB validation found 1 MiB is also the USB optimum, but for different reasons (non-monotonic response; 512KiB regresses on USB). The optional SameDriveSSD larger-buffer probe (Step 3 below) remains open.
 
 **Goal:** Find the optimal buffer size for large-file streaming. The MixedDataset cannot isolate this — buffer changes are lost in the noise of 13,000 tiny files.
 
@@ -414,28 +515,44 @@ Gate: <3% benefit → disable preallocation by default to avoid unnecessary `Set
 
 Only after Step 1 confirms the safe cross-device default, run `ManualLoop1MiB`, `ManualLoop2MiB`, `ManualLoop4MiB`, and optionally `ManualLoop8MiB` on SameDrive SSD with and without preallocation, randomised. Treat this as an optional specialised profile, not a general SameDrive default. If drive type cannot be classified confidently, fall back to the safe 512 KiB–1 MiB range.
 
-**Retire:** `CopyToAsync512KiB` and `ManualLoop512KiBArrayPool` provide no unique signal beyond the Phase 5 sweep variants and the existing baseline. Remove from future runs.
+**Baseline reset:** `ManualLoop512KiBArrayPool` is the new benchmark control for Phase 5/6 buffer-sizing runs. The 4 KiB `CopyToAsync` control (`BaselineAuto` / `Control_BaselineAuto`) is excluded from those runs — definitively suboptimal, it would only flatten the comparison scale. However, `BaselineAuto` should be **retained in the MixedDataset policy validation run** (Phase 3 checklist) as a legacy anchor: the before/after gain on realistic data is the headline result that justifies the whole programme of work, and it should be readable from a single run. `CopyToAsync512KiB` is retired — it provided no unique signal beyond the ManualLoop variants.
 
 ---
 
 ### Phase 6 — Destination-Sensitive Defaults
 
-**Status:** After Phases 1–3. Requires the byte-volume-dominated dataset to be baselined before USB large-file defaults are promoted.
+**Status:** After Phases 1–3. SSD/HDD defaults from Section 2.5.3. USB validation (Section 2.6) showed that variance is too high for a static USB profile to be reliable. See design note below.
 
-**Goal:** Apply appropriate strategy defaults per destination type so gains do not regress on HDD or USB.
+**Goal:** Apply appropriate strategy defaults per destination type, with a path toward per-device learned profiles for devices (like USB flash) where static classification is insufficient.
+
+**Static destination-type routing (initial implementation):**
 
 Detect SSD vs HDD vs USB where reliable platform APIs are available, but assume classification can fail or be ambiguous. Implement as a `DestinationProfile` enum and translate into strategy parameters (buffer size, staging threshold, progress throttle rate). Do not hardcode values — surface them as fields on `OperationalSettings`, which is injected per-run via `PipelineJob`. Unknown or ambiguous destinations must use the conservative profile.
 
-Destination-specific notes:
-- **Unknown / ambiguous:** conservative large-file buffer default in the 512 KiB–1 MiB range; current provisional candidate is 1 MiB. Do not assume SSD behaviour.
-- **SSD:** 1 MiB is the provisional large-file default candidate pending the clean Phase 5 rerun.
-- **HDD:** conservative defaults; cap large-file buffers at 1 MiB unless clean evidence supports a larger value. Small-file strategies transfer directly; no concurrency until Phase 7.
-- **USB:** wall time splits roughly equally between the 0–64 KiB and 256 MiB–2 GiB buckets. Both small-file overhead and large-file streaming must be addressed. Large-file USB buffer defaults remain provisional until validated against the byte-volume-dominated dataset.
-- **SameDrive:** do not collapse into SSDtoSSD. Small files behave similarly; large files are contention-limited. SameDriveSSD may benefit from larger buffers (4–8 MiB in the initial Phase 5 run), but this is device- and cache-sensitive and must not be used when SSD/HDD classification is uncertain.
+Destination-specific notes (buffer defaults per Section 2.5.3; preallocation OFF universally):
+- **Unknown / ambiguous:** 512 KiB buffer. Do not assume SSD behaviour.
+- **SSD:** 1 MiB buffer. Cross-drive validation (Section 2.5) confirms 1 MiB passes in 2/3 SSD-to-SSD scenarios. 4 MiB may benefit on fast NVMe pairs but buffer response is drive-specific and cannot be classified from software alone.
+- **HDD:** 512 KiB buffer. Larger buffers provide no consistent benefit and regress on some HDD pairs. Small-file strategies transfer directly; no concurrency until Phase 7.
+- **USB / removable:** 1 MiB buffer as the starting prior (Section 2.6 LFD PASS; also consistent with SSD/HDD evidence that 1 MiB is broadly safe). Batching inconclusive. USB variance is high enough that no static profile should be trusted — treat this as a temporary default pending per-device learning.
+- **SameDrive:** do not collapse into SSDtoSSD. Small files behave similarly; large files are contention-limited. SameDriveSSD may benefit from larger buffers (4–8 MiB), but this is device- and cache-sensitive; treat as an optional specialised profile (Phase 5 Step 3) and fall back to 512 KiB–1 MiB when SSD/HDD classification is uncertain.
 
-Files to modify: `SmartCopy.Core/FileSystem/LocalFileSystemProvider.cs`, `ProviderCapabilities`
+**Design note — per-device adaptive profiles:**
 
-Benchmark gate: run the full scenario matrix (SSDtoSSD → SameDriveTest → SSDtoHDD → SSDtoUSBFlash). Promote defaults only after all scenarios pass.
+USB flash (and potentially other removable or slow media) exposes a fundamental limitation of static destination-type routing: "USB" is an interface, not a device class. Two flash drives can perform completely differently. The wide variance in Section 2.6 is partly thermal, but also reflects genuine device-to-device spread that no classification heuristic can capture.
+
+The better long-term architecture is a **per-device learned profile**, keyed by device identity and updated from observed copy performance:
+
+- **Device identity:** VolumeID (volume serial number from `GetVolumeInformation` on Windows, UUID from mount metadata on Linux). Already accessible from `LocalFileSystemProvider`; `ProviderCapabilities` is the natural place to surface it. This identifies a specific formatted volume, not the physical drive — sufficient for USB sticks and external drives where the user sees a consistent drive letter/path.
+- **Per-device profile store:** a small persistent JSON file (in `IAppDataStore`) mapping `{VolumeID → {bufferSize, batchEnabled, ...}}`. Indexed via `IAppContext`. Falls back to the static destination-type profile for unknown devices.
+- **In-vivo measurement:** during normal copies, record aggregate throughput per size bucket to the device's profile. After enough observations accumulate, the profile overrides the static default. No user action needed.
+- **Explicit calibration:** a "Calibrate this drive" action (in the copy dialog or device context menu) that runs a brief A/B test — a few dozen small files, a few large files, enough to distinguish strategy variants in under a minute. Faster to converge than passive learning and available to power users who want accurate profiles immediately.
+- **Strategy experimentation:** for unknown or low-confidence devices, occasionally shadow a copy with an alternative strategy on a small sample of files and compare throughput. Converges toward the best strategy for the specific device. Resembles a multi-armed bandit policy, not a fixed schedule.
+
+This framing reorients Phase 6: static destination-type routing is the first step and needed regardless, but the destination profile should be treated as a *prior* that in-vivo measurement can override, not as a permanent classification. The infrastructure required (VolumeID in `ProviderCapabilities`, profile store, measurement hooks) is a modest addition to the copy path and the data model.
+
+Files to modify: `SmartCopy.Core/FileSystem/LocalFileSystemProvider.cs`, `ProviderCapabilities`, `IAppDataStore` (new profile store)
+
+Benchmark gate: run the full scenario matrix (SSDtoSSD → SameDriveTest → SSDtoHDD → SSDtoUSBFlash). Promote static defaults only after all scenarios pass. Per-device learning is a separate incremental feature that can ship after static routing is in place.
 
 ---
 
@@ -518,14 +635,13 @@ Total: ~1 GiB. File counts depend on the available source corpus. If the primary
 
 ### 6.3 Byte-Volume-Dominated Dataset
 
-**Initial LargeFileDataset run complete; clean isolation rerun required before Phases 5 and 6 can be completed.**
+**Cross-drive validation complete (2026-06-07). Phase 5 findings are in Section 2.5.**
 
-The MixedDataset cannot isolate large-file throughput — tiny-file overhead dominates every aggregate metric. A second dataset is needed where large files dominate by byte volume. `LargeFileDataset` now provides this role for initial Phase 5 analysis (Section 2.4).
+The MixedDataset cannot isolate large-file throughput — tiny-file overhead dominates every aggregate metric. A second dataset is needed where large files dominate by byte volume. `LargeFileDataset` provides this role; Section 2.4 documents the initial same-machine run and Section 2.5 documents the cross-drive validation run.
 
-- Example: 100 files × 100 MiB = 10 GiB total
-- Or: 50–100 files in the 64 MiB–2 GiB range from `CandidateData`
+**Cross-drive validation complete (2026-06-07).** The 8-scenario cross-drive suite (Section 2.5) is now the authoritative Phase 5 result. It covered SSD→SSD, SSD→HDD, HDD→SSD, and HDD→HDD with multiple independent drive pairs per direction, providing better generalisation than the original same-machine run. The revised provisional policy is in Section 2.5.3.
 
-Next run at minimum `ManualLoop512KiB`, `ManualLoop1MiB`, `ManualLoop2MiB`, `ManualLoop4MiB` on SSDtoSSD and SSDtoHDD, ≥3 runs per variant, randomised, with `PreallocateDestinationFile = false`. This validates buffer scaling independently. Then rerun the winning buffer with and without preallocation to isolate whether `SetLength` should be part of the production default. SameDriveSSD larger-buffer candidates are a separate optional probe, not a substitute for the safe cross-device rerun.
+**Remaining open:** The SameDriveSSD larger-buffer probe (Phase 5 Step 3 — testing 4–8 MiB on same-drive SSD copies) was deferred and remains optional. The cross-drive data shows 1 MiB is the safe universal SSD default; same-drive SSD is a specialised profile that requires dedicated measurement before any larger buffer default is promoted.
 
 ### 6.4 Pending: Policy Validation Datasets
 
@@ -545,6 +661,17 @@ Policy validation uses whole-run `executeDuration` as the primary metric. Bucket
 dotnet run --project .\SmartCopy.Benchmarks          # run suite
 dotnet run --project .\SmartCopy.Benchmarks --mode analyze  # analyse results
 ```
+
+**Note on OS File Cache (Standby List):**
+Between scenarios, or between variants if configured, the benchmark needs a cold OS file cache to ensure consistent I/O measurement. By default, the suite will pause and ask you to reboot.
+To automate cache clearing without rebooting, download Sysinternals [RAMMap](https://learn.microsoft.com/en-us/sysinternals/downloads/rammap) and configure its path in your `BenchmarkConfig.json`:
+
+```json
+  "clearCacheBetweenRuns": true,
+  "ramMapPath": "D:\\Tools\\RAMMap\\RAMMap64.exe"
+```
+
+**Important:** RAMMap requires Administrator privileges to empty the working sets and standby list. You *must* run the benchmark suite from an **Administrator command prompt or PowerShell instance**. If you run it from a standard console, Windows UAC will intercept the RAMMap execution and prompt you for permission on every single cache clear.
 
 Per-iteration protocol:
 1. Run SSDtoSSD first — fastest feedback loop.

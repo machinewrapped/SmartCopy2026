@@ -40,7 +40,7 @@ internal static class BenchmarkStatistics
             validDurations.Average(),
             min,
             max,
-            TightestPairSpread(validDurations));
+            validDurations.Count > 1 ? validDurations[^1] - validDurations[0] : 0.0);
     }
 
     /// <summary>
@@ -114,15 +114,7 @@ internal static class BenchmarkStatistics
             throughputs.Count > 0 ? throughputs.Average() : 0.0,
             throughputs.Count > 0 ? BenchmarkHelpers.Percentile(throughputs, 0.50) : 0.0,
             throughputs.Count > 0 ? BenchmarkHelpers.Percentile(throughputs, 0.95) : 0.0,
-            TightestPairSpread(runMedians));
-    }
-
-    private static double TightestPairSpread(List<double> sorted)
-    {
-        if (sorted.Count < 2) return 0.0;
-        var minSpread = double.MaxValue;
-        for (int i = 1; i < sorted.Count; i++)
-            minSpread = Math.Min(minSpread, sorted[i] - sorted[i - 1]);
-        return minSpread;
+            runMedians.Count > 1 ? runMedians[^1] - runMedians[0] : 0.0,
+            runThroughputs.Count > 1 ? runThroughputs[^1] - runThroughputs[0] : 0.0);
     }
 }

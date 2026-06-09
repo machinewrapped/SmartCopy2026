@@ -274,10 +274,11 @@ internal sealed record BucketVariantEvidence(
     double MeanThroughputMiBPerSecond,
     double P50ThroughputMiBPerSecond,
     double P95ThroughputMiBPerSecond,
-    double RunMedianSpreadMilliseconds)
+    double RunMedianSpreadMilliseconds,
+    double RunThroughputSpreadMiBPerSecond)
 {
     public static BucketVariantEvidence Empty(string bucketLabel, string variantName) =>
-        new(bucketLabel, variantName, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        new(bucketLabel, variantName, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 }
 
 internal sealed record EvidenceComparison(

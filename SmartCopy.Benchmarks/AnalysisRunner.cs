@@ -299,7 +299,7 @@ internal static class AnalysisRunner
             return;
         }
 
-        report("| Bucket | Best Observed Variant | Matched Control | Median File Duration | Control Median | Delta | Noise Floor | Run-Median MiB/s | Verdict | Recommendation |");
+        report("| Bucket | Best Observed Variant | Matched Control | Run-Median MiB/s | Control MiB/s | Delta | Noise Floor | Median File Duration | Verdict | Recommendation |");
         report("|---|---|---|---:|---:|---:|---:|---:|---|---|");
 
         foreach (var bucket in buckets)
@@ -307,7 +307,7 @@ internal static class AnalysisRunner
             var candidates = variants
                 .Select(v => BenchmarkStatistics.BuildBucketEvidence(records, bucket, v))
                 .Where(e => e.RecordCount > 0)
-                .OrderBy(e => e.MedianDurationMilliseconds)
+                .OrderByDescending(e => e.AggregateThroughputMiBPerSecond)
                 .ToList();
 
             if (candidates.Count == 0)
@@ -336,8 +336,8 @@ internal static class AnalysisRunner
 
             report(
                 $"| {bucket.Label} | {BenchmarkHelpers.EscapeTable(best.VariantName)} | {BenchmarkHelpers.EscapeTable(controlName ?? "-")} | " +
-                $"{best.MedianDurationMilliseconds:0.###} ms | {(control is null ? "-" : $"{control.MedianDurationMilliseconds:0.###} ms")} | " +
-                $"{comparison.DeltaText} | {comparison.NoiseText} | {best.AggregateThroughputMiBPerSecond:0.00} | " +
+                $"{best.AggregateThroughputMiBPerSecond:0.00} | {(control is null ? "-" : $"{control.AggregateThroughputMiBPerSecond:0.00}")} | " +
+                $"{comparison.DeltaText} | {comparison.NoiseText} | {best.MedianDurationMilliseconds:0.###} ms | " +
                 $"{comparison.Verdict} | {recommendation} |");
         }
 
@@ -405,7 +405,7 @@ internal static class AnalysisRunner
         report(null);
         report($"Compares each `DirectWriteBatch*` variant against `{unbatchedControl}` to isolate the contribution of batching beyond direct write alone (Section 7.2.2).");
         report(null);
-        report("| Bucket | Variant | Unbatched Control | Median Duration | Control Median | Delta | Noise Floor | Verdict |");
+        report("| Bucket | Variant | Unbatched Control | Run-Median MiB/s | Control MiB/s | Delta | Noise Floor | Verdict |");
         report("|---|---|---|---:|---:|---:|---:|---|");
 
         foreach (var bucket in buckets)
@@ -423,7 +423,7 @@ internal static class AnalysisRunner
                 var comparison = CompareBucketEvidence(candidate, control, gatePercent, isControl: false);
                 report(
                     $"| {bucket.Label} | {BenchmarkHelpers.EscapeTable(variant)} | {BenchmarkHelpers.EscapeTable(unbatchedControl)} | " +
-                    $"{candidate.MedianDurationMilliseconds:0.###} ms | {control.MedianDurationMilliseconds:0.###} ms | " +
+                    $"{candidate.AggregateThroughputMiBPerSecond:0.00} | {control.AggregateThroughputMiBPerSecond:0.00} | " +
                     $"{comparison.DeltaText} | {comparison.NoiseText} | {comparison.Verdict} |");
             }
         }
@@ -497,16 +497,16 @@ internal static class AnalysisRunner
         if (control.RecordCount == 0)
             return new EvidenceComparison("INCONCLUSIVE", "-", "-");
 
-        var deltaMilliseconds = control.MedianDurationMilliseconds - candidate.MedianDurationMilliseconds;
-        var deltaPercent = control.MedianDurationMilliseconds > 0
-            ? deltaMilliseconds / control.MedianDurationMilliseconds * 100.0
+        var deltaMiBPerSecond = candidate.AggregateThroughputMiBPerSecond - control.AggregateThroughputMiBPerSecond;
+        var deltaPercent = control.AggregateThroughputMiBPerSecond > 0
+            ? deltaMiBPerSecond / control.AggregateThroughputMiBPerSecond * 100.0
             : 0.0;
-        var noiseFloor = (control.RunMedianSpreadMilliseconds + candidate.RunMedianSpreadMilliseconds) / 2.0;
-        var verdict = GetDeltaVerdict(deltaMilliseconds, deltaPercent, noiseFloor, gatePercent);
+        var noiseFloor = (control.RunThroughputSpreadMiBPerSecond + candidate.RunThroughputSpreadMiBPerSecond) / 2.0;
+        var verdict = GetDeltaVerdict(deltaMiBPerSecond, deltaPercent, noiseFloor, gatePercent);
         return new EvidenceComparison(
             verdict,
-            $"{FormatSignedPercent(deltaPercent)} ({deltaMilliseconds:+0.###;-0.###;0} ms)",
-            $"{noiseFloor:0.###} ms");
+            $"{FormatSignedPercent(deltaPercent)} ({deltaMiBPerSecond:+0.00;-0.00;0} MiB/s)",
+            $"{noiseFloor:0.00} MiB/s");
     }
 
     private static string GetDeltaVerdict(double delta, double deltaPercent, double noiseFloor, double gatePercent)
