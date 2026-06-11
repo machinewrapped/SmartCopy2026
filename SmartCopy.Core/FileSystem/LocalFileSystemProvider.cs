@@ -50,7 +50,9 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     {
         try
         {
-            return new DriveInfo(path).Name;
+            var root = Path.GetPathRoot(path);
+            if (string.IsNullOrEmpty(root)) return null;
+            return new DriveInfo(root).Name;
         }
         catch
         {

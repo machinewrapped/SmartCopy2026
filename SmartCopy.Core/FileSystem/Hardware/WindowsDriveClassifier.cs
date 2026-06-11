@@ -16,8 +16,7 @@ internal sealed class WindowsDriveClassifier : IDriveClassifier
     {
         public uint PropertyId;
         public uint QueryType;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 1)]
-        public byte[] AdditionalParameters;
+        public byte AdditionalParameters;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -104,6 +103,17 @@ internal sealed class WindowsDriveClassifier : IDriveClassifier
         out int lpBytesReturned,
         IntPtr lpOverlapped);
 
+    [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+    private static extern bool DeviceIoControl(
+        SafeFileHandle hDevice,
+        uint dwIoControlCode,
+        ref STORAGE_PROPERTY_QUERY lpInBuffer,
+        int nInBufferSize,
+        IntPtr lpOutBuffer,
+        int nOutBufferSize,
+        out int lpBytesReturned,
+        IntPtr lpOverlapped);
+
     public DriveClassification Classify(string rootPath)
     {
         var root = Path.GetPathRoot(rootPath);
@@ -134,7 +144,7 @@ internal sealed class WindowsDriveClassifier : IDriveClassifier
         {
             PropertyId = 7, // StorageDeviceSeekPenaltyProperty
             QueryType = 0,  // PropertyStandardQuery
-            AdditionalParameters = new byte[1]
+            AdditionalParameters = 0
         };
 
         var seekPenaltyDesc = new DEVICE_SEEK_PENALTY_DESCRIPTOR();
@@ -155,7 +165,9 @@ internal sealed class WindowsDriveClassifier : IDriveClassifier
 
         query.PropertyId = 0; // StorageDeviceProperty
         var deviceDesc = new STORAGE_DEVICE_DESCRIPTOR();
-        success = DeviceIoControl(
+        
+        // Step 1: Query with the base struct size just to retrieve the `Size` field.
+        DeviceIoControl(
             handle,
             IOCTL_STORAGE_QUERY_PROPERTY,
             ref query,
@@ -165,17 +177,40 @@ internal sealed class WindowsDriveClassifier : IDriveClassifier
             out _,
             IntPtr.Zero);
 
-        if (success)
+        if (deviceDesc.Size > 0)
         {
-            var busType = (StorageBusType)deviceDesc.BusType;
-            interfaceType = busType switch
+            // Step 2: Allocate the exact dynamically calculated size
+            IntPtr buffer = Marshal.AllocHGlobal((int)deviceDesc.Size);
+            try
             {
-                StorageBusType.Sata => DriveInterfaceType.SATA,
-                StorageBusType.Usb => DriveInterfaceType.USB,
-                StorageBusType.Nvme => DriveInterfaceType.NVMe,
-                StorageBusType.Virtual or StorageBusType.FileBackedVirtual => DriveInterfaceType.Virtual,
-                _ => DriveInterfaceType.Unknown
-            };
+                success = DeviceIoControl(
+                    handle,
+                    IOCTL_STORAGE_QUERY_PROPERTY,
+                    ref query,
+                    Marshal.SizeOf(query),
+                    buffer,
+                    (int)deviceDesc.Size,
+                    out _,
+                    IntPtr.Zero);
+
+                if (success)
+                {
+                    deviceDesc = Marshal.PtrToStructure<STORAGE_DEVICE_DESCRIPTOR>(buffer);
+                    var busType = (StorageBusType)deviceDesc.BusType;
+                    interfaceType = busType switch
+                    {
+                        StorageBusType.Sata => DriveInterfaceType.SATA,
+                        StorageBusType.Usb => DriveInterfaceType.USB,
+                        StorageBusType.Nvme => DriveInterfaceType.NVMe,
+                        StorageBusType.Virtual or StorageBusType.FileBackedVirtual => DriveInterfaceType.Virtual,
+                        _ => DriveInterfaceType.Unknown
+                    };
+                }
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
         }
 
         return new DriveClassification(mediaType, interfaceType);

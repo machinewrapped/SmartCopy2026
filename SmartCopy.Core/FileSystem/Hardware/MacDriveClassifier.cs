@@ -10,12 +10,14 @@ internal sealed class MacDriveClassifier : IDriveClassifier
         var psi = new ProcessStartInfo
         {
             FileName = "diskutil",
-            Arguments = $"info -plist \"{rootPath}\"",
             RedirectStandardOutput = true,
-            RedirectStandardError = true,
+            RedirectStandardError = false,
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        psi.ArgumentList.Add("info");
+        psi.ArgumentList.Add("-plist");
+        psi.ArgumentList.Add(rootPath);
 
         try
         {

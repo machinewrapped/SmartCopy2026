@@ -20,7 +20,7 @@ internal sealed class LinuxDriveClassifier : IDriveClassifier
 
         try
         {
-            var resolvedInfo = File.ResolveLinkTarget(linkPath, true);
+            var resolvedInfo = Directory.ResolveLinkTarget(linkPath, true);
             if (resolvedInfo == null)
                 return DriveClassification.Unknown;
 
