@@ -36,12 +36,20 @@
 
         <!-- Source Field -->
         <Border Grid.Row="1" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="6" Margin="10,10,10,5" Padding="10">
-            <Grid ColumnDefinitions="Auto, *" ColumnSpacing="4">
+            <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="4">
                 <TextBlock Grid.Column="0" Text="Source" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold"/>
                 <views:PathPickerControl Grid.Column="1"
                                         DataContext="{Binding SourcePathPicker}"
                                         BrowseDialogTitle="Select Source Path"
                                         BrowseButtonToolTip="Set the source path for the workflow" />
+                <TextBlock Grid.Column="2" 
+                           Text="{Binding DirectoryTree.SourceProvider.Classification, FallbackValue=''}" 
+                           IsVisible="{Binding DirectoryTree.SourceProvider, Converter={x:Static ObjectConverters.IsNotNull}}"
+                           VerticalAlignment="Center" 
+                           Margin="10,0,0,0" 
+                           Foreground="{DynamicResource MutedTextBrush}" 
+                           ToolTip.Tip="Source Drive Classification"
+                           FontSize="12"/>
             </Grid>
         </Border>
 

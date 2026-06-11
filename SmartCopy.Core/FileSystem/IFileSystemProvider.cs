@@ -19,6 +19,12 @@ public interface IFileSystemProvider
     ProviderCapabilities Capabilities { get; }
 
     /// <summary>
+    /// Gets the hardware classification (media type and interface type) of the volume.
+    /// This property may evaluate lazily or return <c>DriveClassification.Unknown</c> if the classification is unavailable or unsupported.
+    /// </summary>
+    SmartCopy.Core.FileSystem.Hardware.DriveClassification Classification { get; }
+
+    /// <summary>
     /// Gets the immediate child nodes for a directory path.
     /// </summary>
     Task<IReadOnlyList<FileSystemNode>> GetChildrenAsync(string path, CancellationToken ct);

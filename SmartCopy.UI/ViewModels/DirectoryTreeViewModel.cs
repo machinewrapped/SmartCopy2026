@@ -26,8 +26,13 @@ public class DirectoryTreeViewModel : ViewModelBase
     /// <summary>Indicates whether the directory tree is fully loaded</summary>
     public bool IsLoaded { get; private set; }
 
+    private IFileSystemProvider? _sourceProvider;
     /// <summary>The filesystem that contains the root node</summary>
-    public IFileSystemProvider? SourceProvider { get; private set; }
+    public IFileSystemProvider? SourceProvider
+    {
+        get => _sourceProvider;
+        private set => SetProperty(ref _sourceProvider, value);
+    }
 
     /// <summary>The root path of the directory tree</summary>
     public string? SourcePath => RootNode?.FullPath;

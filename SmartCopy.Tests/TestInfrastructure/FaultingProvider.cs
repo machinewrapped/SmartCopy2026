@@ -18,6 +18,7 @@ internal sealed class FaultingProvider(IFileSystemProvider inner) : IFileSystemP
     public Func<string, bool>? FaultOnMove { get; init; }
 
     public ProviderCapabilities Capabilities => inner.Capabilities;
+    public SmartCopy.Core.FileSystem.Hardware.DriveClassification Classification => inner.Classification;
     public string? VolumeId => inner.VolumeId;
     public string RootPath => inner.RootPath;
 

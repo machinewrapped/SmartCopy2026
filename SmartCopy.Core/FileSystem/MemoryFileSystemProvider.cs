@@ -41,6 +41,9 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         CanTrash: false,
         CanQueryFreeSpace: SimulatedCapacity.HasValue);
 
+    public SmartCopy.Core.FileSystem.Hardware.DriveClassification Classification => 
+        new(SmartCopy.Core.FileSystem.Hardware.DriveMediaType.Memory, SmartCopy.Core.FileSystem.Hardware.DriveInterfaceType.Virtual);
+
     public Task<IReadOnlyList<FileSystemNode>> GetChildrenAsync(string path, CancellationToken ct)
     {
         return Task.Run(async () =>

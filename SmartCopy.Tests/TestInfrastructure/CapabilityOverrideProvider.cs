@@ -9,6 +9,7 @@ namespace SmartCopy.Tests.TestInfrastructure;
 internal sealed class CapabilityOverrideProvider(IFileSystemProvider inner, ProviderCapabilities capabilities) : IFileSystemProvider
 {
     public ProviderCapabilities Capabilities => capabilities;
+    public SmartCopy.Core.FileSystem.Hardware.DriveClassification Classification => inner.Classification;
     public string? VolumeId => inner.VolumeId;
     public string RootPath => inner.RootPath;
 
