@@ -1,5 +1,3 @@
-using System.Runtime.InteropServices;
-
 namespace SmartCopy.Core.FileSystem.Hardware;
 
 public static class CrossPlatformDriveClassifier

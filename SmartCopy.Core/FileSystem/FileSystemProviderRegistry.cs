@@ -7,7 +7,7 @@ public sealed class FileSystemProviderRegistry : IPathResolver, IDisposable
     private readonly Dictionary<string, IFileSystemProvider> _registered
         = new(PathHelper.PathComparer);
     private readonly Dictionary<string, Func<string, IFileSystemProvider?>> _schemeFactories
-        = new(PathHelper.PathComparer);
+        = new(StringComparer.OrdinalIgnoreCase);
 
     // Static state — safe: LocalFileSystemProvider is stateless, shared across all registries
     private static readonly System.Threading.Lock LocalSync = new();

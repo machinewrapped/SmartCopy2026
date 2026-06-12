@@ -493,7 +493,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
 
     private string GetRelativeToRoot(string path)
     {
-        if (path.Equals(RootPath, StringComparison.OrdinalIgnoreCase))
+        if (path.Equals(RootPath, StringComparison.Ordinal))
             return string.Empty;
 
         var root = RootPath.EndsWith('/') ? RootPath : RootPath + '/';

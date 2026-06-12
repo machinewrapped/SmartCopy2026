@@ -27,7 +27,7 @@ public static class MtpProviderFactory
     internal static string? ParseDeviceName(string mtpPath)
     {
         const string prefix = "mtp://";
-        if (!mtpPath.StartsWith(prefix, StringComparison.Ordinal))
+        if (!mtpPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             return null;
         var rest = mtpPath[prefix.Length..];
         var slash = rest.IndexOf('/');

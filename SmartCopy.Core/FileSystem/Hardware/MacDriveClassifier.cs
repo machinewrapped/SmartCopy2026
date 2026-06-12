@@ -24,8 +24,13 @@ internal sealed class MacDriveClassifier : IDriveClassifier
             using var process = Process.Start(psi);
             if (process == null) return DriveClassification.Unknown;
 
-            string xmlOutput = process.StandardOutput.ReadToEnd();
-            process.WaitForExit();
+            var readTask = process.StandardOutput.ReadToEndAsync();
+            if (!process.WaitForExit(3000))
+            {
+                try { process.Kill(entireProcessTree: true); } catch { }
+                return DriveClassification.Unknown;
+            }
+            string xmlOutput = readTask.GetAwaiter().GetResult();
 
             if (process.ExitCode != 0 || string.IsNullOrWhiteSpace(xmlOutput))
             {
