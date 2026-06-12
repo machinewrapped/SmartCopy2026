@@ -66,3 +66,6 @@ benchmark-scenarios.json
 benchmark-tasklist.md
 dataset-prep-summary-*.json
 .codex
+*.lscache
+/.obsidian
+/Tools/RAMMap
