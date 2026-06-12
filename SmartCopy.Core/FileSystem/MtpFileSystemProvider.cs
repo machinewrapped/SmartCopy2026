@@ -138,7 +138,7 @@ public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
 
     public string GetRelativePath(string basePath, string fullPath)
     {
-        if (fullPath.StartsWith(basePath, StringComparison.OrdinalIgnoreCase))
+        if (fullPath.StartsWith(basePath, StringComparison.Ordinal))
             return fullPath[basePath.Length..].TrimStart('/');
         return fullPath;
     }
@@ -177,7 +177,7 @@ public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
     /// </summary>
     private string DevicePath(string mtpPath)
     {
-        if (mtpPath.StartsWith(VolumeId!, StringComparison.OrdinalIgnoreCase))
+        if (mtpPath.StartsWith(VolumeId!, StringComparison.Ordinal))
         {
             var rest = mtpPath[VolumeId!.Length..];
             return rest.Length > 0 ? rest : "/";

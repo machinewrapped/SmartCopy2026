@@ -27,7 +27,7 @@ public static class MtpProviderFactory
     internal static string? ParseDeviceName(string mtpPath)
     {
         const string prefix = "mtp://";
-        if (!mtpPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        if (!mtpPath.StartsWith(prefix, StringComparison.Ordinal))
             return null;
         var rest = mtpPath[prefix.Length..];
         var slash = rest.IndexOf('/');
@@ -37,6 +37,6 @@ public static class MtpProviderFactory
     private static bool NameMatches(MediaDevice device, string name)
     {
         var deviceName = string.IsNullOrEmpty(device.FriendlyName) ? device.Model : device.FriendlyName;
-        return string.Equals(deviceName, name, StringComparison.OrdinalIgnoreCase);
+        return string.Equals(deviceName, name, StringComparison.Ordinal);
     }
 }
