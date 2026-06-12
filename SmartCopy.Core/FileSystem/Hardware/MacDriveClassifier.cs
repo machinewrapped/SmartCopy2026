@@ -5,7 +5,7 @@ namespace SmartCopy.Core.FileSystem.Hardware;
 
 internal sealed class MacDriveClassifier : IDriveClassifier
 {
-    public DriveClassification Classify(string rootPath)
+    public async Task<DriveClassification> ClassifyAsync(string rootPath, CancellationToken ct = default)
     {
         var psi = new ProcessStartInfo
         {
@@ -24,13 +24,14 @@ internal sealed class MacDriveClassifier : IDriveClassifier
             using var process = Process.Start(psi);
             if (process == null) return DriveClassification.Unknown;
 
-            var readTask = process.StandardOutput.ReadToEndAsync();
+            // Optional cancellation linking could go here.
+            var readTask = process.StandardOutput.ReadToEndAsync(ct);
             if (!process.WaitForExit(3000))
             {
                 try { process.Kill(entireProcessTree: true); } catch { }
                 return DriveClassification.Unknown;
             }
-            string xmlOutput = readTask.GetAwaiter().GetResult();
+            string xmlOutput = await readTask;
 
             if (process.ExitCode != 0 || string.IsNullOrWhiteSpace(xmlOutput))
             {

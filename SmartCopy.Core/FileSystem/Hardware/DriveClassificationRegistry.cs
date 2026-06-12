@@ -5,13 +5,15 @@ namespace SmartCopy.Core.FileSystem.Hardware;
 
 public static class DriveClassificationRegistry
 {
-    private static readonly ConcurrentDictionary<string, DriveClassification> _cache 
+    private static readonly ConcurrentDictionary<string, Task<DriveClassification>> _cache 
         = new(StringComparer.Ordinal);
 
-    public static DriveClassification GetOrClassify(string rootPath, string? volumeId)
+    public static async ValueTask<DriveClassification> GetOrClassifyAsync(string rootPath, string? volumeId, CancellationToken ct = default)
     {
         string key = string.IsNullOrWhiteSpace(volumeId) ? rootPath : volumeId;
-        
-        return _cache.GetOrAdd(key, _ => CrossPlatformDriveClassifier.Classify(rootPath));
+
+        // Note: Task caching. If the classification fails, we might want to remove it from cache
+        // but for now, we'll cache the result of the hardware query.
+        return await _cache.GetOrAdd(key, _ => CrossPlatformDriveClassifier.ClassifyAsync(rootPath, ct));
     }
 }

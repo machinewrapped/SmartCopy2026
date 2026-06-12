@@ -1,5 +1,5 @@
 using SmartCopy.Core.FileSystem;
-
+using SmartCopy.Core.FileSystem.Hardware;
 namespace SmartCopy.Tests.TestInfrastructure;
 
 /// <summary>
@@ -18,12 +18,20 @@ internal sealed class FaultingProvider(IFileSystemProvider inner) : IFileSystemP
     public Func<string, bool>? FaultOnMove { get; init; }
 
     public ProviderCapabilities Capabilities => inner.Capabilities;
-    public SmartCopy.Core.FileSystem.Hardware.DriveClassification Classification => inner.Classification;
+    
+    public ValueTask<DriveClassification> GetClassificationAsync(CancellationToken ct = default) => inner.GetClassificationAsync(ct);
+    
+    public StringComparer PathComparer => inner.PathComparer;
+    
+    public StringComparison PathComparison => inner.PathComparison;
+    
     public string? VolumeId => inner.VolumeId;
+    
     public string RootPath => inner.RootPath;
 
     public Task<IReadOnlyList<FileSystemNode>> GetChildrenAsync(string path, CancellationToken ct) =>
         inner.GetChildrenAsync(path, ct);
+        
     public Task<FileSystemNode> GetNodeAsync(string path, CancellationToken ct) =>
         inner.GetNodeAsync(path, ct);
 
@@ -53,14 +61,19 @@ internal sealed class FaultingProvider(IFileSystemProvider inner) : IFileSystemP
 
     public Task CreateDirectoryAsync(string path, CancellationToken ct) =>
         inner.CreateDirectoryAsync(path, ct);
+        
     public Task<bool> ExistsAsync(string path, CancellationToken ct) =>
         inner.ExistsAsync(path, ct);
+        
     public string GetRelativePath(string basePath, string fullPath) =>
         inner.GetRelativePath(basePath, fullPath);
+        
     public string[] SplitPath(string path) =>
         inner.SplitPath(path);
+        
     public string JoinPath(string basePath, IReadOnlyList<string> segments) =>
         inner.JoinPath(basePath, segments);
+        
     public Task<long?> GetAvailableFreeSpaceAsync(CancellationToken ct) =>
         inner.GetAvailableFreeSpaceAsync(ct);
 }

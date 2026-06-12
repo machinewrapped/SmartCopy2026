@@ -16,13 +16,13 @@ public static class CrossPlatformDriveClassifier
         return new FallbackDriveClassifier();
     }
 
-    public static DriveClassification Classify(string rootPath)
+    public static Task<DriveClassification> ClassifyAsync(string rootPath, CancellationToken ct = default)
     {
-        return _classifier.Classify(rootPath);
+        return _classifier.ClassifyAsync(rootPath, ct);
     }
 
     private sealed class FallbackDriveClassifier : IDriveClassifier
     {
-        public DriveClassification Classify(string rootPath) => DriveClassification.Unknown;
+        public Task<DriveClassification> ClassifyAsync(string rootPath, CancellationToken ct = default) => Task.FromResult(DriveClassification.Unknown);
     }
 }

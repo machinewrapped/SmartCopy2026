@@ -114,7 +114,12 @@ internal sealed class WindowsDriveClassifier : IDriveClassifier
         out int lpBytesReturned,
         IntPtr lpOverlapped);
 
-    public DriveClassification Classify(string rootPath)
+    public Task<DriveClassification> ClassifyAsync(string rootPath, CancellationToken ct = default)
+    {
+        return Task.Run(() => ClassifyInternal(rootPath), ct);
+    }
+
+    private DriveClassification ClassifyInternal(string rootPath)
     {
         var root = Path.GetPathRoot(rootPath);
         if (string.IsNullOrWhiteSpace(root))

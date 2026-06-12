@@ -4,6 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
         xmlns:views="clr-namespace:SmartCopy.UI.Views"
+        xmlns:conv="using:Avalonia.Data.Converters"
         mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="860"
         x:Class="SmartCopy.UI.Views.MainWindow"
         x:DataType="vm:MainViewModel"
@@ -43,8 +44,8 @@
                                         BrowseDialogTitle="Select Source Path"
                                         BrowseButtonToolTip="Set the source path for the workflow" />
                 <TextBlock Grid.Column="2" 
-                           Text="{Binding DirectoryTree.SourceProvider.Classification, FallbackValue=''}" 
-                           IsVisible="{Binding DirectoryTree.SourceProvider, Converter={x:Static ObjectConverters.IsNotNull}}"
+                           Text="{Binding DirectoryTree.Classification, FallbackValue=''}" 
+                           IsVisible="{Binding DirectoryTree.Classification, Converter={x:Static conv:ObjectConverters.IsNotNull}}"
                            VerticalAlignment="Center" 
                            Margin="10,0,0,0" 
                            Foreground="{DynamicResource MutedTextBrush}" 

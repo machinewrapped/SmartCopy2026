@@ -2,12 +2,27 @@ namespace SmartCopy.Core.FileSystem.Hardware;
 
 internal sealed class LinuxDriveClassifier : IDriveClassifier
 {
-    public DriveClassification Classify(string rootPath)
+    public Task<DriveClassification> ClassifyAsync(string rootPath, CancellationToken ct = default)
+    {
+        return Task.Run(() => ClassifyInternal(rootPath), ct);
+    }
+
+    private DriveClassification ClassifyInternal(string rootPath)
     {
         string mountSource = GetMountSourceForPath(rootPath);
-        if (string.IsNullOrEmpty(mountSource) || !mountSource.StartsWith("/dev/"))
+        if (string.IsNullOrEmpty(mountSource) || !mountSource.StartsWith("/dev/", StringComparison.Ordinal))
         {
             return DriveClassification.Unknown;
+        }
+
+        if (File.Exists(mountSource))
+        {
+            try
+            {
+                var resolved = File.ResolveLinkTarget(mountSource, true);
+                if (resolved != null) mountSource = resolved.FullName;
+            }
+            catch { }
         }
 
         string devName = Path.GetFileName(mountSource);

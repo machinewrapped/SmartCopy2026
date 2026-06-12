@@ -20,9 +20,20 @@ public interface IFileSystemProvider
 
     /// <summary>
     /// Gets the hardware classification (media type and interface type) of the volume.
-    /// This property may evaluate lazily or return <c>DriveClassification.Unknown</c> if the classification is unavailable or unsupported.
+    /// This may evaluate lazily, query hardware APIs, or spawn background processes, so it is asynchronous.
+    /// Returns <c>DriveClassification.Unknown</c> if the classification is unavailable or unsupported.
     /// </summary>
-    SmartCopy.Core.FileSystem.Hardware.DriveClassification Classification { get; }
+    ValueTask<Hardware.DriveClassification> GetClassificationAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets the case-sensitivity string comparer used by this file system provider.
+    /// </summary>
+    StringComparer PathComparer { get; }
+
+    /// <summary>
+    /// Gets the case-sensitivity string comparison used by this file system provider.
+    /// </summary>
+    StringComparison PathComparison { get; }
 
     /// <summary>
     /// Gets the immediate child nodes for a directory path.

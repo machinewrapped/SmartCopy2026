@@ -41,8 +41,12 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         CanTrash: false,
         CanQueryFreeSpace: SimulatedCapacity.HasValue);
 
-    public SmartCopy.Core.FileSystem.Hardware.DriveClassification Classification => 
-        new(SmartCopy.Core.FileSystem.Hardware.DriveMediaType.Memory, SmartCopy.Core.FileSystem.Hardware.DriveInterfaceType.Virtual);
+    public ValueTask<Hardware.DriveClassification> GetClassificationAsync(CancellationToken ct = default) => 
+        ValueTask.FromResult(new Hardware.DriveClassification(Hardware.DriveMediaType.Memory, Hardware.DriveInterfaceType.Virtual));
+
+    public StringComparer PathComparer => StringComparer.Ordinal;
+
+    public StringComparison PathComparison => StringComparison.Ordinal;
 
     public Task<IReadOnlyList<FileSystemNode>> GetChildrenAsync(string path, CancellationToken ct)
     {

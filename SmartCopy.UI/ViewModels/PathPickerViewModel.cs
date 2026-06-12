@@ -153,7 +153,7 @@ public partial class PathPickerViewModel : ViewModelBase
 
         Bookmarks.Clear();
 
-        var addedPaths = new HashSet<string>(PathHelper.PathComparer);
+        var addedPaths = new HashSet<string>(StringComparer.Ordinal);
 
         var recentList = GetRecentList();
 

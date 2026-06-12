@@ -69,3 +69,5 @@ dataset-prep-summary-*.json
 *.lscache
 /.obsidian
 /Tools/RAMMap
+/.benchmarks
+/.antigravitycli

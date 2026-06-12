@@ -30,8 +30,12 @@ public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
         CanSeek: false, CanAtomicMove: false, CanWatch: false,
         MaxPathLength: 260, CanTrash: false);
 
-    public SmartCopy.Core.FileSystem.Hardware.DriveClassification Classification => 
-        new(SmartCopy.Core.FileSystem.Hardware.DriveMediaType.MTP, SmartCopy.Core.FileSystem.Hardware.DriveInterfaceType.USB);
+    public ValueTask<Hardware.DriveClassification> GetClassificationAsync(CancellationToken ct = default) => 
+        ValueTask.FromResult(new Hardware.DriveClassification(Hardware.DriveMediaType.MTP, Hardware.DriveInterfaceType.USB));
+
+    public StringComparer PathComparer => StringComparer.Ordinal;
+
+    public StringComparison PathComparison => StringComparison.Ordinal;
 
     public Task<IReadOnlyList<FileSystemNode>> GetChildrenAsync(string path, CancellationToken ct)
     {

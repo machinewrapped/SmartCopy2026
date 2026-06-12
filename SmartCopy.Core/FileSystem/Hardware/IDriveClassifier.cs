@@ -2,5 +2,5 @@ namespace SmartCopy.Core.FileSystem.Hardware;
 
 public interface IDriveClassifier
 {
-    DriveClassification Classify(string rootPath);
+    Task<DriveClassification> ClassifyAsync(string rootPath, CancellationToken ct = default);
 }

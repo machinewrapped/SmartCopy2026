@@ -7,13 +7,13 @@ namespace SmartCopy.Tests.FileSystem;
 public class DriveClassificationTests
 {
     [Fact]
-    public void MemoryFileSystemProvider_ReturnsMemoryVirtualClassification()
+    public async Task MemoryFileSystemProvider_ReturnsMemoryVirtualClassification()
     {
         // Arrange
         var provider = new MemoryFileSystemProvider();
 
         // Act
-        var classification = provider.Classification;
+        var classification = await provider.GetClassificationAsync();
 
         // Assert
         Assert.Equal(DriveMediaType.Memory, classification.MediaType);
@@ -23,14 +23,14 @@ public class DriveClassificationTests
 
 
     [Fact]
-    public void LocalFileSystemProvider_ReturnsClassificationFromRegistry()
+    public async Task LocalFileSystemProvider_ReturnsClassificationFromRegistry()
     {
         // Arrange
         var root = Environment.CurrentDirectory;
         var provider = new LocalFileSystemProvider(root);
 
         // Act
-        var classification = provider.Classification;
+        var classification = await provider.GetClassificationAsync();
 
         // Assert
         // We can't guarantee SSD or HDD, but it shouldn't be Memory or MTP on a local provider.
@@ -39,7 +39,7 @@ public class DriveClassificationTests
     }
     
     [Fact]
-    public void DriveClassificationRegistry_CachesResultsByVolumeId()
+    public async Task DriveClassificationRegistry_CachesResultsByVolumeId()
     {
         // Arrange
         var root1 = Environment.CurrentDirectory;
@@ -49,8 +49,8 @@ public class DriveClassificationTests
         var testVolumeId = "TEST_VOL_123";
 
         // Act
-        var c1 = DriveClassificationRegistry.GetOrClassify(root1, testVolumeId);
-        var c2 = DriveClassificationRegistry.GetOrClassify(root2, testVolumeId);
+        var c1 = await DriveClassificationRegistry.GetOrClassifyAsync(root1, testVolumeId);
+        var c2 = await DriveClassificationRegistry.GetOrClassifyAsync(root2, testVolumeId);
 
         // Assert
         Assert.Equal(c1, c2);

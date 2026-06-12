@@ -5,10 +5,10 @@ namespace SmartCopy.Core.FileSystem;
 /// </summary>
 public static class PathHelper
 {
-    public static StringComparer PathComparer =>
+    public static StringComparer LocalPathComparer =>
         OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
 
-    public static StringComparison PathComparison =>
+    public static StringComparison LocalPathComparison =>
         OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
 
     public static string EnsureTrailingSeparator(string path)
@@ -36,7 +36,7 @@ public static class PathHelper
         {
             var trimmed = path.TrimEnd(separators);
             var rootTrimmed = root.TrimEnd(separators);
-            if (PathComparer.Equals(trimmed, rootTrimmed))
+            if (LocalPathComparer.Equals(trimmed, rootTrimmed))
             {
                 return root;
             }
@@ -102,7 +102,7 @@ public static class PathHelper
     {
         var normalizedLeft = NormalizeUserPath(left);
         var normalizedRight = NormalizeUserPath(right);
-        return PathComparer.Equals(normalizedLeft, normalizedRight);
+        return LocalPathComparer.Equals(normalizedLeft, normalizedRight);
     }
 
     public static List<string> NormalizeDistinctUserPaths(IEnumerable<string> paths)
@@ -110,7 +110,7 @@ public static class PathHelper
         return paths
             .Select(NormalizeUserPath)
             .Where(path => !string.IsNullOrWhiteSpace(path))
-            .Distinct(PathComparer)
+            .Distinct(LocalPathComparer)
             .ToList();
     }
 

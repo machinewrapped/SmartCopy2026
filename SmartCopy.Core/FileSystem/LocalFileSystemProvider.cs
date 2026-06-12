@@ -16,8 +16,6 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     private readonly bool _isNetworkPath;
     private readonly ProviderCapabilities _capabilities;
     private readonly LocalFileSystemProviderOptions _options;
-    private readonly Lazy<Hardware.DriveClassification> _classification;
-
     public LocalFileSystemProvider(
         string rootPath,
         Func<string>? readLinuxMountInfo = null,
@@ -34,10 +32,6 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
             CanTrash: !_isNetworkPath,
             CanQueryFreeSpace: !_isNetworkPath);
             
-        _classification = new Lazy<Hardware.DriveClassification>(() => 
-            _isNetworkPath 
-                ? Hardware.DriveClassification.Unknown 
-                : Hardware.DriveClassificationRegistry.GetOrClassify(RootPath, VolumeId));
     }
 
     public string RootPath { get; }
@@ -63,7 +57,18 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 
     public ProviderCapabilities Capabilities => _capabilities;
     
-    public Hardware.DriveClassification Classification => _classification.Value;
+    public Hardware.DriveClassification Classification => Hardware.DriveClassification.Unknown; // No longer used, handled by GetClassificationAsync
+
+    public ValueTask<Hardware.DriveClassification> GetClassificationAsync(CancellationToken ct = default)
+    {
+        if (_isNetworkPath)
+            return ValueTask.FromResult(Hardware.DriveClassification.Unknown);
+        return Hardware.DriveClassificationRegistry.GetOrClassifyAsync(RootPath, VolumeId, ct);
+    }
+
+    public StringComparer PathComparer => PathHelper.LocalPathComparer;
+
+    public StringComparison PathComparison => PathHelper.LocalPathComparison;
 
     public Task<IReadOnlyList<FileSystemNode>> GetChildrenAsync(string path, CancellationToken ct)
     {
