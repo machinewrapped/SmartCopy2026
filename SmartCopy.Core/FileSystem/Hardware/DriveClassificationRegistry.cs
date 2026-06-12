@@ -6,7 +6,7 @@ namespace SmartCopy.Core.FileSystem.Hardware;
 public static class DriveClassificationRegistry
 {
     private static readonly ConcurrentDictionary<string, DriveClassification> _cache 
-        = new(StringComparer.OrdinalIgnoreCase);
+        = new(StringComparer.Ordinal);
 
     public static DriveClassification GetOrClassify(string rootPath, string? volumeId)
     {
