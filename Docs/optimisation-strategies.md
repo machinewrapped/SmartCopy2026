@@ -519,7 +519,7 @@ Only after Step 1 confirms the safe cross-device default, run `ManualLoop1MiB`, 
 
 ---
 
-### Phase 6 — Destination-Sensitive Defaults
+### Phase 6 — Destination-Sensitive Policies
 
 **Status:** After Phases 1–3. SSD/HDD defaults from Section 2.5.3. USB validation (Section 2.6) showed that variance is too high for a static USB profile to be reliable. See design note below.
 
@@ -556,21 +556,24 @@ Benchmark gate: run the full scenario matrix (SSDtoSSD → SameDriveTest → SSD
 
 ---
 
-### Phase 7 — Parallelism *(last resort)*
+### Phase 7 — Parallelism
 
-**Status:** Only if Phases 2–3 prove insufficient. Do not begin until both Phase 2 and Phase 3 benchmark gates have been evaluated and neither alone achieved the target improvement.
+**Status:** Kept in reserve in case earlier phases yield insufficient performance gains.
 
 **Goal:** Add concurrency to the copy path. This is the most complex option — it complicates cancellation semantics, progress reporting, and error handling in ways that no sequential strategy does. It is listed last because it should be tried last.
 
-Try phase-separated parallelism first (N concurrent reads → wait → N concurrent writes) before mixed parallelism (N concurrent read+write pairs). Phase-separated keeps read and write I/O separated in time, reducing bus contention and HDD seek-thrash risk.
+Parallel copies introduce risks like HDD head thrashing and bus contention that could make performance unpredictable and very sensitive to the specifics of source, destination and file size. Some devices such as USB flash can be **permanently** damaged by excessive concurrency.
 
-Starting configuration to test: `smallFileMaxConcurrency = 4`, then 6 and 8.
+There are two possible forms of parallelism to test:
+- **inter-phase parallelism** - Producer/Consumer queue where read buffers are filled then drained concurrently
+- **intra-phase parallelism** - N concurrent reads then N concurrent writes, no simultaneous read/write phase
+
+Both need to be tested with same-drive and different-drive source & target pairs.
 
 **Benchmark gate:**
 - Run per the standard protocol (Section 7.1), randomised order. Parallelism variants are likely to exhibit higher variance — expect the 3rd-run threshold to trip more often.
-- Must compare against the best Phase 3 batch variant — not `BaselineAuto` — to isolate the concurrency contribution.
+- Must compare against the best strategies from earlier phases.
 - Must not regress on SSDtoHDD.
-- USB: parallelism is entirely unmeasured on USB flash; do not enable USB parallelism defaults without dedicated measurement.
 
 ---
 
