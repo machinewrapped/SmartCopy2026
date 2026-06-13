@@ -5,14 +5,14 @@ public sealed class FileSystemProviderRegistry : IPathResolver, IDisposable
     // Instance state — per-registry registered providers
     private readonly System.Threading.Lock _lock = new();
     private readonly Dictionary<string, IFileSystemProvider> _registered
-        = new(StringComparer.OrdinalIgnoreCase);
+        = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Func<string, IFileSystemProvider?>> _schemeFactories
         = new(StringComparer.OrdinalIgnoreCase);
 
     // Static state — safe: LocalFileSystemProvider is stateless, shared across all registries
     private static readonly System.Threading.Lock LocalSync = new();
     private static readonly Dictionary<string, LocalFileSystemProvider> LocalProviders
-        = new(StringComparer.OrdinalIgnoreCase);
+        = new(StringComparer.Ordinal);
 
     /// <summary>A shared empty registry for local-path-only resolution.</summary>
     public static FileSystemProviderRegistry Empty { get; } = new();
@@ -91,7 +91,7 @@ public sealed class FileSystemProviderRegistry : IPathResolver, IDisposable
                 bool matches = true;
                 for (int i = 0; i < rootSegments.Length; i++)
                 {
-                    if (!string.Equals(pathSegments[i], rootSegments[i], StringComparison.OrdinalIgnoreCase))
+                    if (!string.Equals(pathSegments[i], rootSegments[i], provider.PathComparison))
                     {
                         matches = false;
                         break;
@@ -169,10 +169,10 @@ public sealed class FileSystemProviderRegistry : IPathResolver, IDisposable
 
     internal static bool IsPrefixMatch(string path, string prefix)
     {
-        if (path.Equals(prefix, StringComparison.OrdinalIgnoreCase))
+        if (path.Equals(prefix, StringComparison.Ordinal))
             return true;
-
-        if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        
+        if (!path.StartsWith(prefix, StringComparison.Ordinal))
             return false;
 
         return path.Length > prefix.Length;
