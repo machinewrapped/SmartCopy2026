@@ -37,20 +37,20 @@
 
         <!-- Source Field -->
         <Border Grid.Row="1" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="6" Margin="10,10,10,5" Padding="10">
-            <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="4">
-                <TextBlock Grid.Column="0" Text="Source" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold"/>
+            <Grid ColumnDefinitions="Auto, *" ColumnSpacing="4">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0" Spacing="8">
+                    <TextBlock Text="Source" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                    <TextBlock Text="{Binding DirectoryTree.Classification, FallbackValue=''}" 
+                               IsVisible="{Binding DirectoryTree.Classification, Converter={x:Static conv:ObjectConverters.IsNotNull}}"
+                               VerticalAlignment="Center" 
+                               Foreground="{DynamicResource MutedTextBrush}" 
+                               ToolTip.Tip="Source Drive Classification"
+                               FontSize="12"/>
+                </StackPanel>
                 <views:PathPickerControl Grid.Column="1"
                                         DataContext="{Binding SourcePathPicker}"
                                         BrowseDialogTitle="Select Source Path"
                                         BrowseButtonToolTip="Set the source path for the workflow" />
-                <TextBlock Grid.Column="2" 
-                           Text="{Binding DirectoryTree.Classification, FallbackValue=''}" 
-                           IsVisible="{Binding DirectoryTree.Classification, Converter={x:Static conv:ObjectConverters.IsNotNull}}"
-                           VerticalAlignment="Center" 
-                           Margin="10,0,0,0" 
-                           Foreground="{DynamicResource MutedTextBrush}" 
-                           ToolTip.Tip="Source Drive Classification"
-                           FontSize="12"/>
             </Grid>
         </Border>
 
