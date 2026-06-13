@@ -91,7 +91,7 @@ public sealed class FileSystemProviderRegistry : IPathResolver, IDisposable
                 bool matches = true;
                 for (int i = 0; i < rootSegments.Length; i++)
                 {
-                    if (!string.Equals(pathSegments[i], rootSegments[i], StringComparison.Ordinal))
+                    if (!string.Equals(pathSegments[i], rootSegments[i], provider.PathComparison))
                     {
                         matches = false;
                         break;

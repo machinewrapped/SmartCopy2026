@@ -42,8 +42,8 @@ public class DriveClassificationTests
     public async Task DriveClassificationRegistry_CachesResultsByVolumeId()
     {
         // Arrange
-        var root1 = Environment.CurrentDirectory;
-        var root2 = Environment.CurrentDirectory;
+        var root1 = Path.Combine(Environment.CurrentDirectory, "FolderA");
+        var root2 = Path.Combine(Environment.CurrentDirectory, "FolderB");
         
         // Let's get a unique volume ID for testing
         var testVolumeId = "TEST_VOL_123";

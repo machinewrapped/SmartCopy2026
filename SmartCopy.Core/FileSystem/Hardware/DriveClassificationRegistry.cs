@@ -12,8 +12,23 @@ public static class DriveClassificationRegistry
     {
         string key = string.IsNullOrWhiteSpace(volumeId) ? rootPath : volumeId;
 
-        // Note: Task caching. If the classification fails, we might want to remove it from cache
-        // but for now, we'll cache the result of the hardware query.
-        return await _cache.GetOrAdd(key, _ => CrossPlatformDriveClassifier.ClassifyAsync(rootPath, ct));
+        var task = _cache.GetOrAdd(key, k => 
+        {
+            var innerTask = CrossPlatformDriveClassifier.ClassifyAsync(rootPath, CancellationToken.None);
+            
+            // Evict faulted/canceled tasks so subsequent calls can retry
+            _ = innerTask.ContinueWith(t => 
+            {
+                if (t.IsFaulted || t.IsCanceled)
+                {
+                    ((ICollection<KeyValuePair<string, Task<DriveClassification>>>)_cache)
+                        .Remove(new KeyValuePair<string, Task<DriveClassification>>(k, innerTask));
+                }
+            }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+
+            return innerTask;
+        });
+
+        return await task.WaitAsync(ct).ConfigureAwait(false);
     }
 }

@@ -53,6 +53,7 @@ public class DirectoryTreeViewModel : ViewModelBase
     private async Task LoadClassificationAsync(IFileSystemProvider? provider)
     {
         _classificationCts?.Cancel();
+        _classificationCts?.Dispose();
         _classificationCts = new CancellationTokenSource();
         var ct = _classificationCts.Token;
 
@@ -70,6 +71,10 @@ public class DirectoryTreeViewModel : ViewModelBase
         catch (OperationCanceledException)
         {
             // Ignore cancellation
+        }
+        catch
+        {
+            Classification = DriveClassification.Unknown;
         }
     }
 
