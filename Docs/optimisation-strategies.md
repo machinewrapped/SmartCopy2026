@@ -521,7 +521,7 @@ Only after Step 1 confirms the safe cross-device default, run `ManualLoop1MiB`, 
 
 ### Phase 6 — Destination-Sensitive Policies
 
-**Status:** After Phases 1–3. SSD/HDD defaults from Section 2.5.3. USB validation (Section 2.6) showed that variance is too high for a static USB profile to be reliable. See design note below.
+**Status:** **Static routing implemented (2026-06-13); benchmark validation pending.** The copy engine was refactored into a policy+strategy system (`SmartCopy.Core/Pipeline/Strategy/`, see `Docs/Architecture.md` §2.4.1): `DefaultCopyStrategyPolicy` selects the copy buffer from the source→destination drive pair per the validated table below, gated behind `OperationalSettings.DestinationRoutingEnabled` (enabled in the app under `AllowCopyOptimisations`; default-off elsewhere, so the refactor is behaviour-preserving). `CopyStep` and `MoveStep` now delegate byte transfer to the shared strategy, removing the duplicated copy engine. SSD/HDD defaults from Section 2.5.3; USB from Section 2.6. The remaining work is the whole-policy benchmark gate (full scenario matrix) before promoting defaults, plus the per-device learned profiles in the design note below. USB variance (Section 2.6) is still too high for a static USB profile to be trusted — treated as a prior pending per-device learning.
 
 **Goal:** Apply appropriate strategy defaults per destination type, with a path toward per-device learned profiles for devices (like USB flash) where static classification is insufficient.
 

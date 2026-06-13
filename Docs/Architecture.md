@@ -49,6 +49,15 @@ SmartCopy2026 follows a strict separation of concerns, heavily utilizing Depende
 
 *   **Signpost**: Search `IPipelineStep.cs`, `PipelineRunner.cs`, and `PipelineValidator.cs`.
 
+#### 2.4.1 Copy Strategy (policy + strategy)
+*   **Principle**: The byte-transfer mechanics of a copy are owned by a single, reusable *strategy*, selected per source→destination pair by a *policy*. Steps delegate the transfer; they keep only their own orchestration (CopyStep's flat enumeration vs MoveStep's recursive atomic-subtree walk and source cleanup).
+*   **Details**:
+    *   `ICopyStrategyPolicy.Resolve(CopyStrategyInputs)` clamps `OperationalSettings` to provider capabilities, then — when `OperationalSettings.DestinationRoutingEnabled` is set — picks the copy buffer from the drive pair (source/target `DriveClassification`, same-volume). `DefaultCopyStrategyPolicy` encodes the benchmark-validated table (see `Docs/optimisation-strategies.md` §2.5.3/§2.6.3); preallocation is OFF universally. The policy then selects the concrete strategy (`BatchedCopyStrategy` when `BatchBufferBytes > 0`, else `StreamingCopyStrategy`).
+    *   `ICopyStrategy` exposes `CopySelectionAsync` (whole flat selection, batching-aware; caller supplies the success label so Copy vs Move stays caller-side) and `TransferFileAsync` (single-file bytes, throws on IO error). `MoveStep`'s non-atomic fallback reuses `TransferFileAsync` then deletes the source.
+    *   Steps obtain the strategy via the `IStepContext.ResolveCopyStrategyAsync(target, ct)` seam (a default interface method); `PipelineRunner.StepContext` overrides the policy from `PipelineJob.CopyStrategyPolicy`. This is the seam where future per-device learned profiles (a different `ICopyStrategyPolicy`) and parallel copy (a new `ICopyStrategy`) plug in.
+*   **Write durability is an intent, not a provider-internal heuristic.** Per file, the strategy decides `WriteDurability.Staged` (crash-safe) vs `Direct` (no staging) from the tiny-file threshold and the target's `AllowStagedWrite` capability, and carries it on `OperationalSettings` (two variants precomputed per strategy to avoid per-file allocation). The provider *executes* the intent with its own mechanism — `LocalFileSystemProvider` stages via temp file + atomic rename or writes direct; `MemoryFileSystemProvider`'s single buffered insert is atomic regardless; MTP reports `AllowStagedWrite: false` and is always asked for `Direct`. The provider-agnostic byte pump lives in `StreamCopyEngine`; the directory-creation cache is the reusable `FreshDirectoryTracker`.
+*   **Signpost**: `SmartCopy.Core/Pipeline/Strategy/` (`ICopyStrategyPolicy`, `DefaultCopyStrategyPolicy`, `ICopyStrategy`, `StreamingCopyStrategy`, `BatchedCopyStrategy`); `SmartCopy.Core/FileSystem/` (`StreamCopyEngine`, `FreshDirectoryTracker`, `WriteDurability`).
+
 ### 2.5 Scanning & Watching
 *   **Principle**: Progressively loaded, non-blocking asynchronous directories.
 *   **Details**: `DirectoryScanner` streams folders directly in, presenting them immediately to maintain responsive UI while recursively background-scanning. 

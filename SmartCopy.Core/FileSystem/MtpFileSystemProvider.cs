@@ -28,7 +28,8 @@ public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
     public string? VolumeId { get; }
     public ProviderCapabilities Capabilities => new(
         CanSeek: false, CanAtomicMove: false, CanWatch: false,
-        MaxPathLength: 260, CanTrash: false);
+        MaxPathLength: 260, CanTrash: false,
+        AllowStagedWrite: false); // UploadFile writes directly; there is no temp+rename on MTP.
 
     public ValueTask<Hardware.DriveClassification> GetClassificationAsync(CancellationToken ct = default) => 
         ValueTask.FromResult(new Hardware.DriveClassification(Hardware.DriveMediaType.MTP, Hardware.DriveInterfaceType.USB));

@@ -1,6 +1,7 @@
 using System;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.Pipeline.Strategy;
 using SmartCopy.Core.Progress;
 using SmartCopy.Core.Trash;
 
@@ -48,4 +49,7 @@ public sealed record PipelineJob
 
     /// <summary>Execution-time tuning parameters for this pipeline run.</summary>
     public OperationalSettings OperationalSettings { get; init; } = new();
+
+    /// <summary>Policy used to resolve copy strategies (buffer/batching selection per drive pair).</summary>
+    public ICopyStrategyPolicy CopyStrategyPolicy { get; init; } = DefaultCopyStrategyPolicy.Instance;
 }

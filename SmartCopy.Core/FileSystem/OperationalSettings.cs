@@ -7,6 +7,20 @@ public enum LocalFileSystemWriteMode
     CopyToAsync,
 }
 
+/// <summary>
+/// Durability intent for a single write, decided by the copy strategy and honoured by the provider.
+/// <see cref="Staged"/> requests a crash-safe commit (the provider chooses the mechanism — e.g. a temp
+/// file + atomic rename); <see cref="Direct"/> permits writing straight to the destination, trading
+/// interruption-safety for less per-file ceremony (used for tiny files where the write is effectively
+/// atomic anyway). A provider that cannot stage (<see cref="ProviderCapabilities.AllowStagedWrite"/> =
+/// false) is always asked for <see cref="Direct"/>.
+/// </summary>
+public enum WriteDurability
+{
+    Staged,
+    Direct,
+}
+
 public sealed record OperationalSettings
 {
     public int CopyBufferSizeBytes { get; init; } = 256 * 1024;
@@ -16,6 +30,15 @@ public sealed record OperationalSettings
     public bool PreallocateDestinationFile { get; init; }
     public long TinyFileFastPathThresholdBytes { get; init; }
     public long BatchBufferBytes { get; init; }
+    /// <summary>
+    /// Durability intent for the write. Set per file by the copy strategy (from the tiny-file
+    /// threshold and the target's staging capability) and honoured by the provider. Default
+    /// <see cref="WriteDurability.Staged"/> preserves crash-safe behaviour for direct WriteAsync callers.
+    /// </summary>
+    public WriteDurability WriteDurability { get; init; } = WriteDurability.Staged;
+    /// <summary>When true, the copy strategy policy selects the copy buffer from the
+    /// source→destination drive pair. Default false preserves the fixed-buffer behaviour.</summary>
+    public bool DestinationRoutingEnabled { get; init; }
     /// <summary>Minimum interval between completion-progress reports, in milliseconds. 0 disables the time gate.</summary>
     public int CompletionProgressIntervalMs { get; init; } = 100;
     /// <summary>Minimum number of files between completion-progress reports. 0 disables the file-count gate.</summary>

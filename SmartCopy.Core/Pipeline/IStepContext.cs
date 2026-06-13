@@ -1,5 +1,6 @@
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.Pipeline.Strategy;
 using SmartCopy.Core.Trash;
 
 namespace SmartCopy.Core.Pipeline;
@@ -27,4 +28,29 @@ public interface IStepContext
 
     bool IsNodeFailed(DirectoryTreeNode node);
     void MarkFailed(DirectoryTreeNode node);
+
+    /// <summary>The policy used to resolve copy strategies. Defaults to the static policy;
+    /// the runner overrides it with the per-job policy.</summary>
+    ICopyStrategyPolicy CopyStrategyPolicy => DefaultCopyStrategyPolicy.Instance;
+
+    /// <summary>
+    /// Resolves the <see cref="ICopyStrategy"/> for transferring files to <paramref name="targetProvider"/>,
+    /// from the source/destination drive classifications, same-volume status, and provider capabilities.
+    /// </summary>
+    async ValueTask<ICopyStrategy> ResolveCopyStrategyAsync(IFileSystemProvider targetProvider, CancellationToken ct)
+    {
+        var source = await SourceProvider.GetClassificationAsync(ct);
+        var target = await targetProvider.GetClassificationAsync(ct);
+        var sameVolume = SourceProvider.VolumeId is { } vid && targetProvider.VolumeId == vid;
+        
+        return CopyStrategyPolicy.Resolve(
+            new CopyStrategyInputs(
+                OperationalSettings, 
+                source, 
+                target,
+                SourceProvider.Capabilities, 
+                targetProvider.Capabilities, 
+                sameVolume)
+                );
+    }
 }

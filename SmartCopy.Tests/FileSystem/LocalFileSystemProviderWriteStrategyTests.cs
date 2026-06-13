@@ -109,7 +109,7 @@ public sealed class LocalFileSystemProviderWriteStrategyTests
     }
 
     [Fact]
-    public async Task WriteAsync_TinyFileFastPath_WritesContentDirectlyAndSucceeds()
+    public async Task WriteAsync_DirectDurability_WritesContentDirectlyAndSucceeds()
     {
         using var temp = new TempDirectory();
         var provider = new LocalFileSystemProvider(temp.Path);
@@ -122,7 +122,7 @@ public sealed class LocalFileSystemProviderWriteStrategyTests
         var settings = new OperationalSettings
         {
             CopyBufferSizeBytes = 4,
-            TinyFileFastPathThresholdBytes = 100,
+            WriteDurability = WriteDurability.Direct,
         };
 
         await using var source = new MemoryStream(payload);
@@ -135,7 +135,7 @@ public sealed class LocalFileSystemProviderWriteStrategyTests
     }
 
     [Fact]
-    public async Task WriteAsync_TinyFileFastPath_WhenInterrupted_DoesNotLeaveCorruptedFile()
+    public async Task WriteAsync_DirectDurability_WhenInterrupted_DoesNotLeaveCorruptedFile()
     {
         using var temp = new TempDirectory();
         var provider = new LocalFileSystemProvider(temp.Path);
@@ -144,7 +144,7 @@ public sealed class LocalFileSystemProviderWriteStrategyTests
         var settings = new OperationalSettings
         {
             CopyBufferSizeBytes = 4,
-            TinyFileFastPathThresholdBytes = 1024,
+            WriteDurability = WriteDurability.Direct,
         };
 
         await Assert.ThrowsAsync<OperationCanceledException>(async () =>
@@ -158,7 +158,7 @@ public sealed class LocalFileSystemProviderWriteStrategyTests
     }
 
     [Fact]
-    public async Task WriteAsync_TinyFileFastPath_WhenOpenFails_DoesNotDeletePreExistingFile()
+    public async Task WriteAsync_DirectDurability_WhenOpenFails_DoesNotDeletePreExistingFile()
     {
         using var temp = new TempDirectory();
         var provider = new LocalFileSystemProvider(temp.Path);
@@ -170,7 +170,7 @@ public sealed class LocalFileSystemProviderWriteStrategyTests
         var settings = new OperationalSettings
         {
             CopyBufferSizeBytes = 4,
-            TinyFileFastPathThresholdBytes = 1024,
+            WriteDurability = WriteDurability.Direct,
         };
 
         await Assert.ThrowsAnyAsync<IOException>(async () =>

@@ -1,6 +1,7 @@
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline.Steps;
+using SmartCopy.Core.Pipeline.Strategy;
 using SmartCopy.Core.Pipeline.Validation;
 using SmartCopy.Core.Trash;
 
@@ -219,6 +220,7 @@ public sealed partial class PipelineRunner
         public bool AllowDeleteReadOnly { get; }
         public ITrashService TrashService { get; }
         public OperationalSettings OperationalSettings { get; }
+        public ICopyStrategyPolicy CopyStrategyPolicy { get; }
 
         public StepContext(
             PipelineJob job,
@@ -231,6 +233,7 @@ public sealed partial class PipelineRunner
             AllowDeleteReadOnly = job.AllowDeleteReadOnly;
             TrashService = job.TrashService;
             OperationalSettings = job.OperationalSettings;
+            CopyStrategyPolicy = job.CopyStrategyPolicy;
             _fileTransferProgress = fileTransferProgress;
         }
 

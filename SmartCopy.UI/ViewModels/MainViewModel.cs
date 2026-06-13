@@ -1222,6 +1222,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                   {
                       TinyFileFastPathThresholdBytes = (long)_settings.TinyFileFastPathKb * 1024,
                       BatchBufferBytes               = (long)_settings.BatchBufferKb * 1024,
+                      DestinationRoutingEnabled      = true,
                   }.Normalize()
                 : new OperationalSettings(),
         };
@@ -1325,6 +1326,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                   {
                       TinyFileFastPathThresholdBytes = (long)_settings.TinyFileFastPathKb * 1024,
                       BatchBufferBytes               = (long)_settings.BatchBufferKb * 1024,
+                      DestinationRoutingEnabled      = true,
                   }.Normalize()
                 : new OperationalSettings(),
         };

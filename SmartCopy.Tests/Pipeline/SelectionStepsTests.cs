@@ -3,7 +3,6 @@ using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Pipeline.Validation;
-using SmartCopy.Core.Trash;
 using SmartCopy.Tests.TestInfrastructure;
 
 namespace SmartCopy.Tests.Pipeline;
@@ -13,54 +12,6 @@ public sealed class SelectionStepsTests
     // -------------------------------------------------------------------------
     // Test infrastructure
     // -------------------------------------------------------------------------
-
-    /// <summary>
-    /// Minimal IStepContext for unit-testing individual steps.
-    /// </summary>
-    private sealed class TestStepContext : IStepContext
-    {
-        private readonly Dictionary<DirectoryTreeNode, PipelineContext> _contexts = new();
-        private readonly HashSet<DirectoryTreeNode> _failed = new();
-
-        public DirectoryNode RootNode { get; }
-        public IFileSystemProvider SourceProvider { get; }
-        public FileSystemProviderRegistry ProviderRegistry { get; } = new();
-        public bool ShowHiddenFiles { get; }
-        public bool AllowDeleteReadOnly { get; }
-        public ITrashService TrashService { get; } = new NullTrashService();
-        public OperationalSettings OperationalSettings { get; } = new();
-
-        public TestStepContext(DirectoryNode root, IFileSystemProvider provider)
-        {
-            RootNode = root;
-            SourceProvider = provider;
-            ProviderRegistry = new FileSystemProviderRegistry();
-            ProviderRegistry.Register(provider);
-        }
-
-        public PipelineContext GetNodeContext(DirectoryTreeNode node)
-        {
-            if (!_contexts.TryGetValue(node, out var context))
-            {
-                context = new PipelineContext
-                {
-                    SourceNode = node,
-                    SourceProvider = SourceProvider,
-                    ProviderRegistry = ProviderRegistry,
-                    PathSegments = node.RelativePathSegments.Length > 0
-                        ? node.RelativePathSegments
-                        : [node.Name],
-                    CurrentExtension = Path.GetExtension(node.Name).TrimStart('.'),
-                    VirtualCheckState = node.CheckState,
-                };
-                _contexts[node] = context;
-            }
-            return context;
-        }
-
-        public bool IsNodeFailed(DirectoryTreeNode node) => _failed.Contains(node);
-        public void MarkFailed(DirectoryTreeNode node) => _failed.Add(node);
-    }
 
     /// <summary>
     /// Builds a minimal tree rooted at /src with a single file.txt.
@@ -88,7 +39,7 @@ public sealed class SelectionStepsTests
     {
         var step = new SelectAllStep();
         var (root, file, provider) = await MakeTree(CheckState.Unchecked);
-        var context = new TestStepContext(root, provider);
+        var context = new FakeStepContext(root, provider);
 
         var results = new List<TransformResult>();
         await foreach (var r in step.PreviewAsync(context, CancellationToken.None)) results.Add(r);
@@ -106,7 +57,7 @@ public sealed class SelectionStepsTests
     {
         var step = new SelectAllStep();
         var (root, file, provider) = await MakeTree(CheckState.Unchecked);
-        var context = new TestStepContext(root, provider);
+        var context = new FakeStepContext(root, provider);
 
         var results = new List<TransformResult>();
         await foreach (var r in step.ApplyAsync(context, CancellationToken.None)) results.Add(r);
@@ -135,7 +86,7 @@ public sealed class SelectionStepsTests
     {
         var step = new ClearSelectionStep();
         var (root, file, provider) = await MakeTree(CheckState.Checked);
-        var context = new TestStepContext(root, provider);
+        var context = new FakeStepContext(root, provider);
 
         var results = new List<TransformResult>();
         await foreach (var r in step.PreviewAsync(context, CancellationToken.None)) results.Add(r);
@@ -153,7 +104,7 @@ public sealed class SelectionStepsTests
     {
         var step = new ClearSelectionStep();
         var (root, file, provider) = await MakeTree(CheckState.Checked);
-        var context = new TestStepContext(root, provider);
+        var context = new FakeStepContext(root, provider);
 
         var results = new List<TransformResult>();
         await foreach (var r in step.ApplyAsync(context, CancellationToken.None)) results.Add(r);
@@ -182,7 +133,7 @@ public sealed class SelectionStepsTests
     {
         var step = new InvertSelectionStep();
         var (root, file, provider) = await MakeTree(CheckState.Unchecked);
-        var context = new TestStepContext(root, provider);
+        var context = new FakeStepContext(root, provider);
 
         var results = new List<TransformResult>();
         await foreach (var r in step.PreviewAsync(context, CancellationToken.None)) results.Add(r);
@@ -200,7 +151,7 @@ public sealed class SelectionStepsTests
     {
         var step = new InvertSelectionStep();
         var (root, file, provider) = await MakeTree(CheckState.Checked);
-        var context = new TestStepContext(root, provider);
+        var context = new FakeStepContext(root, provider);
 
         await foreach (var _ in step.ApplyAsync(context, CancellationToken.None)) { }
 
@@ -212,7 +163,7 @@ public sealed class SelectionStepsTests
     {
         var step = new InvertSelectionStep();
         var (root, file, provider) = await MakeTree(CheckState.Unchecked);
-        var context = new TestStepContext(root, provider);
+        var context = new FakeStepContext(root, provider);
 
         await foreach (var _ in step.ApplyAsync(context, CancellationToken.None)) { }
 
