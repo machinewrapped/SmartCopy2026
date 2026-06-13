@@ -200,6 +200,7 @@ public partial class FilterChainViewModel : ViewModelBase
     /// <summary>Adds a new filter card from a freshly-built <see cref="IFilter"/>.</summary>
     public void AddFilterFromResult(IFilter filter)
     {
+        SyncPipelineAwarePath(filter);
         var vm = new FilterViewModel(filter);
         vm.IsEnabledChanged += (_, _) => ChainChanged?.Invoke(this, EventArgs.Empty);
         Filters.Add(vm);
@@ -210,6 +211,7 @@ public partial class FilterChainViewModel : ViewModelBase
     /// <summary>Replaces the filter wrapped by an existing card (edit dialog result).</summary>
     public void ReplaceFilter(FilterViewModel filterVm, IFilter newFilter)
     {
+        SyncPipelineAwarePath(newFilter);
         filterVm.ReplaceFilter(newFilter);
         ChainChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -278,6 +280,7 @@ public partial class FilterChainViewModel : ViewModelBase
         foreach (var filterConfig in preset.Config.Filters)
         {
             var filter = FilterFactory.FromConfig(filterConfig);
+            SyncPipelineAwarePath(filter);
             var vm = new FilterViewModel(filter);
             vm.IsEnabledChanged += (_, _) => ChainChanged?.Invoke(this, EventArgs.Empty);
             Filters.Add(vm);
@@ -293,8 +296,16 @@ public partial class FilterChainViewModel : ViewModelBase
 
     partial void OnPipelineDestinationPathChanged(string value)
     {
-        // Let live-wiring in MainViewModel re-evaluate the mirror filter description
-        // by firing ChainChanged so it rebuilds and re-applies.
+        foreach (var vm in Filters)
+            SyncPipelineAwarePath(vm.BackingFilter);
+
+        // Re-evaluate filters with the updated destination path.
         ChainChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void SyncPipelineAwarePath(IFilter filter)
+    {
+        if (filter is IPipelineAwareFilter aware)
+            aware.PipelineDestinationPath = PipelineDestinationPath;
     }
 }

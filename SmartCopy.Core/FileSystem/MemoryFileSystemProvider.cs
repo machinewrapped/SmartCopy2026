@@ -6,7 +6,7 @@ namespace SmartCopy.Core.FileSystem;
 public sealed class MemoryFileSystemProvider : IFileSystemProvider
 {
     private const string DefaultRoot = "mem://";
-    private readonly ConcurrentDictionary<string, MemoryEntry> _entries = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, MemoryEntry> _entries = new(StringComparer.Ordinal);
     // SemaphoreSlim(1,1) provides async-compatible exclusive locking for all mutation operations.
     private readonly SemaphoreSlim _mutationSemaphore = new(1, 1);
 
@@ -41,6 +41,13 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         CanTrash: false,
         CanQueryFreeSpace: SimulatedCapacity.HasValue);
 
+    public ValueTask<Hardware.DriveClassification> GetClassificationAsync(CancellationToken ct = default) => 
+        ValueTask.FromResult(new Hardware.DriveClassification(Hardware.DriveMediaType.Memory, Hardware.DriveInterfaceType.Virtual));
+
+    public StringComparer PathComparer => StringComparer.Ordinal;
+
+    public StringComparison PathComparison => StringComparison.Ordinal;
+
     public Task<IReadOnlyList<FileSystemNode>> GetChildrenAsync(string path, CancellationToken ct)
     {
         return Task.Run(async () =>
@@ -52,11 +59,11 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
             // GetParentPath(kv.Key) == normalizedPath selects direct children.
             // The extra inequality guard is only needed for root, where GetParentPath(RootPath) == RootPath.
             IReadOnlyList<FileSystemNode> children = _entries
-                .Where(kv => GetParentPath(kv.Key).Equals(normalizedPath, StringComparison.OrdinalIgnoreCase)
-                            && !kv.Key.Equals(normalizedPath, StringComparison.OrdinalIgnoreCase))
+                .Where(kv => GetParentPath(kv.Key).Equals(normalizedPath, StringComparison.Ordinal)
+                            && !kv.Key.Equals(normalizedPath, StringComparison.Ordinal))
                 .Select(kv => ToNode(kv.Key, kv.Value))
                 .OrderBy(node => node.IsDirectory ? 0 : 1)
-                .ThenBy(node => node.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(node => node.Name, StringComparer.Ordinal)
                 .ToList();
 
             if (AddArtificialDelay)
@@ -183,7 +190,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
                 throw new FileNotFoundException($"Source path does not exist: {normalizedSourcePath}", normalizedSourcePath);
             }
 
-            if (normalizedSourcePath.Equals(normalizedDestinationPath, StringComparison.OrdinalIgnoreCase))
+            if (normalizedSourcePath.Equals(normalizedDestinationPath, StringComparison.Ordinal))
             {
                 return;
             }
@@ -203,14 +210,14 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
             if (sourceEntry.IsDirectory)
             {
                 var keysToMove = _entries.Keys
-                    .Where(currentPath => currentPath.Equals(normalizedSourcePath, StringComparison.OrdinalIgnoreCase)
+                    .Where(currentPath => currentPath.Equals(normalizedSourcePath, StringComparison.Ordinal)
                                           || IsDescendantOf(currentPath, normalizedSourcePath))
                     .OrderBy(pathToMove => pathToMove.Length)
                     .ToList();
 
                 foreach (var oldKey in keysToMove)
                 {
-                    var relative = oldKey.Equals(normalizedSourcePath, StringComparison.OrdinalIgnoreCase)
+                    var relative = oldKey.Equals(normalizedSourcePath, StringComparison.Ordinal)
                         ? string.Empty
                         : oldKey.Substring(normalizedSourcePath.Length).TrimStart('/');
                     var newKey = string.IsNullOrEmpty(relative)
@@ -291,10 +298,10 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
     {
         var root = Normalize(basePath);
         var full = Normalize(fullPath);
-        if (full.Equals(root, StringComparison.OrdinalIgnoreCase))
+        if (full.Equals(root, StringComparison.Ordinal))
             return string.Empty;
         var prefix = root.EndsWith('/') ? root : root + '/';
-        return full.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+        return full.StartsWith(prefix, StringComparison.Ordinal)
             ? full[prefix.Length..]
             : GetRelativeToRoot(full);
     }
@@ -367,7 +374,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
             throw new DirectoryNotFoundException(path);
         }
 
-        if (!path.Equals(RootPath, StringComparison.OrdinalIgnoreCase))
+        if (!path.Equals(RootPath, StringComparison.Ordinal))
         {
             EnsureDirectoryExists(GetParentPath(path), createIfMissing: true);
         }
@@ -378,7 +385,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
     private async Task RemovePathInternal(string normalizedPath, CancellationToken ct)
     {
         var toRemove = _entries.Keys
-            .Where(currentPath => currentPath.Equals(normalizedPath, StringComparison.OrdinalIgnoreCase)
+            .Where(currentPath => currentPath.Equals(normalizedPath, StringComparison.Ordinal)
                                   || IsDescendantOf(currentPath, normalizedPath))
             .ToList();
 
@@ -396,13 +403,13 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
 
     private static bool IsDescendantOf(string path, string ancestorPath)
     {
-        if (path.Equals(ancestorPath, StringComparison.OrdinalIgnoreCase))
+        if (path.Equals(ancestorPath, StringComparison.Ordinal))
         {
             return false;
         }
 
         var prefix = ancestorPath.EndsWith('/') ? ancestorPath : ancestorPath + "/";
-        return path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+        return path.StartsWith(prefix, StringComparison.Ordinal);
     }
 
     private string Normalize(string path)
@@ -441,8 +448,8 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
 
         // If full path is exactly RootPath or directly beneath it, return as-is.
         var rootPrefix = RootPath.EndsWith('/') ? RootPath : RootPath + "/";
-        if (full.Equals(RootPath, StringComparison.OrdinalIgnoreCase) ||
-            full.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
+        if (full.Equals(RootPath, StringComparison.Ordinal) ||
+            full.StartsWith(rootPrefix, StringComparison.Ordinal))
             return string.IsNullOrEmpty(rest) ? RootPath : full;
 
         // Treat rest as a relative segment under RootPath.
@@ -454,7 +461,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
     private string GetParentPath(string path)
     {
         path = Normalize(path);
-        if (path.Equals(RootPath, StringComparison.OrdinalIgnoreCase))
+        if (path.Equals(RootPath, StringComparison.Ordinal))
             return RootPath;
 
         // Skip past "://" so we only search for path separators after the scheme.
@@ -472,7 +479,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
 
     private FileSystemNode ToNode(string path, MemoryEntry entry)
     {
-        var name = path.Equals(RootPath, StringComparison.OrdinalIgnoreCase)
+        var name = path.Equals(RootPath, StringComparison.Ordinal)
             ? RootPath
             : path[(path.LastIndexOf('/') + 1)..];
 
@@ -490,11 +497,11 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
 
     private string GetRelativeToRoot(string path)
     {
-        if (path.Equals(RootPath, StringComparison.OrdinalIgnoreCase))
+        if (path.Equals(RootPath, StringComparison.Ordinal))
             return string.Empty;
 
         var root = RootPath.EndsWith('/') ? RootPath : RootPath + '/';
-        return path.StartsWith(root, StringComparison.OrdinalIgnoreCase)
+        return path.StartsWith(root, StringComparison.Ordinal)
             ? path[root.Length..]
             : path.TrimStart('/');
     }

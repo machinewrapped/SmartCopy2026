@@ -4,6 +4,7 @@ using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Filters;
 using SmartCopy.Core.Scanning;
+using SmartCopy.Core.FileSystem.Hardware;
 
 namespace SmartCopy.UI.ViewModels;
 
@@ -26,8 +27,56 @@ public class DirectoryTreeViewModel : ViewModelBase
     /// <summary>Indicates whether the directory tree is fully loaded</summary>
     public bool IsLoaded { get; private set; }
 
+    private IFileSystemProvider? _sourceProvider;
+    private CancellationTokenSource? _classificationCts;
+    
     /// <summary>The filesystem that contains the root node</summary>
-    public IFileSystemProvider? SourceProvider { get; private set; }
+    public IFileSystemProvider? SourceProvider
+    {
+        get => _sourceProvider;
+        private set
+        {
+            if (SetProperty(ref _sourceProvider, value))
+            {
+                _ = LoadClassificationAsync(value);
+            }
+        }
+    }
+
+    private DriveClassification? _classification;
+    public DriveClassification? Classification
+    {
+        get => _classification;
+        private set => SetProperty(ref _classification, value);
+    }
+
+    private async Task LoadClassificationAsync(IFileSystemProvider? provider)
+    {
+        _classificationCts?.Cancel();
+        _classificationCts?.Dispose();
+        _classificationCts = new CancellationTokenSource();
+        var ct = _classificationCts.Token;
+
+        if (provider == null)
+        {
+            Classification = null;
+            return;
+        }
+
+        Classification = null; // Clear while loading
+        try
+        {
+            Classification = await provider.GetClassificationAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            // Ignore cancellation
+        }
+        catch
+        {
+            Classification = DriveClassification.Unknown;
+        }
+    }
 
     /// <summary>The root path of the directory tree</summary>
     public string? SourcePath => RootNode?.FullPath;

@@ -17,7 +17,6 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     private readonly bool _isNetworkPath;
     private readonly ProviderCapabilities _capabilities;
     private string? _lastCreatedDirectory;
-
     public LocalFileSystemProvider(
         string rootPath,
         Func<string>? readLinuxMountInfo = null)
@@ -31,15 +30,42 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
             MaxPathLength: int.MaxValue,
             CanTrash: !_isNetworkPath,
             CanQueryFreeSpace: !_isNetworkPath);
+            
     }
 
     public string RootPath { get; }
 
     public string? VolumeId => _isNetworkPath
         ? null
-        : Path.GetPathRoot(RootPath)?.ToUpperInvariant();
+        : GetVolumeIdSafe(RootPath);
+
+    private static string? GetVolumeIdSafe(string path)
+    {
+        try
+        {
+            string drivePath = OperatingSystem.IsWindows() 
+                ? (Path.GetPathRoot(path) ?? path) 
+                : path;
+            return new DriveInfo(drivePath).Name;
+        }
+        catch
+        {
+            return Path.GetPathRoot(path)?.ToUpperInvariant();
+        }
+    }
 
     public ProviderCapabilities Capabilities => _capabilities;
+    
+    public ValueTask<Hardware.DriveClassification> GetClassificationAsync(CancellationToken ct = default)
+    {
+        if (_isNetworkPath)
+            return ValueTask.FromResult(Hardware.DriveClassification.Unknown);
+        return Hardware.DriveClassificationRegistry.GetOrClassifyAsync(RootPath, VolumeId, ct);
+    }
+
+    public StringComparer PathComparer => PathHelper.LocalPathComparer;
+
+    public StringComparison PathComparison => PathHelper.LocalPathComparison;
 
     public Task<IReadOnlyList<FileSystemNode>> GetChildrenAsync(string path, CancellationToken ct)
     {

@@ -68,7 +68,7 @@ public partial class ExtensionFilterEditorViewModel : FilterEditorViewModelBase
     }
 
     public override IFilter BuildFilter()
-        => new ExtensionFilter(Extensions, Mode);
+        => new ExtensionFilter(Extensions, Mode, IsEnabled);
 
     public override void LoadFrom(IFilter filter)
     {
@@ -78,6 +78,7 @@ public partial class ExtensionFilterEditorViewModel : FilterEditorViewModelBase
         }
 
         Mode = ef.Mode;
+        IsEnabled = ef.IsEnabled;
         Extensions.Clear();
         foreach (var ext in ef.Extensions)
         {

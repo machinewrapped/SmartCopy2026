@@ -71,3 +71,5 @@ dataset-prep-summary-*.json
 /.benchmarks/
 /.antigravitycli
 /Tools
+.codex
+*.lscache

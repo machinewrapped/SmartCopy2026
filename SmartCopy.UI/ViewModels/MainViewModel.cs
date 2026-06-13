@@ -1069,7 +1069,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         var currentPath = PathHelper.NormalizeUserPath(SourcePath);
 
         SourceBookmarks.Clear();
-        var addedPaths = new HashSet<string>(PathHelper.PathComparer);
+        var addedPaths = new HashSet<string>(StringComparer.Ordinal);
 
         var normalizedFavourites = PathHelper.NormalizeDistinctUserPaths(_settings.FavouritePaths);
         var normalizedRecent = PathHelper.NormalizeDistinctUserPaths(_settings.RecentSources);

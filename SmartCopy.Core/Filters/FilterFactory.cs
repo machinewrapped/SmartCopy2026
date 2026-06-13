@@ -86,7 +86,10 @@ public static class FilterFactory
         var comparisonPath = c.Parameters["comparisonPath"]?.GetValue<string>() ?? string.Empty;
         var compareModeStr = c.Parameters["compareMode"]?.GetValue<string>() ?? "NameAndSize";
         var compareMode = Enum.Parse<MirrorCompareMode>(compareModeStr);
-        return new MirrorFilter(comparisonPath, compareMode, mode, c.IsEnabled);
+        var useAutomaticPath = c.Parameters.TryGetPropertyValue("useAutomaticPath", out var autoNode)
+            && autoNode is not null
+            && autoNode.GetValue<bool>();
+        return new MirrorFilter(comparisonPath, compareMode, mode, c.IsEnabled, useAutomaticPath);
     }
 
     private static IFilter BuildAttribute(FilterConfig c, FilterMode mode)

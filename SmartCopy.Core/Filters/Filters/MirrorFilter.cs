@@ -1,4 +1,3 @@
-using System;
 using System.Text.Json.Nodes;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
@@ -11,38 +10,54 @@ public enum MirrorCompareMode
     NameAndSize,
 }
 
-public sealed class MirrorFilter : FilterBase
+public sealed class MirrorFilter : FilterBase, IPipelineAwareFilter
 {
     public MirrorFilter(
         string comparisonPath,
         MirrorCompareMode compareMode,
         FilterMode mode,
-        bool isEnabled = true)
+        bool isEnabled = true,
+        bool useAutomaticPath = false)
         : base("Mirror", mode, isEnabled)
     {
         ComparisonPath = comparisonPath;
         CompareMode = compareMode;
+        UseAutomaticPath = useAutomaticPath;
     }
 
     public string ComparisonPath { get; }
     public MirrorCompareMode CompareMode { get; }
+    public bool UseAutomaticPath { get; }
+
+    /// <inheritdoc cref="IPipelineAwareFilter.PipelineDestinationPath"/>
+    public string? PipelineDestinationPath { get; set; }
+
+    private string EffectiveComparisonPath =>
+        UseAutomaticPath ? (PipelineDestinationPath ?? string.Empty) : ComparisonPath;
+
     public override bool AppliesToDirectories => true;
 
     public override string Summary => "Skip files already in target";
-    public override string Description => $"Mirror: {ComparisonPath} ({CompareMode})";
+    public override string Description => UseAutomaticPath
+        ? $"Mirror: (automatic) ({CompareMode})"
+        : $"Mirror: {ComparisonPath} ({CompareMode})";
 
     public override async ValueTask<bool> MatchesAsync(
         DirectoryTreeNode node,
         IPathResolver context,
         CancellationToken ct = default)
     {
-        var comparisonProvider = ResolveComparisonProvider(context);
+        var effectivePath = EffectiveComparisonPath;
+        var comparisonProvider = ResolveComparisonProvider(context, effectivePath);
         if (comparisonProvider is null)
         {
-            return false;
+            // No comparison path available — degrade gracefully so the filter is a no-op.
+            // Return the neutral value for this mode: true for Only (don't exclude anything),
+            // false for Exclude/Add (don't exclude or force-include anything).
+            return UseAutomaticPath && Mode == FilterMode.Only;
         }
 
-        var comparePath = comparisonProvider.JoinPath(ComparisonPath, node.RelativePathSegments);
+        var comparePath = comparisonProvider.JoinPath(effectivePath, node.RelativePathSegments);
         var exists = await comparisonProvider.ExistsAsync(comparePath, ct);
 
         if (!exists)
@@ -62,7 +77,7 @@ public sealed class MirrorFilter : FilterBase
             // by the filter chain infrastructure, so we only need to check direct files here.
             foreach (var file in dirNode.Files)
             {
-                var fileMirrorPath = comparisonProvider.JoinPath(ComparisonPath, file.RelativePathSegments);
+                var fileMirrorPath = comparisonProvider.JoinPath(effectivePath, file.RelativePathSegments);
                 if (!await comparisonProvider.ExistsAsync(fileMirrorPath, ct))
                 {
                     return false;
@@ -85,12 +100,12 @@ public sealed class MirrorFilter : FilterBase
         return targetNode.Size == node.Size;
     }
 
-    private IFileSystemProvider? ResolveComparisonProvider(IPathResolver resolver)
+    private static IFileSystemProvider? ResolveComparisonProvider(IPathResolver resolver, string path)
     {
-        if (string.IsNullOrWhiteSpace(ComparisonPath))
+        if (string.IsNullOrWhiteSpace(path))
             return null;
 
-        return resolver.ResolveProvider(ComparisonPath);
+        return resolver.ResolveProvider(path);
     }
 
     protected override JsonObject BuildParameters() =>
@@ -98,5 +113,6 @@ public sealed class MirrorFilter : FilterBase
         {
             ["comparisonPath"] = ComparisonPath,
             ["compareMode"] = CompareMode.ToString(),
+            ["useAutomaticPath"] = UseAutomaticPath,
         };
 }

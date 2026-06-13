@@ -43,11 +43,11 @@ public partial class AddFilterViewModel : ObservableObject
 
     public IReadOnlyList<FilterTypeItem> FilterTypes { get; } =
     [
+        new("Mirror",     "Mirror",      "Filter files based on another path"),
         new("Extension",  "Extension",   "Filter by file extension"),
         new("Wildcard",   "Wildcard",    "Filter by name pattern"),
         new("DateRange",  "Date Range",  "Filter by created/modified date"),
         new("SizeRange",  "Size Range",  "Filter by file size"),
-        new("Mirror",     "Mirror",      "Skip files already on target"),
         new("Attribute",  "Attribute",   "Filter by file attributes"),
     ];
 
