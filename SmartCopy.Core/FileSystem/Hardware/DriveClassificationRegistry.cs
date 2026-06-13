@@ -14,7 +14,7 @@ public static class DriveClassificationRegistry
 
         var task = _cache.GetOrAdd(key, k => 
         {
-            var innerTask = CrossPlatformDriveClassifier.ClassifyAsync(rootPath, CancellationToken.None);
+            var innerTask = CrossPlatformDriveClassifier.ClassifyAsync(rootPath, ct);
             
             // Evict faulted/canceled tasks so subsequent calls can retry
             _ = innerTask.ContinueWith(t => 

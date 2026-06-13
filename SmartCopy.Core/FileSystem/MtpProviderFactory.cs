@@ -36,6 +36,8 @@ public static class MtpProviderFactory
 
     private static bool NameMatches(MediaDevice device, string name)
     {
+        // Ordinal (not IgnoreCase): Windows allows two MTP devices whose display names
+        // differ only in case.  OrdinalIgnoreCase would produce a non-deterministic match.
         var deviceName = string.IsNullOrEmpty(device.FriendlyName) ? device.Model : device.FriendlyName;
         return string.Equals(deviceName, name, StringComparison.Ordinal);
     }

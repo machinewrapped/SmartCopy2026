@@ -57,8 +57,6 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 
     public ProviderCapabilities Capabilities => _capabilities;
     
-    public Hardware.DriveClassification Classification => Hardware.DriveClassification.Unknown; // No longer used, handled by GetClassificationAsync
-
     public ValueTask<Hardware.DriveClassification> GetClassificationAsync(CancellationToken ct = default)
     {
         if (_isNetworkPath)
