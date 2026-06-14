@@ -104,26 +104,12 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
     }
 
     /// <summary>
-    /// Intentional depth-first enumeration for batching: yields each directory's own selected files
-    /// smallest-first (so the buffer packs optimally), then recurses into child directories in order —
-    /// completing each subtree in full before the next sibling. This deliberate order (rather than
-    /// relying on <see cref="DirectoryNode.GetSelectedDescendants"/>'s incidental traversal) gives the
-    /// resume property: because accumulation and flush write in this same order, an interrupted copy
-    /// leaves a clean depth-first prefix on disk, so completed and missing subtrees are obvious.
-    /// <para>
-    /// Selection is enforced per node via <c>IsSelected</c> (Checked &amp;&amp; Included &amp;&amp; not
-    /// marked-for-removal), so a partially-selected directory (CheckState=Indeterminate, or a Mixed
-    /// filter result) is still recursed into to reach its selected descendants — gating recursion on the
-    /// directory's own <c>IsSelected</c> would silently drop them. As an optimisation we prune subtrees
-    /// that <em>cannot</em> contain a selected node: a directory that is Unchecked, filter-Excluded, or
-    /// marked for removal guarantees the same of its whole subtree (CheckState and FilterResult are
-    /// computed bottom-up — see <see cref="DirectoryNode.RecalculateCheckState"/> /
-    /// <see cref="Filters.FilterChain.RecalculateParentExclusion"/> — and <c>MarkForRemoval</c> recurses).
-    /// Note the polarity: we prune on <c>== Unchecked</c>/<c>== Excluded</c>, not <c>!= Checked</c>/
-    /// <c>!= Included</c>, because Indeterminate/Mixed subtrees still hold selected nodes. The directory
-    /// node is yielded as a traversal marker only when it is itself selected (the caller emits a no-op
-    /// result for markers).
-    /// </para>
+    /// Intentional depth-first enumeration for batching: each directory's own selected files
+    /// smallest-first (optimal buffer packing), then each child subtree completed in full before the
+    /// next sibling (the resume property — accumulation and flush share this order). Recurses into
+    /// partially-selected directories but prunes subtrees that can hold no selected node. The traversal,
+    /// selection, and prune-polarity rules are documented in <c>Docs/Architecture.md</c> §2.4.1
+    /// ("Traversal selection &amp; pruning").
     /// </summary>
     private static IEnumerable<DirectoryTreeNode> EnumerateForBatching(DirectoryNode dir)
     {
@@ -132,7 +118,8 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
 
         foreach (var child in dir.Children)
         {
-            // Prune subtrees that can hold no selected node (each condition holds for the whole subtree).
+            // Prune subtrees that can hold no selected node — each condition holds for the whole subtree
+            // (bottom-up CheckState/FilterResult; recursive MarkForRemoval). See Architecture.md §2.4.1.
             if (child.CheckState == CheckState.Unchecked ||
                 child.FilterResult == FilterResult.Excluded ||
                 child.IsMarkedForRemoval)

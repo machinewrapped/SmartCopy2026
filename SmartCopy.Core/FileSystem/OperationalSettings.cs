@@ -1,48 +1,52 @@
 namespace SmartCopy.Core.FileSystem;
 
+/// <summary>Selects the byte-pump path in <see cref="StreamCopyEngine"/>.</summary>
 public enum LocalFileSystemWriteMode
 {
+    /// <summary>Choose per file from size and whether progress is wired.</summary>
     Auto,
+    /// <summary>Force the per-chunk loop (reports progress per chunk).</summary>
     ManualLoop,
+    /// <summary>Force the framework <c>Stream.CopyToAsync</c>.</summary>
     CopyToAsync,
 }
 
-/// <summary>
-/// Durability intent for a single write, decided by the copy strategy and honoured by the provider.
-/// <see cref="Staged"/> requests a crash-safe commit (the provider chooses the mechanism — e.g. a temp
-/// file + atomic rename); <see cref="Direct"/> permits writing straight to the destination, trading
-/// interruption-safety for less per-file ceremony (used for tiny files where the write is effectively
-/// atomic anyway). A provider that cannot stage (<see cref="ProviderCapabilities.AllowStagedWrite"/> =
-/// false) is always asked for <see cref="Direct"/>.
-/// </summary>
+/// <summary>Per-write durability intent, decided by the copy strategy and executed by the provider
+/// (full design: <c>Docs/Architecture.md</c> §2.4.1).</summary>
 public enum WriteDurability
 {
+    /// <summary>Crash-safe commit; the provider picks the mechanism (e.g. temp file + atomic rename).</summary>
     Staged,
+    /// <summary>Write straight to the destination, no staging — used for tiny files and for providers
+    /// that cannot stage (<see cref="ProviderCapabilities.AllowStagedWrite"/> = false).</summary>
     Direct,
 }
 
 public sealed record OperationalSettings
 {
+    /// <summary>Size of the per-file copy buffer (and the ArrayPool rent size for the manual loop).</summary>
     public int CopyBufferSizeBytes { get; init; } = 256 * 1024;
+    /// <summary>Files at or below this size report progress once on completion rather than per chunk.</summary>
     public long SmallFileProgressThresholdBytes { get; init; } = 10L * 1024 * 1024;
+    /// <summary>Which byte-pump path the engine uses; <see cref="LocalFileSystemWriteMode.Auto"/> decides per file.</summary>
     public LocalFileSystemWriteMode WriteMode { get; init; } = LocalFileSystemWriteMode.Auto;
+    /// <summary>Rent the manual-loop buffer from <c>ArrayPool</c> instead of allocating one per file.</summary>
     public bool UseArrayPoolForManualLoop { get; init; }
+    /// <summary>Pre-size the destination to the known length before writing. OFF universally (no validated
+    /// win, and it throws on non-seekable targets — see <see cref="StreamCopyEngine"/>).</summary>
     public bool PreallocateDestinationFile { get; init; }
+    /// <summary>Files at or below this size are written <see cref="WriteDurability.Direct"/> (no staging),
+    /// the write being effectively atomic anyway. <c>0</c> disables the fast path (always stage).</summary>
     public long TinyFileFastPathThresholdBytes { get; init; }
+    /// <summary>When &gt; 0, selects <c>BatchedCopyStrategy</c> and sets its accumulation-buffer capacity;
+    /// <c>0</c> uses <c>StreamingCopyStrategy</c>.</summary>
     public long BatchBufferBytes { get; init; }
-    /// <summary>
-    /// Files at or below this size are eligible for the batch path; larger files bypass batching and
-    /// stream individually (the ManualLoop path). Capped to the batch buffer capacity where used, so
-    /// eligibility alone guarantees a file fits the buffer. Default 512 KiB ensures genuine phase
-    /// separation — at least two files share every flush of a 1 MiB+ buffer (see
-    /// <c>Docs/optimisation-strategies.md</c> Phase 3). <c>0</c> disables the ceiling (use buffer capacity).
-    /// </summary>
+    /// <summary>Files at or below this size batch; larger ones stream individually. Capped to the batch
+    /// buffer capacity, so the default 512 KiB keeps ≥2 files per flush of a 1 MiB+ buffer (rationale:
+    /// <c>Docs/optimisation-strategies.md</c> Phase 3). <c>0</c> disables the ceiling (use buffer capacity).</summary>
     public long BatchEligibilityCeilingBytes { get; init; } = 512 * 1024;
-    /// <summary>
-    /// Durability intent for the write. Set per file by the copy strategy (from the tiny-file
-    /// threshold and the target's staging capability) and honoured by the provider. Default
-    /// <see cref="WriteDurability.Staged"/> preserves crash-safe behaviour for direct WriteAsync callers.
-    /// </summary>
+    /// <summary>Per-file durability intent (set by the strategy). Default <see cref="WriteDurability.Staged"/>
+    /// keeps direct <c>WriteAsync</c> callers crash-safe.</summary>
     public WriteDurability WriteDurability { get; init; } = WriteDurability.Staged;
     /// <summary>When true, the copy strategy policy selects the copy buffer from the
     /// source→destination drive pair. Default false preserves the fixed-buffer behaviour.</summary>
