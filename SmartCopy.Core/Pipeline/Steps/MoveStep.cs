@@ -14,7 +14,7 @@ namespace SmartCopy.Core.Pipeline.Steps;
 /// moves; otherwise it degrades to copy-then-delete. Both modes are handled by a single depth-first
 /// walk (<see cref="WalkAndMoveAsync"/>): it moves whole subtrees in one operation where it safely
 /// can, and falls back to per-file work (and source cleanup) where it cannot. The byte transfer in
-/// the fallback is delegated to the shared <see cref="Strategy.ICopyStrategy"/>, so move and copy use
+/// the fallback is delegated to the shared <see cref="SmartCopy.Core.Pipeline.Strategy.ICopyStrategy"/>, so move and copy use
 /// identical transfer mechanics.
 /// </para>
 /// </summary>
