@@ -26,14 +26,16 @@ public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
 
     public ICopyStrategy Resolve(CopyStrategyInputs inputs)
     {
-        var resolved = inputs.Base.WithProviderConstraints(inputs.SourceCaps, inputs.TargetCaps);
+        // Preallocation is OFF universally (no validated win, and it throws on non-seekable targets),
+        // so clamp it regardless of routing — not only on the routed path.
+        var resolved = inputs.Base.WithProviderConstraints(inputs.SourceCaps, inputs.TargetCaps)
+            with { PreallocateDestinationFile = false };
 
         if (resolved.DestinationRoutingEnabled)
         {
             resolved = resolved with
             {
                 CopyBufferSizeBytes = SelectBufferBytes(inputs.Source, inputs.Target),
-                PreallocateDestinationFile = false,
             };
         }
 

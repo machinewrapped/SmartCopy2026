@@ -168,7 +168,9 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
                     DestinationPath: destination,
                     NumberOfFilesSkipped: PipelineHelpers.GetSelectedFileCount(node),
                     NumberOfFoldersSkipped: PipelineHelpers.GetSelectedFolderCount(node),
-                    InputBytes: node.Size);
+                    // Directory Size is 0; report the subtree's selected bytes so a skipped row's byte
+                    // total stays consistent with its file/folder counts (matches the non-skip path).
+                    InputBytes: node is DirectoryNode dskip ? dskip.TotalSelectedBytes : node.Size);
                 continue;
             }
 

@@ -85,6 +85,15 @@ public sealed record OperationalSettings
                 "Batch buffer size must be zero or greater.");
         }
 
+        // The batch buffer is rented as a single array via ArrayPool<byte>.Rent((int)capacity); a value
+        // above int.MaxValue would overflow the cast and fault at runtime — fail fast with a clear error.
+        if (BatchBufferBytes > int.MaxValue)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(BatchBufferBytes),
+                "Batch buffer size must not exceed Int32.MaxValue.");
+        }
+
         if (BatchEligibilityCeilingBytes < 0)
         {
             throw new ArgumentOutOfRangeException(

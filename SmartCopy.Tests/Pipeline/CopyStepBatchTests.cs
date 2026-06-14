@@ -140,12 +140,39 @@ public sealed class CopyStepBatchTests
         Assert.Equal(new[] { "y.txt", "z.txt", "x.txt", "q.txt", "p.txt" }, copiedOrder);
     }
 
+    [Fact]
+    public async Task BatchCopy_PartiallySelectedDirectory_StillCopiesSelectedFiles()
+    {
+        // The "music" subdirectory is only partially selected (one file checked, one not), so the
+        // directory itself is Indeterminate — *not* IsSelected. The batch traversal must still recurse
+        // into it and copy the selected file; gating recursion on the directory's own selection would
+        // silently drop it (data loss). Guards the EnumerateForBatching unconditional-recursion contract.
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithFile("/src/music/keep.txt", "KEEP"u8)
+            .WithFile("/src/music/drop.txt", "DROP"u8)
+            .WithDirectory("/dest"));
+
+        var root = await provider.BuildDirectoryTree("/src");
+
+        // Select only keep.txt; leave drop.txt unchecked → "music" becomes Indeterminate.
+        var keep = root.FindNodeByPathSegments("music", "keep.txt");
+        Assert.NotNull(keep);
+        keep.FilterResult = FilterResult.Included;
+        keep.CheckState = CheckState.Checked;
+
+        var results = await RunCopyAsync(root, provider, batchBufferBytes: 512 * 1024);
+
+        Assert.Equal(1, results.Count(r => r.SourceNodeResult == SourceResult.Copied && r.IsSuccess));
+        Assert.Equal("KEEP"u8.ToArray(), await ReadAllBytesAsync(provider, "/dest/music/keep.txt"));
+        Assert.False(await provider.ExistsAsync("/dest/music/drop.txt", CancellationToken.None));
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static void SelectAllFiles(DirectoryNode dir)
     {
-        // Select the directory itself too — the batch enumeration recurses only into IsSelected
-        // children, which requires the directory's own CheckState/FilterResult to be set.
+        // Select the directory itself too, so it is emitted as a traversal marker. (Recursion into
+        // children is unconditional, but a directory is only yielded when its own CheckState is set.)
         dir.FilterResult = FilterResult.Included;
         dir.CheckState = CheckState.Checked;
         foreach (var file in dir.Files)

@@ -162,9 +162,11 @@ public sealed partial class PipelineRunner
                 // folder only) so steps targeting like-named folders on different drives stay distinct.
                 notes.Add($"{step.Description} — {DescribeDrivePair(source, dest, sameVolume)}: {strategy.Describe()}");
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                // Informational only — never let a classification probe block the preview.
+                // Informational only — never let a classification/strategy probe block the preview.
+                // Drive classification can throw provider- or platform-specific exceptions beyond IO,
+                // so swallow everything except cancellation (which must propagate).
             }
         }
 

@@ -105,21 +105,28 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
 
     /// <summary>
     /// Intentional depth-first enumeration for batching: yields each directory's own selected files
-    /// smallest-first (so the buffer packs optimally), then recurses into selected child directories in
-    /// order — completing each subtree in full before the next sibling. This deliberate order (rather
-    /// than relying on <see cref="DirectoryNode.GetSelectedDescendants"/>'s incidental traversal) gives
-    /// the resume property: because accumulation and flush write in this same order, an interrupted copy
+    /// smallest-first (so the buffer packs optimally), then recurses into child directories in order —
+    /// completing each subtree in full before the next sibling. This deliberate order (rather than
+    /// relying on <see cref="DirectoryNode.GetSelectedDescendants"/>'s incidental traversal) gives the
+    /// resume property: because accumulation and flush write in this same order, an interrupted copy
     /// leaves a clean depth-first prefix on disk, so completed and missing subtrees are obvious.
-    /// Directory nodes are yielded as traversal markers (the caller emits a no-op result for them).
+    /// <para>
+    /// Recursion is unconditional, matching <see cref="DirectoryNode.GetSelectedDescendants"/>: a
+    /// partially-selected directory (CheckState=Indeterminate) is not itself selected yet can still
+    /// contain selected descendants that must be copied — gating recursion on the directory's own
+    /// selection would silently drop them. The directory node is only yielded as a traversal marker
+    /// when it is itself selected (the caller emits a no-op result for markers).
+    /// </para>
     /// </summary>
     private static IEnumerable<DirectoryTreeNode> EnumerateForBatching(DirectoryNode dir)
     {
         foreach (var file in dir.Files.Where(f => f.IsSelected).OrderBy(f => f.Size))
             yield return file;
 
-        foreach (var child in dir.Children.Where(c => c.IsSelected))
+        foreach (var child in dir.Children)
         {
-            yield return child;
+            if (child.IsSelected)
+                yield return child;
             foreach (var node in EnumerateForBatching(child))
                 yield return node;
         }
