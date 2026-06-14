@@ -195,6 +195,10 @@ public sealed class PipelineIntegrationTests
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
                 Progress = new SyncProgress<OperationProgress>(progressUpdates.Add),
+                // Drop the small-file threshold below the file size so the transfer takes the
+                // chunked manual-loop path that emits per-chunk in-flight progress (the production
+                // behaviour for files larger than the threshold).
+                OperationalSettings = new OperationalSettings { SmallFileProgressThresholdBytes = 256 * 1024 },
             });
 
         Assert.NotEmpty(progressUpdates);
@@ -231,6 +235,8 @@ public sealed class PipelineIntegrationTests
                 SourceProvider = sourceProvider,
                 ProviderRegistry = registry,
                 Progress = new SyncProgress<OperationProgress>(progressUpdates.Add),
+                // See the copy variant above: a sub-threshold size forces the chunked in-flight path.
+                OperationalSettings = new OperationalSettings { SmallFileProgressThresholdBytes = 256 * 1024 },
             });
 
         Assert.NotEmpty(progressUpdates);

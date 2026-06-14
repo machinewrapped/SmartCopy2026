@@ -113,26 +113,15 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
 
     public async Task WriteAsync(string path, Stream data, IProgress<long>? progress, OperationalSettings? settings, CancellationToken ct)
     {
+        var opts = settings ?? new OperationalSettings();
         var normalizedPath = Normalize(path);
 
-        // Read stream content before acquiring the mutation lock to avoid holding it during I/O.
-        const int chunkSize = 256 * 1024;
-        var buffer = new byte[chunkSize];
+        // Pump the source into an in-memory buffer before acquiring the mutation lock, so the lock is
+        // never held during I/O. The transfer itself goes through the shared StreamCopyEngine, giving
+        // the memory provider the same buffer/write-mode/progress behaviour as the local filesystem.
+        long? remainingBytes = StreamCopyEngine.TryGetRemainingLength(data, out var known) ? known : null;
         await using var output = new MemoryStream();
-
-        while (true)
-        {
-            ct.ThrowIfCancellationRequested();
-            var read = await data.ReadAsync(buffer.AsMemory(0, buffer.Length), ct);
-            if (read == 0)
-            {
-                break;
-            }
-
-            await output.WriteAsync(buffer.AsMemory(0, read), ct);
-
-            progress?.Report(read);
-        }
+        await StreamCopyEngine.CopyAsync(data, output, remainingBytes, progress, opts, ct);
 
         var now = DateTime.UtcNow;
         var entry = MemoryEntry.CreateFile(output.ToArray(), now);

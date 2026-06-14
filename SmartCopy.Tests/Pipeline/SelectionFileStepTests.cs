@@ -4,7 +4,6 @@ using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Pipeline.Validation;
 using SmartCopy.Core.Selection;
-using SmartCopy.Core.Trash;
 using SmartCopy.Tests.TestInfrastructure;
 
 namespace SmartCopy.Tests.Pipeline;
@@ -30,50 +29,6 @@ public sealed class SelectionFileStepTests : IDisposable
         return path;
     }
 
-    private sealed class TestStepContext : IStepContext
-    {
-        private readonly Dictionary<DirectoryTreeNode, PipelineContext> _contexts = new();
-        private readonly HashSet<DirectoryTreeNode> _failed = new();
-
-        public DirectoryNode RootNode { get; }
-        public IFileSystemProvider SourceProvider { get; }
-        public FileSystemProviderRegistry ProviderRegistry { get; }
-        public bool ShowHiddenFiles => false;
-        public bool AllowDeleteReadOnly => false;
-        public ITrashService TrashService { get; } = new NullTrashService();
-        public OperationalSettings OperationalSettings { get; } = new();
-
-        public TestStepContext(DirectoryNode root, IFileSystemProvider provider)
-        {
-            RootNode = root;
-            SourceProvider = provider;
-            ProviderRegistry = new FileSystemProviderRegistry();
-            ProviderRegistry.Register(provider);
-        }
-
-        public PipelineContext GetNodeContext(DirectoryTreeNode node)
-        {
-            if (!_contexts.TryGetValue(node, out var context))
-            {
-                context = new PipelineContext
-                {
-                    SourceNode = node,
-                    SourceProvider = SourceProvider,
-                    ProviderRegistry = ProviderRegistry,
-                    PathSegments = node.RelativePathSegments.Length > 0
-                        ? node.RelativePathSegments
-                        : [node.Name],
-                    CurrentExtension = Path.GetExtension(node.Name).TrimStart('.'),
-                    VirtualCheckState = node.CheckState,
-                };
-                _contexts[node] = context;
-            }
-            return context;
-        }
-
-        public bool IsNodeFailed(DirectoryTreeNode node) => _failed.Contains(node);
-        public void MarkFailed(DirectoryTreeNode node) => _failed.Add(node);
-    }
 
     /// <summary>Tree with /src/file_a.txt (checked) and /src/file_b.txt (unchecked).</summary>
     private static async Task<(DirectoryNode Root, FileNode FileA, FileNode FileB, IFileSystemProvider Provider)>
@@ -135,7 +90,7 @@ public sealed class SelectionFileStepTests : IDisposable
         var (root, fileA, _, provider) = await MakeTwoFileTree();
         var outPath = GetTempFile(".txt");
         var step = new SaveSelectionToFileStep(outPath, useAbsolutePaths: false);
-        var context = new TestStepContext(root, provider);
+        var context = new FakeStepContext(root, provider);
 
         await foreach (var _ in step.ApplyAsync(context, CancellationToken.None)) { }
 
@@ -150,7 +105,7 @@ public sealed class SelectionFileStepTests : IDisposable
         var (root, fileA, _, provider) = await MakeTwoFileTree();
         var outPath = GetTempFile(".txt");
         var step = new SaveSelectionToFileStep(outPath, useAbsolutePaths: true);
-        var context = new TestStepContext(root, provider);
+        var context = new FakeStepContext(root, provider);
 
         await foreach (var _ in step.ApplyAsync(context, CancellationToken.None)) { }
 
@@ -166,7 +121,7 @@ public sealed class SelectionFileStepTests : IDisposable
         var (root, _, _, provider) = await MakeTwoFileTree();
         var outPath = GetTempFile(".txt");
         var step = new SaveSelectionToFileStep(outPath, useAbsolutePaths: false);
-        var context = new TestStepContext(root, provider);
+        var context = new FakeStepContext(root, provider);
 
         await foreach (var _ in step.PreviewAsync(context, CancellationToken.None)) { }
 
@@ -224,7 +179,7 @@ public sealed class SelectionFileStepTests : IDisposable
         var selFile = await WriteTxtSelectionFile(["file_b.txt"]);
         _tempFiles.Add(selFile);
         var step = new AddSelectionFromFileStep(selFile);
-        var context = new TestStepContext(root, provider);
+        var context = new FakeStepContext(root, provider);
 
         await foreach (var _ in step.ApplyAsync(context, CancellationToken.None)) { }
 
@@ -239,7 +194,7 @@ public sealed class SelectionFileStepTests : IDisposable
         var selFile = await WriteTxtSelectionFile(["file_b.txt"]);
         _tempFiles.Add(selFile);
         var step = new AddSelectionFromFileStep(selFile);
-        var context = new TestStepContext(root, provider);
+        var context = new FakeStepContext(root, provider);
 
         var results = new List<TransformResult>();
         await foreach (var r in step.PreviewAsync(context, CancellationToken.None))
@@ -315,7 +270,7 @@ public sealed class SelectionFileStepTests : IDisposable
         var selFile = await WriteTxtSelectionFile(["file_a.txt"]);
         _tempFiles.Add(selFile);
         var step = new RemoveSelectionFromFileStep(selFile);
-        var context = new TestStepContext(root, provider);
+        var context = new FakeStepContext(root, provider);
 
         await foreach (var _ in step.ApplyAsync(context, CancellationToken.None)) { }
 
@@ -330,7 +285,7 @@ public sealed class SelectionFileStepTests : IDisposable
         var selFile = await WriteTxtSelectionFile(["file_a.txt"]);
         _tempFiles.Add(selFile);
         var step = new RemoveSelectionFromFileStep(selFile);
-        var context = new TestStepContext(root, provider);
+        var context = new FakeStepContext(root, provider);
 
         var results = new List<TransformResult>();
         await foreach (var r in step.PreviewAsync(context, CancellationToken.None))

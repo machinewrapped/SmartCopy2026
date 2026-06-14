@@ -16,7 +16,8 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 
     private readonly bool _isNetworkPath;
     private readonly ProviderCapabilities _capabilities;
-    private string? _lastCreatedDirectory;
+    // Ordinal matches the historical behaviour of the inline directory cache this replaced.
+    private readonly FreshDirectoryTracker _directoryTracker = new(StringComparison.Ordinal);
     public LocalFileSystemProvider(
         string rootPath,
         Func<string>? readLinuxMountInfo = null)
@@ -148,23 +149,23 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         var opts = settings ?? new OperationalSettings();
         var fullPath = Resolve(path);
         var directory = Path.GetDirectoryName(fullPath);
-        if (!string.IsNullOrEmpty(directory) && directory != _lastCreatedDirectory)
+        if (!string.IsNullOrEmpty(directory) && !_directoryTracker.IsFreshlyCreated(directory))
         {
             if (!Directory.Exists(directory))
             {
                 Directory.CreateDirectory(directory);
-                _lastCreatedDirectory = directory;
+                _directoryTracker.MarkCreated(directory);
             }
         }
 
-        long? remainingBytes = TryGetRemainingLength(data, out var knownRemainingBytes)
+        long? remainingBytes = StreamCopyEngine.TryGetRemainingLength(data, out var knownRemainingBytes)
             ? knownRemainingBytes
             : null;
 
-        // Tiny-file fast-path (Direct Write)
-        if (opts.TinyFileFastPathThresholdBytes > 0 &&
-            remainingBytes is long fileSize &&
-            fileSize <= opts.TinyFileFastPathThresholdBytes)
+        // Direct write (no staging): the strategy requests this for tiny files (where the write is
+        // effectively atomic anyway) and the provider must obey. A partial file is best-effort
+        // cleaned up on error.
+        if (opts.WriteDurability == WriteDurability.Direct)
         {
             var fileOpened = false;
             try
@@ -181,7 +182,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                     }))
                 {
                     fileOpened = true;
-                    await CopyStreamWithProgressAsync(data, output, fileSize, progress, opts, ct);
+                    await StreamCopyEngine.CopyAsync(data, output, remainingBytes, progress, opts, ct);
                 }
             }
             catch
@@ -196,7 +197,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
             return;
         }
 
-        // Standard Staged Write (Atomic rename)
+        // Staged write (atomic rename) — the crash-safe default.
         var tempPath = string.Empty;
         var stagedOutsideDestinationDirectory = false;
         var committed = false;
@@ -208,7 +209,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                 out tempPath,
                 out stagedOutsideDestinationDirectory))
             {
-                await CopyStreamWithProgressAsync(data, output, remainingBytes, progress, opts, ct);
+                await StreamCopyEngine.CopyAsync(data, output, remainingBytes, progress, opts, ct);
             }
 
             CommitStagedWrite(tempPath, fullPath, stagedOutsideDestinationDirectory);
@@ -221,146 +222,6 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                 TryDeleteStagedFile(tempPath);
             }
         }
-    }
-
-    private static async Task CopyStreamWithProgressAsync(
-        Stream source,
-        Stream destination,
-        long? remainingBytes,
-        IProgress<long>? progress,
-        OperationalSettings opts,
-        CancellationToken ct)
-    {
-        if (remainingBytes is long bytesRemaining &&
-            opts.PreallocateDestinationFile &&
-            bytesRemaining > 0)
-        {
-            destination.SetLength(bytesRemaining);
-        }
-
-        var writeMode = DetermineWriteMode(progress, remainingBytes, opts);
-
-        if (writeMode == LocalFileSystemWriteMode.CopyToAsync)
-        {
-            // CopyToAsync mode: wraps the source in a ProgressReportingReadStream so the
-            // framework's internal buffer loop reports progress without a manual loop here.
-            await CopyViaCopyToAsync(source, destination, progress, opts, ct);
-        }
-        else if (writeMode == LocalFileSystemWriteMode.Auto &&
-                 remainingBytes is long autoBytesRemaining &&
-                 autoBytesRemaining <= opts.SmallFileProgressThresholdBytes)
-        {
-            // Small-file optimisation: for files whose full size fits in memory we know
-            // exactly how many bytes will be written, so we let the framework copy without
-            // overhead and report progress in one shot at the end instead of per-chunk.
-            await source.CopyToAsync(destination, opts.CopyBufferSizeBytes, ct);
-            if (progress is not null && autoBytesRemaining > 0)
-            {
-                progress.Report(autoBytesRemaining);
-            }
-        }
-        else
-        {
-            // Large files and unknown-length streams: manual loop reports progress per chunk,
-            // which keeps UI responsive during long transfers without adding a stream wrapper.
-            await CopyWithManualLoopAsync(source, destination, progress, opts, ct);
-        }
-
-        await destination.FlushAsync(ct);
-    }
-
-    // Write strategy — private helpers for WriteAsync above.
-
-    private static LocalFileSystemWriteMode DetermineWriteMode(
-        IProgress<long>? progress, 
-        long? remainingBytes, 
-        OperationalSettings opts)
-    {
-        if (opts.WriteMode != LocalFileSystemWriteMode.Auto)
-            return opts.WriteMode;
-        // No progress handler: CopyToAsync with no wrapper is the fastest path.
-        if (progress is null)
-            return LocalFileSystemWriteMode.CopyToAsync;
-        // Unknown length: can't apply the small-file optimisation, go straight to manual loop.
-        if (remainingBytes is null)
-            return LocalFileSystemWriteMode.ManualLoop;
-        // Known length with progress: WriteAsync resolves the heuristic inline.
-        return LocalFileSystemWriteMode.Auto;
-    }
-
-    private static async Task CopyViaCopyToAsync(
-        Stream data,
-        Stream output,
-        IProgress<long>? progress,
-        OperationalSettings opts,
-        CancellationToken ct)
-    {
-        Stream source = data;
-        if (progress is not null)
-        {
-            source = new ProgressReportingReadStream(data, progress);
-        }
-
-        await source.CopyToAsync(output, opts.CopyBufferSizeBytes, ct);
-    }
-
-    private static async Task CopyWithManualLoopAsync(
-        Stream data,
-        Stream output,
-        IProgress<long>? progress,
-        OperationalSettings opts,
-        CancellationToken ct)
-    {
-        if (opts.UseArrayPoolForManualLoop)
-        {
-            var rentedBuffer = System.Buffers.ArrayPool<byte>.Shared.Rent(opts.CopyBufferSizeBytes);
-            try
-            {
-                await CopyWithManualLoopCoreAsync(data, output, rentedBuffer, progress, ct);
-            }
-            finally
-            {
-                System.Buffers.ArrayPool<byte>.Shared.Return(rentedBuffer);
-            }
-
-            return;
-        }
-
-        var buffer = new byte[opts.CopyBufferSizeBytes];
-        await CopyWithManualLoopCoreAsync(data, output, buffer, progress, ct);
-    }
-
-    private static async Task CopyWithManualLoopCoreAsync(
-        Stream data,
-        Stream output,
-        byte[] buffer,
-        IProgress<long>? progress,
-        CancellationToken ct)
-    {
-        while (true)
-        {
-            ct.ThrowIfCancellationRequested();
-            var read = await data.ReadAsync(buffer.AsMemory(0, buffer.Length), ct);
-            if (read == 0)
-            {
-                break;
-            }
-
-            await output.WriteAsync(buffer.AsMemory(0, read), ct);
-            progress?.Report(read);
-        }
-    }
-
-    private static bool TryGetRemainingLength(Stream data, out long remainingBytes)
-    {
-        if (!data.CanSeek)
-        {
-            remainingBytes = 0;
-            return false;
-        }
-
-        remainingBytes = Math.Max(0, data.Length - data.Position);
-        return true;
     }
 
     private static string BuildStagedWritePath(string destinationPath)
@@ -564,8 +425,8 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         {
             ct.ThrowIfCancellationRequested();
             var fullPath = Resolve(path);
-            if (_lastCreatedDirectory != null &&
-                Path.GetDirectoryName(fullPath) == _lastCreatedDirectory)
+            // A directory we just created is empty by definition, so nothing inside it exists yet.
+            if (_directoryTracker.IsFreshlyCreated(Path.GetDirectoryName(fullPath)))
                 return false;
             return File.Exists(fullPath) || Directory.Exists(fullPath);
         }, ct);
@@ -573,7 +434,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 
     public IAsyncDisposable BeginBulkWriteAsync()
     {
-        _lastCreatedDirectory = null;
+        _directoryTracker.Reset();
         return new BulkWriteScope(this);
     }
 
@@ -581,7 +442,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     {
         public ValueTask DisposeAsync()
         {
-            owner._lastCreatedDirectory = null;
+            owner._directoryTracker.Reset();
             return ValueTask.CompletedTask;
         }
     }

@@ -113,10 +113,74 @@ public sealed class CopyStepBatchTests
         Assert.Equal(content, await ReadAllBytesAsync(provider, "/dest/file.txt"));
     }
 
+    [Fact]
+    public async Task BatchCopy_EmitsDepthFirst_FilesSizeSortedWithinDirectory()
+    {
+        // Two sibling subtrees, files stored alphabetically (x,y,z / p,q) — deliberately *not* by size.
+        // The batch path must complete each subtree in turn (depth-first) with its files ascending by
+        // size. This is the sole guard for that ordering contract — other tests check counts/content.
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithFile("/src/A/x.txt", new byte[3])
+            .WithFile("/src/A/y.txt", new byte[1])
+            .WithFile("/src/A/z.txt", new byte[2])
+            .WithFile("/src/B/p.txt", new byte[2])
+            .WithFile("/src/B/q.txt", new byte[1])
+            .WithDirectory("/dest"));
+
+        var root = await provider.BuildDirectoryTree("/src");
+        SelectAllFiles(root);
+
+        var results = await RunCopyAsync(root, provider, batchBufferBytes: 512 * 1024);
+
+        var copiedOrder = results
+            .Where(r => r.SourceNodeResult == SourceResult.Copied && r.IsSuccess)
+            .Select(r => r.SourceNode.Name)
+            .ToList();
+
+        Assert.Equal(new[] { "y.txt", "z.txt", "x.txt", "q.txt", "p.txt" }, copiedOrder);
+    }
+
+    [Fact]
+    public async Task BatchCopy_PartiallySelectedDirectory_StillCopiesSelectedFiles()
+    {
+        // The "music" subdirectory holds one selected file (keep.txt) and one that is both unchecked and
+        // filter-Excluded (drop.txt), making the directory itself Indeterminate *and* Mixed — neither
+        // IsSelected nor a prunable subtree. The batch traversal must still recurse in and copy keep.txt.
+        // This pins both prune polarities: pruning on != Checked (Indeterminate) or != Included (Mixed),
+        // rather than == Unchecked / == Excluded, would silently drop keep.txt (data loss).
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithFile("/src/music/keep.txt", "KEEP"u8)
+            .WithFile("/src/music/drop.txt", "DROP"u8)
+            .WithDirectory("/dest"));
+
+        var root = await provider.BuildDirectoryTree("/src");
+
+        var keep = root.FindNodeByPathSegments("music", "keep.txt");
+        var drop = root.FindNodeByPathSegments("music", "drop.txt");
+        Assert.NotNull(keep);
+        Assert.NotNull(drop);
+        keep.FilterResult = FilterResult.Included;
+        keep.CheckState = CheckState.Checked;
+        drop.FilterResult = FilterResult.Excluded; // → "music" is Mixed, not Excluded
+        // (drop.txt stays unchecked → "music" is Indeterminate, not Unchecked.)
+
+        keep.Parent!.FilterResult = FilterResult.Mixed;
+
+        var results = await RunCopyAsync(root, provider, batchBufferBytes: 512 * 1024);
+
+        Assert.Equal(1, results.Count(r => r.SourceNodeResult == SourceResult.Copied && r.IsSuccess));
+        Assert.Equal("KEEP"u8.ToArray(), await ReadAllBytesAsync(provider, "/dest/music/keep.txt"));
+        Assert.False(await provider.ExistsAsync("/dest/music/drop.txt", CancellationToken.None));
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static void SelectAllFiles(DirectoryNode dir)
     {
+        // Select the directory itself too, so it is emitted as a traversal marker. (Recursion into
+        // children is unconditional, but a directory is only yielded when its own CheckState is set.)
+        dir.FilterResult = FilterResult.Included;
+        dir.CheckState = CheckState.Checked;
         foreach (var file in dir.Files)
         {
             file.FilterResult = FilterResult.Included;

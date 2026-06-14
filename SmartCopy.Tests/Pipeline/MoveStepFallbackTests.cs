@@ -2,7 +2,6 @@ using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
-using SmartCopy.Core.Trash;
 using SmartCopy.Tests.TestInfrastructure;
 
 namespace SmartCopy.Tests.Pipeline;
@@ -13,62 +12,6 @@ namespace SmartCopy.Tests.Pipeline;
 /// </summary>
 public sealed class MoveStepFallbackTests
 {
-    // -------------------------------------------------------------------------
-    // Minimal IStepContext that supports a configurable TargetProvider.
-    // -------------------------------------------------------------------------
-
-    private sealed class MoveTestContext : IStepContext
-    {
-        private readonly Dictionary<DirectoryTreeNode, PipelineContext> _contexts = new();
-        private readonly HashSet<DirectoryTreeNode> _failed = new();
-
-        public DirectoryNode RootNode { get; }
-        public IFileSystemProvider SourceProvider { get; }
-        public FileSystemProviderRegistry ProviderRegistry { get; }
-        public bool ShowHiddenFiles { get; }
-        public bool AllowDeleteReadOnly { get; }
-        public ITrashService TrashService { get; } = new NullTrashService();
-        public OperationalSettings OperationalSettings { get; } = new();
-
-        public MoveTestContext(DirectoryNode root, IFileSystemProvider source, IFileSystemProvider? target = null)
-        {
-            RootNode = root;
-            SourceProvider = source;
-            ProviderRegistry = new FileSystemProviderRegistry();
-            ProviderRegistry.Register(source);
-            if (target != null && target != source)
-            {
-                ProviderRegistry.Register(target);
-            }
-        }
-
-        public PipelineContext GetNodeContext(DirectoryTreeNode node)
-        {
-            if (!_contexts.TryGetValue(node, out var ctx))
-            {
-                ctx = new PipelineContext
-                {
-                    SourceNode = node,
-                    SourceProvider = SourceProvider,
-                    ProviderRegistry = ProviderRegistry,
-                    PathSegments = node.RelativePathSegments.Length > 0
-                        ? node.RelativePathSegments
-                        : [node.Name],
-                    CurrentExtension = Path.GetExtension(node.Name).TrimStart('.'),
-                    VirtualCheckState = node.CheckState,
-                };
-                _contexts[node] = ctx;
-            }
-            return ctx;
-        }
-
-        public bool IsNodeFailed(DirectoryTreeNode node) => _failed.Contains(node);
-        public void MarkFailed(DirectoryTreeNode node) => _failed.Add(node);
-    }
-
-    // -------------------------------------------------------------------------
-    // Tests
-    // -------------------------------------------------------------------------
 
     /// <summary>
     /// Cross-provider file move: source ≠ target provider triggers copy+delete fallback.
@@ -83,7 +26,7 @@ public sealed class MoveStepFallbackTests
         var root = await sourceProvider.BuildDirectoryTree("/src");
         root.Files[0].CheckState = CheckState.Checked;
 
-        var ctx = new MoveTestContext(root, sourceProvider, targetProvider);
+        var ctx = new FakeStepContext(root, sourceProvider, targetProvider);
         var step = new MoveStep("mem://target/dest");
 
         var results = new List<TransformResult>();
@@ -110,7 +53,7 @@ public sealed class MoveStepFallbackTests
         root.Files[0].CheckState = CheckState.Checked;
 
         // Same provider instance for both source and target → sameProvider = true.
-        var ctx = new MoveTestContext(root, provider, provider);
+        var ctx = new FakeStepContext(root, provider, provider);
         var step = new MoveStep("mem://dest");
 
         var results = new List<TransformResult>();
@@ -139,7 +82,7 @@ public sealed class MoveStepFallbackTests
         root.Files[0].CheckState = CheckState.Checked;
 
         // Same wrapped instance, VolumeId="MEM" → sameVolume=true, canAtomicMove=false → fallback.
-        var ctx = new MoveTestContext(root, noAtomicMove);
+        var ctx = new FakeStepContext(root, noAtomicMove);
         var step = new MoveStep("mem://dest");
 
         var results = new List<TransformResult>();
@@ -173,7 +116,7 @@ public sealed class MoveStepFallbackTests
         dir.CheckState = CheckState.Checked;
         foreach (var f in dir.Files) f.CheckState = CheckState.Checked;
 
-        var ctx = new MoveTestContext(root, sourceProvider, targetProvider);
+        var ctx = new FakeStepContext(root, sourceProvider, targetProvider);
         var step = new MoveStep("mem://target/dest");
 
         var results = new List<TransformResult>();
@@ -208,7 +151,7 @@ public sealed class MoveStepFallbackTests
         dir.CheckState = CheckState.Indeterminate;
         dir.Files.Single(f => f.Name == "move.txt").CheckState = CheckState.Checked;
 
-        var ctx = new MoveTestContext(root, sourceProvider, targetProvider);
+        var ctx = new FakeStepContext(root, sourceProvider, targetProvider);
         var step = new MoveStep("mem://target/dest");
 
         var results = new List<TransformResult>();
@@ -239,7 +182,7 @@ public sealed class MoveStepFallbackTests
         Assert.NotNull(dir);
         dir.CheckState = CheckState.Checked;
 
-        var ctx = new MoveTestContext(root, provider, provider);
+        var ctx = new FakeStepContext(root, provider, provider);
         var step = new MoveStep("mem://dest");
 
         var results = new List<TransformResult>();
@@ -277,7 +220,7 @@ public sealed class MoveStepFallbackTests
         foreach (var f in dir.Files) f.CheckState = CheckState.Checked;
         foreach (var f in sub.Files) f.CheckState = CheckState.Checked;
 
-        var ctx = new MoveTestContext(root, sourceProvider, targetProvider);
+        var ctx = new FakeStepContext(root, sourceProvider, targetProvider);
         var step = new MoveStep("mem://target/dest");
 
         var results = new List<TransformResult>();
@@ -313,7 +256,7 @@ public sealed class MoveStepFallbackTests
         dir.CheckState = CheckState.Checked;
         foreach (var f in dir.Files) f.CheckState = CheckState.Checked;
 
-        var ctx = new MoveTestContext(root, noAtomicMove, noAtomicMove);
+        var ctx = new FakeStepContext(root, noAtomicMove, noAtomicMove);
         var step = new MoveStep("mem://dest");
 
         var results = new List<TransformResult>();
@@ -341,7 +284,7 @@ public sealed class MoveStepFallbackTests
         var root = await sourceProvider.BuildDirectoryTree("/src");
         root.Files[0].CheckState = CheckState.Checked;
 
-        var ctx = new MoveTestContext(root, sourceProvider, targetProvider);
+        var ctx = new FakeStepContext(root, sourceProvider, targetProvider);
         var step = new MoveStep("mem://target/dest");
 
         var results = new List<TransformResult>();
@@ -369,7 +312,7 @@ public sealed class MoveStepFallbackTests
         root.Files[0].CheckState = CheckState.Checked;
 
         // Same instance for source and target — copy+delete still moves the file correctly.
-        var ctx = new MoveTestContext(root, provider, provider);
+        var ctx = new FakeStepContext(root, provider, provider);
         var step = new MoveStep("mem://dest");
 
         var results = new List<TransformResult>();

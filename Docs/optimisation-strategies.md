@@ -434,7 +434,7 @@ The current per-file overhead chain:
 
 ### Phase 3 — Buffered Read-Write Batching
 
-**Status:** **Core integration complete; policy validation pending.** Clean-room run (2026-06-01) established that batching adds 1–2% above a 512 KiB baseline (the headline +8.5% vs `Control_BaselineAuto` is mostly chunk-size improvement — see Section 2.3.5). See Section 2.3 for detailed evidence. The batching coordinator is implemented in `CopyStep` (`ApplyBatchedAsync` / `ApplyUnbatchedAsync` paths with `BatchCopyBuffer`). The remaining work is the MixedDataset policy validation pass (Section 7.6 checklist C) before defaults are promoted.
+**Status:** **Core integration complete; policy validation pending.** Clean-room run (2026-06-01) established that batching adds 1–2% above a 512 KiB baseline (the headline +8.5% vs `Control_BaselineAuto` is mostly chunk-size improvement — see Section 2.3.5). See Section 2.3 for detailed evidence. The batching coordinator now lives in `BatchedCopyStrategy` (with `BatchCopyBuffer`), selected by the policy when `BatchBufferBytes > 0`. As of 2026-06-14 it implements the full Step-2 design that the benchmark harness (`BenchmarkCopyRunner`) measured but that had not been propagated to production: the **intentional depth-first walk with per-directory ascending-size sorting**, and the **512 KiB batch-eligibility ceiling** (`OperationalSettings.BatchEligibilityCeilingBytes`, default on). The remaining work is the MixedDataset policy validation pass (Section 7.6 checklist C) — which now also confirms the 512 KiB ceiling on SSD/HDD (it was only isolated on USB) — before defaults are promoted.
 
 **What batching does:** The current model interleaves read and write on every file, alternating I/O direction continuously. Batching accumulates multiple small files into a pool-allocated buffer during a read phase, then drains it during a write phase:
 
@@ -521,7 +521,7 @@ Only after Step 1 confirms the safe cross-device default, run `ManualLoop1MiB`, 
 
 ### Phase 6 — Destination-Sensitive Policies
 
-**Status:** After Phases 1–3. SSD/HDD defaults from Section 2.5.3. USB validation (Section 2.6) showed that variance is too high for a static USB profile to be reliable. See design note below.
+**Status:** **Static routing implemented (2026-06-13); benchmark validation pending.** The copy engine was refactored into a policy+strategy system (`SmartCopy.Core/Pipeline/Strategy/`, see `Docs/Architecture.md` §2.4.1): `DefaultCopyStrategyPolicy` selects the copy buffer from the source→destination drive pair per the validated table below, gated behind `OperationalSettings.DestinationRoutingEnabled` (enabled in the app under `AllowCopyOptimisations`; default-off elsewhere, so the refactor is behaviour-preserving). `CopyStep` and `MoveStep` now delegate byte transfer to the shared strategy, removing the duplicated copy engine. SSD/HDD defaults from Section 2.5.3; USB from Section 2.6. The remaining work is the whole-policy benchmark gate (full scenario matrix) before promoting defaults, plus the per-device learned profiles in the design note below. USB variance (Section 2.6) is still too high for a static USB profile to be trusted — treated as a prior pending per-device learning.
 
 **Goal:** Apply appropriate strategy defaults per destination type, with a path toward per-device learned profiles for devices (like USB flash) where static classification is insufficient.
 

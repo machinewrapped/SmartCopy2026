@@ -6,11 +6,15 @@ namespace SmartCopy.Tests.TestInfrastructure;
 /// Wraps an <see cref="IFileSystemProvider"/> and overrides <see cref="Capabilities"/>
 /// to exercise capability-gated code paths in tests without a real cross-volume setup.
 /// </summary>
-internal sealed class CapabilityOverrideProvider(IFileSystemProvider inner, ProviderCapabilities capabilities) : IFileSystemProvider
+internal sealed class CapabilityOverrideProvider(
+    IFileSystemProvider inner,
+    ProviderCapabilities capabilities,
+    DriveClassification? classification = null) : IFileSystemProvider
 {
     public ProviderCapabilities Capabilities => capabilities;
-    
-    public ValueTask<DriveClassification> GetClassificationAsync(CancellationToken ct = default) => inner.GetClassificationAsync(ct);
+
+    public ValueTask<DriveClassification> GetClassificationAsync(CancellationToken ct = default) =>
+        classification is { } c ? ValueTask.FromResult(c) : inner.GetClassificationAsync(ct);
     
     public StringComparer PathComparer => inner.PathComparer;
     
