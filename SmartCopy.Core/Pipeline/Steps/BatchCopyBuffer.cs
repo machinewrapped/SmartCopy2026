@@ -31,9 +31,6 @@ internal sealed class BatchCopyBuffer : IDisposable
         _data = ArrayPool<byte>.Shared.Rent((int)capacityBytes);
     }
 
-    /// <summary>Returns true if <paramref name="fileSize"/> could ever fit in an empty buffer.</summary>
-    public bool WouldFitEver(long fileSize) => fileSize <= Capacity && fileSize <= int.MaxValue;
-
     /// <summary>Returns true if <paramref name="fileSize"/> bytes fit in the remaining space.</summary>
     public bool HasSpaceFor(int fileSize) => _used + fileSize <= (int)Capacity;
 

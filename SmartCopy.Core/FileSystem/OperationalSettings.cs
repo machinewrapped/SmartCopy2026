@@ -31,6 +31,14 @@ public sealed record OperationalSettings
     public long TinyFileFastPathThresholdBytes { get; init; }
     public long BatchBufferBytes { get; init; }
     /// <summary>
+    /// Files at or below this size are eligible for the batch path; larger files bypass batching and
+    /// stream individually (the ManualLoop path). Capped to the batch buffer capacity where used, so
+    /// eligibility alone guarantees a file fits the buffer. Default 512 KiB ensures genuine phase
+    /// separation — at least two files share every flush of a 1 MiB+ buffer (see
+    /// <c>Docs/optimisation-strategies.md</c> Phase 3). <c>0</c> disables the ceiling (use buffer capacity).
+    /// </summary>
+    public long BatchEligibilityCeilingBytes { get; init; } = 512 * 1024;
+    /// <summary>
     /// Durability intent for the write. Set per file by the copy strategy (from the tiny-file
     /// threshold and the target's staging capability) and honoured by the provider. Default
     /// <see cref="WriteDurability.Staged"/> preserves crash-safe behaviour for direct WriteAsync callers.
@@ -75,6 +83,13 @@ public sealed record OperationalSettings
             throw new ArgumentOutOfRangeException(
                 nameof(BatchBufferBytes),
                 "Batch buffer size must be zero or greater.");
+        }
+
+        if (BatchEligibilityCeilingBytes < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(BatchEligibilityCeilingBytes),
+                "Batch eligibility ceiling must be zero or greater.");
         }
 
         if (CompletionProgressIntervalMs < 0)

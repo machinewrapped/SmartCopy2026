@@ -8,21 +8,6 @@ namespace SmartCopy.Tests.Pipeline;
 public sealed class BatchCopyBufferTests
 {
     [Fact]
-    public void WouldFitEver_ReturnsTrueWhenFileFitsInEmptyBuffer()
-    {
-        using var buf = new BatchCopyBuffer(512);
-        Assert.True(buf.WouldFitEver(512));
-        Assert.True(buf.WouldFitEver(1));
-    }
-
-    [Fact]
-    public void WouldFitEver_ReturnsFalseWhenFileLargerThanCapacity()
-    {
-        using var buf = new BatchCopyBuffer(512);
-        Assert.False(buf.WouldFitEver(513));
-    }
-
-    [Fact]
     public void HasSpaceFor_ReflectsUsedBytes()
     {
         using var buf = new BatchCopyBuffer(100);

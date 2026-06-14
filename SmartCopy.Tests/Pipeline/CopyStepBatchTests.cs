@@ -113,10 +113,41 @@ public sealed class CopyStepBatchTests
         Assert.Equal(content, await ReadAllBytesAsync(provider, "/dest/file.txt"));
     }
 
+    [Fact]
+    public async Task BatchCopy_EmitsDepthFirst_FilesSizeSortedWithinDirectory()
+    {
+        // Two sibling subtrees, files stored alphabetically (x,y,z / p,q) — deliberately *not* by size.
+        // The batch path must complete each subtree in turn (depth-first) with its files ascending by
+        // size. This is the sole guard for that ordering contract — other tests check counts/content.
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithFile("/src/A/x.txt", new byte[3])
+            .WithFile("/src/A/y.txt", new byte[1])
+            .WithFile("/src/A/z.txt", new byte[2])
+            .WithFile("/src/B/p.txt", new byte[2])
+            .WithFile("/src/B/q.txt", new byte[1])
+            .WithDirectory("/dest"));
+
+        var root = await provider.BuildDirectoryTree("/src");
+        SelectAllFiles(root);
+
+        var results = await RunCopyAsync(root, provider, batchBufferBytes: 512 * 1024);
+
+        var copiedOrder = results
+            .Where(r => r.SourceNodeResult == SourceResult.Copied && r.IsSuccess)
+            .Select(r => r.SourceNode.Name)
+            .ToList();
+
+        Assert.Equal(new[] { "y.txt", "z.txt", "x.txt", "q.txt", "p.txt" }, copiedOrder);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static void SelectAllFiles(DirectoryNode dir)
     {
+        // Select the directory itself too — the batch enumeration recurses only into IsSelected
+        // children, which requires the directory's own CheckState/FilterResult to be set.
+        dir.FilterResult = FilterResult.Included;
+        dir.CheckState = CheckState.Checked;
         foreach (var file in dir.Files)
         {
             file.FilterResult = FilterResult.Included;

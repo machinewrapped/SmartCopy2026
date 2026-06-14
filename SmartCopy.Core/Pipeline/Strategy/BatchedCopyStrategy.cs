@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Progress;
@@ -26,7 +27,13 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
         // One pool-rented buffer for the whole selection; reused across flushes, returned on dispose.
         using var buffer = new BatchCopyBuffer(Settings.BatchBufferBytes);
 
-        foreach (var node in context.RootNode.GetSelectedDescendants())
+        // Files at/below this size batch; larger ones stream individually. Capped to the buffer
+        // capacity, so "size <= ceiling" alone guarantees the file fits the buffer. The 512 KiB
+        // default keeps >=2 files per flush on a 1 MiB+ buffer (Docs/optimisation-strategies.md Phase 3).
+        var ceiling = Settings.BatchEligibilityCeilingBytes;
+        var effectiveCeiling = ceiling <= 0 ? buffer.Capacity : Math.Min(ceiling, buffer.Capacity);
+
+        foreach (var node in EnumerateForBatching(context.RootNode))
         {
             ct.ThrowIfCancellationRequested();
             if (context.IsNodeFailed(node)) continue;
@@ -49,7 +56,7 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
                 continue;
             }
 
-            if (buffer.WouldFitEver(node.Size))
+            if (node.Size <= effectiveCeiling)
             {
                 // Batch-eligible: read it into the buffer now, defer the write to the next flush.
                 var fileSize = (int)node.Size;
@@ -82,8 +89,8 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
             }
             else
             {
-                // File too large for any batch — flush pending entries (to preserve order), then
-                // stream it directly. (Files above the batch ceiling are routed here by the policy.)
+                // File above the eligibility ceiling — flush pending entries (to preserve order), then
+                // stream it directly via the ManualLoop fallback.
                 await foreach (var r in FlushBatchAsync(buffer, targetProvider, context, successResult, ct))
                     yield return r;
 
@@ -94,6 +101,28 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
         // Drain whatever remains after the last file.
         await foreach (var r in FlushBatchAsync(buffer, targetProvider, context, successResult, ct))
             yield return r;
+    }
+
+    /// <summary>
+    /// Intentional depth-first enumeration for batching: yields each directory's own selected files
+    /// smallest-first (so the buffer packs optimally), then recurses into selected child directories in
+    /// order — completing each subtree in full before the next sibling. This deliberate order (rather
+    /// than relying on <see cref="DirectoryNode.GetSelectedDescendants"/>'s incidental traversal) gives
+    /// the resume property: because accumulation and flush write in this same order, an interrupted copy
+    /// leaves a clean depth-first prefix on disk, so completed and missing subtrees are obvious.
+    /// Directory nodes are yielded as traversal markers (the caller emits a no-op result for them).
+    /// </summary>
+    private static IEnumerable<DirectoryTreeNode> EnumerateForBatching(DirectoryNode dir)
+    {
+        foreach (var file in dir.Files.Where(f => f.IsSelected).OrderBy(f => f.Size))
+            yield return file;
+
+        foreach (var child in dir.Children.Where(c => c.IsSelected))
+        {
+            yield return child;
+            foreach (var node in EnumerateForBatching(child))
+                yield return node;
+        }
     }
 
     /// <summary>

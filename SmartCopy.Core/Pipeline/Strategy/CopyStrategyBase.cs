@@ -49,9 +49,22 @@ public abstract class CopyStrategyBase : ICopyStrategy
     /// </summary>
     public string Describe()
     {
-        var kind = Settings.BatchBufferBytes > 0 ? "Batched copy" : "Streaming copy";
-        var batch = Settings.BatchBufferBytes > 0 ? $" · {FormatBytes(Settings.BatchBufferBytes)} batches" : "";
+        var batched = Settings.BatchBufferBytes > 0;
+        var kind = batched ? "Batched copy" : "Streaming copy";
+        // For batched copies, surface both the buffer (how much accumulates per flush) and the
+        // eligibility ceiling (which files batch vs stream individually).
+        var batch = batched
+            ? $" · {FormatBytes(Settings.BatchBufferBytes)} batches (≤ {FormatBytes(EffectiveBatchCeiling())} eligible)"
+            : "";
         return $"{kind} · {FormatBytes(Settings.CopyBufferSizeBytes)} buffer{batch} · {DescribeDurability()}";
+    }
+
+    /// <summary>The batch eligibility ceiling actually applied: the configured value clamped to the
+    /// buffer capacity, or the capacity itself when the ceiling is disabled (0).</summary>
+    private long EffectiveBatchCeiling()
+    {
+        var ceiling = Settings.BatchEligibilityCeilingBytes;
+        return ceiling <= 0 ? Settings.BatchBufferBytes : Math.Min(ceiling, Settings.BatchBufferBytes);
     }
 
     private string DescribeDurability()
