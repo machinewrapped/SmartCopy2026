@@ -24,7 +24,7 @@ public sealed class DirectoryScanner
         if (!rootNode.IsDirectory) yield break;
 
         // visited guards against circular symbolic links re-enqueueing an already-processed path.
-        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { rootNode.FullPath };
+        var visited = new HashSet<string>(_provider.PathComparer) { rootNode.FullPath };
         var queue = new Queue<(DirectoryNode Node, int Depth)>();
         queue.Enqueue((rootNode, 0));
 

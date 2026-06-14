@@ -30,6 +30,13 @@ public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
         CanSeek: false, CanAtomicMove: false, CanWatch: false,
         MaxPathLength: 260, CanTrash: false);
 
+    public ValueTask<Hardware.DriveClassification> GetClassificationAsync(CancellationToken ct = default) => 
+        ValueTask.FromResult(new Hardware.DriveClassification(Hardware.DriveMediaType.MTP, Hardware.DriveInterfaceType.USB));
+
+    public StringComparer PathComparer => StringComparer.Ordinal;
+
+    public StringComparison PathComparison => StringComparison.Ordinal;
+
     public Task<IReadOnlyList<FileSystemNode>> GetChildrenAsync(string path, CancellationToken ct)
     {
         return Task.Run<IReadOnlyList<FileSystemNode>>(() =>
@@ -135,7 +142,7 @@ public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
 
     public string GetRelativePath(string basePath, string fullPath)
     {
-        if (fullPath.StartsWith(basePath, StringComparison.OrdinalIgnoreCase))
+        if (fullPath.StartsWith(basePath, StringComparison.Ordinal))
             return fullPath[basePath.Length..].TrimStart('/');
         return fullPath;
     }
@@ -174,7 +181,7 @@ public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
     /// </summary>
     private string DevicePath(string mtpPath)
     {
-        if (mtpPath.StartsWith(VolumeId!, StringComparison.OrdinalIgnoreCase))
+        if (mtpPath.StartsWith(VolumeId!, StringComparison.Ordinal))
         {
             var rest = mtpPath[VolumeId!.Length..];
             return rest.Length > 0 ? rest : "/";
