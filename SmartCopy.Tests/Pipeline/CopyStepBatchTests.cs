@@ -143,10 +143,11 @@ public sealed class CopyStepBatchTests
     [Fact]
     public async Task BatchCopy_PartiallySelectedDirectory_StillCopiesSelectedFiles()
     {
-        // The "music" subdirectory is only partially selected (one file checked, one not), so the
-        // directory itself is Indeterminate — *not* IsSelected. The batch traversal must still recurse
-        // into it and copy the selected file; gating recursion on the directory's own selection would
-        // silently drop it (data loss). Guards the EnumerateForBatching unconditional-recursion contract.
+        // The "music" subdirectory holds one selected file (keep.txt) and one that is both unchecked and
+        // filter-Excluded (drop.txt), making the directory itself Indeterminate *and* Mixed — neither
+        // IsSelected nor a prunable subtree. The batch traversal must still recurse in and copy keep.txt.
+        // This pins both prune polarities: pruning on != Checked (Indeterminate) or != Included (Mixed),
+        // rather than == Unchecked / == Excluded, would silently drop keep.txt (data loss).
         var provider = MemoryFileSystemFixtures.Create(f => f
             .WithFile("/src/music/keep.txt", "KEEP"u8)
             .WithFile("/src/music/drop.txt", "DROP"u8)
@@ -154,11 +155,16 @@ public sealed class CopyStepBatchTests
 
         var root = await provider.BuildDirectoryTree("/src");
 
-        // Select only keep.txt; leave drop.txt unchecked → "music" becomes Indeterminate.
         var keep = root.FindNodeByPathSegments("music", "keep.txt");
+        var drop = root.FindNodeByPathSegments("music", "drop.txt");
         Assert.NotNull(keep);
+        Assert.NotNull(drop);
         keep.FilterResult = FilterResult.Included;
         keep.CheckState = CheckState.Checked;
+        drop.FilterResult = FilterResult.Excluded; // → "music" is Mixed, not Excluded
+        // (drop.txt stays unchecked → "music" is Indeterminate, not Unchecked.)
+
+        keep.Parent!.FilterResult = FilterResult.Mixed;
 
         var results = await RunCopyAsync(root, provider, batchBufferBytes: 512 * 1024);
 

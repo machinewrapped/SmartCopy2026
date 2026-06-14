@@ -111,13 +111,18 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
     /// resume property: because accumulation and flush write in this same order, an interrupted copy
     /// leaves a clean depth-first prefix on disk, so completed and missing subtrees are obvious.
     /// <para>
-    /// Recursion descends into every child that is not fully Unchecked: a partially-selected directory
-    /// (CheckState=Indeterminate) is not itself selected yet can still contain selected descendants that
-    /// must be copied — gating recursion on the directory's own <c>IsSelected</c> would silently drop
-    /// them. Conversely an Unchecked directory has, by tri-state propagation, no Checked descendant
-    /// (<see cref="DirectoryNode.RecalculateCheckState"/>), so its subtree is pruned rather than walked.
-    /// The directory node is only yielded as a traversal marker when it is itself selected (the caller
-    /// emits a no-op result for markers).
+    /// Selection is enforced per node via <c>IsSelected</c> (Checked &amp;&amp; Included &amp;&amp; not
+    /// marked-for-removal), so a partially-selected directory (CheckState=Indeterminate, or a Mixed
+    /// filter result) is still recursed into to reach its selected descendants — gating recursion on the
+    /// directory's own <c>IsSelected</c> would silently drop them. As an optimisation we prune subtrees
+    /// that <em>cannot</em> contain a selected node: a directory that is Unchecked, filter-Excluded, or
+    /// marked for removal guarantees the same of its whole subtree (CheckState and FilterResult are
+    /// computed bottom-up — see <see cref="DirectoryNode.RecalculateCheckState"/> /
+    /// <see cref="Filters.FilterChain.RecalculateParentExclusion"/> — and <c>MarkForRemoval</c> recurses).
+    /// Note the polarity: we prune on <c>== Unchecked</c>/<c>== Excluded</c>, not <c>!= Checked</c>/
+    /// <c>!= Included</c>, because Indeterminate/Mixed subtrees still hold selected nodes. The directory
+    /// node is yielded as a traversal marker only when it is itself selected (the caller emits a no-op
+    /// result for markers).
     /// </para>
     /// </summary>
     private static IEnumerable<DirectoryTreeNode> EnumerateForBatching(DirectoryNode dir)
@@ -127,8 +132,11 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
 
         foreach (var child in dir.Children)
         {
-            if (child.CheckState == CheckState.Unchecked)
-                continue; // no Checked descendant possible — skip the whole subtree
+            // Prune subtrees that can hold no selected node (each condition holds for the whole subtree).
+            if (child.CheckState == CheckState.Unchecked ||
+                child.FilterResult == FilterResult.Excluded ||
+                child.IsMarkedForRemoval)
+                continue;
 
             if (child.IsSelected)
                 yield return child;
