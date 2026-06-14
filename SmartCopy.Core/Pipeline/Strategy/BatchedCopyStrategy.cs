@@ -111,11 +111,13 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
     /// resume property: because accumulation and flush write in this same order, an interrupted copy
     /// leaves a clean depth-first prefix on disk, so completed and missing subtrees are obvious.
     /// <para>
-    /// Recursion is unconditional, matching <see cref="DirectoryNode.GetSelectedDescendants"/>: a
-    /// partially-selected directory (CheckState=Indeterminate) is not itself selected yet can still
-    /// contain selected descendants that must be copied — gating recursion on the directory's own
-    /// selection would silently drop them. The directory node is only yielded as a traversal marker
-    /// when it is itself selected (the caller emits a no-op result for markers).
+    /// Recursion descends into every child that is not fully Unchecked: a partially-selected directory
+    /// (CheckState=Indeterminate) is not itself selected yet can still contain selected descendants that
+    /// must be copied — gating recursion on the directory's own <c>IsSelected</c> would silently drop
+    /// them. Conversely an Unchecked directory has, by tri-state propagation, no Checked descendant
+    /// (<see cref="DirectoryNode.RecalculateCheckState"/>), so its subtree is pruned rather than walked.
+    /// The directory node is only yielded as a traversal marker when it is itself selected (the caller
+    /// emits a no-op result for markers).
     /// </para>
     /// </summary>
     private static IEnumerable<DirectoryTreeNode> EnumerateForBatching(DirectoryNode dir)
@@ -125,6 +127,9 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
 
         foreach (var child in dir.Children)
         {
+            if (child.CheckState == CheckState.Unchecked)
+                continue; // no Checked descendant possible — skip the whole subtree
+
             if (child.IsSelected)
                 yield return child;
             foreach (var node in EnumerateForBatching(child))
