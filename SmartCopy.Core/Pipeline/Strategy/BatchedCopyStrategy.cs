@@ -142,7 +142,7 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
         foreach (var entry in buffer.Entries)
         {
             IProgress<long>? progress = null;
-            if (context is IFileTransferProgressSink sink)
+            if (entry.Length > 0 && context is IFileTransferProgressSink sink)
                 progress = new DelegateProgress<long>(b => sink.ReportFileTransferBytes(entry.Node, b, entry.Length));
 
             string? error = null;

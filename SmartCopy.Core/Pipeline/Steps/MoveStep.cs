@@ -271,6 +271,9 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
             if (atomicMoved)
             {
                 // One result aggregates the whole subtree that was renamed in a single operation.
+                // Directory Size is 0, so report the subtree's selected bytes (matches the preview path)
+                // to keep progress/journal totals accurate for large atomic moves.
+                var movedBytes = child.TotalSelectedBytes;
                 yield return new TransformResult(
                     IsSuccess: true,
                     SourceNode: child,
@@ -279,8 +282,8 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
                     DestinationResult: DestinationResult.Created,
                     NumberOfFilesAffected: child.CountAllFiles(),
                     NumberOfFoldersAffected: child.CountAllFolders(),
-                    InputBytes: child.Size,
-                    OutputBytes: child.Size);
+                    InputBytes: movedBytes,
+                    OutputBytes: movedBytes);
             }
             else
             {

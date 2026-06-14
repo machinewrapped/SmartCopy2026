@@ -113,7 +113,7 @@ public abstract class CopyStrategyBase : ICopyStrategy
         // Wire byte-level progress only when the context can consume it (the UI run); benchmarks
         // and tests pass a context that is not a progress sink and skip the allocation.
         IProgress<long>? writeProgress = null;
-        if (context is IFileTransferProgressSink progressSink)
+        if (file.Size > 0 && context is IFileTransferProgressSink progressSink)
         {
             writeProgress = new DelegateProgress<long>(
                 bytes => progressSink.ReportFileTransferBytes(file, bytes, file.Size));

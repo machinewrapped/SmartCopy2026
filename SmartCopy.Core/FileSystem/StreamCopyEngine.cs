@@ -44,7 +44,8 @@ internal static class StreamCopyEngine
     {
         if (remainingBytes is long bytesRemaining &&
             opts.PreallocateDestinationFile &&
-            bytesRemaining > 0)
+            bytesRemaining > 0 &&
+            destination.CanSeek) // SetLength throws on non-seekable destinations (MTP, network streams)
         {
             destination.SetLength(bytesRemaining);
         }

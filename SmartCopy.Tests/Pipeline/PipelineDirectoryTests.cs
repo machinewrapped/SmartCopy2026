@@ -96,6 +96,10 @@ public sealed class PipelineDirectoryTests
         Assert.Single(results);
         Assert.True(results[0].IsSuccess);
         Assert.Equal(SourceResult.Moved, results[0].SourceNodeResult);
+        // The aggregate row reports the subtree's selected bytes (1000 + 2000), not the directory
+        // node's own Size (0) — guards against the atomic-move byte-accounting regression.
+        Assert.Equal(3000, results[0].InputBytes);
+        Assert.Equal(3000, results[0].OutputBytes);
         Assert.False(await provider.ExistsAsync("/src/music", CancellationToken.None));
         Assert.True(await provider.ExistsAsync("/dest/src/music", CancellationToken.None));
         Assert.True(await provider.ExistsAsync("/dest/src/music/a.flac", CancellationToken.None));
