@@ -1,5 +1,6 @@
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.FileSystem.Hardware;
 using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Pipeline.Strategy;
 using SmartCopy.Core.Pipeline.Validation;
@@ -108,6 +109,12 @@ public sealed partial class PipelineRunner
             }
         }
 
+        var strategyNotes = await BuildStrategyNotesAsync(job, context, ct);
+
+        // The optimisations status only means anything when something actually transfers bytes
+        // (a Copy or a non-atomic Move) — i.e. exactly when strategy notes were produced.
+        var strategyStatus = strategyNotes.Count > 0 ? DescribeOptimisations(job.OperationalSettings) : "";
+
         return new OperationPlan
         {
             Actions = actions,
@@ -116,8 +123,67 @@ public sealed partial class PipelineRunner
             Warnings = warnings,
             InfoMessages = infoMessages,
             Errors = errors,
+            StrategyNotes = strategyNotes,
+            StrategyStatus = strategyStatus,
         };
     }
+
+    /// <summary>
+    /// Resolves, without transferring any bytes, the copy strategy each executable destination step
+    /// (Copy/Move) will use, and formats a one-line summary per step for the preview pane. The
+    /// classification probes are registry-cached and cheap. This is purely informational: a probe that
+    /// throws is swallowed so a strategy-description failure can never block or break a preview.
+    /// </summary>
+    private async Task<IReadOnlyList<string>> BuildStrategyNotesAsync(
+        PipelineJob job, IStepContext context, CancellationToken ct)
+    {
+        var notes = new List<string>();
+        foreach (var step in _pipeline.Steps)
+        {
+            if (!step.IsExecutable || step is not IHasDestinationPath { DestinationPath: { } destPath })
+                continue;
+
+            try
+            {
+                var target = job.ProviderRegistry.ResolveProvider(destPath);
+                if (target is null) continue;
+
+                var source = await job.SourceProvider.GetClassificationAsync(ct);
+                var dest = await target.GetClassificationAsync(ct);
+                var sameVolume = job.SourceProvider.VolumeId is { } vid && target.VolumeId == vid;
+
+                // A same-volume atomic Move is a rename — no copy strategy ever runs, so there are no
+                // transfer mechanics to report. Only Copy and non-atomic (copy-then-delete) Move qualify.
+                if (step is MoveStep && sameVolume && target.Capabilities.CanAtomicMove)
+                    continue;
+
+                var strategy = await context.ResolveCopyStrategyAsync(target, ct);
+                // Description (full destination path + overwrite mode) rather than AutoSummary (leaf
+                // folder only) so steps targeting like-named folders on different drives stay distinct.
+                notes.Add($"{step.Description} — {DescribeDrivePair(source, dest, sameVolume)}: {strategy.Describe()}");
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Informational only — never let a classification probe block the preview.
+            }
+        }
+
+        return notes;
+    }
+
+    /// <summary>Drive-pair label for a strategy note, e.g. "SSD (NVMe)→HDD (SATA), same volume".</summary>
+    private static string DescribeDrivePair(DriveClassification source, DriveClassification target, bool sameVolume)
+    {
+        var pair = $"{source}→{target}";
+        return sameVolume ? $"{pair}, same volume" : pair;
+    }
+
+    /// <summary>Plan-wide copy-optimisations status. Destination routing is the proxy the UI toggles
+    /// with "Allow Copy Optimisations": on ⇒ buffer chosen per drive pair; off ⇒ the fixed default.</summary>
+    private static string DescribeOptimisations(OperationalSettings settings) =>
+        settings.DestinationRoutingEnabled
+            ? "Copy optimisations: on — buffer routed by drive pair"
+            : "Copy optimisations: off — fixed buffer, no routing";
 
     public async Task<IReadOnlyList<TransformResult>> ExecuteAsync(PipelineJob job, CancellationToken ct = default)
     {

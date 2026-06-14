@@ -19,6 +19,13 @@ public interface ICopyStrategy
     OperationalSettings Settings { get; }
 
     /// <summary>
+    /// One-line, human-readable summary of the resolved transfer mechanics — strategy kind, copy
+    /// buffer, batching, and write durability — for display in the preview so the user can see what
+    /// each step will do without running it. Pure formatting; no I/O.
+    /// </summary>
+    string Describe();
+
+    /// <summary>
     /// Copies every selected, filter-included file under <see cref="IStepContext.RootNode"/> into
     /// <paramref name="destPath"/>, emitting one <see cref="TransformResult"/> per file. Directories
     /// yield a <see cref="SourceResult.None"/> marker. <paramref name="successResult"/> lets the caller

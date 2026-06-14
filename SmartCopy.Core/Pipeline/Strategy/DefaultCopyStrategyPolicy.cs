@@ -1,5 +1,7 @@
+using Microsoft.Extensions.Logging;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.FileSystem.Hardware;
+using SmartCopy.Core.Logging;
 
 namespace SmartCopy.Core.Pipeline.Strategy;
 
@@ -13,6 +15,8 @@ namespace SmartCopy.Core.Pipeline.Strategy;
 public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
 {
     public static readonly DefaultCopyStrategyPolicy Instance = new();
+
+    private readonly ILogger<DefaultCopyStrategyPolicy> _logger = AppLog.CreateLogger<DefaultCopyStrategyPolicy>();
 
     /// <summary>Buffer for fast destinations (SSD/NVMe and USB removable). Section 2.5.3 / 2.6.3.</summary>
     public const int FastBufferBytes = 1024 * 1024;
@@ -34,9 +38,26 @@ public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
         }
 
         var targetSupportsStaging = inputs.TargetCaps.AllowStagedWrite;
-        return resolved.BatchBufferBytes > 0
+        ICopyStrategy strategy = resolved.BatchBufferBytes > 0
             ? new BatchedCopyStrategy(resolved, targetSupportsStaging)
             : new StreamingCopyStrategy(resolved, targetSupportsStaging);
+
+        // One line per step (not per file) describing the resolved decision; enable Debug to see it.
+        if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            _logger.LogDebug(
+                "Copy strategy resolved: {Strategy} buffer={BufferKiB}KiB batch={BatchKiB}KiB " +
+                "durabilityThreshold={ThresholdKiB}KiB (source={Source}, target={Target}, " +
+                "sameVolume={SameVolume}, routing={Routing}, targetStaging={Staging})",
+                strategy.GetType().Name,
+                resolved.CopyBufferSizeBytes / 1024,
+                resolved.BatchBufferBytes / 1024,
+                resolved.TinyFileFastPathThresholdBytes / 1024,
+                inputs.Source, inputs.Target, inputs.SameVolume,
+                resolved.DestinationRoutingEnabled, targetSupportsStaging);
+        }
+
+        return strategy;
     }
 
     /// <summary>

@@ -41,6 +41,46 @@ public abstract class CopyStrategyBase : ICopyStrategy
         return _tinyThreshold > 0 && fileSize <= _tinyThreshold ? _directSettings : _stagedSettings;
     }
 
+    /// <summary>
+    /// Formats the resolved mechanics for the preview. Batching presence is read from the settings
+    /// (batch buffer &gt; 0 ⇒ batched), and durability reflects what <see cref="SettingsFor"/> will
+    /// choose per file: direct when the target cannot stage, otherwise staged with a direct fast-path
+    /// for files at/below the tiny-file threshold.
+    /// </summary>
+    public string Describe()
+    {
+        var kind = Settings.BatchBufferBytes > 0 ? "Batched copy" : "Streaming copy";
+        var batch = Settings.BatchBufferBytes > 0 ? $" · {FormatBytes(Settings.BatchBufferBytes)} batches" : "";
+        return $"{kind} · {FormatBytes(Settings.CopyBufferSizeBytes)} buffer{batch} · {DescribeDurability()}";
+    }
+
+    private string DescribeDurability()
+    {
+        // Unconditional cases read as plain "direct writes" / "staged writes"; only a mixed policy
+        // (staging with a tiny-file direct fast-path) needs the qualifier.
+        if (!_targetSupportsStaging)
+            return "direct writes";
+        return _tinyThreshold > 0
+            ? $"staged writes (direct ≤ {FormatBytes(_tinyThreshold)})"
+            : "staged writes";
+    }
+
+    /// <summary>Compact binary-unit size for display: whole MiB/KiB where exact, else one decimal.</summary>
+    internal static string FormatBytes(long bytes)
+    {
+        if (bytes >= 1024 * 1024)
+        {
+            var mib = bytes / (1024.0 * 1024.0);
+            return mib == Math.Floor(mib) ? $"{(long)mib} MiB" : $"{mib:0.#} MiB";
+        }
+        if (bytes >= 1024)
+        {
+            var kib = bytes / 1024.0;
+            return kib == Math.Floor(kib) ? $"{(long)kib} KiB" : $"{kib:0.#} KiB";
+        }
+        return $"{bytes} B";
+    }
+
     public abstract IAsyncEnumerable<TransformResult> CopySelectionAsync(
         IStepContext context,
         IFileSystemProvider targetProvider,
