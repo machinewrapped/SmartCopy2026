@@ -24,7 +24,7 @@ internal static class ValidationGate
         firstFailVerdict = "OK";
 
         var matchedControls = config.Variants
-            .Where(v => !string.IsNullOrWhiteSpace(v.MatchedControl))
+            .Where(v => v.Enabled && !string.IsNullOrWhiteSpace(v.MatchedControl))
             .ToDictionary(v => v.Name, v => v.MatchedControl!, StringComparer.OrdinalIgnoreCase);
         if (matchedControls.Count == 0)
             return false;
