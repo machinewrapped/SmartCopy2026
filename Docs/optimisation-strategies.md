@@ -434,7 +434,7 @@ The current per-file overhead chain:
 
 ### Phase 3 — Buffered Read-Write Batching
 
-**Status:** **Core integration complete; policy validation pending.** Clean-room run (2026-06-01) established that batching adds 1–2% above a 512 KiB baseline (the headline +8.5% vs `Control_BaselineAuto` is mostly chunk-size improvement — see Section 2.3.5). See Section 2.3 for detailed evidence. The batching coordinator now lives in `BatchedCopyStrategy` (with `BatchCopyBuffer`), selected by the policy when `BatchBufferBytes > 0`. As of 2026-06-14 it implements the full Step-2 design that the benchmark harness (`BenchmarkCopyRunner`) measured but that had not been propagated to production: the **intentional depth-first walk with per-directory ascending-size sorting**, and the **512 KiB batch-eligibility ceiling** (`OperationalSettings.BatchEligibilityCeilingBytes`, default on). The remaining work is the MixedDataset policy validation pass (Section 7.6 checklist C) — which now also confirms the 512 KiB ceiling on SSD/HDD (it was only isolated on USB) — before defaults are promoted.
+**Status:** **Core integration complete; policy validation pending.** Clean-room run (2026-06-01) established that batching adds 1–2% above a 512 KiB baseline (the headline +8.5% vs `Control_BaselineAuto` is mostly chunk-size improvement — see Section 2.3.5). See Section 2.3 for detailed evidence. The batching coordinator now lives in `BatchedCopyStrategy` (with `BatchCopyBuffer`), selected by the policy when `BatchBufferBytes > 0`. As of 2026-06-14 it implements the full Step-2 design that the benchmark harness (`BenchmarkCopyRunner`) measured but that had not been propagated to production: the **intentional depth-first walk with per-directory ascending-size sorting**, and the **512 KiB batch-eligibility ceiling** (`OperationalSettings.BatchEligibilityCeilingBytes`, default on). The ceiling itself is already motivated on SSD by the SmallFileDataset clean-room run (Section 2.3.3, Section 2.3.5 #3/#4: phase separation needs ≥2 files per flush, and >512 KiB "gains" are a large-buffer effect that does not survive a 512 KiB floor), so it does **not** need re-proving by the multi-week matrix — a cheap SmallFileDataset × SSDtoSSD A/B suffices if empirical re-confirmation is ever wanted. The remaining work is the MixedDataset policy validation pass (Section 7.6 checklist C / §7.7) — production-path parity and the routing defaults — before defaults are promoted.
 
 **What batching does:** The current model interleaves read and write on every file, alternating I/O direction continuously. Batching accumulates multiple small files into a pool-allocated buffer during a read phase, then drains it during a write phase:
 
@@ -734,10 +734,10 @@ Reports should separate measurement from interpretation:
 4. **Policy candidate summary:** proposed routing table built from bucket evidence.
 5. **Policy validation summary:** whole-run result for candidate policies on MixedDataset and destination matrix.
 
-Use mechanical verdict language:
-- `PASS`: exceeds gate and variance.
-- `INCONCLUSIVE`: delta is within variance or matched control is missing.
-- `FAIL`: below required improvement.
+Use mechanical verdict language. The terms are adoption decisions, not a single speed ranking — `BELOW_THRESHOLD` is faster than the control (a better measured result than `INCONCLUSIVE` or `REGRESSION`); it just doesn't clear the gate that justifies promoting it. The `BELOW_THRESHOLD` band only exists where the gate sits above the measured noise floor (e.g. SSD, ~0.2% spread vs a 3% gate); on noisy media whose spread exceeds the gate it is empty, since clearing the noise already clears the gate.
+- `PASS`: faster, clears both the gate and the observed variance.
+- `BELOW_THRESHOLD`: faster beyond variance, but short of the gate — real improvement, not enough to promote.
+- `INCONCLUSIVE`: delta is within variance, or a matched control is missing.
 - `REGRESSION`: slower beyond variance.
 - `INVALID`: correctness or run-integrity problem.
 
@@ -842,8 +842,58 @@ Ordered steps to completion. To continue: find the first unchecked item and exec
 **C — Policy Validation**
 
 > Policy validation deferred to Core integration. The clean-room noise floor (<0.2% CV on 58–64 second runs) makes the bucket-level findings definitive without a standalone MixedDataset pre-pass. Whole-policy validation runs as part of the Core integration pre-merge checklist (Section 7.4).
+>
+> **Execution follows the fail-fast ladder in §7.7** — the full MixedDataset matrix is a multi-week run, so production-path parity is proven on a tiny SSDtoSSD dataset before any drive-weeks are spent.
 
 - [ ] Convert bucket recommendations into one or more candidate routing policies
 - [ ] Run candidate policies on MixedDataset × SSDtoSSD (during Core integration, before merge)
 - [ ] Promote to SameDriveTest and SSDtoHDD only after SSDtoSSD passes beyond variance
 - [ ] Treat USB as a separate validation target; do not infer USB defaults from SSD/HDD
+
+---
+
+### 7.7 Production-Path Validation Pass (fail-fast)
+
+The production copy path (`PipelineRunner → CopyStep → DefaultCopyStrategyPolicy → BatchedCopyStrategy`) has **never been measured with batching/routing enabled**: under `--mode benchmark` the harness diverts any variant carrying batch/direct-write settings to the `BenchmarkCopyRunner` prototype. The new **`--mode validation`** always drives the production runner, mapping each variant's batch/eligibility/direct-write fields onto `OperationalSettings` — so `Production_Routed` measures production where benchmark mode would measure the prototype. (`Legacy_Baseline` carries no batch settings, so it runs the production streaming path under either mode; `Production_Routed` is the variant that requires validation mode.) This pass validates that production *matches* the prototype (parity) and that the routed defaults beat the legacy default (value). The MixedDataset matrix is a multi-week run, so the ladder fails fast: cheap signals before drive-weeks.
+
+**Metric.** Median `executeDuration` per scenario/variant; variance = the `ConvergenceSpreadPercent` window (`BenchmarkConvergence`); verdicts PASS / INCONCLUSIVE / FAIL / REGRESSION / INVALID per §7.2.3.
+
+#### Gate 1 — Parity smoke · ~minutes
+
+- **Run:** `--mode validation --config validation-smoke.json`. **Once** (not re-run for Gate 2).
+- **Scenario:** `SmallFileDataset` × SSDtoSSD. Already prepared; ~60 s/variant; its `Sub512KiB`/`Sub1MiB`/`Tail` buckets straddle the 512 KiB ceiling, so both the batch and stream-individual paths run. SSDtoSSD because wrapper overhead is most exposed on the fastest pair — pass equivalence there and it holds on slower pairs.
+- **Variants** — all four, shuffled into one session (so the equivalence delta is a matched control):
+
+  | Variant | Runner | Settings |
+  |---|---|---|
+  | `Prototype` | `BenchmarkCopyRunner` | per-pair champion params |
+  | `Production_Fixed` | `PipelineRunner` | champion params pinned, routing off |
+  | `Production_Routed` | `PipelineRunner` | routing on, promoted defaults |
+  | `Legacy_Baseline` | `PipelineRunner` | 256 KiB auto (old default) |
+
+- **Convergence:** config defaults — `ConvergenceSpreadPercent`/`GatePercent` 3%, `DesiredRunCount` 5, `MaxConvergenceRuns` 5. SSD clears 3% with margin (§2.3 floor: <100 ms on ~60 s ≈ <0.2%).
+- **PASS — all of:**
+  - **Equivalence** `Production_Fixed` vs `Prototype`: non-regression — production ≤ prototype + variance.
+  - **Value** `Production_Routed` vs `Legacy_Baseline`: `PASS` is the target; `BELOW_THRESHOLD` and `INCONCLUSIVE` are tolerated (a real-but-sub-gate or noise-bound delta means production is no worse); only `REGRESSION` fails here.
+  - **No INVALID** — neither production copy faulted or self-reported a failure.
+- **On REGRESSION** (production slower than prototype beyond variance): **STOP**, chase wrapper overhead (per-file allocation, progress wiring, `ExistsAsync` pre-check, staging) before any drive-weeks.
+
+#### Gate 2 — Full matrix, fail-fast ordered · hours → weeks
+
+- **Run:** `--mode validation --config validation-matrix.json`. **Resumes across cold boots** — `BenchmarkPass` schedules only unconverged scenario/variant pairs, so a restart continues where it left off.
+- **Scenarios:** `MixedDataset` × drive pairs **in this order** (cheapest / most-likely-to-fail first, so SSDtoSSD ~hours gates the multi-week HDD/USB pairs): `SSDtoSSD → SameDriveTest → SSDtoHDD → SSDtoUSBFlash`.
+- **Variants** — two, no prototype runner: `Production_Routed` and `Legacy_Baseline` (settings as Gate 1).
+- **Convergence:** `GatePercent` 3%, `DesiredRunCount` 5, `MaxConvergenceRuns` 5. USB/HDD spread is 3–9% (§2.6.2), so noisy pairs will not reach 3% → `GaveUp` (analysis uses the tightest window), and an effect smaller than a pair's spread reads INCONCLUSIVE per §7.2.1. Do **not** loosen the threshold — the verdict already compares the delta to the actual measured spread.
+- **Per-pair outcome:** `PASS` is the goal on pairs whose noise floor sits below the gate (SSD); `BELOW_THRESHOLD` and `INCONCLUSIVE` continue the matrix (routed is no worse than legacy). On noisy pairs (HDD/USB) the floor exceeds the gate, so a genuine win reads `PASS` and anything smaller reads `INCONCLUSIVE` — `BELOW_THRESHOLD` cannot arise there.
+- **Abort** on the first pair returning `REGRESSION` or `INVALID` — do not finish the set then report. `BELOW_THRESHOLD` is a (sub-gate) improvement, not a failure, and never aborts.
+
+**Decisions.**
+- The two validation configs are separate from the discovery benchmarks, so all three archive independently under `.benchmarks/`.
+- `BenchmarkCopyRunner` is the discovery/experimentation harness — a distinct job from production code (fast prototyping; the discipline is to port validated findings into production, not to replace it). It stays. In this pass it doubles as the `Prototype` equivalence control in Gate 1.
+
+**Implementation — new code required.** None of the gates can run until this is built; it is the bulk of the work, and `--mode benchmark` must keep behaving exactly as today.
+
+- **Mode + executor seam.** Add `BenchmarkRunMode.Validation`; parse `validation`/`validate` in `BenchmarkCliOptions.ParseMode`; route it in `Program.cs`. Extract the copy invocation in `BenchmarkTask.RunCopyAsync` (today's `if (directWriteThresholdBytes > 0 || bufferBatchBytes > 0)` branch) behind an `ICopyExecutor`: `PrototypeCopyExecutor` (that branch verbatim — `BenchmarkCopyRunner` when batch/direct set, else `PipelineRunner`; used by `--mode benchmark`) and `ProductionCopyExecutor` (always `PipelineRunner.ExecuteAsync`; used by `--mode validation`). `BenchmarkTask` selects the executor from the mode.
+- **Settings mapping** (the crux — today nothing maps the new fields). Add `DestinationRoutingEnabled` to `BenchmarkVariant` (`Production_Routed` sets it; `Production_Fixed` leaves it off); `BufferBatchBytes` / `BatchEligibilityThresholdBytes` / `DirectWriteThresholdBytes` / `MatchedControl` already exist. Add `BenchmarkVariant.CreateProductionOperationalSettings`: `BufferBatchBytes → BatchBufferBytes`, `BatchEligibilityThresholdBytes → BatchEligibilityCeilingBytes`, `DirectWriteThresholdBytes → TinyFileFastPathThresholdBytes`, set `DestinationRoutingEnabled`, job `CopyStrategyPolicy = DefaultCopyStrategyPolicy.Instance`. The existing `CreateOperationalSettings` (legacy provider fields only) is left for the prototype path. `ProductionCopyExecutor` logs the resolved `OperationalSettings` (+ the policy's resolved buffer) at startup — the run-1 sanity check.
+- **Configs + data** (authored, not code). `validation-smoke.json` (Gate 1) and `validation-matrix.json` (Gate 2). Champion params for `Prototype` / `Production_Fixed` come from the §2.5.3 / §2.6.3 discovery results, set as per-scenario overrides (scenario-level `BufferBatchBytes`/buffer fields already exist). Equivalence pairing reuses `MatchedControl` (`Production_Fixed` → `Prototype`).
+- **Reused unchanged:** convergence, analysis/report, journals, dataset-prep, cooldown/cold-cache, the §7.2.3 verdict machinery, the `BenchmarkSizeScalingAnalysis` invariants, and the existing unit suite.
