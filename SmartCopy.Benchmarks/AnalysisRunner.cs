@@ -127,7 +127,6 @@ internal static class AnalysisRunner
         Report($"- **Variants:** {string.Join(", ", allVariants.Select(v => $"`{v}`"))}");
         Report($"- **Run input:** `{resultsPath}`");
         Report($"- **File input:** `{fileResultsPath}`");
-        Report("- **Verdicts:** `PASS` means the measured improvement exceeds both the gate and observed variance. `INCONCLUSIVE` means the delta is inside variance or a matched control is missing.");
         Report();
 
         var buckets = config.DatasetPreparation?.Buckets?.Select(b => new FileSizeBucket(b.MinimumFileSizeBytes, b.MaximumFileSizeBytes, b.Name)).ToList()
@@ -515,7 +514,7 @@ internal static class AnalysisRunner
             return "REGRESSION";
         if (delta <= noiseFloor)
             return "INCONCLUSIVE";
-        return deltaPercent >= gatePercent ? "PASS" : "FAIL";
+        return deltaPercent >= gatePercent ? "PASS" : "BELOW_THRESHOLD";
     }
 
     /// <summary>
