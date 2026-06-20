@@ -104,7 +104,13 @@ internal sealed class BenchmarkCliOptions
             return BenchmarkRunMode.SizeScaling;
         }
 
-        throw new InvalidOperationException($"Unknown benchmark mode '{value}'. Expected 'benchmark', 'dataset-prep', 'analysis', or 'size-scaling'.");
+        if (string.Equals(value, "validation", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(value, "validate", StringComparison.OrdinalIgnoreCase))
+        {
+            return BenchmarkRunMode.Validation;
+        }
+
+        throw new InvalidOperationException($"Unknown benchmark mode '{value}'. Expected 'benchmark', 'dataset-prep', 'analysis', 'size-scaling', or 'validation'.");
     }
 }
 

@@ -1,0 +1,166 @@
+{
+  "sourcePath": "D:\\TestData\\SmallFileDataset",
+  "artifactPath": "C:\\benchmark-artifacts",
+  "includeHidden": false,
+  "convergenceSpreadPercent": 3,
+  "gatePercent": 3,
+  "maxConvergenceRuns": 5,
+  "converge": true,
+  "clearCacheBetweenRuns": true,
+  "ramMapPath": "D:\\Development\\Github\\SmartCopy2026\\Tools\\RAMMap\\RAMMap64.exe",
+  "scenarios": [
+    {
+      "name": "SmallFileDataset-SSDtoSSD",
+      "destinationPath": "R:\\TestData\\SmallFileDataset_ValidationSmoke",
+      "sourcePath": "D:\\TestData\\SmallFileDataset",
+      "enabled": true,
+      "clearDestinationBeforeRun": true,
+      "clearDestinationAfterRun": true,
+      "overwriteMode": 1,
+      "providerCopyBufferSizeBytes": null,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": null,
+      "skipExistsCheckForOverwrite": null,
+      "bufferBatchBytes": null,
+      "batchEligibilityThresholdBytes": null,
+      "usePathPool": true
+    }
+  ],
+  "scenarioExecutionOrder": [
+    "SmallFileDataset-SSDtoSSD"
+  ],
+  "variants": [
+    {
+      "name": "Prototype",
+      "notes": "Prototype reference (BenchmarkCopyRunner) with promoted defaults: 64 KiB direct write, 1 MiB batch, 512 KiB eligibility ceiling. Runs the prototype engine even under --mode validation via usePrototypeExecutor.",
+      "enabled": true,
+      "desiredRunCount": 5,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": 1048576,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": 65536,
+      "skipExistsCheckForOverwrite": false,
+      "bufferBatchBytes": 1048576,
+      "batchEligibilityThresholdBytes": 524288,
+      "destinationRoutingEnabled": false,
+      "usePrototypeExecutor": true,
+      "matchedControl": null
+    },
+    {
+      "name": "Production_Fixed",
+      "notes": "Production runner (PipelineRunner) with promoted defaults pinned, routing off. Equivalence pair with Prototype.",
+      "enabled": true,
+      "desiredRunCount": 5,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": 1048576,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": 65536,
+      "skipExistsCheckForOverwrite": false,
+      "bufferBatchBytes": 1048576,
+      "batchEligibilityThresholdBytes": 524288,
+      "destinationRoutingEnabled": false,
+      "usePrototypeExecutor": null,
+      "matchedControl": "Prototype",
+      "validationRole": "Equivalence"
+    },
+    {
+      "name": "Production_Routed",
+      "notes": "Production runner with promoted defaults (64 KiB direct, 1 MiB batch, 512 KiB eligibility) and destination routing ON. Value pair vs Legacy_Baseline. Buffer left null so routing picks it from the drive pair.",
+      "enabled": true,
+      "desiredRunCount": 5,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": null,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": 65536,
+      "skipExistsCheckForOverwrite": false,
+      "bufferBatchBytes": 1048576,
+      "batchEligibilityThresholdBytes": 524288,
+      "destinationRoutingEnabled": true,
+      "usePrototypeExecutor": null,
+      "matchedControl": "Legacy_Baseline",
+      "validationRole": "Value"
+    },
+    {
+      "name": "Legacy_Baseline",
+      "notes": "Production streaming path with the old 256 KiB auto default (no batch, no direct write, no routing). Legacy anchor.",
+      "enabled": true,
+      "desiredRunCount": 5,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": 262144,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": 0,
+      "skipExistsCheckForOverwrite": false,
+      "bufferBatchBytes": 0,
+      "batchEligibilityThresholdBytes": null,
+      "destinationRoutingEnabled": false,
+      "usePrototypeExecutor": null,
+      "matchedControl": null
+    }
+  ],
+  "datasetPreparation": {
+    "sourcePath": "D:\\Games",
+    "destinationPath": "D:\\TestData\\SmallFileDataset",
+    "organizeByBucket": true,
+    "poolCloneCount": 32,
+    "buckets": [
+      {
+        "name": "Sub4KiB",
+        "minimumFileSizeBytes": 0,
+        "maximumFileSizeBytes": 4096,
+        "targetTotalBytes": 41943040
+      },
+      {
+        "name": "Sub16KiB",
+        "minimumFileSizeBytes": 4097,
+        "maximumFileSizeBytes": 16384,
+        "targetTotalBytes": 83886080
+      },
+      {
+        "name": "Sub64KiB",
+        "minimumFileSizeBytes": 16385,
+        "maximumFileSizeBytes": 65536,
+        "targetTotalBytes": 125829120
+      },
+      {
+        "name": "Sub256KiB",
+        "minimumFileSizeBytes": 65537,
+        "maximumFileSizeBytes": 262144,
+        "targetTotalBytes": 167772160
+      },
+      {
+        "name": "Sub512KiB",
+        "minimumFileSizeBytes": 262145,
+        "maximumFileSizeBytes": 524288,
+        "targetTotalBytes": 209715200
+      },
+      {
+        "name": "Sub1MiB",
+        "minimumFileSizeBytes": 524289,
+        "maximumFileSizeBytes": 1048576,
+        "targetTotalBytes": 209715200
+      },
+      {
+        "name": "Tail",
+        "minimumFileSizeBytes": 1048577,
+        "maximumFileSizeBytes": 4194304,
+        "targetTotalBytes": 209715200
+      }
+    ]
+  },
+  "cooldownSeconds": 120
+}

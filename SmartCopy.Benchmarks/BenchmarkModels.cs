@@ -12,6 +12,7 @@ internal enum BenchmarkRunMode
     DatasetPreparation,
     Analysis,
     SizeScaling,
+    Validation,
 }
 
 internal sealed class BenchmarkState
@@ -280,11 +281,6 @@ internal sealed record BucketVariantEvidence(
     public static BucketVariantEvidence Empty(string bucketLabel, string variantName) =>
         new(bucketLabel, variantName, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 }
-
-internal sealed record EvidenceComparison(
-    string Verdict,
-    string DeltaText,
-    string NoiseText);
 
 internal static class FileSizeBuckets
 {

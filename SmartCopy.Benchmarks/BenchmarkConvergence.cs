@@ -102,6 +102,33 @@ internal static class BenchmarkConvergence
     }
 
     /// <summary>
+    /// Per-variant converged-run-index sets for one scenario's terminal runs (the tightest
+    /// window, or the best available when a variant gave up). Shared by the analysis report,
+    /// the validation gate, and the validation conclusion so they select identical windows
+    /// and cannot disagree on a verdict.
+    /// </summary>
+    public static Dictionary<string, HashSet<int>> GetConvergedIndexesForVariants(
+        BenchmarkConfig config,
+        IReadOnlyList<BenchmarkRunRecord> scenarioRuns,
+        IReadOnlyList<string> variants)
+    {
+        return variants.ToDictionary(
+            v => v,
+            v =>
+            {
+                var successful = scenarioRuns
+                    .Where(r => string.Equals(r.VariantName, v, StringComparison.OrdinalIgnoreCase))
+                    .Where(BenchmarkHelpers.IsSuccessfulRun)
+                    .ToList();
+                return GetConvergedRunIndexes(
+                    successful,
+                    GetDesiredRunCount(config, v),
+                    config.ConvergenceSpreadPercent);
+            },
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     /// Returns the configured <c>DesiredRunCount</c> for a variant name, defaulting to 3.
     /// </summary>
     public static int GetDesiredRunCount(BenchmarkConfig config, string variantName)
