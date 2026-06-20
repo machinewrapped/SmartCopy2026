@@ -14,7 +14,7 @@ public sealed class DefaultCopyStrategyPolicyTests
         DefaultCopyStrategyPolicy.Instance.Resolve(new CopyStrategyInputs(
             settings, source, target, ProviderCapabilities.Full, ProviderCapabilities.Full, SameVolume: false));
 
-    [Theory] // the validated routing table (Docs/optimisation-strategies.md §2.5.3/§2.6.3)
+    [Theory] // the benchmark-validated routing table: 1 MiB for SSD/USB, 512 KiB where an HDD caps the pair
     [InlineData(DriveMediaType.SSD, DriveInterfaceType.NVMe, DriveMediaType.SSD, DriveInterfaceType.NVMe, DefaultCopyStrategyPolicy.FastBufferBytes)]          // SSD↔SSD
     [InlineData(DriveMediaType.SSD, DriveInterfaceType.NVMe, DriveMediaType.SSD, DriveInterfaceType.USB, DefaultCopyStrategyPolicy.FastBufferBytes)]           // USB target
     [InlineData(DriveMediaType.SSD, DriveInterfaceType.NVMe, DriveMediaType.HDD, DriveInterfaceType.SATA, DefaultCopyStrategyPolicy.ConservativeBufferBytes)]  // HDD target

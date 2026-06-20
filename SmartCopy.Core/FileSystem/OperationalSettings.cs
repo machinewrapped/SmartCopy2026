@@ -42,8 +42,8 @@ public sealed record OperationalSettings
     /// <c>0</c> uses <c>StreamingCopyStrategy</c>.</summary>
     public long BatchBufferBytes { get; init; }
     /// <summary>Files at or below this size batch; larger ones stream individually. Capped to the batch
-    /// buffer capacity, so the default 512 KiB keeps ≥2 files per flush of a 1 MiB+ buffer (rationale:
-    /// <c>Docs/optimisation-strategies.md</c> Phase 3). <c>0</c> disables the ceiling (use buffer capacity).</summary>
+    /// buffer capacity, so the default 512 KiB keeps ≥2 files per flush of a 1 MiB+ buffer — which is
+    /// what makes phase separation happen. <c>0</c> disables the ceiling (use buffer capacity).</summary>
     public long BatchEligibilityCeilingBytes { get; init; } = 512 * 1024;
     /// <summary>Per-file durability intent (set by the strategy). Default <see cref="WriteDurability.Staged"/>
     /// keeps direct <c>WriteAsync</c> callers crash-safe.</summary>

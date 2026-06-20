@@ -29,7 +29,7 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
 
         // Files at/below this size batch; larger ones stream individually. Capped to the buffer
         // capacity, so "size <= ceiling" alone guarantees the file fits the buffer. The 512 KiB
-        // default keeps >=2 files per flush on a 1 MiB+ buffer (Docs/optimisation-strategies.md Phase 3).
+        // default keeps >=2 files per flush on a 1 MiB+ buffer, so phase separation actually happens.
         var ceiling = Settings.BatchEligibilityCeilingBytes;
         var effectiveCeiling = ceiling <= 0 ? buffer.Capacity : Math.Min(ceiling, buffer.Capacity);
 
