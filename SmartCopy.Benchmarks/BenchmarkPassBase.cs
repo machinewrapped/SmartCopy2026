@@ -157,9 +157,15 @@ internal abstract class BenchmarkPassBase
 
     private bool HasAnyPendingRuns()
     {
-        foreach (var scenario in Config.Scenarios.Where(s => s.Enabled))
-            foreach (var variant in Config.Variants.Where(v => v.Enabled))
-                if (BenchmarkConvergence.Check(HistoricalRuns, scenario.Name, variant, Config) == BenchmarkConvergence.Status.NotConverged)
+        // Use BuildScenarioGroups() so per-scenario variant lists (e.g.
+        // benchmark-scenarios-usb.json) are respected. Checking the full
+        // cartesian product of enabled scenarios × enabled variants would
+        // see 0-run excluded pairs as NotConverged forever, blocking
+        // auto-archive even when all eligible work is done.
+        var groups = BuildScenarioGroups();
+        foreach (var group in groups)
+            foreach (var selection in group.Variants)
+                if (BenchmarkConvergence.Check(HistoricalRuns, group.Scenario.Name, selection.Variant, Config) == BenchmarkConvergence.Status.NotConverged)
                     return true;
         return false;
     }
