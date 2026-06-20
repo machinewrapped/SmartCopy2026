@@ -100,7 +100,74 @@ public static class BenchmarkSizeScalingAnalysis
             .Select(t => BuildCoverageRow(validRecords, t))
             .ToList();
 
-        return new SizeScalingReport(groupReports, coverage);
+        var report = new SizeScalingReport(groupReports, coverage);
+        ValidateInvariants(report, validRecords);
+        return report;
+    }
+
+    /// <summary>
+    /// Polices the analysis output against invariants that must hold for any input, so a logic bug
+    /// (e.g. a bucket gap/overlap, a broken percentile, a non-monotonic coverage filter) fails the run
+    /// loudly rather than emitting plausible-but-wrong numbers that could mislead a policy decision.
+    /// These run on real data every analysis — broader than example-based tests, which is the point.
+    /// They do not pin <em>semantic</em> choices (exact boundary inclusivity, ratio direction); those
+    /// are internally consistent either way and low-consequence, so they are left to review of output.
+    /// </summary>
+    private static void ValidateInvariants(
+        SizeScalingReport report,
+        IReadOnlyList<SizeScalingInputRecord> validRecords)
+    {
+        // Conservation: the power-of-two buckets partition [0, maxSize], so each group's bucket counts
+        // must sum to exactly its analysed record count. A gap or overlap in Contains breaks this.
+        var countsByGroup = validRecords
+            .GroupBy(r => (r.ScenarioName, r.VariantName))
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        foreach (var group in report.Groups)
+        {
+            var expected = countsByGroup.GetValueOrDefault((group.ScenarioName, group.VariantName));
+            var actual = group.Buckets.Sum(b => b.RecordCount);
+            if (actual != expected)
+            {
+                throw new InvalidOperationException(
+                    $"Size-scaling invariant violated: scenario '{group.ScenarioName}' variant " +
+                    $"'{group.VariantName}' bucket counts sum to {actual} but {expected} records were " +
+                    "analysed (bucket gap or overlap).");
+            }
+
+            // Percentiles interpolate within the sorted inputs, so P50 can never exceed P95.
+            foreach (var bucket in group.Buckets)
+            {
+                if (bucket.P50ThroughputMiBPerSecond is double tp50 &&
+                    bucket.P95ThroughputMiBPerSecond is double tp95 && tp50 > tp95)
+                {
+                    throw new InvalidOperationException(
+                        $"Size-scaling invariant violated: bucket '{bucket.Label}' throughput P50 " +
+                        $"{tp50} exceeds P95 {tp95}.");
+                }
+
+                if (bucket.P50DurationMilliseconds is double d50 &&
+                    bucket.P95DurationMilliseconds is double d95 && d50 > d95)
+                {
+                    throw new InvalidOperationException(
+                        $"Size-scaling invariant violated: bucket '{bucket.Label}' duration P50 " +
+                        $"{d50} exceeds P95 {d95}.");
+                }
+            }
+        }
+
+        // Coverage is a "size >= threshold" filter, so a higher threshold can only match fewer records.
+        var coverage = report.Coverage.OrderBy(c => c.ThresholdBytes).ToList();
+        for (var i = 1; i < coverage.Count; i++)
+        {
+            if (coverage[i].RecordCount > coverage[i - 1].RecordCount)
+            {
+                throw new InvalidOperationException(
+                    $"Size-scaling invariant violated: coverage at {coverage[i].Label} " +
+                    $"({coverage[i].RecordCount}) exceeds {coverage[i - 1].Label} " +
+                    $"({coverage[i - 1].RecordCount}); thresholds are not monotonic.");
+            }
+        }
     }
 
     public static string ToMarkdown(SizeScalingReport report, string inputPath)
