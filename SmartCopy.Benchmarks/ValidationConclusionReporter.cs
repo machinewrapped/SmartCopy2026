@@ -159,7 +159,10 @@ internal static class ValidationConclusionReporter
         var variantIndex = config.Variants.Select((v, i) => (v.Name, i))
             .ToDictionary(t => t.Name, t => t.i, StringComparer.OrdinalIgnoreCase);
 
-        var found = new HashSet<(string Scenario, string Candidate)>();
+        // Case-insensitive on both elements so a casing mismatch between config
+        // (e.g. SSDtoSSD) and runs file (e.g. ssdtossd) cannot cause a pair to be
+        // misreported as pending and flip the verdict to INCOMPLETE.
+        var found = new HashSet<(string Scenario, string Candidate)>(new ScenarioCandidateTupleComparer());
         foreach (var p in pairs)
             found.Add((p.Scenario, p.Candidate));
 
@@ -262,5 +265,17 @@ internal static class ValidationConclusionReporter
             "INCONCLUSIVE" => isEquivalence ? "OK — parity (within noise)" : "OK — no change (within noise)",
             _ => pair.Verdict,
         };
+    }
+
+    private sealed class ScenarioCandidateTupleComparer : IEqualityComparer<(string Scenario, string Candidate)>
+    {
+        public bool Equals((string Scenario, string Candidate) x, (string Scenario, string Candidate) y) =>
+            string.Equals(x.Scenario, y.Scenario, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(x.Candidate, y.Candidate, StringComparison.OrdinalIgnoreCase);
+
+        public int GetHashCode((string Scenario, string Candidate) obj) =>
+            HashCode.Combine(
+                obj.Scenario?.ToUpperInvariant() ?? string.Empty,
+                obj.Candidate?.ToUpperInvariant() ?? string.Empty);
     }
 }
