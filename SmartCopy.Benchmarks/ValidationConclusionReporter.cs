@@ -66,7 +66,7 @@ internal static class ValidationConclusionReporter
             scenarioOrder = scenarioOrder.Where(n => string.Equals(n, selection.ScenarioName, StringComparison.OrdinalIgnoreCase)).ToList();
 
         var matchedControls = config.Variants
-            .Where(v => !string.IsNullOrWhiteSpace(v.MatchedControl))
+            .Where(v => v.Enabled && !string.IsNullOrWhiteSpace(v.MatchedControl))
             .ToDictionary(v => v.Name, v => v.MatchedControl!, StringComparer.OrdinalIgnoreCase);
 
         var variantIndex = config.Variants.Select((v, i) => (v.Name, i))
