@@ -14,7 +14,6 @@ internal sealed class BenchmarkVariant
     public long? ProviderSmallFileProgressThresholdBytes { get; set; }
     public LocalFileSystemWriteMode? ProviderWriteMode { get; set; }
     public bool? ProviderUseArrayPoolForManualLoop { get; set; }
-    public bool? ProviderPreallocateDestinationFile { get; set; }
     public long? DirectWriteThresholdBytes { get; set; }
     public long? BufferBatchBytes { get; set; }
     public long? BatchEligibilityThresholdBytes { get; set; }
@@ -61,9 +60,6 @@ internal sealed class BenchmarkVariant
             UseArrayPoolForManualLoop = ProviderUseArrayPoolForManualLoop
                 ?? scenario.ProviderUseArrayPoolForManualLoop
                 ?? defaults.UseArrayPoolForManualLoop,
-            PreallocateDestinationFile = ProviderPreallocateDestinationFile
-                ?? scenario.ProviderPreallocateDestinationFile
-                ?? defaults.PreallocateDestinationFile,
         }.Normalize();
     }
 
@@ -97,9 +93,6 @@ internal sealed class BenchmarkVariant
             UseArrayPoolForManualLoop = ProviderUseArrayPoolForManualLoop
                 ?? scenario.ProviderUseArrayPoolForManualLoop
                 ?? defaults.UseArrayPoolForManualLoop,
-            PreallocateDestinationFile = ProviderPreallocateDestinationFile
-                ?? scenario.ProviderPreallocateDestinationFile
-                ?? defaults.PreallocateDestinationFile,
             BatchBufferBytes = batchBufferBytes,
             BatchEligibilityCeilingBytes = batchEligibilityCeilingBytes,
             TinyFileFastPathThresholdBytes = tinyFileFastPathThresholdBytes,

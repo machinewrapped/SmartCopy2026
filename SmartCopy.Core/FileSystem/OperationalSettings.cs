@@ -32,9 +32,6 @@ public sealed record OperationalSettings
     public LocalFileSystemWriteMode WriteMode { get; init; } = LocalFileSystemWriteMode.Auto;
     /// <summary>Rent the manual-loop buffer from <c>ArrayPool</c> instead of allocating one per file.</summary>
     public bool UseArrayPoolForManualLoop { get; init; }
-    /// <summary>Pre-size the destination to the known length before writing. OFF universally (no validated
-    /// win, and it throws on non-seekable targets — see <see cref="StreamCopyEngine"/>).</summary>
-    public bool PreallocateDestinationFile { get; init; }
     /// <summary>Files at or below this size are written <see cref="WriteDurability.Direct"/> (no staging),
     /// the write being effectively atomic anyway. <c>0</c> disables the fast path (always stage).</summary>
     public long TinyFileFastPathThresholdBytes { get; init; }

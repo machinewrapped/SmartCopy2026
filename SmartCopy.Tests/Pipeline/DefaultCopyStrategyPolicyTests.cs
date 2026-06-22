@@ -53,15 +53,4 @@ public sealed class DefaultCopyStrategyPolicyTests
 
         Assert.Equal(baseSettings.CopyBufferSizeBytes, strategy.Settings.CopyBufferSizeBytes);
     }
-
-    [Fact]
-    public void RoutingEnabled_ForcesPreallocationOff()
-    {
-        var strategy = Resolve(
-            new OperationalSettings { DestinationRoutingEnabled = true, PreallocateDestinationFile = true },
-            new DriveClassification(DriveMediaType.SSD, DriveInterfaceType.NVMe),
-            new DriveClassification(DriveMediaType.SSD, DriveInterfaceType.NVMe));
-
-        Assert.False(strategy.Settings.PreallocateDestinationFile);
-    }
 }

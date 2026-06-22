@@ -166,8 +166,7 @@ internal sealed class BenchmarkTask
             $"Provider: buffer={providerOptions.CopyBufferSizeBytes} bytes, " +
             $"small-file-threshold={providerOptions.SmallFileProgressThresholdBytes} bytes, " +
             $"write-mode={providerOptions.WriteMode}, " +
-            $"array-pool={providerOptions.UseArrayPoolForManualLoop}, " +
-            $"preallocate={providerOptions.PreallocateDestinationFile}");
+            $"array-pool={providerOptions.UseArrayPoolForManualLoop}");
         if (useProductionExecutor)
         {
             Console.WriteLine(
@@ -377,7 +376,6 @@ internal sealed class BenchmarkTask
             ["providerSmallFileProgressThresholdBytes"] = providerOptions.SmallFileProgressThresholdBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["providerWriteMode"] = providerOptions.WriteMode.ToString(),
             ["providerUseArrayPoolForManualLoop"] = providerOptions.UseArrayPoolForManualLoop.ToString(),
-            ["providerPreallocateDestinationFile"] = providerOptions.PreallocateDestinationFile.ToString(),
             ["bufferBatchBytes"] = (_variant.BufferBatchBytes ?? _scenario.BufferBatchBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["batchEligibilityThresholdBytes"] = (_variant.BatchEligibilityThresholdBytes ?? _scenario.BatchEligibilityThresholdBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["directWriteThresholdBytes"] = (_variant.DirectWriteThresholdBytes ?? _scenario.DirectWriteThresholdBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),

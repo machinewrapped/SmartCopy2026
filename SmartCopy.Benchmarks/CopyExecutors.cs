@@ -129,8 +129,7 @@ internal sealed class ProductionCopyExecutor : ICopyExecutor
                 $"tinyFileFastPathThreshold={_settings.TinyFileFastPathThresholdBytes} bytes, " +
                 $"destinationRouting={_settings.DestinationRoutingEnabled}, " +
                 $"writeMode={_settings.WriteMode}, " +
-                $"arrayPool={_settings.UseArrayPoolForManualLoop}, " +
-                $"preallocate={_settings.PreallocateDestinationFile}");
+                $"arrayPool={_settings.UseArrayPoolForManualLoop}");
 
             var source = await _sourceProvider.GetClassificationAsync(ct);
             var target = await _destinationProvider.GetClassificationAsync(ct);
@@ -144,8 +143,7 @@ internal sealed class ProductionCopyExecutor : ICopyExecutor
                 Console.WriteLine(
                     $"Resolved strategy: {strategy.GetType().Name}, " +
                     $"buffer={resolved.CopyBufferSizeBytes} bytes, " +
-                    $"batchBuffer={resolved.BatchBufferBytes} bytes, " +
-                    $"preallocate={resolved.PreallocateDestinationFile} " +
+                    $"batchBuffer={resolved.BatchBufferBytes} bytes " +
                     $"(source={source.MediaType}/{source.InterfaceType}, " +
                     $"target={target.MediaType}/{target.InterfaceType}, sameVolume={sameVolume})");
             }

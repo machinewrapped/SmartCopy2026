@@ -44,7 +44,6 @@ internal sealed class BenchmarkRunRecord
     public long? ProviderSmallFileProgressThresholdBytes { get; init; }
     public LocalFileSystemWriteMode? ProviderWriteMode { get; init; }
     public bool? ProviderUseArrayPoolForManualLoop { get; init; }
-    public bool? ProviderPreallocateDestinationFile { get; init; }
     public long? DirectWriteThresholdBytes { get; init; }
     public long? BufferBatchBytes { get; init; }
     public required TimeSpan ScanDuration { get; init; }
@@ -88,7 +87,6 @@ internal sealed class BenchmarkRunRecord
             ProviderSmallFileProgressThresholdBytes = providerOptions.SmallFileProgressThresholdBytes,
             ProviderWriteMode = providerOptions.WriteMode,
             ProviderUseArrayPoolForManualLoop = providerOptions.UseArrayPoolForManualLoop,
-            ProviderPreallocateDestinationFile = providerOptions.PreallocateDestinationFile,
             DirectWriteThresholdBytes = variant.DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes,
             BufferBatchBytes = variant.BufferBatchBytes ?? scenario.BufferBatchBytes,
             ScanDuration = TimeSpan.Zero,
@@ -159,7 +157,6 @@ internal sealed class BenchmarkRunRecord
             ProviderSmallFileProgressThresholdBytes = providerOptions.SmallFileProgressThresholdBytes,
             ProviderWriteMode = providerOptions.WriteMode,
             ProviderUseArrayPoolForManualLoop = providerOptions.UseArrayPoolForManualLoop,
-            ProviderPreallocateDestinationFile = providerOptions.PreallocateDestinationFile,
             DirectWriteThresholdBytes = variant.DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes,
             BufferBatchBytes = variant.BufferBatchBytes ?? scenario.BufferBatchBytes,
             ScanDuration = state.ScanStopwatch.Elapsed,
