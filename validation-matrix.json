@@ -11,7 +11,7 @@
   "scenarios": [
     {
       "name": "SSDtoSSD",
-      "destinationPath": "R:\\TestData\\Matrix_SSDtoSSD",
+      "destinationPath": "O:\\TestData\\Matrix_SSDtoSSD",
       "sourcePath": null,
       "enabled": true,
       "clearDestinationBeforeRun": true,
@@ -68,7 +68,7 @@
     },
     {
       "name": "SSDtoHDD",
-      "destinationPath": "E:\\TestData\\Matrix_SSDtoHDD",
+      "destinationPath": "M:\\TestData\\Matrix_SSDtoHDD",
       "sourcePath": null,
       "enabled": true,
       "clearDestinationBeforeRun": true,
@@ -147,9 +147,9 @@
     "SSDtoSSD",
     "SameDriveSSD",
     "SameDriveHDD",
-    "HDDtoHDD",
     "SSDtoHDD",
     "HDDtoSSD",
+    "HDDtoHDD",
     "SSDtoUSBFlash"
   ],
   "variants": [

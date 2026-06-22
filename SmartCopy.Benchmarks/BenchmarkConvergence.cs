@@ -10,6 +10,70 @@ internal static class BenchmarkConvergence
     }
 
     /// <summary>
+    /// A detected split of a variant's run durations into a low cluster and a high cluster
+    /// separated by a dominant gap (seconds). Signals that the distribution is multimodal
+    /// (e.g. cache-warm runs vs cold runs), so a converged window may represent only one mode.
+    /// </summary>
+    internal sealed record DistributionPartition(
+        int LowCount, double LowMinSeconds, double LowMaxSeconds,
+        int HighCount, double HighMinSeconds, double HighMaxSeconds,
+        double GapSeconds);
+
+    /// <summary>
+    /// Heuristic multimodality test. Splits the duration-sorted runs at their largest interior
+    /// gap (keeping at least <paramref name="minClusterSize"/> runs on each side) and reports a
+    /// partition only when that gap both dominates every other gap (by
+    /// <paramref name="dominanceFactor"/>) and is large relative to the median
+    /// (<paramref name="minRelativeGap"/>). Returns <c>null</c> for unimodal or merely noisy
+    /// distributions (a lone outlier is not a partition — convergence already handles those).
+    /// </summary>
+    public static DistributionPartition? DetectMultimodal(
+        IReadOnlyList<double> durationsSeconds,
+        double dominanceFactor = 2.0,
+        double minRelativeGap = 0.15,
+        int minClusterSize = 2)
+    {
+        var d = durationsSeconds.OrderBy(x => x).ToList();
+        var n = d.Count;
+        if (n < 2 * minClusterSize)
+            return null;
+
+        var lo = minClusterSize - 1;
+        var hi = n - 1 - minClusterSize;
+
+        var splitIdx = -1;
+        var bestGap = -1.0;
+        for (var i = lo; i <= hi; i++)
+        {
+            var gap = d[i + 1] - d[i];
+            if (gap > bestGap)
+            {
+                bestGap = gap;
+                splitIdx = i;
+            }
+        }
+
+        if (splitIdx < 0)
+            return null;
+
+        var refGap = 0.0;
+        for (var i = 0; i < n - 1; i++)
+            if (i != splitIdx)
+                refGap = Math.Max(refGap, d[i + 1] - d[i]);
+
+        var median = BenchmarkHelpers.Percentile(d, 0.5);
+        if (bestGap < dominanceFactor * refGap)
+            return null;
+        if (median > 0 && bestGap < minRelativeGap * median)
+            return null;
+
+        return new DistributionPartition(
+            splitIdx + 1, d[0], d[splitIdx],
+            n - 1 - splitIdx, d[splitIdx + 1], d[^1],
+            bestGap);
+    }
+
+    /// <summary>
     /// Determines convergence status for a specific scenario/variant pair.
     /// Used by the run selector to decide whether to schedule more runs.
     /// </summary>

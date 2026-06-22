@@ -66,12 +66,6 @@ internal static class BenchmarkStatistics
             .Where(v => v > 0)
             .OrderBy(v => v)
             .ToList();
-        var throughputs = bucketRecords
-            .Select(r => r.ThroughputMiBPerSecond)
-            .Where(v => v is not null)
-            .Select(v => v!.Value)
-            .OrderBy(v => v)
-            .ToList();
         var runMedians = bucketRecords
             .GroupBy(r => (r.RunStartedUtc, r.RunIndex))
             .Select(g => g
@@ -107,13 +101,11 @@ internal static class BenchmarkStatistics
             variant,
             bucketRecords.Count,
             totalBytes,
+            durations.Sum(),
             durations.Count > 0 ? durations.Average() : 0.0,
             durations.Count > 0 ? BenchmarkHelpers.Percentile(durations, 0.50) : 0.0,
             durations.Count > 0 ? BenchmarkHelpers.Percentile(durations, 0.95) : 0.0,
             aggregateThroughput,
-            throughputs.Count > 0 ? throughputs.Average() : 0.0,
-            throughputs.Count > 0 ? BenchmarkHelpers.Percentile(throughputs, 0.50) : 0.0,
-            throughputs.Count > 0 ? BenchmarkHelpers.Percentile(throughputs, 0.95) : 0.0,
             runMedians.Count > 1 ? runMedians[^1] - runMedians[0] : 0.0,
             runThroughputs.Count > 1 ? runThroughputs[^1] - runThroughputs[0] : 0.0);
     }

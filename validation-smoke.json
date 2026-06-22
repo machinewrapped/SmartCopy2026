@@ -1,18 +1,16 @@
 {
-  "sourcePath": "D:\\TestData\\SmallFileDataset",
+  "sourcePath": "D:\\TestData\\SmokeDataset",
   "artifactPath": "C:\\benchmark-artifacts",
   "includeHidden": false,
   "convergenceSpreadPercent": 3,
   "gatePercent": 3,
   "maxConvergenceRuns": 5,
   "converge": true,
-  "clearCacheBetweenRuns": true,
-  "ramMapPath": "D:\\Development\\Github\\SmartCopy2026\\Tools\\RAMMap\\RAMMap64.exe",
   "scenarios": [
     {
-      "name": "SmallFileDataset-SSDtoSSD",
-      "destinationPath": "R:\\TestData\\SmallFileDataset_ValidationSmoke",
-      "sourcePath": "D:\\TestData\\SmallFileDataset",
+      "name": "SmokeDataset-DtoO",
+      "destinationPath": "O:\\TestData\\SmokeDataset_ValidationSmoke",
+      "sourcePath": "D:\\TestData\\SmokeDataset",
       "enabled": true,
       "clearDestinationBeforeRun": true,
       "clearDestinationAfterRun": true,
@@ -25,13 +23,33 @@
       "directWriteThresholdBytes": null,
       "bufferBatchBytes": null,
       "batchEligibilityThresholdBytes": null,
-      "usePathPool": true
+      "usePathPool": true,
+      "variants": null
     }
   ],
   "scenarioExecutionOrder": [
-    "SmallFileDataset-SSDtoSSD"
+    "SmokeDataset-DtoO"
   ],
   "variants": [
+    {
+      "name": "Legacy_Baseline",
+      "notes": "Production streaming path with the old 256 KiB auto default (no batch, no direct write, no routing). Legacy anchor.",
+      "enabled": true,
+      "desiredRunCount": 5,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": 262144,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": 0,
+      "bufferBatchBytes": 0,
+      "batchEligibilityThresholdBytes": null,
+      "destinationRoutingEnabled": false,
+      "usePrototypeExecutor": null,
+      "matchedControl": null,
+      "validationRole": null
+    },
     {
       "name": "Prototype",
       "notes": "Prototype reference (BenchmarkCopyRunner) with promoted defaults: 64 KiB direct write, 1 MiB batch, 512 KiB eligibility ceiling. Runs the prototype engine even under --mode validation via usePrototypeExecutor.",
@@ -48,7 +66,8 @@
       "batchEligibilityThresholdBytes": 524288,
       "destinationRoutingEnabled": false,
       "usePrototypeExecutor": true,
-      "matchedControl": null
+      "matchedControl": "Legacy_Baseline",
+      "validationRole": "Value"
     },
     {
       "name": "Production_Fixed",
@@ -85,77 +104,85 @@
       "batchEligibilityThresholdBytes": 524288,
       "destinationRoutingEnabled": true,
       "usePrototypeExecutor": null,
-      "matchedControl": "Legacy_Baseline",
-      "validationRole": "Value"
-    },
-    {
-      "name": "Legacy_Baseline",
-      "notes": "Production streaming path with the old 256 KiB auto default (no batch, no direct write, no routing). Legacy anchor.",
-      "enabled": true,
-      "desiredRunCount": 5,
-      "overwriteMode": null,
-      "providerCopyBufferSizeBytes": 262144,
-      "providerSmallFileProgressThresholdBytes": null,
-      "providerWriteMode": null,
-      "providerUseArrayPoolForManualLoop": null,
-      "providerPreallocateDestinationFile": null,
-      "directWriteThresholdBytes": 0,
-      "bufferBatchBytes": 0,
-      "batchEligibilityThresholdBytes": null,
-      "destinationRoutingEnabled": false,
-      "usePrototypeExecutor": null,
-      "matchedControl": null
+      "matchedControl": "Production_Fixed",
+      "validationRole": "Equivalence"
     }
   ],
   "datasetPreparation": {
     "sourcePath": "D:\\Games",
-    "destinationPath": "D:\\TestData\\SmallFileDataset",
+    "destinationPath": "D:\\TestData\\SmokeDataset",
     "organizeByBucket": true,
     "poolCloneCount": 32,
     "buckets": [
       {
-        "name": "Sub4KiB",
-        "minimumFileSizeBytes": 0,
-        "maximumFileSizeBytes": 4096,
-        "targetTotalBytes": 41943040
-      },
-      {
         "name": "Sub16KiB",
-        "minimumFileSizeBytes": 4097,
+        "minimumFileSizeBytes": 16,
         "maximumFileSizeBytes": 16384,
-        "targetTotalBytes": 83886080
-      },
-      {
-        "name": "Sub64KiB",
-        "minimumFileSizeBytes": 16385,
-        "maximumFileSizeBytes": 65536,
-        "targetTotalBytes": 125829120
+        "targetTotalBytes": 12582912
       },
       {
         "name": "Sub256KiB",
-        "minimumFileSizeBytes": 65537,
+        "minimumFileSizeBytes": 16385,
         "maximumFileSizeBytes": 262144,
-        "targetTotalBytes": 167772160
+        "targetTotalBytes": 62914560
       },
       {
         "name": "Sub512KiB",
         "minimumFileSizeBytes": 262145,
         "maximumFileSizeBytes": 524288,
-        "targetTotalBytes": 209715200
+        "targetTotalBytes": 251658240
       },
       {
-        "name": "Sub1MiB",
+        "name": "Sub4MiB",
         "minimumFileSizeBytes": 524289,
-        "maximumFileSizeBytes": 1048576,
-        "targetTotalBytes": 209715200
+        "maximumFileSizeBytes": 4194304,
+        "targetTotalBytes": 786432000
       },
       {
-        "name": "Tail",
-        "minimumFileSizeBytes": 1048577,
-        "maximumFileSizeBytes": 4194304,
-        "targetTotalBytes": 209715200
+        "name": "Sub32MiB",
+        "minimumFileSizeBytes": 4194305,
+        "maximumFileSizeBytes": 33554432,
+        "targetTotalBytes": 2359296000
       }
     ]
   },
-  "cooldownSeconds": 120
+  "cooldownSeconds": 120,
+  "clearCacheBetweenRuns": false,
+  "ramMapPath": "D:\\Development\\Github\\SmartCopy2026\\Tools\\RAMMap\\RAMMap64.exe",
+  "sourcePools": {
+    "D:\\TestData\\SmokeDataset": [
+      "D:\\TestData\\SmokeDataset_13",
+      "D:\\TestData\\SmokeDataset_24",
+      "D:\\TestData\\SmokeDataset_16",
+      "D:\\TestData\\SmokeDataset_7",
+      "D:\\TestData\\SmokeDataset_18",
+      "D:\\TestData\\SmokeDataset_5",
+      "D:\\TestData\\SmokeDataset_10",
+      "D:\\TestData\\SmokeDataset_27",
+      "D:\\TestData\\SmokeDataset_26",
+      "D:\\TestData\\SmokeDataset_15",
+      "D:\\TestData\\SmokeDataset_22",
+      "D:\\TestData\\SmokeDataset_19",
+      "D:\\TestData\\SmokeDataset_29",
+      "D:\\TestData\\SmokeDataset_4",
+      "D:\\TestData\\SmokeDataset_25",
+      "D:\\TestData\\SmokeDataset_28",
+      "D:\\TestData\\SmokeDataset_20",
+      "D:\\TestData\\SmokeDataset_1",
+      "D:\\TestData\\SmokeDataset_12",
+      "D:\\TestData\\SmokeDataset_6",
+      "D:\\TestData\\SmokeDataset_3",
+      "D:\\TestData\\SmokeDataset_14",
+      "D:\\TestData\\SmokeDataset_31",
+      "D:\\TestData\\SmokeDataset_30",
+      "D:\\TestData\\SmokeDataset_21",
+      "D:\\TestData\\SmokeDataset_8",
+      "D:\\TestData\\SmokeDataset_23",
+      "D:\\TestData\\SmokeDataset_9",
+      "D:\\TestData\\SmokeDataset_11",
+      "D:\\TestData\\SmokeDataset_17",
+      "D:\\TestData\\SmokeDataset_2",
+      "D:\\TestData\\SmokeDataset_32"
+    ]
+  }
 }
