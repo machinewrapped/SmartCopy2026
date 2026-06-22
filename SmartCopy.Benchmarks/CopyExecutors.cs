@@ -33,19 +33,22 @@ internal sealed class PrototypeCopyExecutor : ICopyExecutor
     private readonly long _directWriteThresholdBytes;
     private readonly long _bufferBatchBytes;
     private readonly long _batchEligibilityThresholdBytes;
+    private readonly bool _writeSequentialScan;
 
     public PrototypeCopyExecutor(
         string destinationPath,
         OverwriteMode overwriteMode,
         long directWriteThresholdBytes,
         long bufferBatchBytes,
-        long batchEligibilityThresholdBytes)
+        long batchEligibilityThresholdBytes,
+        bool writeSequentialScan)
     {
         _destinationPath = destinationPath;
         _overwriteMode = overwriteMode;
         _directWriteThresholdBytes = directWriteThresholdBytes;
         _bufferBatchBytes = bufferBatchBytes;
         _batchEligibilityThresholdBytes = batchEligibilityThresholdBytes;
+        _writeSequentialScan = writeSequentialScan;
     }
 
     public Task<IReadOnlyList<TransformResult>> ExecuteAsync(PipelineJob job, CancellationToken ct)
@@ -60,6 +63,7 @@ internal sealed class PrototypeCopyExecutor : ICopyExecutor
                 _bufferBatchBytes,
                 _batchEligibilityThresholdBytes,
                 job.OperationalSettings.CopyBufferSizeBytes,
+                _writeSequentialScan,
                 ct);
         }
 

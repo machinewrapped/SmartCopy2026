@@ -26,6 +26,7 @@ internal static class BenchmarkCopyRunner
         long bufferBatchBytes,
         long batchEligibilityThresholdBytes,
         int copyBufferSizeBytes,
+        bool enableWriteSequentialScan,
         CancellationToken ct)
     {
         job.RootNode.BuildStats();
@@ -122,13 +123,22 @@ internal static class BenchmarkCopyRunner
                     }
                     else
                     {
+                        var options = FileOptions.Asynchronous;
+                        if (enableWriteSequentialScan)
+                        {
+                            options |= FileOptions.SequentialScan;
+                        }
+
                         await using (var destStream = new FileStream(
                             targetWritePath,
-                            FileMode.Create,
-                            FileAccess.Write,
-                            FileShare.None,
-                            bufferSize: copyBufferSizeBytes,
-                            useAsync: true))
+                            new FileStreamOptions
+                            {
+                                Mode = FileMode.Create,
+                                Access = FileAccess.Write,
+                                Share = FileShare.None,
+                                BufferSize = copyBufferSizeBytes,
+                                Options = options
+                            }))
                         {
                             await destStream.WriteAsync(sharedBuffer.AsMemory(batched.Offset, batched.Length), ct);
                         }
@@ -352,6 +362,12 @@ internal static class BenchmarkCopyRunner
                     }
                     else
                     {
+                        var writeOptions = FileOptions.Asynchronous;
+                        if (enableWriteSequentialScan)
+                        {
+                            writeOptions |= FileOptions.SequentialScan;
+                        }
+
                         await using (var sourceStream = new FileStream(
                             node.FullPath,
                             FileMode.Open,
@@ -362,11 +378,14 @@ internal static class BenchmarkCopyRunner
                         {
                             await using (var destStream = new FileStream(
                                 targetWritePath,
-                                FileMode.Create,
-                                FileAccess.Write,
-                                FileShare.None,
-                                bufferSize: copyBufferSizeBytes,
-                                useAsync: true))
+                                new FileStreamOptions
+                                {
+                                    Mode = FileMode.Create,
+                                    Access = FileAccess.Write,
+                                    Share = FileShare.None,
+                                    BufferSize = copyBufferSizeBytes,
+                                    Options = writeOptions
+                                }))
                             {
                                 await sourceStream.CopyToAsync(destStream, copyBufferSizeBytes, ct);
                             }

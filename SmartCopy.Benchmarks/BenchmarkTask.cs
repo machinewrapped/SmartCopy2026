@@ -238,6 +238,7 @@ internal sealed class BenchmarkTask
         var directWriteThresholdBytes = _variant.DirectWriteThresholdBytes ?? _scenario.DirectWriteThresholdBytes ?? 0L;
         var bufferBatchBytes = _variant.BufferBatchBytes ?? _scenario.BufferBatchBytes ?? 0L;
         var batchEligibilityThresholdBytes = _variant.BatchEligibilityThresholdBytes ?? _scenario.BatchEligibilityThresholdBytes ?? 0L;
+        var writeSequentialScan = _variant.ProviderWriteSequentialScan ?? _scenario.ProviderWriteSequentialScan ?? false;
 
         ICopyExecutor executor = useProductionExecutor
             ? new ProductionCopyExecutor(
@@ -245,7 +246,7 @@ internal sealed class BenchmarkTask
                 providerOptions, _sourceProvider!, resolvedDestinationProvider)
             : new PrototypeCopyExecutor(
                 _destinationPath, overwriteMode,
-                directWriteThresholdBytes, bufferBatchBytes, batchEligibilityThresholdBytes);
+                directWriteThresholdBytes, bufferBatchBytes, batchEligibilityThresholdBytes, writeSequentialScan);
 
         BenchmarkHelpers.UpdateProgress("Preparing copy...");
         using (var executeProgress = new ThrottledConsoleProgress<OperationProgress>(p =>
@@ -376,6 +377,7 @@ internal sealed class BenchmarkTask
             ["providerSmallFileProgressThresholdBytes"] = providerOptions.SmallFileProgressThresholdBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["providerWriteMode"] = providerOptions.WriteMode.ToString(),
             ["providerUseArrayPoolForManualLoop"] = providerOptions.UseArrayPoolForManualLoop.ToString(),
+            ["providerWriteSequentialScan"] = (_variant.ProviderWriteSequentialScan ?? _scenario.ProviderWriteSequentialScan ?? false).ToString(),
             ["bufferBatchBytes"] = (_variant.BufferBatchBytes ?? _scenario.BufferBatchBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["batchEligibilityThresholdBytes"] = (_variant.BatchEligibilityThresholdBytes ?? _scenario.BatchEligibilityThresholdBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["directWriteThresholdBytes"] = (_variant.DirectWriteThresholdBytes ?? _scenario.DirectWriteThresholdBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),

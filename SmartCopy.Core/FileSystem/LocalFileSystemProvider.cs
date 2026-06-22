@@ -178,7 +178,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                         Access = FileAccess.Write,
                         Share = FileShare.None,
                         BufferSize = opts.CopyBufferSizeBytes,
-                        Options = FileOptions.Asynchronous | FileOptions.SequentialScan
+                        Options = FileOptions.Asynchronous
                     }))
                 {
                     fileOpened = true;
@@ -280,7 +280,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                         Access = FileAccess.Write,
                         Share = FileShare.None,
                         BufferSize = bufferSizeBytes,
-                        Options = FileOptions.Asynchronous | FileOptions.SequentialScan
+                        Options = FileOptions.Asynchronous
                     });
 
                 stagedPath = candidate;

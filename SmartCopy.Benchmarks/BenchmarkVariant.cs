@@ -18,6 +18,7 @@ internal sealed class BenchmarkVariant
     public long? BufferBatchBytes { get; set; }
     public long? BatchEligibilityThresholdBytes { get; set; }
     public bool? DestinationRoutingEnabled { get; set; }
+    public bool? ProviderWriteSequentialScan { get; set; }
     public bool? UsePrototypeExecutor { get; set; }
     public string? MatchedControl { get; set; }
 
