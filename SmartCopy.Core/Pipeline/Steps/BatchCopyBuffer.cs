@@ -20,10 +20,19 @@ internal sealed class BatchCopyBuffer : IDisposable
     private readonly byte[] _data;
     private readonly List<Entry> _entries = new();
     private int _used;
+    private TimeSpan _preWriteElapsed;
 
     public long Capacity { get; }
     public bool HasEntries => _entries.Count > 0;
     public IReadOnlyList<Entry> Entries => _entries;
+
+    /// <summary>
+    /// Wall time spent on this batch's files before the write phase — each file's destination check plus
+    /// its read into the buffer. The caller banks it via <see cref="AddPreWriteElapsed"/>; the strategy
+    /// adds the flush time and splits the total evenly across the batch's files (per-file copy time in
+    /// this regime is overhead-dominated, not byte-proportional). Cleared by <see cref="Reset"/>.
+    /// </summary>
+    public TimeSpan PreWriteElapsed => _preWriteElapsed;
 
     public BatchCopyBuffer(long capacityBytes)
     {
@@ -51,6 +60,9 @@ internal sealed class BatchCopyBuffer : IDisposable
         _used += fileSize;
     }
 
+    /// <summary>Banks a file's pre-write time (destination check + read) for even attribution at flush.</summary>
+    public void AddPreWriteElapsed(TimeSpan elapsed) => _preWriteElapsed += elapsed;
+
     /// <summary>Opens a read-only <see cref="MemoryStream"/> view over the entry's region.</summary>
     public MemoryStream OpenSegmentStream(Entry entry) =>
         new MemoryStream(_data, entry.Offset, entry.Length, writable: false);
@@ -59,6 +71,7 @@ internal sealed class BatchCopyBuffer : IDisposable
     {
         _entries.Clear();
         _used = 0;
+        _preWriteElapsed = TimeSpan.Zero;
     }
 
     public void Dispose() => ArrayPool<byte>.Shared.Return(_data);

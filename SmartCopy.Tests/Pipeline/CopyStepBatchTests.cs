@@ -173,6 +173,36 @@ public sealed class CopyStepBatchTests
         Assert.False(await provider.ExistsAsync("/dest/music/drop.txt", CancellationToken.None));
     }
 
+    [Fact]
+    public async Task BatchCopy_AttributesExecutionDurationEquallyPerFile()
+    {
+        // The batch's read + flush time is split evenly across its files, so files of *different* sizes
+        // in one flush still get equal ExecutionDuration — small-file copy time is overhead-dominated,
+        // not byte-proportional. This pins the even split (a bytes-proportional split would give 1:4:16)
+        // and guards against the old attribution that dumped the batch's read cost on the first file.
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithFile("/src/a.bin", new byte[1024])
+            .WithFile("/src/b.bin", new byte[4096])
+            .WithFile("/src/c.bin", new byte[16384])
+            .WithDirectory("/dest"));
+
+        var root = await provider.BuildDirectoryTree("/src");
+        SelectAllFiles(root);
+
+        var results = await RunCopyAsync(root, provider, batchBufferBytes: 512 * 1024);
+
+        var durations = results
+            .Where(r => r.SourceNodeResult == SourceResult.Copied && r.IsSuccess)
+            .Select(r => r.ExecutionDuration)
+            .ToList();
+
+        Assert.Equal(3, durations.Count);
+        Assert.All(durations, d => Assert.NotNull(d));
+        // Different sizes, one flush → identical share (each is batchElapsed / 3).
+        Assert.Equal(durations[0], durations[1]);
+        Assert.Equal(durations[1], durations[2]);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static void SelectAllFiles(DirectoryNode dir)
