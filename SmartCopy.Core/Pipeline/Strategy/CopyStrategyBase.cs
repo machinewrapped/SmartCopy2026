@@ -109,8 +109,8 @@ public abstract class CopyStrategyBase : ICopyStrategy
         string destination,
         CancellationToken ct)
     {
-        // Wire byte-level progress only when the context can consume it (the UI run); benchmarks
-        // and tests pass a context that is not a progress sink and skip the allocation.
+        // Wire byte-level progress only when the context can consume it (UI and benchmark runs);
+        // tests pass a context that is not a progress sink and skip the allocation.
         IProgress<long>? writeProgress = null;
         if (file.Size > 0 && context is IFileTransferProgressSink progressSink)
         {

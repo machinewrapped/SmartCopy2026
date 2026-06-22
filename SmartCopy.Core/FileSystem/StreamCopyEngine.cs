@@ -42,7 +42,7 @@ internal static class StreamCopyEngine
         OperationalSettings opts,
         CancellationToken ct)
     {
-        var writeMode = DetermineWriteMode(progress, remainingBytes, opts);
+        var writeMode = DetermineWriteMode(remainingBytes, opts);
 
         if (writeMode == LocalFileSystemWriteMode.CopyToAsync)
         {
@@ -74,19 +74,15 @@ internal static class StreamCopyEngine
     }
 
     private static LocalFileSystemWriteMode DetermineWriteMode(
-        IProgress<long>? progress,
         long? remainingBytes,
         OperationalSettings opts)
     {
         if (opts.WriteMode != LocalFileSystemWriteMode.Auto)
             return opts.WriteMode;
-        // No progress handler: CopyToAsync with no wrapper is the fastest path.
-        if (progress is null)
-            return LocalFileSystemWriteMode.CopyToAsync;
         // Unknown length: can't apply the small-file optimisation, go straight to manual loop.
         if (remainingBytes is null)
             return LocalFileSystemWriteMode.ManualLoop;
-        // Known length with progress: the size heuristic above resolves the path inline.
+        // Known length: the size heuristic in CopyAsync resolves the path inline.
         return LocalFileSystemWriteMode.Auto;
     }
 
