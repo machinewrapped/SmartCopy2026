@@ -120,8 +120,9 @@ public abstract class CopyStrategyBase : ICopyStrategy
 
         // The provider executes the staging mechanism; the strategy decides the intent (Staged/Direct)
         // per file via SettingsFor and the provider honours it.
-        await using var sourceStream = await context.SourceProvider.OpenReadAsync(file.FullPath, ct);
-        await targetProvider.WriteAsync(destination, sourceStream, writeProgress, SettingsFor(file.Size), ct);
+        var settings = SettingsFor(file.Size);
+        await using var sourceStream = await context.SourceProvider.OpenReadAsync(file.FullPath, settings.CopyBufferSizeBytes, ct);
+        await targetProvider.WriteAsync(destination, sourceStream, writeProgress, settings, ct);
     }
 
     /// <summary>

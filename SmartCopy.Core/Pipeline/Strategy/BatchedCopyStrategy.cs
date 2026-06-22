@@ -79,7 +79,7 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
                 var readStart = Stopwatch.GetTimestamp();
                 try
                 {
-                    await using var src = await context.SourceProvider.OpenReadAsync(node.FullPath, ct);
+                    await using var src = await context.SourceProvider.OpenReadAsync(node.FullPath, Settings.CopyBufferSizeBytes, ct);
                     await buffer.AccumulateAsync(src, fileSize, destination, destResult.Value, node, ct);
                     // Bank destination-check + read as this file's pre-write cost; split evenly at flush.
                     buffer.AddPreWriteElapsed(ceremonyElapsed + Stopwatch.GetElapsedTime(readStart));

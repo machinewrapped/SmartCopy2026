@@ -239,7 +239,7 @@ public sealed class CopyStepBatchTests
 
     private static async Task<byte[]> ReadAllBytesAsync(MemoryFileSystemProvider provider, string path)
     {
-        await using var stream = await provider.OpenReadAsync(path, CancellationToken.None);
+        await using var stream = await provider.OpenReadAsync(path, ct: CancellationToken.None);
         using var ms = new MemoryStream();
         await stream.CopyToAsync(ms);
         return ms.ToArray();

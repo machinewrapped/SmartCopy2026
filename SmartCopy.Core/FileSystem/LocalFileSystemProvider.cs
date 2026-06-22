@@ -119,7 +119,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         }, ct);
     }
 
-    public Task<Stream> OpenReadAsync(string path, CancellationToken ct)
+    public Task<Stream> OpenReadAsync(string path, int? bufferSize = null, CancellationToken ct = default)
     {
         return Task.Run<Stream>(() =>
         {
@@ -133,7 +133,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                     Mode = FileMode.Open,
                     Access = FileAccess.Read,
                     Share = FileShare.Read,
-                    BufferSize = DefaultBufferSize,
+                    BufferSize = bufferSize ?? DefaultBufferSize,
                     Options = FileOptions.Asynchronous | FileOptions.SequentialScan
                 });
         }, ct);

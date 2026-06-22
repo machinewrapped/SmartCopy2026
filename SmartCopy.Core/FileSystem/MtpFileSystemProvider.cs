@@ -96,7 +96,7 @@ public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
         }, ct);
     }
 
-    public Task<Stream> OpenReadAsync(string path, CancellationToken ct)
+    public Task<Stream> OpenReadAsync(string path, int? bufferSize = null, CancellationToken ct = default)
         => Task.Run<Stream>(() => _device.GetFileInfo(DevicePath(path)).OpenRead(), ct);
 
     public Task WriteAsync(string path, Stream data, IProgress<long>? progress, OperationalSettings? settings, CancellationToken ct)
