@@ -235,7 +235,6 @@ internal sealed class BenchmarkTask
             ? _variant.CreateProductionOperationalSettings(_scenario)
             : _variant.CreateOperationalSettings(_scenario);
         var overwriteMode = _variant.OverwriteMode ?? _scenario.OverwriteMode;
-        var skipExistsCheckForOverwrite = _variant.SkipExistsCheckForOverwrite ?? _scenario.SkipExistsCheckForOverwrite ?? false;
 
         var directWriteThresholdBytes = _variant.DirectWriteThresholdBytes ?? _scenario.DirectWriteThresholdBytes ?? 0L;
         var bufferBatchBytes = _variant.BufferBatchBytes ?? _scenario.BufferBatchBytes ?? 0L;
@@ -243,12 +242,11 @@ internal sealed class BenchmarkTask
 
         ICopyExecutor executor = useProductionExecutor
             ? new ProductionCopyExecutor(
-                _destinationPath, overwriteMode, skipExistsCheckForOverwrite,
+                _destinationPath, overwriteMode,
                 providerOptions, _sourceProvider!, resolvedDestinationProvider)
             : new PrototypeCopyExecutor(
                 _destinationPath, overwriteMode,
-                directWriteThresholdBytes, bufferBatchBytes, batchEligibilityThresholdBytes,
-                skipExistsCheckForOverwrite);
+                directWriteThresholdBytes, bufferBatchBytes, batchEligibilityThresholdBytes);
 
         BenchmarkHelpers.UpdateProgress("Preparing copy...");
         using (var executeProgress = new ThrottledConsoleProgress<OperationProgress>(p =>

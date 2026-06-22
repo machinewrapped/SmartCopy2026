@@ -25,7 +25,6 @@ internal static class BenchmarkCopyRunner
         long directWriteThresholdBytes,
         long bufferBatchBytes,
         long batchEligibilityThresholdBytes,
-        bool skipExistsCheckForOverwrite,
         int copyBufferSizeBytes,
         CancellationToken ct)
     {
@@ -221,33 +220,20 @@ internal static class BenchmarkCopyRunner
             var relativePath = Path.Combine(segments);
             var destination = Path.GetFullPath(Path.Combine(destinationPath, relativePath));
 
-            var destResult = DestinationResult.Written;
-            bool skipWrite = false;
-
-            if (!skipExistsCheckForOverwrite || overwriteMode == OverwriteMode.Skip)
+            var exists = File.Exists(destination);
+            if (exists && overwriteMode == OverwriteMode.Skip)
             {
-                var exists = File.Exists(destination);
-                if (exists && overwriteMode == OverwriteMode.Skip)
-                {
-                    results.Add(new TransformResult(
-                        IsSuccess: true,
-                        SourceNode: node,
-                        SourceNodeResult: SourceResult.Skipped,
-                        DestinationPath: destination,
-                        NumberOfFilesSkipped: 1,
-                        InputBytes: node.Size));
-                    skipWrite = true;
-                }
-                else
-                {
-                    destResult = exists ? DestinationResult.Overwritten : DestinationResult.Created;
-                }
-            }
-
-            if (skipWrite)
-            {
+                results.Add(new TransformResult(
+                    IsSuccess: true,
+                    SourceNode: node,
+                    SourceNodeResult: SourceResult.Skipped,
+                    DestinationPath: destination,
+                    NumberOfFilesSkipped: 1,
+                    InputBytes: node.Size));
                 continue;
             }
+
+            var destResult = exists ? DestinationResult.Overwritten : DestinationResult.Created;
 
             var isBatchable =
                 hasUsableBatchBuffer &&

@@ -33,22 +33,19 @@ internal sealed class PrototypeCopyExecutor : ICopyExecutor
     private readonly long _directWriteThresholdBytes;
     private readonly long _bufferBatchBytes;
     private readonly long _batchEligibilityThresholdBytes;
-    private readonly bool _skipExistsCheckForOverwrite;
 
     public PrototypeCopyExecutor(
         string destinationPath,
         OverwriteMode overwriteMode,
         long directWriteThresholdBytes,
         long bufferBatchBytes,
-        long batchEligibilityThresholdBytes,
-        bool skipExistsCheckForOverwrite)
+        long batchEligibilityThresholdBytes)
     {
         _destinationPath = destinationPath;
         _overwriteMode = overwriteMode;
         _directWriteThresholdBytes = directWriteThresholdBytes;
         _bufferBatchBytes = bufferBatchBytes;
         _batchEligibilityThresholdBytes = batchEligibilityThresholdBytes;
-        _skipExistsCheckForOverwrite = skipExistsCheckForOverwrite;
     }
 
     public Task<IReadOnlyList<TransformResult>> ExecuteAsync(PipelineJob job, CancellationToken ct)
@@ -62,17 +59,13 @@ internal sealed class PrototypeCopyExecutor : ICopyExecutor
                 _directWriteThresholdBytes,
                 _bufferBatchBytes,
                 _batchEligibilityThresholdBytes,
-                _skipExistsCheckForOverwrite,
                 job.OperationalSettings.CopyBufferSizeBytes,
                 ct);
         }
 
         var pipelineRunner = new PipelineRunner(new TransformPipeline(
         [
-            new CopyStep(_destinationPath, _overwriteMode)
-            {
-                SkipExistsCheckForOverwrite = _skipExistsCheckForOverwrite,
-            },
+            new CopyStep(_destinationPath, _overwriteMode),
         ]));
         return pipelineRunner.ExecuteAsync(job, ct);
     }
@@ -91,7 +84,6 @@ internal sealed class ProductionCopyExecutor : ICopyExecutor
 {
     private readonly string _destinationPath;
     private readonly OverwriteMode _overwriteMode;
-    private readonly bool _skipExistsCheckForOverwrite;
     private readonly OperationalSettings _settings;
     private readonly IFileSystemProvider _sourceProvider;
     private readonly IFileSystemProvider _destinationProvider;
@@ -99,14 +91,12 @@ internal sealed class ProductionCopyExecutor : ICopyExecutor
     public ProductionCopyExecutor(
         string destinationPath,
         OverwriteMode overwriteMode,
-        bool skipExistsCheckForOverwrite,
         OperationalSettings settings,
         IFileSystemProvider sourceProvider,
         IFileSystemProvider destinationProvider)
     {
         _destinationPath = destinationPath;
         _overwriteMode = overwriteMode;
-        _skipExistsCheckForOverwrite = skipExistsCheckForOverwrite;
         _settings = settings;
         _sourceProvider = sourceProvider;
         _destinationProvider = destinationProvider;
@@ -118,10 +108,7 @@ internal sealed class ProductionCopyExecutor : ICopyExecutor
 
         var pipelineRunner = new PipelineRunner(new TransformPipeline(
         [
-            new CopyStep(_destinationPath, _overwriteMode)
-            {
-                SkipExistsCheckForOverwrite = _skipExistsCheckForOverwrite,
-            },
+            new CopyStep(_destinationPath, _overwriteMode),
         ]));
         return await pipelineRunner.ExecuteAsync(job, ct);
     }

@@ -16,7 +16,6 @@ public sealed class StreamingCopyStrategy(OperationalSettings settings, bool tar
         IFileSystemProvider targetProvider,
         string destPath,
         OverwriteMode mode,
-        bool skipExistsCheck,
         SourceResult successResult,
         [EnumeratorCancellation] CancellationToken ct)
     {
@@ -38,7 +37,7 @@ public sealed class StreamingCopyStrategy(OperationalSettings settings, bool tar
             var destination = targetProvider.JoinPath(destPath, nodeCtx.PathSegments);
 
             // null => the file already exists and OverwriteMode is Skip; report it skipped.
-            var destResult = await ResolveDestResultAsync(targetProvider, destination, mode, skipExistsCheck, ct);
+            var destResult = await ResolveDestResultAsync(targetProvider, destination, mode, ct);
             if (destResult is null)
             {
                 yield return SkippedResult(node, destination);

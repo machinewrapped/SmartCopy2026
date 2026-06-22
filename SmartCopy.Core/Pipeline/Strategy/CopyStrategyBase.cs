@@ -99,7 +99,6 @@ public abstract class CopyStrategyBase : ICopyStrategy
         IFileSystemProvider targetProvider,
         string destPath,
         OverwriteMode mode,
-        bool skipExistsCheck,
         SourceResult successResult,
         CancellationToken ct);
 
@@ -169,12 +168,8 @@ public abstract class CopyStrategyBase : ICopyStrategy
         IFileSystemProvider targetProvider,
         string destination,
         OverwriteMode mode,
-        bool skipExistsCheck,
         CancellationToken ct)
     {
-        if (skipExistsCheck && mode != OverwriteMode.Skip)
-            return DestinationResult.Written;
-
         var exists = await targetProvider.ExistsAsync(destination, ct);
         if (exists && mode == OverwriteMode.Skip)
             return null;

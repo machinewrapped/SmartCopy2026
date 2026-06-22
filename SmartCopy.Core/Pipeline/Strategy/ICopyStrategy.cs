@@ -29,15 +29,14 @@ public interface ICopyStrategy
     /// Copies every selected, filter-included file under <see cref="IStepContext.RootNode"/> into
     /// <paramref name="destPath"/>, emitting one <see cref="TransformResult"/> per file. Directories
     /// yield a <see cref="SourceResult.None"/> marker. <paramref name="successResult"/> lets the caller
-    /// label outcomes (e.g. <see cref="SourceResult.Copied"/>). Honours <paramref name="mode"/> and
-    /// <paramref name="skipExistsCheck"/> for destination-existence handling.
+    /// label outcomes (e.g. <see cref="SourceResult.Copied"/>). Honours <paramref name="mode"/>
+    /// for destination-existence handling.
     /// </summary>
     IAsyncEnumerable<TransformResult> CopySelectionAsync(
         IStepContext context,
         IFileSystemProvider targetProvider,
         string destPath,
         OverwriteMode mode,
-        bool skipExistsCheck,
         SourceResult successResult,
         CancellationToken ct);
 

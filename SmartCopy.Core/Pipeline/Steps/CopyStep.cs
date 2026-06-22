@@ -31,13 +31,6 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
     /// <summary>How to treat a file that already exists at the destination (Skip / Overwrite).</summary>
     public OverwriteMode OverwriteMode { get; set; }
 
-    /// <summary>
-    /// When true and <see cref="OverwriteMode"/> is not Skip, the per-file destination-exists probe
-    /// is omitted (the write overwrites unconditionally). Trades the Created/Overwritten distinction
-    /// for one fewer stat per file — a negligible saving in practice.
-    /// </summary>
-    public bool SkipExistsCheckForOverwrite { get; set; }
-
     /// <summary>Rebuilds a step from its serialized config (workflow presets, .sc2 pipelines).</summary>
     internal static CopyStep FromConfig(TransformStepConfig config) =>
         new(config.GetRequired("destinationPath"),
@@ -198,7 +191,7 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
         var strategy = await context.ResolveCopyStrategyAsync(targetProvider, ct);
 
         await foreach (var result in strategy.CopySelectionAsync(
-            context, targetProvider, DestinationPath, OverwriteMode, SkipExistsCheckForOverwrite, SourceResult.Copied, ct))
+            context, targetProvider, DestinationPath, OverwriteMode, SourceResult.Copied, ct))
         {
             yield return result;
         }

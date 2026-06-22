@@ -46,7 +46,6 @@ internal sealed class BenchmarkRunRecord
     public bool? ProviderUseArrayPoolForManualLoop { get; init; }
     public bool? ProviderPreallocateDestinationFile { get; init; }
     public long? DirectWriteThresholdBytes { get; init; }
-    public bool? SkipExistsCheckForOverwrite { get; init; }
     public long? BufferBatchBytes { get; init; }
     public required TimeSpan ScanDuration { get; init; }
     public required TimeSpan ExecuteDuration { get; init; }
@@ -91,7 +90,6 @@ internal sealed class BenchmarkRunRecord
             ProviderUseArrayPoolForManualLoop = providerOptions.UseArrayPoolForManualLoop,
             ProviderPreallocateDestinationFile = providerOptions.PreallocateDestinationFile,
             DirectWriteThresholdBytes = variant.DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes,
-            SkipExistsCheckForOverwrite = variant.SkipExistsCheckForOverwrite ?? scenario.SkipExistsCheckForOverwrite,
             BufferBatchBytes = variant.BufferBatchBytes ?? scenario.BufferBatchBytes,
             ScanDuration = TimeSpan.Zero,
             ExecuteDuration = TimeSpan.Zero,
@@ -163,7 +161,6 @@ internal sealed class BenchmarkRunRecord
             ProviderUseArrayPoolForManualLoop = providerOptions.UseArrayPoolForManualLoop,
             ProviderPreallocateDestinationFile = providerOptions.PreallocateDestinationFile,
             DirectWriteThresholdBytes = variant.DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes,
-            SkipExistsCheckForOverwrite = variant.SkipExistsCheckForOverwrite ?? scenario.SkipExistsCheckForOverwrite,
             BufferBatchBytes = variant.BufferBatchBytes ?? scenario.BufferBatchBytes,
             ScanDuration = state.ScanStopwatch.Elapsed,
             ExecuteDuration = state.ExecuteStopwatch.Elapsed,
@@ -268,18 +265,16 @@ internal sealed record BucketVariantEvidence(
     string VariantName,
     int RecordCount,
     long TotalBytes,
+    double TotalCopyDurationMilliseconds,
     double MeanDurationMilliseconds,
     double MedianDurationMilliseconds,
     double P95DurationMilliseconds,
     double AggregateThroughputMiBPerSecond,
-    double MeanThroughputMiBPerSecond,
-    double P50ThroughputMiBPerSecond,
-    double P95ThroughputMiBPerSecond,
     double RunMedianSpreadMilliseconds,
     double RunThroughputSpreadMiBPerSecond)
 {
     public static BucketVariantEvidence Empty(string bucketLabel, string variantName) =>
-        new(bucketLabel, variantName, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        new(bucketLabel, variantName, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 }
 
 internal static class FileSizeBuckets

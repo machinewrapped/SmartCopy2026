@@ -20,7 +20,6 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
         IFileSystemProvider targetProvider,
         string destPath,
         OverwriteMode mode,
-        bool skipExistsCheck,
         SourceResult successResult,
         [EnumeratorCancellation] CancellationToken ct)
     {
@@ -49,7 +48,7 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
             var destination = targetProvider.JoinPath(destPath, nodeCtx.PathSegments);
 
             // null => already exists and OverwriteMode is Skip; report skipped without reading.
-            var destResult = await ResolveDestResultAsync(targetProvider, destination, mode, skipExistsCheck, ct);
+            var destResult = await ResolveDestResultAsync(targetProvider, destination, mode, ct);
             if (destResult is null)
             {
                 yield return SkippedResult(node, destination);

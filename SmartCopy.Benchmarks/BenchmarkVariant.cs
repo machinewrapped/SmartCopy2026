@@ -16,7 +16,6 @@ internal sealed class BenchmarkVariant
     public bool? ProviderUseArrayPoolForManualLoop { get; set; }
     public bool? ProviderPreallocateDestinationFile { get; set; }
     public long? DirectWriteThresholdBytes { get; set; }
-    public bool? SkipExistsCheckForOverwrite { get; set; }
     public long? BufferBatchBytes { get; set; }
     public long? BatchEligibilityThresholdBytes { get; set; }
     public bool? DestinationRoutingEnabled { get; set; }
