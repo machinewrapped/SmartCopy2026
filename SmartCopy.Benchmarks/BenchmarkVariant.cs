@@ -21,6 +21,11 @@ internal sealed class BenchmarkVariant
     public bool? ProviderWriteSequentialScan { get; set; }
     public bool? UsePrototypeExecutor { get; set; }
     public string? MatchedControl { get; set; }
+    public int? ExpectedEffectiveCopyBufferSizeBytes { get; set; }
+    public long? ExpectedEffectiveBatchBufferBytes { get; set; }
+    public long? ExpectedEffectiveBatchEligibilityCeilingBytes { get; set; }
+    public long? ExpectedEffectiveTinyFileFastPathThresholdBytes { get; set; }
+    public bool? ExpectedEffectiveDestinationRoutingEnabled { get; set; }
 
     /// <summary>
     /// Describes what the <see cref="MatchedControl"/> comparison is for, so <c>--mode validation</c>

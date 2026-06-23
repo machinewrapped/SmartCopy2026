@@ -86,15 +86,20 @@
       "destinationRoutingEnabled": false,
       "usePrototypeExecutor": null,
       "matchedControl": "Prototype",
-      "validationRole": "Equivalence"
+      "validationRole": "Equivalence",
+      "expectedEffectiveCopyBufferSizeBytes": 1048576,
+      "expectedEffectiveBatchBufferBytes": 1048576,
+      "expectedEffectiveBatchEligibilityCeilingBytes": 524288,
+      "expectedEffectiveTinyFileFastPathThresholdBytes": 65536,
+      "expectedEffectiveDestinationRoutingEnabled": false
     },
     {
       "name": "Production_Routed",
-      "notes": "Production runner with promoted defaults (64 KiB direct, 1 MiB batch, 512 KiB eligibility) and destination routing ON. Value pair vs Legacy_Baseline. Buffer left null so routing picks it from the drive pair.",
+      "notes": "Production runner with promoted defaults (64 KiB direct, 1 MiB copy/batch, 512 KiB eligibility) and destination routing ON. Equivalence pair vs Production_Fixed; validation asserts the routed drive pair resolves to the same effective parameters.",
       "enabled": true,
       "desiredRunCount": 5,
       "overwriteMode": null,
-      "providerCopyBufferSizeBytes": null,
+      "providerCopyBufferSizeBytes": 1048576,
       "providerSmallFileProgressThresholdBytes": null,
       "providerWriteMode": null,
       "providerUseArrayPoolForManualLoop": null,
@@ -105,7 +110,12 @@
       "destinationRoutingEnabled": true,
       "usePrototypeExecutor": null,
       "matchedControl": "Production_Fixed",
-      "validationRole": "Equivalence"
+      "validationRole": "Equivalence",
+      "expectedEffectiveCopyBufferSizeBytes": 1048576,
+      "expectedEffectiveBatchBufferBytes": 1048576,
+      "expectedEffectiveBatchEligibilityCeilingBytes": 524288,
+      "expectedEffectiveTinyFileFastPathThresholdBytes": 65536,
+      "expectedEffectiveDestinationRoutingEnabled": true
     }
   ],
   "datasetPreparation": {
@@ -146,7 +156,7 @@
       }
     ]
   },
-  "cooldownSeconds": 120,
+  "cooldownSeconds": 90,
   "clearCacheBetweenRuns": false,
   "ramMapPath": "D:\\Development\\Github\\SmartCopy2026\\Tools\\RAMMap\\RAMMap64.exe",
   "sourcePools": {

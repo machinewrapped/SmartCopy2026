@@ -13,6 +13,7 @@ internal enum BenchmarkRunMode
     Analysis,
     SizeScaling,
     Validation,
+    Compare,
 }
 
 internal sealed class BenchmarkState
@@ -47,6 +48,11 @@ internal sealed class BenchmarkRunRecord
     public bool? ProviderWriteSequentialScan { get; init; }
     public long? DirectWriteThresholdBytes { get; init; }
     public long? BufferBatchBytes { get; init; }
+    public long? BatchEligibilityThresholdBytes { get; init; }
+    public bool? DestinationRoutingEnabled { get; init; }
+    public long? ProductionBatchBufferBytes { get; init; }
+    public long? ProductionBatchEligibilityCeilingBytes { get; init; }
+    public long? ProductionTinyFileFastPathThresholdBytes { get; init; }
     public required TimeSpan ScanDuration { get; init; }
     public required TimeSpan ExecuteDuration { get; init; }
     public required int CopiedFiles { get; init; }
@@ -67,9 +73,10 @@ internal sealed class BenchmarkRunRecord
         string artifactPath,
         DateTime runStartedUtc,
         string? notes,
-        int runIndex)
+        int runIndex,
+        OperationalSettings? recordedSettings = null)
     {
-        var providerOptions = variant.CreateOperationalSettings(scenario);
+        var providerOptions = recordedSettings ?? variant.CreateOperationalSettings(scenario);
         return new BenchmarkRunRecord
         {
             RunStatus = BenchmarkRunStatus.InProgress,
@@ -91,6 +98,11 @@ internal sealed class BenchmarkRunRecord
             ProviderWriteSequentialScan = variant.ProviderWriteSequentialScan ?? scenario.ProviderWriteSequentialScan,
             DirectWriteThresholdBytes = variant.DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes,
             BufferBatchBytes = variant.BufferBatchBytes ?? scenario.BufferBatchBytes,
+            BatchEligibilityThresholdBytes = variant.BatchEligibilityThresholdBytes ?? scenario.BatchEligibilityThresholdBytes,
+            DestinationRoutingEnabled = providerOptions.DestinationRoutingEnabled,
+            ProductionBatchBufferBytes = providerOptions.BatchBufferBytes,
+            ProductionBatchEligibilityCeilingBytes = providerOptions.BatchEligibilityCeilingBytes,
+            ProductionTinyFileFastPathThresholdBytes = providerOptions.TinyFileFastPathThresholdBytes,
             ScanDuration = TimeSpan.Zero,
             ExecuteDuration = TimeSpan.Zero,
             CopiedFiles = 0,
@@ -114,7 +126,8 @@ internal sealed class BenchmarkRunRecord
         DateTime runStartedUtc,
         BenchmarkState state,
         string? notes,
-        int runIndex) => Create(scenario, variant, sourcePath, destinationPath, artifactPath, runStartedUtc, state, notes, runIndex, ex: null);
+        int runIndex,
+        OperationalSettings? recordedSettings = null) => Create(scenario, variant, sourcePath, destinationPath, artifactPath, runStartedUtc, state, notes, runIndex, ex: null, recordedSettings: recordedSettings);
  
     public static BenchmarkRunRecord CreateFailure(
         BenchmarkScenario scenario,
@@ -126,7 +139,8 @@ internal sealed class BenchmarkRunRecord
         BenchmarkState state,
         string? notes,
         int runIndex,
-        Exception ex) => Create(scenario, variant, sourcePath, destinationPath, artifactPath, runStartedUtc, state, notes, runIndex, ex);
+        Exception ex,
+        OperationalSettings? recordedSettings = null) => Create(scenario, variant, sourcePath, destinationPath, artifactPath, runStartedUtc, state, notes, runIndex, ex, recordedSettings);
  
     private static BenchmarkRunRecord Create(
         BenchmarkScenario scenario,
@@ -138,9 +152,10 @@ internal sealed class BenchmarkRunRecord
         BenchmarkState state,
         string? notes,
         int runIndex,
-        Exception? ex)
+        Exception? ex,
+        OperationalSettings? recordedSettings = null)
     {
-        var providerOptions = variant.CreateOperationalSettings(scenario);
+        var providerOptions = recordedSettings ?? variant.CreateOperationalSettings(scenario);
         return new BenchmarkRunRecord
         {
             RunStatus = ex is null ? BenchmarkRunStatus.Completed : BenchmarkRunStatus.Failed,
@@ -162,6 +177,11 @@ internal sealed class BenchmarkRunRecord
             ProviderWriteSequentialScan = variant.ProviderWriteSequentialScan ?? scenario.ProviderWriteSequentialScan,
             DirectWriteThresholdBytes = variant.DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes,
             BufferBatchBytes = variant.BufferBatchBytes ?? scenario.BufferBatchBytes,
+            BatchEligibilityThresholdBytes = variant.BatchEligibilityThresholdBytes ?? scenario.BatchEligibilityThresholdBytes,
+            DestinationRoutingEnabled = providerOptions.DestinationRoutingEnabled,
+            ProductionBatchBufferBytes = providerOptions.BatchBufferBytes,
+            ProductionBatchEligibilityCeilingBytes = providerOptions.BatchEligibilityCeilingBytes,
+            ProductionTinyFileFastPathThresholdBytes = providerOptions.TinyFileFastPathThresholdBytes,
             ScanDuration = state.ScanStopwatch.Elapsed,
             ExecuteDuration = state.ExecuteStopwatch.Elapsed,
             CopiedFiles = state.Results.Sum(r => r.NumberOfFilesAffected),

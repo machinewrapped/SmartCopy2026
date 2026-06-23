@@ -106,56 +106,12 @@ internal sealed class ProductionCopyExecutor : ICopyExecutor
         _destinationProvider = destinationProvider;
     }
 
-    public async Task<IReadOnlyList<TransformResult>> ExecuteAsync(PipelineJob job, CancellationToken ct)
+    public Task<IReadOnlyList<TransformResult>> ExecuteAsync(PipelineJob job, CancellationToken ct)
     {
-        await LogResolvedSettingsAsync(ct);
-
         var pipelineRunner = new PipelineRunner(new TransformPipeline(
         [
             new CopyStep(_destinationPath, _overwriteMode),
         ]));
-        return await pipelineRunner.ExecuteAsync(job, ct);
-    }
-
-    /// <summary>
-    /// Run-1 sanity check: resolve the strategy the production path will actually use and log its
-    /// buffer/batch/durability decisions. The policy's resolved buffer can differ from
-    /// <see cref="OperationalSettings.CopyBufferSizeBytes"/> when destination routing is enabled.
-    /// </summary>
-    private async Task LogResolvedSettingsAsync(CancellationToken ct)
-    {
-        try
-        {
-            Console.WriteLine(
-                $"Production OperationalSettings: buffer={_settings.CopyBufferSizeBytes} bytes, " +
-                $"batchBuffer={_settings.BatchBufferBytes} bytes, " +
-                $"batchEligibilityCeiling={_settings.BatchEligibilityCeilingBytes} bytes, " +
-                $"tinyFileFastPathThreshold={_settings.TinyFileFastPathThresholdBytes} bytes, " +
-                $"destinationRouting={_settings.DestinationRoutingEnabled}, " +
-                $"writeMode={_settings.WriteMode}, " +
-                $"arrayPool={_settings.UseArrayPoolForManualLoop}");
-
-            var source = await _sourceProvider.GetClassificationAsync(ct);
-            var target = await _destinationProvider.GetClassificationAsync(ct);
-            var sameVolume = _sourceProvider.VolumeId is { } vid && _destinationProvider.VolumeId == vid;
-            var strategy = DefaultCopyStrategyPolicy.Instance.Resolve(new CopyStrategyInputs(
-                _settings, source, target, _sourceProvider.Capabilities, _destinationProvider.Capabilities, sameVolume));
-
-            if (strategy is CopyStrategyBase baseStrategy)
-            {
-                var resolved = baseStrategy.Settings;
-                Console.WriteLine(
-                    $"Resolved strategy: {strategy.GetType().Name}, " +
-                    $"buffer={resolved.CopyBufferSizeBytes} bytes, " +
-                    $"batchBuffer={resolved.BatchBufferBytes} bytes " +
-                    $"(source={source.MediaType}/{source.InterfaceType}, " +
-                    $"target={target.MediaType}/{target.InterfaceType}, sameVolume={sameVolume})");
-            }
-        }
-        catch (Exception ex)
-        {
-            // Sanity log must never break the run — the engine will re-resolve and surface real errors.
-            Console.Error.WriteLine($"Warning: could not log resolved strategy: {ex.Message}");
-        }
+        return pipelineRunner.ExecuteAsync(job, ct);
     }
 }
