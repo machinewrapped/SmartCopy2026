@@ -299,36 +299,5 @@ internal sealed record SessionPaths(
     string TaskListPath,
     string JournalDirectory);
 
-internal static class FileNamesResolver
-{
-    public const string DefaultResults = "benchmark-results.ndjson";
-    public const string DefaultFileResults = "benchmark-file-results.ndjson";
-    public const string DefaultAnalysis = "benchmark-analysis.md";
-    public const string DefaultSizeScaling = "benchmark-size-scaling.md";
-    public const string DefaultTaskList = "benchmark-tasklist.md";
-
-    public static (string Results, string FileResults, string Analysis, string SizeScaling, string TaskList) GetFileNames(string configPath)
-    {
-        var configFileName = Path.GetFileName(configPath);
-        var prefix = configFileName.EndsWith(".json") ? configFileName[..^5] : configFileName;
-
-        var results = prefix.Replace("scenarios", "results") + ".ndjson";
-        if (results == prefix + ".ndjson") results = DefaultResults;
-
-        var fileResults = prefix.Replace("scenarios", "file-results") + ".ndjson";
-        if (fileResults == prefix + ".ndjson") fileResults = DefaultFileResults;
-
-        var analysis = prefix.Replace("scenarios", "analysis") + ".md";
-        if (analysis == prefix + ".md") analysis = DefaultAnalysis;
-
-        var sizeScaling = prefix.Replace("scenarios", "size-scaling") + ".md";
-        if (sizeScaling == prefix + ".md") sizeScaling = DefaultSizeScaling;
-
-        var taskList = prefix.Replace("scenarios", "tasklist") + ".md";
-        if (taskList == prefix + ".md") taskList = DefaultTaskList;
-
-        return (results, fileResults, analysis, sizeScaling, taskList);
-    }
-}
 
 
