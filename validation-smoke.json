@@ -122,37 +122,37 @@
     "sourcePath": "D:\\Games",
     "destinationPath": "D:\\TestData\\SmokeDataset",
     "organizeByBucket": true,
-    "poolCloneCount": 32,
+    "poolCloneCount": 16,
     "buckets": [
       {
         "name": "Sub16KiB",
         "minimumFileSizeBytes": 16,
         "maximumFileSizeBytes": 16384,
-        "targetTotalBytes": 12582912
+        "targetTotalBytes": 25165824
       },
       {
         "name": "Sub256KiB",
         "minimumFileSizeBytes": 16385,
         "maximumFileSizeBytes": 262144,
-        "targetTotalBytes": 62914560
+        "targetTotalBytes": 125829120
       },
       {
         "name": "Sub512KiB",
         "minimumFileSizeBytes": 262145,
         "maximumFileSizeBytes": 524288,
-        "targetTotalBytes": 251658240
+        "targetTotalBytes": 503316480
       },
       {
         "name": "Sub4MiB",
         "minimumFileSizeBytes": 524289,
         "maximumFileSizeBytes": 4194304,
-        "targetTotalBytes": 786432000
+        "targetTotalBytes": 1572864000
       },
       {
         "name": "Sub32MiB",
         "minimumFileSizeBytes": 4194305,
         "maximumFileSizeBytes": 33554432,
-        "targetTotalBytes": 2359296000
+        "targetTotalBytes": 3538944000
       }
     ]
   },
@@ -162,37 +162,21 @@
   "sourcePools": {
     "D:\\TestData\\SmokeDataset": [
       "D:\\TestData\\SmokeDataset_13",
-      "D:\\TestData\\SmokeDataset_24",
       "D:\\TestData\\SmokeDataset_16",
       "D:\\TestData\\SmokeDataset_7",
-      "D:\\TestData\\SmokeDataset_18",
       "D:\\TestData\\SmokeDataset_5",
       "D:\\TestData\\SmokeDataset_10",
-      "D:\\TestData\\SmokeDataset_27",
-      "D:\\TestData\\SmokeDataset_26",
       "D:\\TestData\\SmokeDataset_15",
-      "D:\\TestData\\SmokeDataset_22",
-      "D:\\TestData\\SmokeDataset_19",
-      "D:\\TestData\\SmokeDataset_29",
       "D:\\TestData\\SmokeDataset_4",
-      "D:\\TestData\\SmokeDataset_25",
-      "D:\\TestData\\SmokeDataset_28",
-      "D:\\TestData\\SmokeDataset_20",
       "D:\\TestData\\SmokeDataset_1",
       "D:\\TestData\\SmokeDataset_12",
       "D:\\TestData\\SmokeDataset_6",
       "D:\\TestData\\SmokeDataset_3",
       "D:\\TestData\\SmokeDataset_14",
-      "D:\\TestData\\SmokeDataset_31",
-      "D:\\TestData\\SmokeDataset_30",
-      "D:\\TestData\\SmokeDataset_21",
       "D:\\TestData\\SmokeDataset_8",
-      "D:\\TestData\\SmokeDataset_23",
       "D:\\TestData\\SmokeDataset_9",
       "D:\\TestData\\SmokeDataset_11",
-      "D:\\TestData\\SmokeDataset_17",
-      "D:\\TestData\\SmokeDataset_2",
-      "D:\\TestData\\SmokeDataset_32"
+      "D:\\TestData\\SmokeDataset_2"
     ]
   }
 }
