@@ -89,7 +89,7 @@ public sealed class MemoryFileSystemProvider : IFileSystemProvider
         return Task.FromResult(ToNode(normalizedPath, entry));
     }
 
-    public Task<Stream> OpenReadAsync(string path, CancellationToken ct)
+    public Task<Stream> OpenReadAsync(string path, int? bufferSize = null, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var normalizedPath = Normalize(path);

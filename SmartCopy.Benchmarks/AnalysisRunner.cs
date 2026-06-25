@@ -174,20 +174,7 @@ internal static class AnalysisRunner
 
             var warnings = BuildMissingControlWarnings(variants, matchedControlLookup);
 
-            var convergedIndexesByVariant = variants.ToDictionary(
-                v => v,
-                v =>
-                {
-                    var successful = runs
-                        .Where(r => string.Equals(r.VariantName, v, StringComparison.OrdinalIgnoreCase))
-                        .Where(BenchmarkHelpers.IsSuccessfulRun)
-                        .ToList();
-                    return BenchmarkConvergence.GetConvergedRunIndexes(
-                        successful,
-                        BenchmarkConvergence.GetDesiredRunCount(config, v),
-                        config.ConvergenceSpreadPercent);
-                },
-                StringComparer.OrdinalIgnoreCase);
+            var convergedIndexesByVariant = BenchmarkConvergence.GetConvergedIndexesForVariants(config, runs, variants);
 
             var convergedRuns = runs
                 .Where(r => convergedIndexesByVariant.TryGetValue(r.VariantName, out var idx) && idx.Contains(r.RunIndex))
@@ -196,7 +183,7 @@ internal static class AnalysisRunner
                 .Where(r => convergedIndexesByVariant.TryGetValue(r.VariantName, out var idx) && idx.Contains(r.RunIndex))
                 .ToList();
 
-            ReportRunEvidence(Report, convergedRuns, variants, config.GatePercent, matchedControlLookup);
+            ReportRunEvidence(Report, config, scenarioName, runs, convergedRuns, variants, config.GatePercent, matchedControlLookup);
             ReportBucketRecommendations(Report, convergedRecords, buckets, variants, warnings, matchedControlLookup, config.GatePercent);
             ReportBucketMetrics(Report, convergedRecords, buckets, variants);
             ReportBatchingIsolationEvidence(Report, convergedRecords, buckets, variants, config.GatePercent);
@@ -218,7 +205,7 @@ internal static class AnalysisRunner
             if (scenariosToAnalyze.Count > 1)
                 htmlPath = Path.Combine(Path.GetDirectoryName(htmlPath) ?? "", $"{Path.GetFileNameWithoutExtension(htmlPath)}-{scenarioName}.html");
 
-            await BenchmarkHtmlReportGenerator.GenerateAsync(htmlPath, scenarioName, buckets, variants, convergedRecords, convergedRuns, matchedControlLookup);
+            await BenchmarkHtmlReportGenerator.GenerateAsync(htmlPath, scenarioName, buckets, variants, convergedRecords, convergedRuns, runs, matchedControlLookup);
         }
 
         if (scenariosToAnalyze.Count > 1)
@@ -235,7 +222,10 @@ internal static class AnalysisRunner
 
     private static void ReportRunEvidence(
         Action<string?> report,
-        IReadOnlyList<BenchmarkRunRecord> runs,
+        BenchmarkConfig config,
+        string scenarioName,
+        IReadOnlyList<BenchmarkRunRecord> terminalRuns,
+        IReadOnlyList<BenchmarkRunRecord> convergedRuns,
         IReadOnlyList<string> variants,
         double gatePercent,
         IReadOnlyDictionary<string, string> matchedControls)
@@ -243,40 +233,161 @@ internal static class AnalysisRunner
         report("### Run-Level Evidence");
         report(null);
 
-        if (runs.Count == 0)
+        if (terminalRuns.Count == 0)
         {
             report("No run-level records available. Whole-policy wall-clock verdicts cannot be produced.");
             report(null);
             return;
         }
 
-        report("| Variant | Valid Runs | Invalid Runs | Median Execute | Mean Execute | Min | Max | Spread | Delta vs Control | Noise Floor | Verdict |");
-        report("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|");
+        report("_Median/Mean/Min/Max/Window Spread describe the **converged window only** — the tightest `used` of `ran` runs the selector kept; runs it discarded are not reflected in those columns. **Convergence** reports whether that window actually met the spread gate (`converged`) or the selector exhausted its attempts (`gave up`) — a `*` on a verdict means it rests on a window that never converged._");
+        report(null);
+        report("| Variant | Runs (used/ran) | Convergence | Median Execute | Mean Execute | Min | Max | Window Spread | Delta vs Control | Noise Floor | Verdict |");
+        report("|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---|");
+
+        var anyUnconverged = false;
 
         foreach (var variant in variants)
         {
-            var evidence = BenchmarkStatistics.BuildRunEvidence(runs, variant);
-            if (evidence.TotalRuns == 0)
+            var variantTerminal = terminalRuns
+                .Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (variantTerminal.Count == 0)
                 continue;
+
+            var evidence = BenchmarkStatistics.BuildRunEvidence(convergedRuns, variant);
 
             var isControl = !matchedControls.ContainsKey(variant);
             RunVariantEvidence? controlEvidence = null;
             if (!isControl && matchedControls.TryGetValue(variant, out var controlName))
             {
-                var ce = BenchmarkStatistics.BuildRunEvidence(runs, controlName);
+                var ce = BenchmarkStatistics.BuildRunEvidence(convergedRuns, controlName);
                 if (ce.TotalRuns > 0) controlEvidence = ce;
             }
 
-            var comparison = CompareRunEvidence(evidence, controlEvidence, gatePercent, isControl);
+            var comparison = BenchmarkComparison.CompareRunEvidence(evidence, controlEvidence, gatePercent, isControl);
+
+            var ran = variantTerminal.Count;
+            var failed = variantTerminal.Count(r => !BenchmarkHelpers.IsSuccessfulRun(r));
+            var successful = ran - failed;
+            var used = evidence.ValidRuns;
+
+            var variantConfig = config.Variants.FirstOrDefault(v =>
+                string.Equals(v.Name, variant, StringComparison.OrdinalIgnoreCase));
+            var desired = BenchmarkConvergence.GetDesiredRunCount(config, variant);
+            var status = variantConfig is not null
+                ? BenchmarkConvergence.Check(terminalRuns, scenarioName, variantConfig, config)
+                : BenchmarkConvergence.Status.NotConverged;
+            var spreadPercent = variantConfig is not null
+                ? BenchmarkConvergence.GetCurrentSpreadPercent(terminalRuns, scenarioName, variantConfig, config)
+                : double.NaN;
+
+            var converged = status == BenchmarkConvergence.Status.Converged;
+            if (!converged) anyUnconverged = true;
+
+            var runsCell = failed > 0 ? $"{used}/{ran} ({failed} failed)" : $"{used}/{ran}";
+            var convergenceCell = FormatConvergence(status, spreadPercent, successful, desired);
+            var verdictCell = converged ? comparison.Verdict : $"{comparison.Verdict} \\*";
+
+            string Dur(double seconds) => used == 0 ? "-" : BenchmarkHelpers.FormatDurationHuman(seconds);
 
             report(
-                $"| {BenchmarkHelpers.EscapeTable(variant)} | {evidence.ValidRuns} | {evidence.InvalidRuns} | " +
-                $"{BenchmarkHelpers.FormatDurationHuman(evidence.MedianSeconds)} | {BenchmarkHelpers.FormatDurationHuman(evidence.MeanSeconds)} | " +
-                $"{BenchmarkHelpers.FormatDurationHuman(evidence.MinSeconds)} | {BenchmarkHelpers.FormatDurationHuman(evidence.MaxSeconds)} | " +
-                $"{BenchmarkHelpers.FormatDurationHuman(evidence.SpreadSeconds)} | {comparison.DeltaText} | {comparison.NoiseText} | {comparison.Verdict} |");
+                $"| {BenchmarkHelpers.EscapeTable(variant)} | {runsCell} | {convergenceCell} | " +
+                $"{Dur(evidence.MedianSeconds)} | {Dur(evidence.MeanSeconds)} | " +
+                $"{Dur(evidence.MinSeconds)} | {Dur(evidence.MaxSeconds)} | " +
+                $"{Dur(evidence.SpreadSeconds)} | {comparison.DeltaText} | {comparison.NoiseText} | {verdictCell} |");
         }
 
         report(null);
+        if (anyUnconverged)
+        {
+            report("> ⚠ One or more variants did not converge (`gave up` / `not converged`). Their window statistics are the *tightest available* slice, not a stable measurement; treat `*`-marked verdicts as indicative only, not gate-quality evidence.");
+            report(null);
+        }
+
+        report("### Run Distribution (All Successful Runs)");
+        report(null);
+        report("_This table uses every successful terminal run for the variant, including runs discarded by the converged-window selector above._");
+        report(null);
+        report("| Variant | Successful/Ran | All-Run Median | All-Run Mean | Global Min | Global Max | Global Spread | Cluster Count | Clusters |");
+        report("|---|---:|---:|---:|---:|---:|---:|---:|---|");
+
+        var clustered = new List<(string Variant, BenchmarkConvergence.DistributionSummary Summary)>();
+        foreach (var variant in variants)
+        {
+            var variantTerminal = terminalRuns
+                .Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (variantTerminal.Count == 0)
+                continue;
+
+            var durations = variantTerminal
+                .Where(BenchmarkHelpers.IsSuccessfulRun)
+                .Select(r => r.ExecuteDuration.TotalSeconds)
+                .ToList();
+
+            var summary = BenchmarkConvergence.BuildDistributionSummary(durations);
+            if (summary.HasSeparatedClusters)
+                clustered.Add((variant, summary));
+
+            var successful = durations.Count;
+            var runCount = variantTerminal.Count;
+            var clustersText = summary.Clusters.Count == 0
+                ? "-"
+                : string.Join("; ", summary.Clusters.Select(FormatCluster));
+
+            report(
+                $"| {BenchmarkHelpers.EscapeTable(variant)} | {successful}/{runCount} | " +
+                $"{FormatDistributionDuration(summary.MedianSeconds)} | " +
+                $"{FormatDistributionDuration(summary.MeanSeconds)} | " +
+                $"{FormatDistributionDuration(summary.MinSeconds)} | " +
+                $"{FormatDistributionDuration(summary.MaxSeconds)} | " +
+                $"{FormatDistributionDuration(summary.SpreadSeconds)} | " +
+                $"{summary.Clusters.Count} | {BenchmarkHelpers.EscapeTable(clustersText)} |");
+        }
+
+        report(null);
+        if (clustered.Count > 0)
+        {
+            report("> ⚠ **Clustered run distribution** — these variants' successful runs split into separated clusters, so convergence may be selecting one mode (e.g. cache-warm vs cold). A verdict drawn from one cluster is not trustworthy until the split is explained:");
+            foreach (var (variant, summary) in clustered)
+            {
+                report(
+                    $">   - `{BenchmarkHelpers.EscapeTable(variant)}`: " +
+                    $"{BenchmarkHelpers.EscapeTable(string.Join("; ", summary.Clusters.Select(FormatCluster)))}");
+            }
+            report(null);
+        }
+
+        static string FormatDistributionDuration(double seconds) =>
+            double.IsNaN(seconds) ? "-" : BenchmarkHelpers.FormatDurationHuman(seconds);
+
+        static string FormatCluster(BenchmarkConvergence.DistributionCluster cluster)
+        {
+            var min = BenchmarkHelpers.FormatDurationHuman(cluster.MinSeconds);
+            var max = BenchmarkHelpers.FormatDurationHuman(cluster.MaxSeconds);
+            var range = Math.Abs(cluster.MaxSeconds - cluster.MinSeconds) < 0.0005
+                ? min
+                : $"{min}-{max}";
+            return $"{cluster.Count} @ {range}";
+        }
+    }
+
+    private static string FormatConvergence(
+        BenchmarkConvergence.Status status,
+        double spreadPercent,
+        int successfulRuns,
+        int desiredRunCount)
+    {
+        var spread = double.IsNaN(spreadPercent) ? "n/a" : $"{spreadPercent:0.0}%";
+        return status switch
+        {
+            BenchmarkConvergence.Status.Converged => $"converged @ {spread}",
+            BenchmarkConvergence.Status.GaveUp => $"⚠ gave up @ {spread}",
+            _ => successfulRuns < desiredRunCount
+                ? $"⚠ insufficient ({successfulRuns}/{desiredRunCount})"
+                : $"⚠ not converged @ {spread}",
+        };
     }
 
     private static void ReportBucketRecommendations(
@@ -326,7 +437,7 @@ internal static class AnalysisRunner
             }
 
             var isControl = !matchedControls.ContainsKey(best.VariantName);
-            var comparison = CompareBucketEvidence(best, control, gatePercent, isControl);
+            var comparison = BenchmarkComparison.CompareBucketEvidence(best, control, gatePercent, isControl);
             var recommendation = comparison.Verdict == "PASS"
                 ? "Candidate for policy"
                 : isControl
@@ -359,8 +470,15 @@ internal static class AnalysisRunner
             return;
         }
 
-        report("| Bucket | Variant | Records | Bytes | Median Duration | P95 Duration | Aggregate MiB/s | Mean MiB/s | P50 MiB/s | P95 MiB/s | Run-Median Spread |");
-        report("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+        // Per-variant total copy time (all buckets) — the denominator for each bucket's % of copy time.
+        // The shares partition the variant's summed per-file durations, which (with batched attribution
+        // conserved) ≈ the copy-phase wall clock — so this shows where the run's time actually goes.
+        var variantTotalCopyMs = variants.ToDictionary(
+            v => v,
+            v => BenchmarkStatistics.BuildBucketEvidence(records, null, v).TotalCopyDurationMilliseconds);
+
+        report("| Bucket | Variant | Records | Bytes | % Copy Time | Median Duration | P95 Duration | Run-Median Spread | Aggregate MiB/s |");
+        report("|---|---|---:|---:|---:|---:|---:|---:|---:|");
 
         foreach (var bucket in buckets)
         {
@@ -370,12 +488,15 @@ internal static class AnalysisRunner
                 if (evidence.RecordCount == 0)
                     continue;
 
+                var totalMs = variantTotalCopyMs.GetValueOrDefault(variant);
+                var copyTimeShare = totalMs > 0 ? evidence.TotalCopyDurationMilliseconds / totalMs * 100.0 : 0.0;
+
                 report(
                     $"| {bucket.Label} | {BenchmarkHelpers.EscapeTable(variant)} | {evidence.RecordCount} | {BenchmarkHelpers.FormatBytesHuman(evidence.TotalBytes)} | " +
+                    $"{copyTimeShare:0.0}% | " +
                     $"{evidence.MedianDurationMilliseconds:0.###} ms | {evidence.P95DurationMilliseconds:0.###} ms | " +
-                    $"{evidence.AggregateThroughputMiBPerSecond:0.00} | {evidence.MeanThroughputMiBPerSecond:0.00} | " +
-                    $"{evidence.P50ThroughputMiBPerSecond:0.00} | {evidence.P95ThroughputMiBPerSecond:0.00} | " +
-                    $"{evidence.RunMedianSpreadMilliseconds:0.###} ms |");
+                    $"{evidence.RunMedianSpreadMilliseconds:0.###} ms |" +
+                    $"{evidence.AggregateThroughputMiBPerSecond:0.00} | ");
             }
         }
 
@@ -419,7 +540,7 @@ internal static class AnalysisRunner
                 if (candidate.RecordCount == 0)
                     continue;
 
-                var comparison = CompareBucketEvidence(candidate, control, gatePercent, isControl: false);
+                var comparison = BenchmarkComparison.CompareBucketEvidence(candidate, control, gatePercent, isControl: false);
                 report(
                     $"| {bucket.Label} | {BenchmarkHelpers.EscapeTable(variant)} | {BenchmarkHelpers.EscapeTable(unbatchedControl)} | " +
                     $"{candidate.AggregateThroughputMiBPerSecond:0.00} | {control.AggregateThroughputMiBPerSecond:0.00} | " +
@@ -452,71 +573,6 @@ internal static class AnalysisRunner
             .ToList();
     }
 
-    private static EvidenceComparison CompareRunEvidence(
-        RunVariantEvidence candidate,
-        RunVariantEvidence? control,
-        double gatePercent,
-        bool isControl)
-    {
-        if (candidate.ValidRuns == 0)
-            return new EvidenceComparison("INVALID", "-", "-");
-
-        if (control is null)
-            return isControl
-                ? new EvidenceComparison("CONTROL", "-", "-")
-                : new EvidenceComparison("INCONCLUSIVE", "-", "-");
-
-        if (control.ValidRuns == 0)
-            return new EvidenceComparison("INCONCLUSIVE", "-", "-");
-
-        var deltaSeconds = control.MedianSeconds - candidate.MedianSeconds;
-        var deltaPercent = control.MedianSeconds > 0 ? deltaSeconds / control.MedianSeconds * 100.0 : 0.0;
-        var noiseFloor = (control.SpreadSeconds + candidate.SpreadSeconds) / 2.0;
-        var verdict = GetDeltaVerdict(deltaSeconds, deltaPercent, noiseFloor, gatePercent);
-        return new EvidenceComparison(
-            verdict,
-            $"{FormatSignedPercent(deltaPercent)} ({FormatSignedDurationSeconds(deltaSeconds)})",
-            BenchmarkHelpers.FormatDurationHuman(noiseFloor));
-    }
-
-    private static EvidenceComparison CompareBucketEvidence(
-        BucketVariantEvidence candidate,
-        BucketVariantEvidence? control,
-        double gatePercent,
-        bool isControl)
-    {
-        if (candidate.RecordCount == 0)
-            return new EvidenceComparison("INVALID", "-", "-");
-
-        if (control is null)
-            return isControl
-                ? new EvidenceComparison("CONTROL", "-", "-")
-                : new EvidenceComparison("INCONCLUSIVE", "-", "-");
-
-        if (control.RecordCount == 0)
-            return new EvidenceComparison("INCONCLUSIVE", "-", "-");
-
-        var deltaMiBPerSecond = candidate.AggregateThroughputMiBPerSecond - control.AggregateThroughputMiBPerSecond;
-        var deltaPercent = control.AggregateThroughputMiBPerSecond > 0
-            ? deltaMiBPerSecond / control.AggregateThroughputMiBPerSecond * 100.0
-            : 0.0;
-        var noiseFloor = (control.RunThroughputSpreadMiBPerSecond + candidate.RunThroughputSpreadMiBPerSecond) / 2.0;
-        var verdict = GetDeltaVerdict(deltaMiBPerSecond, deltaPercent, noiseFloor, gatePercent);
-        return new EvidenceComparison(
-            verdict,
-            $"{FormatSignedPercent(deltaPercent)} ({deltaMiBPerSecond:+0.00;-0.00;0} MiB/s)",
-            $"{noiseFloor:0.00} MiB/s");
-    }
-
-    private static string GetDeltaVerdict(double delta, double deltaPercent, double noiseFloor, double gatePercent)
-    {
-        if (delta < -noiseFloor)
-            return "REGRESSION";
-        if (delta <= noiseFloor)
-            return "INCONCLUSIVE";
-        return deltaPercent >= gatePercent ? "PASS" : "BELOW_THRESHOLD";
-    }
-
     /// <summary>
     /// Returns the matched control variant name for <paramref name="variant"/> if it appears
     /// in <paramref name="variants"/>. Returns <c>null</c> for control variants (no entry in
@@ -531,22 +587,6 @@ internal static class AnalysisRunner
             return null;
         return variants.FirstOrDefault(v => string.Equals(v, controlName, StringComparison.OrdinalIgnoreCase));
     }
-
-    private static string FormatSignedPercent(double value) =>
-        value switch
-        {
-            > 0 => $"+{value:0.0}%",
-            < 0 => $"{value:0.0}%",
-            _ => "0.0%",
-        };
-
-    private static string FormatSignedDurationSeconds(double seconds) =>
-        seconds switch
-        {
-            > 0 => $"+{BenchmarkHelpers.FormatDurationHuman(seconds)}",
-            < 0 => $"-{BenchmarkHelpers.FormatDurationHuman(Math.Abs(seconds))}",
-            _ => "0s",
-        };
 
     private static void ReportCrossScenarioSummary(
         Action<string?> report,

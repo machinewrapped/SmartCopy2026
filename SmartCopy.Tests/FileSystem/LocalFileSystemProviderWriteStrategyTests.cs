@@ -46,7 +46,6 @@ public sealed class LocalFileSystemProviderWriteStrategyTests
             CopyBufferSizeBytes = 3,
             WriteMode = LocalFileSystemWriteMode.ManualLoop,
             UseArrayPoolForManualLoop = true,
-            PreallocateDestinationFile = true,
         };
 
         await using var source = new MemoryStream(payload);

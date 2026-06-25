@@ -35,11 +35,11 @@ internal sealed class FaultingProvider(IFileSystemProvider inner) : IFileSystemP
     public Task<FileSystemNode> GetNodeAsync(string path, CancellationToken ct) =>
         inner.GetNodeAsync(path, ct);
 
-    public Task<Stream> OpenReadAsync(string path, CancellationToken ct)
+    public Task<Stream> OpenReadAsync(string path, int? bufferSize = null, CancellationToken ct = default)
     {
         if (FaultOnOpen?.Invoke(path) == true)
             throw new IOException($"Simulated lock on '{path}'.");
-        return inner.OpenReadAsync(path, ct);
+        return inner.OpenReadAsync(path, bufferSize, ct);
     }
 
     public Task WriteAsync(string path, Stream data, IProgress<long>? progress, OperationalSettings? settings, CancellationToken ct) =>

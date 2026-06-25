@@ -16,11 +16,10 @@ internal sealed class BenchmarkScenario
     public long? ProviderSmallFileProgressThresholdBytes { get; set; }
     public LocalFileSystemWriteMode? ProviderWriteMode { get; set; }
     public bool? ProviderUseArrayPoolForManualLoop { get; set; }
-    public bool? ProviderPreallocateDestinationFile { get; set; }
     public long? DirectWriteThresholdBytes { get; set; }
-    public bool? SkipExistsCheckForOverwrite { get; set; }
     public long? BufferBatchBytes { get; set; }
     public long? BatchEligibilityThresholdBytes { get; set; }
+    public bool? ProviderWriteSequentialScan { get; set; }
     public bool UsePathPool { get; set; }
     public List<string>? Variants { get; set; }
 
@@ -46,8 +45,6 @@ internal sealed class BenchmarkScenario
             WriteMode = ProviderWriteMode ?? defaults.WriteMode,
             UseArrayPoolForManualLoop = ProviderUseArrayPoolForManualLoop
                 ?? defaults.UseArrayPoolForManualLoop,
-            PreallocateDestinationFile = ProviderPreallocateDestinationFile
-                ?? defaults.PreallocateDestinationFile,
         }.Normalize();
     }
 }

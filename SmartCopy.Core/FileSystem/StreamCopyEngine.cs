@@ -30,9 +30,9 @@ internal static class StreamCopyEngine
     }
 
     /// <summary>
-    /// Copies <paramref name="source"/> into <paramref name="destination"/> and flushes. When the
-    /// length is known it is passed as <paramref name="remainingBytes"/> so the write mode and
-    /// preallocation heuristics can apply; pass null for unknown-length streams.
+    /// Copies <paramref name="source"/> into <paramref name="destination"/>. When the length is known
+    /// it is passed as <paramref name="remainingBytes"/> so the write mode heuristics can apply; pass
+    /// null for unknown-length streams. The caller owns stream disposal, which flushes managed buffers.
     /// </summary>
     public static async Task CopyAsync(
         Stream source,
@@ -42,15 +42,7 @@ internal static class StreamCopyEngine
         OperationalSettings opts,
         CancellationToken ct)
     {
-        if (remainingBytes is long bytesRemaining &&
-            opts.PreallocateDestinationFile &&
-            bytesRemaining > 0 &&
-            destination.CanSeek) // SetLength throws on non-seekable destinations (MTP, network streams)
-        {
-            destination.SetLength(bytesRemaining);
-        }
-
-        var writeMode = DetermineWriteMode(progress, remainingBytes, opts);
+        var writeMode = DetermineWriteMode(remainingBytes, opts);
 
         if (writeMode == LocalFileSystemWriteMode.CopyToAsync)
         {
@@ -78,23 +70,18 @@ internal static class StreamCopyEngine
             await CopyWithManualLoopAsync(source, destination, progress, opts, ct);
         }
 
-        await destination.FlushAsync(ct);
     }
 
     private static LocalFileSystemWriteMode DetermineWriteMode(
-        IProgress<long>? progress,
         long? remainingBytes,
         OperationalSettings opts)
     {
         if (opts.WriteMode != LocalFileSystemWriteMode.Auto)
             return opts.WriteMode;
-        // No progress handler: CopyToAsync with no wrapper is the fastest path.
-        if (progress is null)
-            return LocalFileSystemWriteMode.CopyToAsync;
         // Unknown length: can't apply the small-file optimisation, go straight to manual loop.
         if (remainingBytes is null)
             return LocalFileSystemWriteMode.ManualLoop;
-        // Known length with progress: the size heuristic above resolves the path inline.
+        // Known length: the size heuristic in CopyAsync resolves the path inline.
         return LocalFileSystemWriteMode.Auto;
     }
 

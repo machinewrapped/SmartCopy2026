@@ -74,7 +74,7 @@ public abstract class ProviderContractTests : IDisposable
         await using var writeStream = new MemoryStream(payload);
         await Provider.WriteAsync(dest, writeStream, progress: null, settings: null, CancellationToken.None);
 
-        await using var readStream = await Provider.OpenReadAsync(dest, CancellationToken.None);
+        await using var readStream = await Provider.OpenReadAsync(dest, ct: CancellationToken.None);
         using var reader = new StreamReader(readStream);
         Assert.Equal("round-trip", await reader.ReadToEndAsync());
     }

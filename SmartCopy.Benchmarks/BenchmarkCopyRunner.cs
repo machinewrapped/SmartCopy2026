@@ -25,8 +25,8 @@ internal static class BenchmarkCopyRunner
         long directWriteThresholdBytes,
         long bufferBatchBytes,
         long batchEligibilityThresholdBytes,
-        bool skipExistsCheckForOverwrite,
         int copyBufferSizeBytes,
+        bool enableWriteSequentialScan,
         CancellationToken ct)
     {
         job.RootNode.BuildStats();
@@ -50,11 +50,10 @@ internal static class BenchmarkCopyRunner
                 SourceNodeResult: SourceResult.None));
         }
 
-        // 2. Group and sort file nodes to maximize buffer usage while preserving directory cohesion
-        var sortedFileNodes = job.RootNode.GetSelectedDescendants()
+        // 2. Match the production batch traversal: each directory's files smallest-first,
+        // then each child subtree depth-first, preserving directory-cohesive interruption semantics.
+        var sortedFileNodes = EnumerateForBatching(job.RootNode)
             .Where(n => !n.IsDirectory)
-            .GroupBy(n => n.Parent)
-            .SelectMany(g => g.OrderBy(n => n.Size))
             .ToList();
 
         var currentBatch = new List<BatchedFile>();
@@ -123,13 +122,22 @@ internal static class BenchmarkCopyRunner
                     }
                     else
                     {
+                        var options = FileOptions.Asynchronous;
+                        if (enableWriteSequentialScan)
+                        {
+                            options |= FileOptions.SequentialScan;
+                        }
+
                         await using (var destStream = new FileStream(
                             targetWritePath,
-                            FileMode.Create,
-                            FileAccess.Write,
-                            FileShare.None,
-                            bufferSize: copyBufferSizeBytes,
-                            useAsync: true))
+                            new FileStreamOptions
+                            {
+                                Mode = FileMode.Create,
+                                Access = FileAccess.Write,
+                                Share = FileShare.None,
+                                BufferSize = copyBufferSizeBytes,
+                                Options = options
+                            }))
                         {
                             await destStream.WriteAsync(sharedBuffer.AsMemory(batched.Offset, batched.Length), ct);
                         }
@@ -221,33 +229,20 @@ internal static class BenchmarkCopyRunner
             var relativePath = Path.Combine(segments);
             var destination = Path.GetFullPath(Path.Combine(destinationPath, relativePath));
 
-            var destResult = DestinationResult.Written;
-            bool skipWrite = false;
-
-            if (!skipExistsCheckForOverwrite || overwriteMode == OverwriteMode.Skip)
+            var exists = File.Exists(destination);
+            if (exists && overwriteMode == OverwriteMode.Skip)
             {
-                var exists = File.Exists(destination);
-                if (exists && overwriteMode == OverwriteMode.Skip)
-                {
-                    results.Add(new TransformResult(
-                        IsSuccess: true,
-                        SourceNode: node,
-                        SourceNodeResult: SourceResult.Skipped,
-                        DestinationPath: destination,
-                        NumberOfFilesSkipped: 1,
-                        InputBytes: node.Size));
-                    skipWrite = true;
-                }
-                else
-                {
-                    destResult = exists ? DestinationResult.Overwritten : DestinationResult.Created;
-                }
-            }
-
-            if (skipWrite)
-            {
+                results.Add(new TransformResult(
+                    IsSuccess: true,
+                    SourceNode: node,
+                    SourceNodeResult: SourceResult.Skipped,
+                    DestinationPath: destination,
+                    NumberOfFilesSkipped: 1,
+                    InputBytes: node.Size));
                 continue;
             }
+
+            var destResult = exists ? DestinationResult.Overwritten : DestinationResult.Created;
 
             var isBatchable =
                 hasUsableBatchBuffer &&
@@ -366,6 +361,12 @@ internal static class BenchmarkCopyRunner
                     }
                     else
                     {
+                        var writeOptions = FileOptions.Asynchronous;
+                        if (enableWriteSequentialScan)
+                        {
+                            writeOptions |= FileOptions.SequentialScan;
+                        }
+
                         await using (var sourceStream = new FileStream(
                             node.FullPath,
                             FileMode.Open,
@@ -376,11 +377,14 @@ internal static class BenchmarkCopyRunner
                         {
                             await using (var destStream = new FileStream(
                                 targetWritePath,
-                                FileMode.Create,
-                                FileAccess.Write,
-                                FileShare.None,
-                                bufferSize: copyBufferSizeBytes,
-                                useAsync: true))
+                                new FileStreamOptions
+                                {
+                                    Mode = FileMode.Create,
+                                    Access = FileAccess.Write,
+                                    Share = FileShare.None,
+                                    BufferSize = copyBufferSizeBytes,
+                                    Options = writeOptions
+                                }))
                             {
                                 await sourceStream.CopyToAsync(destStream, copyBufferSizeBytes, ct);
                             }
@@ -480,5 +484,25 @@ internal static class BenchmarkCopyRunner
             return TimeSpan.MaxValue;
 
         return TimeSpan.FromSeconds(remainingSeconds);
+    }
+
+    private static IEnumerable<DirectoryTreeNode> EnumerateForBatching(DirectoryNode dir)
+    {
+        foreach (var file in dir.Files.Where(f => f.IsSelected).OrderBy(f => f.Size))
+            yield return file;
+
+        foreach (var child in dir.Children)
+        {
+            if (child.CheckState == CheckState.Unchecked ||
+                child.FilterResult == FilterResult.Excluded ||
+                child.IsMarkedForRemoval)
+                continue;
+
+            if (child.IsSelected)
+                yield return child;
+
+            foreach (var node in EnumerateForBatching(child))
+                yield return node;
+        }
     }
 }

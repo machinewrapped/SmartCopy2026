@@ -15,7 +15,8 @@ internal sealed class BatchCopyBuffer : IDisposable
         string Destination,
         DestinationResult DestResult,
         int Offset,
-        int Length);
+        int Length,
+        TimeSpan PreWriteElapsed);
 
     private readonly byte[] _data;
     private readonly List<Entry> _entries = new();
@@ -44,10 +45,11 @@ internal sealed class BatchCopyBuffer : IDisposable
         string destination,
         DestinationResult destResult,
         DirectoryTreeNode node,
+        TimeSpan preWriteElapsed,
         CancellationToken ct)
     {
         await source.ReadExactlyAsync(_data.AsMemory(_used, fileSize), ct);
-        _entries.Add(new Entry(node, destination, destResult, _used, fileSize));
+        _entries.Add(new Entry(node, destination, destResult, _used, fileSize, preWriteElapsed));
         _used += fileSize;
     }
 

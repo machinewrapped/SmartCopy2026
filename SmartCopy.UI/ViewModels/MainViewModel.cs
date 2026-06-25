@@ -44,6 +44,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     private bool _autoOpenLogOnRun = true;
 
     [ObservableProperty]
+    private bool _writeOperationJournal;
+
+    [ObservableProperty]
     private bool _verboseLogging;
 
     [ObservableProperty]
@@ -295,6 +298,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         UseAbsolutePathsForSelection = _settings.UseAbsolutePathsForSelectionSave;
         AutoOpenLogOnRun = _settings.AutoOpenLogOnRun;
+        WriteOperationJournal = _settings.WriteOperationJournal;
         VerboseLogging = _settings.VerboseLogging;
         ShowExcludedNodesByDefault = _settings.ShowFilteredNodesInTree;
         RestoreLastWorkflow = _settings.RestoreLastWorkflow;
@@ -320,7 +324,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         SourcePathPicker.RefreshSettings();
 
-        await _operationJournal.RotateAsync(_settings.LogRetentionDays);
+        if (_settings.WriteOperationJournal)
+        {
+            await _operationJournal.RotateAsync(_settings.LogRetentionDays);
+        }
         await WorkflowMenu.RefreshAsync();
 
         // Restore last workflow if the option is enabled and a session snapshot exists.
@@ -388,6 +395,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     partial void OnAutoOpenLogOnRunChanged(bool value)
     {
         _settings.AutoOpenLogOnRun = value;
+        _ = SaveSettingsAsync();
+    }
+
+    partial void OnWriteOperationJournalChanged(bool value)
+    {
+        _settings.WriteOperationJournal = value;
         _ = SaveSettingsAsync();
     }
 
@@ -863,6 +876,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         UseAbsolutePathsForSelection = _settings.UseAbsolutePathsForSelectionSave;
         AutoOpenLogOnRun = _settings.AutoOpenLogOnRun;
+        WriteOperationJournal = _settings.WriteOperationJournal;
         VerboseLogging = _settings.VerboseLogging;
         ShowExcludedNodesByDefault = _settings.ShowFilteredNodesInTree;
         RestoreLastWorkflow = _settings.RestoreLastWorkflow;
@@ -1420,7 +1434,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             await ApplyPendingWatcherBatchesAsync();
         }
 
-        if (results is { Count: > 0 })
+        if (_settings.WriteOperationJournal && results is { Count: > 0 })
         {
             try { await _operationJournal.WriteAsync(results.Where(r => r.SourceNodeResult != SourceResult.None)); }
             catch (Exception ex) { _logger.LogWarning(ex, "Failed to write operation journal"); }

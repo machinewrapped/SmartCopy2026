@@ -30,8 +30,8 @@ internal sealed class CapabilityOverrideProvider(
     public Task<FileSystemNode> GetNodeAsync(string path, CancellationToken ct) =>
         inner.GetNodeAsync(path, ct);
         
-    public Task<Stream> OpenReadAsync(string path, CancellationToken ct) =>
-        inner.OpenReadAsync(path, ct);
+    public Task<Stream> OpenReadAsync(string path, int? bufferSize = null, CancellationToken ct = default) =>
+        inner.OpenReadAsync(path, bufferSize, ct);
     public Task WriteAsync(string path, Stream data, IProgress<long>? progress, OperationalSettings? settings, CancellationToken ct) =>
         inner.WriteAsync(path, data, progress, settings, ct);
     public Task DeleteAsync(string path, CancellationToken ct) =>

@@ -12,6 +12,8 @@ internal enum BenchmarkRunMode
     DatasetPreparation,
     Analysis,
     SizeScaling,
+    Validation,
+    Compare,
 }
 
 internal sealed class BenchmarkState
@@ -43,10 +45,15 @@ internal sealed class BenchmarkRunRecord
     public long? ProviderSmallFileProgressThresholdBytes { get; init; }
     public LocalFileSystemWriteMode? ProviderWriteMode { get; init; }
     public bool? ProviderUseArrayPoolForManualLoop { get; init; }
-    public bool? ProviderPreallocateDestinationFile { get; init; }
+    public bool? ProviderWriteSequentialScan { get; init; }
     public long? DirectWriteThresholdBytes { get; init; }
-    public bool? SkipExistsCheckForOverwrite { get; init; }
     public long? BufferBatchBytes { get; init; }
+    public long? BatchEligibilityThresholdBytes { get; init; }
+    public bool? DestinationRoutingEnabled { get; init; }
+    public long? ProductionBatchBufferBytes { get; init; }
+    public long? ProductionBatchEligibilityCeilingBytes { get; init; }
+    public long? ProductionTinyFileFastPathThresholdBytes { get; init; }
+    public bool? JournalEnabled { get; init; }
     public required TimeSpan ScanDuration { get; init; }
     public required TimeSpan ExecuteDuration { get; init; }
     public required int CopiedFiles { get; init; }
@@ -67,9 +74,10 @@ internal sealed class BenchmarkRunRecord
         string artifactPath,
         DateTime runStartedUtc,
         string? notes,
-        int runIndex)
+        int runIndex,
+        OperationalSettings? recordedSettings = null)
     {
-        var providerOptions = variant.CreateOperationalSettings(scenario);
+        var providerOptions = recordedSettings ?? variant.CreateOperationalSettings(scenario);
         return new BenchmarkRunRecord
         {
             RunStatus = BenchmarkRunStatus.InProgress,
@@ -88,10 +96,15 @@ internal sealed class BenchmarkRunRecord
             ProviderSmallFileProgressThresholdBytes = providerOptions.SmallFileProgressThresholdBytes,
             ProviderWriteMode = providerOptions.WriteMode,
             ProviderUseArrayPoolForManualLoop = providerOptions.UseArrayPoolForManualLoop,
-            ProviderPreallocateDestinationFile = providerOptions.PreallocateDestinationFile,
+            ProviderWriteSequentialScan = variant.ProviderWriteSequentialScan ?? scenario.ProviderWriteSequentialScan,
             DirectWriteThresholdBytes = variant.DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes,
-            SkipExistsCheckForOverwrite = variant.SkipExistsCheckForOverwrite ?? scenario.SkipExistsCheckForOverwrite,
             BufferBatchBytes = variant.BufferBatchBytes ?? scenario.BufferBatchBytes,
+            BatchEligibilityThresholdBytes = variant.BatchEligibilityThresholdBytes ?? scenario.BatchEligibilityThresholdBytes,
+            DestinationRoutingEnabled = providerOptions.DestinationRoutingEnabled,
+            ProductionBatchBufferBytes = providerOptions.BatchBufferBytes,
+            ProductionBatchEligibilityCeilingBytes = providerOptions.BatchEligibilityCeilingBytes,
+            ProductionTinyFileFastPathThresholdBytes = providerOptions.TinyFileFastPathThresholdBytes,
+            JournalEnabled = variant.WriteJournal,
             ScanDuration = TimeSpan.Zero,
             ExecuteDuration = TimeSpan.Zero,
             CopiedFiles = 0,
@@ -115,7 +128,8 @@ internal sealed class BenchmarkRunRecord
         DateTime runStartedUtc,
         BenchmarkState state,
         string? notes,
-        int runIndex) => Create(scenario, variant, sourcePath, destinationPath, artifactPath, runStartedUtc, state, notes, runIndex, ex: null);
+        int runIndex,
+        OperationalSettings? recordedSettings = null) => Create(scenario, variant, sourcePath, destinationPath, artifactPath, runStartedUtc, state, notes, runIndex, ex: null, recordedSettings: recordedSettings);
  
     public static BenchmarkRunRecord CreateFailure(
         BenchmarkScenario scenario,
@@ -127,7 +141,8 @@ internal sealed class BenchmarkRunRecord
         BenchmarkState state,
         string? notes,
         int runIndex,
-        Exception ex) => Create(scenario, variant, sourcePath, destinationPath, artifactPath, runStartedUtc, state, notes, runIndex, ex);
+        Exception ex,
+        OperationalSettings? recordedSettings = null) => Create(scenario, variant, sourcePath, destinationPath, artifactPath, runStartedUtc, state, notes, runIndex, ex, recordedSettings);
  
     private static BenchmarkRunRecord Create(
         BenchmarkScenario scenario,
@@ -139,9 +154,10 @@ internal sealed class BenchmarkRunRecord
         BenchmarkState state,
         string? notes,
         int runIndex,
-        Exception? ex)
+        Exception? ex,
+        OperationalSettings? recordedSettings = null)
     {
-        var providerOptions = variant.CreateOperationalSettings(scenario);
+        var providerOptions = recordedSettings ?? variant.CreateOperationalSettings(scenario);
         return new BenchmarkRunRecord
         {
             RunStatus = ex is null ? BenchmarkRunStatus.Completed : BenchmarkRunStatus.Failed,
@@ -160,10 +176,15 @@ internal sealed class BenchmarkRunRecord
             ProviderSmallFileProgressThresholdBytes = providerOptions.SmallFileProgressThresholdBytes,
             ProviderWriteMode = providerOptions.WriteMode,
             ProviderUseArrayPoolForManualLoop = providerOptions.UseArrayPoolForManualLoop,
-            ProviderPreallocateDestinationFile = providerOptions.PreallocateDestinationFile,
+            ProviderWriteSequentialScan = variant.ProviderWriteSequentialScan ?? scenario.ProviderWriteSequentialScan,
             DirectWriteThresholdBytes = variant.DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes,
-            SkipExistsCheckForOverwrite = variant.SkipExistsCheckForOverwrite ?? scenario.SkipExistsCheckForOverwrite,
             BufferBatchBytes = variant.BufferBatchBytes ?? scenario.BufferBatchBytes,
+            BatchEligibilityThresholdBytes = variant.BatchEligibilityThresholdBytes ?? scenario.BatchEligibilityThresholdBytes,
+            DestinationRoutingEnabled = providerOptions.DestinationRoutingEnabled,
+            ProductionBatchBufferBytes = providerOptions.BatchBufferBytes,
+            ProductionBatchEligibilityCeilingBytes = providerOptions.BatchEligibilityCeilingBytes,
+            ProductionTinyFileFastPathThresholdBytes = providerOptions.TinyFileFastPathThresholdBytes,
+            JournalEnabled = variant.WriteJournal,
             ScanDuration = state.ScanStopwatch.Elapsed,
             ExecuteDuration = state.ExecuteStopwatch.Elapsed,
             CopiedFiles = state.Results.Sum(r => r.NumberOfFilesAffected),
@@ -267,24 +288,17 @@ internal sealed record BucketVariantEvidence(
     string VariantName,
     int RecordCount,
     long TotalBytes,
+    double TotalCopyDurationMilliseconds,
     double MeanDurationMilliseconds,
     double MedianDurationMilliseconds,
     double P95DurationMilliseconds,
     double AggregateThroughputMiBPerSecond,
-    double MeanThroughputMiBPerSecond,
-    double P50ThroughputMiBPerSecond,
-    double P95ThroughputMiBPerSecond,
     double RunMedianSpreadMilliseconds,
     double RunThroughputSpreadMiBPerSecond)
 {
     public static BucketVariantEvidence Empty(string bucketLabel, string variantName) =>
-        new(bucketLabel, variantName, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        new(bucketLabel, variantName, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 }
-
-internal sealed record EvidenceComparison(
-    string Verdict,
-    string DeltaText,
-    string NoiseText);
 
 internal static class FileSizeBuckets
 {
@@ -308,36 +322,5 @@ internal sealed record SessionPaths(
     string TaskListPath,
     string JournalDirectory);
 
-internal static class FileNamesResolver
-{
-    public const string DefaultResults = "benchmark-results.ndjson";
-    public const string DefaultFileResults = "benchmark-file-results.ndjson";
-    public const string DefaultAnalysis = "benchmark-analysis.md";
-    public const string DefaultSizeScaling = "benchmark-size-scaling.md";
-    public const string DefaultTaskList = "benchmark-tasklist.md";
-
-    public static (string Results, string FileResults, string Analysis, string SizeScaling, string TaskList) GetFileNames(string configPath)
-    {
-        var configFileName = Path.GetFileName(configPath);
-        var prefix = configFileName.EndsWith(".json") ? configFileName[..^5] : configFileName;
-
-        var results = prefix.Replace("scenarios", "results") + ".ndjson";
-        if (results == prefix + ".ndjson") results = DefaultResults;
-
-        var fileResults = prefix.Replace("scenarios", "file-results") + ".ndjson";
-        if (fileResults == prefix + ".ndjson") fileResults = DefaultFileResults;
-
-        var analysis = prefix.Replace("scenarios", "analysis") + ".md";
-        if (analysis == prefix + ".md") analysis = DefaultAnalysis;
-
-        var sizeScaling = prefix.Replace("scenarios", "size-scaling") + ".md";
-        if (sizeScaling == prefix + ".md") sizeScaling = DefaultSizeScaling;
-
-        var taskList = prefix.Replace("scenarios", "tasklist") + ".md";
-        if (taskList == prefix + ".md") taskList = DefaultTaskList;
-
-        return (results, fileResults, analysis, sizeScaling, taskList);
-    }
-}
 
 

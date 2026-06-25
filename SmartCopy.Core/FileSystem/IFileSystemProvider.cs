@@ -48,7 +48,7 @@ public interface IFileSystemProvider
     /// <summary>
     /// Opens a readable stream for the file at <paramref name="path"/>.
     /// </summary>
-    Task<Stream> OpenReadAsync(string path, CancellationToken ct);
+    Task<Stream> OpenReadAsync(string path, int? bufferSize = null, CancellationToken ct = default);
 
     /// <summary>
     /// Writes <paramref name="data"/> to <paramref name="path"/>.

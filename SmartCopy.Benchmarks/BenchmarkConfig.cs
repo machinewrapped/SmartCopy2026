@@ -68,16 +68,6 @@ internal sealed class BenchmarkConfig
                     ProviderWriteMode = LocalFileSystemWriteMode.ManualLoop,
                     ProviderUseArrayPoolForManualLoop = true,
                 },
-                new BenchmarkVariant
-                {
-                    Name = "ManualLoop1MiBPreallocate",
-                    Notes = "Manual loop with a 1 MiB buffer and destination preallocation.",
-                    DesiredRunCount = 3,
-                    ProviderCopyBufferSizeBytes = 1024 * 1024,
-                    ProviderWriteMode = LocalFileSystemWriteMode.ManualLoop,
-                    ProviderUseArrayPoolForManualLoop = true,
-                    ProviderPreallocateDestinationFile = true,
-                },
             ],
             DatasetPreparation = new DatasetPreparationConfig
             {

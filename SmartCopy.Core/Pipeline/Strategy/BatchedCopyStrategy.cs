@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
@@ -20,7 +21,6 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
         IFileSystemProvider targetProvider,
         string destPath,
         OverwriteMode mode,
-        bool skipExistsCheck,
         SourceResult successResult,
         [EnumeratorCancellation] CancellationToken ct)
     {
@@ -48,8 +48,14 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
             var nodeCtx = context.GetNodeContext(node);
             var destination = targetProvider.JoinPath(destPath, nodeCtx.PathSegments);
 
+            // Time the destination check (ExistsAsync): the streaming path's per-file cadence includes this
+            // ceremony, so batched timing must bank it too — otherwise bucket comparisons charge the
+            // streaming control for a stat the batched variants hide. Banked with the read at flush.
+            var ceremonyStart = Stopwatch.GetTimestamp();
+            var destResult = await ResolveDestResultAsync(targetProvider, destination, mode, ct);
+            var ceremonyElapsed = Stopwatch.GetElapsedTime(ceremonyStart);
+
             // null => already exists and OverwriteMode is Skip; report skipped without reading.
-            var destResult = await ResolveDestResultAsync(targetProvider, destination, mode, skipExistsCheck, ct);
             if (destResult is null)
             {
                 yield return SkippedResult(node, destination);
@@ -70,10 +76,18 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
 
                 // Read failures are per-file: mark the node failed and keep batching the rest.
                 string? readError = null;
+                var readStart = Stopwatch.GetTimestamp();
                 try
                 {
-                    await using var src = await context.SourceProvider.OpenReadAsync(node.FullPath, ct);
-                    await buffer.AccumulateAsync(src, fileSize, destination, destResult.Value, node, ct);
+                    await using var src = await context.SourceProvider.OpenReadAsync(node.FullPath, Settings.CopyBufferSizeBytes, ct);
+                    await buffer.AccumulateAsync(
+                        src,
+                        fileSize,
+                        destination,
+                        destResult.Value,
+                        node,
+                        ceremonyElapsed + Stopwatch.GetElapsedTime(readStart),
+                        ct);
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
@@ -133,8 +147,9 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
     }
 
     /// <summary>
-    /// The write phase: drains every accumulated entry to the target, one result per file, then
-    /// resets the buffer for reuse. Write failures are per-file and do not abort the batch.
+    /// The write phase: drains every accumulated entry to the target, then attributes per-file
+    /// <see cref="TransformResult.ExecutionDuration"/> as exact destination-check + read time plus
+    /// that entry's measured flush write time. Write failures are per-file and do not abort the batch.
     /// </summary>
     private async IAsyncEnumerable<TransformResult> FlushBatchAsync(
         BatchCopyBuffer buffer,
@@ -146,12 +161,14 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
         if (!buffer.HasEntries)
             yield break;
 
+        var outcomes = new List<(BatchCopyBuffer.Entry Entry, TimeSpan WriteElapsed, string? Error)>(buffer.Entries.Count);
         foreach (var entry in buffer.Entries)
         {
             IProgress<long>? progress = null;
             if (entry.Length > 0 && context is IFileTransferProgressSink sink)
                 progress = new DelegateProgress<long>(b => sink.ReportFileTransferBytes(entry.Node, b, entry.Length));
 
+            var writeStart = Stopwatch.GetTimestamp();
             string? error = null;
             try
             {
@@ -164,13 +181,19 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
                 error = ex.Message;
             }
 
+            outcomes.Add((entry, Stopwatch.GetElapsedTime(writeStart), error));
+        }
+
+        foreach (var (entry, writeElapsed, error) in outcomes)
+        {
+            var duration = entry.PreWriteElapsed + writeElapsed;
             yield return error is null
                 ? new TransformResult(IsSuccess: true, SourceNode: entry.Node,
                     SourceNodeResult: successResult, DestinationPath: entry.Destination,
                     DestinationResult: entry.DestResult, NumberOfFilesAffected: 1,
-                    InputBytes: entry.Length, OutputBytes: entry.Length)
+                    InputBytes: entry.Length, OutputBytes: entry.Length, ExecutionDuration: duration)
                 : new TransformResult(IsSuccess: false, SourceNode: entry.Node,
-                    SourceNodeResult: SourceResult.Skipped, ErrorMessage: error);
+                    SourceNodeResult: SourceResult.Skipped, ErrorMessage: error, ExecutionDuration: duration);
         }
 
         buffer.Reset();

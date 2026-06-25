@@ -10,6 +10,153 @@ internal static class BenchmarkConvergence
     }
 
     /// <summary>
+    /// A detected split of a variant's run durations into a low cluster and a high cluster
+    /// separated by a dominant gap (seconds). Signals that the distribution is multimodal
+    /// (e.g. cache-warm runs vs cold runs), so a converged window may represent only one mode.
+    /// </summary>
+    internal sealed record DistributionPartition(
+        int LowCount, double LowMinSeconds, double LowMaxSeconds,
+        int HighCount, double HighMinSeconds, double HighMaxSeconds,
+        double GapSeconds);
+
+    internal sealed record DistributionCluster(
+        int Count,
+        double MinSeconds,
+        double MaxSeconds);
+
+    internal sealed record DistributionSummary(
+        int RunCount,
+        double MedianSeconds,
+        double MeanSeconds,
+        double MinSeconds,
+        double MaxSeconds,
+        double SpreadSeconds,
+        IReadOnlyList<DistributionCluster> Clusters,
+        bool HasSeparatedClusters);
+
+    /// <summary>
+    /// Summarises all successful run durations, splitting them at every large interior gap.
+    /// This is intentionally less strict than <see cref="DetectMultimodal"/>: benchmark runs
+    /// often show a low cluster, a bridge run, and a high cluster, where no single gap dominates.
+    /// Edge gaps are ignored so a lone slow/fast outlier does not become its own mode.
+    /// </summary>
+    public static DistributionSummary BuildDistributionSummary(
+        IReadOnlyList<double> durationsSeconds,
+        double minRelativeGap = 0.15,
+        int minClusterSize = 2)
+    {
+        var d = durationsSeconds.OrderBy(x => x).ToList();
+        if (d.Count == 0)
+        {
+            return new DistributionSummary(
+                0,
+                double.NaN,
+                double.NaN,
+                double.NaN,
+                double.NaN,
+                double.NaN,
+                [],
+                false);
+        }
+
+        var median = BenchmarkHelpers.Percentile(d, 0.5);
+        var mean = d.Average();
+        var min = d[0];
+        var max = d[^1];
+        var splitIndexes = new List<int>();
+        var gapThreshold = median > 0 ? median * minRelativeGap : double.PositiveInfinity;
+
+        if (d.Count >= 2 * minClusterSize && double.IsFinite(gapThreshold))
+        {
+            var lo = minClusterSize - 1;
+            var hi = d.Count - 1 - minClusterSize;
+            for (var i = lo; i <= hi; i++)
+            {
+                var gap = d[i + 1] - d[i];
+                if (gap >= gapThreshold)
+                {
+                    splitIndexes.Add(i);
+                }
+            }
+        }
+
+        var clusters = new List<DistributionCluster>();
+        var start = 0;
+        foreach (var split in splitIndexes)
+        {
+            clusters.Add(new DistributionCluster(split - start + 1, d[start], d[split]));
+            start = split + 1;
+        }
+
+        clusters.Add(new DistributionCluster(d.Count - start, d[start], d[^1]));
+
+        var substantialClusters = clusters.Count(c => c.Count >= minClusterSize);
+        return new DistributionSummary(
+            d.Count,
+            median,
+            mean,
+            min,
+            max,
+            max - min,
+            clusters,
+            substantialClusters >= 2);
+    }
+
+    /// <summary>
+    /// Heuristic multimodality test. Splits the duration-sorted runs at their largest interior
+    /// gap (keeping at least <paramref name="minClusterSize"/> runs on each side) and reports a
+    /// partition only when that gap both dominates every other gap (by
+    /// <paramref name="dominanceFactor"/>) and is large relative to the median
+    /// (<paramref name="minRelativeGap"/>). Returns <c>null</c> for unimodal or merely noisy
+    /// distributions (a lone outlier is not a partition — convergence already handles those).
+    /// </summary>
+    public static DistributionPartition? DetectMultimodal(
+        IReadOnlyList<double> durationsSeconds,
+        double dominanceFactor = 2.0,
+        double minRelativeGap = 0.15,
+        int minClusterSize = 2)
+    {
+        var d = durationsSeconds.OrderBy(x => x).ToList();
+        var n = d.Count;
+        if (n < 2 * minClusterSize)
+            return null;
+
+        var lo = minClusterSize - 1;
+        var hi = n - 1 - minClusterSize;
+
+        var splitIdx = -1;
+        var bestGap = -1.0;
+        for (var i = lo; i <= hi; i++)
+        {
+            var gap = d[i + 1] - d[i];
+            if (gap > bestGap)
+            {
+                bestGap = gap;
+                splitIdx = i;
+            }
+        }
+
+        if (splitIdx < 0)
+            return null;
+
+        var refGap = 0.0;
+        for (var i = 0; i < n - 1; i++)
+            if (i != splitIdx)
+                refGap = Math.Max(refGap, d[i + 1] - d[i]);
+
+        var median = BenchmarkHelpers.Percentile(d, 0.5);
+        if (bestGap < dominanceFactor * refGap)
+            return null;
+        if (median > 0 && bestGap < minRelativeGap * median)
+            return null;
+
+        return new DistributionPartition(
+            splitIdx + 1, d[0], d[splitIdx],
+            n - 1 - splitIdx, d[splitIdx + 1], d[^1],
+            bestGap);
+    }
+
+    /// <summary>
     /// Determines convergence status for a specific scenario/variant pair.
     /// Used by the run selector to decide whether to schedule more runs.
     /// </summary>
@@ -99,6 +246,33 @@ internal static class BenchmarkConvergence
 
         var (_, bestSpread, _) = FindTightestWindow(sorted, W, config.ConvergenceSpreadPercent);
         return bestSpread;
+    }
+
+    /// <summary>
+    /// Per-variant converged-run-index sets for one scenario's terminal runs (the tightest
+    /// window, or the best available when a variant gave up). Shared by the analysis report,
+    /// the validation gate, and the validation conclusion so they select identical windows
+    /// and cannot disagree on a verdict.
+    /// </summary>
+    public static Dictionary<string, HashSet<int>> GetConvergedIndexesForVariants(
+        BenchmarkConfig config,
+        IReadOnlyList<BenchmarkRunRecord> scenarioRuns,
+        IReadOnlyList<string> variants)
+    {
+        return variants.ToDictionary(
+            v => v,
+            v =>
+            {
+                var successful = scenarioRuns
+                    .Where(r => string.Equals(r.VariantName, v, StringComparison.OrdinalIgnoreCase))
+                    .Where(BenchmarkHelpers.IsSuccessfulRun)
+                    .ToList();
+                return GetConvergedRunIndexes(
+                    successful,
+                    GetDesiredRunCount(config, v),
+                    config.ConvergenceSpreadPercent);
+            },
+            StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>

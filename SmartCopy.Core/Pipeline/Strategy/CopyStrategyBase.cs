@@ -99,7 +99,6 @@ public abstract class CopyStrategyBase : ICopyStrategy
         IFileSystemProvider targetProvider,
         string destPath,
         OverwriteMode mode,
-        bool skipExistsCheck,
         SourceResult successResult,
         CancellationToken ct);
 
@@ -110,8 +109,8 @@ public abstract class CopyStrategyBase : ICopyStrategy
         string destination,
         CancellationToken ct)
     {
-        // Wire byte-level progress only when the context can consume it (the UI run); benchmarks
-        // and tests pass a context that is not a progress sink and skip the allocation.
+        // Wire byte-level progress only when the context can consume it (UI and benchmark runs);
+        // tests pass a context that is not a progress sink and skip the allocation.
         IProgress<long>? writeProgress = null;
         if (file.Size > 0 && context is IFileTransferProgressSink progressSink)
         {
@@ -121,8 +120,9 @@ public abstract class CopyStrategyBase : ICopyStrategy
 
         // The provider executes the staging mechanism; the strategy decides the intent (Staged/Direct)
         // per file via SettingsFor and the provider honours it.
-        await using var sourceStream = await context.SourceProvider.OpenReadAsync(file.FullPath, ct);
-        await targetProvider.WriteAsync(destination, sourceStream, writeProgress, SettingsFor(file.Size), ct);
+        var settings = SettingsFor(file.Size);
+        await using var sourceStream = await context.SourceProvider.OpenReadAsync(file.FullPath, settings.CopyBufferSizeBytes, ct);
+        await targetProvider.WriteAsync(destination, sourceStream, writeProgress, settings, ct);
     }
 
     /// <summary>
@@ -169,12 +169,8 @@ public abstract class CopyStrategyBase : ICopyStrategy
         IFileSystemProvider targetProvider,
         string destination,
         OverwriteMode mode,
-        bool skipExistsCheck,
         CancellationToken ct)
     {
-        if (skipExistsCheck && mode != OverwriteMode.Skip)
-            return DestinationResult.Written;
-
         var exists = await targetProvider.ExistsAsync(destination, ct);
         if (exists && mode == OverwriteMode.Skip)
             return null;

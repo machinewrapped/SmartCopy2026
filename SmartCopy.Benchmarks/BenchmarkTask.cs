@@ -2,11 +2,11 @@ using System.Text;
 using System.Text.Json;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
-using SmartCopy.Core.Pipeline.Steps;
 using SmartCopy.Core.Scanning;
 using SmartCopy.Core.Selection;
 using SmartCopy.Core.Progress;
 using SmartCopy.Core.DirectoryTree;
+using SmartCopy.Core.Pipeline.Strategy;
 
 namespace SmartCopy.Benchmarks;
 
@@ -28,6 +28,8 @@ internal sealed class BenchmarkTask
     private int? _pathIndex;
     private LocalFileSystemProvider? _sourceProvider;
     private FileSystemProviderRegistry? _registry;
+    private OperationalSettings? _executionSettings;
+    private OperationalSettings? _recordedSettings;
 
     internal BenchmarkTask(
         BenchmarkSelection selection,
@@ -64,9 +66,11 @@ internal sealed class BenchmarkTask
                 ClearDestination("Clearing destination contents before benchmark...");
 
             SetupProviders();
+            await ResolveAndValidateRunSettingsAsync();
             await ScanAsync();
             await RunCopyAsync();
-            await WriteJournalAsync(runStartedUtc);
+            if (ShouldWriteJournal())
+                await WriteJournalAsync(runStartedUtc);
             await WriteSuccessRecordAsync(runStartedUtc);
 
             Console.WriteLine();
@@ -145,11 +149,16 @@ internal sealed class BenchmarkTask
 
     private void PrintHeader()
     {
-        var providerOptions = _variant.CreateOperationalSettings(_scenario);
+        var isValidation = _cliOptions.Mode == BenchmarkRunMode.Validation;
+        var usePrototypeExecutor = _variant.UsePrototypeExecutor ?? false;
+        var useProductionExecutor = isValidation && !usePrototypeExecutor;
+        var providerOptions = useProductionExecutor
+            ? _variant.CreateProductionOperationalSettings(_scenario)
+            : _variant.CreateOperationalSettings(_scenario);
         Console.WriteLine();
         Console.WriteLine("-------------------------------------------------------------------");
         Console.WriteLine($"Scenario: {_scenario.Name}");
-        Console.WriteLine($"Variant:  {_variant.Name} (run {_nextRunIndex})");
+        Console.WriteLine($"Variant:  {_variant.Name} (run {_nextRunIndex})" + (isValidation ? (useProductionExecutor ? " [validation/production]" : " [validation/prototype]") : ""));
         Console.WriteLine("-------------------------------------------------------------------");
         
         var sourceDisplay = _pathIndex is null 
@@ -158,19 +167,20 @@ internal sealed class BenchmarkTask
 
         Console.WriteLine($"Source:   {sourceDisplay}");
         Console.WriteLine($"Target:   {_destinationPath}");
-        Console.WriteLine(
-            $"Provider: buffer={providerOptions.CopyBufferSizeBytes} bytes, " +
-            $"small-file-threshold={providerOptions.SmallFileProgressThresholdBytes} bytes, " +
-            $"write-mode={providerOptions.WriteMode}, " +
-            $"array-pool={providerOptions.UseArrayPoolForManualLoop}, " +
-            $"preallocate={providerOptions.PreallocateDestinationFile}");
+        Console.WriteLine();
+        Console.WriteLine("Provider Settings:");
+        Console.WriteLine($"  Buffer:                  {BenchmarkHelpers.FormatSize(providerOptions.CopyBufferSizeBytes)}");
+        Console.WriteLine($"  Small file threshold:    {BenchmarkHelpers.FormatSize(providerOptions.SmallFileProgressThresholdBytes)}");
+        Console.WriteLine($"  Write mode:              {providerOptions.WriteMode}");
+        Console.WriteLine($"  Array pool:              {providerOptions.UseArrayPoolForManualLoop}");
     }
 
     private async Task WriteInProgressRecordAsync(DateTime runStartedUtc)
     {
         var record = BenchmarkRunRecord.CreateInProgress(
             _scenario, _variant, _sourcePath, _destinationPath,
-            _paths.ArtifactDirectory, runStartedUtc, _cliOptions.Notes, _nextRunIndex);
+            _paths.ArtifactDirectory, runStartedUtc, _cliOptions.Notes, _nextRunIndex,
+            GetRecordedSettings());
 
         await AppendJsonLineAsync(_paths.ResultsPath, record, _ct);
         _historicalRuns.Add(record);
@@ -184,6 +194,99 @@ internal sealed class BenchmarkTask
         _registry = new FileSystemProviderRegistry();
         _registry.Register(_sourceProvider);
         _registry.Register(destinationProvider);
+    }
+
+    private async Task ResolveAndValidateRunSettingsAsync()
+    {
+        var isValidation = _cliOptions.Mode == BenchmarkRunMode.Validation;
+        var usePrototypeExecutor = _variant.UsePrototypeExecutor ?? false;
+        var useProductionExecutor = isValidation && !usePrototypeExecutor;
+
+        _executionSettings = useProductionExecutor
+            ? _variant.CreateProductionOperationalSettings(_scenario)
+            : _variant.CreateOperationalSettings(_scenario);
+        _recordedSettings = _executionSettings;
+
+        if (!useProductionExecutor)
+        {
+            return;
+        }
+
+        var destinationProvider = _registry!.ResolveProvider(_destinationPath)
+            ?? throw new InvalidOperationException($"No destination provider for {_destinationPath}.");
+        var source = await _sourceProvider!.GetClassificationAsync(_ct);
+        var target = await destinationProvider.GetClassificationAsync(_ct);
+        var sameVolume = _sourceProvider.VolumeId is { } vid && destinationProvider.VolumeId == vid;
+        var strategy = DefaultCopyStrategyPolicy.Instance.Resolve(new CopyStrategyInputs(
+            _executionSettings, source, target, _sourceProvider.Capabilities, destinationProvider.Capabilities, sameVolume));
+
+        _recordedSettings = strategy is CopyStrategyBase baseStrategy
+            ? baseStrategy.Settings
+            : _executionSettings;
+
+        Console.WriteLine();
+        Console.WriteLine($"Resolved Production Settings ({strategy.GetType().Name}):");
+        
+        void PrintSetting(string label, string resolvedValue, string requestedValue)
+        {
+            if (resolvedValue == requestedValue)
+                Console.WriteLine($"  {label,-24} {resolvedValue}");
+            else
+                Console.WriteLine($"  {label,-24} {resolvedValue} (requested: {requestedValue})");
+        }
+
+        PrintSetting("Buffer:", BenchmarkHelpers.FormatSize(_recordedSettings.CopyBufferSizeBytes), BenchmarkHelpers.FormatSize(_executionSettings.CopyBufferSizeBytes));
+        PrintSetting("Batch buffer:", BenchmarkHelpers.FormatSize(_recordedSettings.BatchBufferBytes), BenchmarkHelpers.FormatSize(_executionSettings.BatchBufferBytes));
+        PrintSetting("Batch elig. ceiling:", BenchmarkHelpers.FormatSize(_recordedSettings.BatchEligibilityCeilingBytes), BenchmarkHelpers.FormatSize(_executionSettings.BatchEligibilityCeilingBytes));
+        PrintSetting("Tiny file threshold:", BenchmarkHelpers.FormatSize(_recordedSettings.TinyFileFastPathThresholdBytes), BenchmarkHelpers.FormatSize(_executionSettings.TinyFileFastPathThresholdBytes));
+        PrintSetting("Destination routing:", _recordedSettings.DestinationRoutingEnabled.ToString(), _executionSettings.DestinationRoutingEnabled.ToString());
+        
+        Console.WriteLine($"  {"Source:",-24} {source}");
+        Console.WriteLine($"  {"Target:",-24} {target}");
+        Console.WriteLine($"  {"Same volume:",-24} {sameVolume}");
+
+        ValidateExpectedEffectiveSettings(_recordedSettings);
+    }
+
+    private OperationalSettings GetExecutionSettings()
+    {
+        if (_executionSettings is not null)
+        {
+            return _executionSettings;
+        }
+
+        var isValidation = _cliOptions.Mode == BenchmarkRunMode.Validation;
+        var usePrototypeExecutor = _variant.UsePrototypeExecutor ?? false;
+        return isValidation && !usePrototypeExecutor
+            ? _variant.CreateProductionOperationalSettings(_scenario)
+            : _variant.CreateOperationalSettings(_scenario);
+    }
+
+    private OperationalSettings GetRecordedSettings() => _recordedSettings ?? GetExecutionSettings();
+
+    private void ValidateExpectedEffectiveSettings(OperationalSettings effectiveSettings)
+    {
+        var failures = new List<string>();
+        CheckExpected(_variant.ExpectedEffectiveCopyBufferSizeBytes, effectiveSettings.CopyBufferSizeBytes, "copyBufferSizeBytes");
+        CheckExpected(_variant.ExpectedEffectiveBatchBufferBytes, effectiveSettings.BatchBufferBytes, "batchBufferBytes");
+        CheckExpected(_variant.ExpectedEffectiveBatchEligibilityCeilingBytes, effectiveSettings.BatchEligibilityCeilingBytes, "batchEligibilityCeilingBytes");
+        CheckExpected(_variant.ExpectedEffectiveTinyFileFastPathThresholdBytes, effectiveSettings.TinyFileFastPathThresholdBytes, "tinyFileFastPathThresholdBytes");
+        CheckExpected(_variant.ExpectedEffectiveDestinationRoutingEnabled, effectiveSettings.DestinationRoutingEnabled, "destinationRoutingEnabled");
+
+        if (failures.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Variant '{_variant.Name}' resolved unexpected production settings: {string.Join("; ", failures)}.");
+        }
+
+        void CheckExpected<T>(T? expected, T actual, string name)
+            where T : struct, IEquatable<T>
+        {
+            if (expected is { } value && !value.Equals(actual))
+            {
+                failures.Add($"{name} expected {value} but resolved {actual}");
+            }
+        }
     }
 
     private async Task ScanAsync()
@@ -216,48 +319,37 @@ internal sealed class BenchmarkTask
 
         _state.FreeSpaceBefore = await resolvedDestinationProvider.GetAvailableFreeSpaceAsync(_ct);
 
-        var providerOptions = _variant.CreateOperationalSettings(_scenario);
+        var providerOptions = GetExecutionSettings();
+        var useProductionExecutor = _cliOptions.Mode == BenchmarkRunMode.Validation && !(_variant.UsePrototypeExecutor ?? false);
         var overwriteMode = _variant.OverwriteMode ?? _scenario.OverwriteMode;
-        var copyStep = new CopyStep(_destinationPath, overwriteMode)
-        {
-            SkipExistsCheckForOverwrite = _variant.SkipExistsCheckForOverwrite ?? _scenario.SkipExistsCheckForOverwrite ?? false
-        };
-        var pipelineRunner = new PipelineRunner(new TransformPipeline([copyStep]));
 
         var directWriteThresholdBytes = _variant.DirectWriteThresholdBytes ?? _scenario.DirectWriteThresholdBytes ?? 0L;
         var bufferBatchBytes = _variant.BufferBatchBytes ?? _scenario.BufferBatchBytes ?? 0L;
         var batchEligibilityThresholdBytes = _variant.BatchEligibilityThresholdBytes ?? _scenario.BatchEligibilityThresholdBytes ?? 0L;
-        var skipExistsCheckForOverwrite = _variant.SkipExistsCheckForOverwrite ?? _scenario.SkipExistsCheckForOverwrite ?? false;
+        var writeSequentialScan = _variant.ProviderWriteSequentialScan ?? _scenario.ProviderWriteSequentialScan ?? false;
+
+        ICopyExecutor executor = useProductionExecutor
+            ? new ProductionCopyExecutor(
+                _destinationPath, overwriteMode,
+                providerOptions, _sourceProvider!, resolvedDestinationProvider)
+            : new PrototypeCopyExecutor(
+                _destinationPath, overwriteMode,
+                directWriteThresholdBytes, bufferBatchBytes, batchEligibilityThresholdBytes, writeSequentialScan);
 
         BenchmarkHelpers.UpdateProgress("Preparing copy...");
         using (var executeProgress = new ThrottledConsoleProgress<OperationProgress>(p =>
             BenchmarkHelpers.UpdateProgress($"Copying: {p.FilesCompleted}/{p.FilesTotal} files ({BenchmarkHelpers.FormatSize(p.TotalBytesCompleted)}/{BenchmarkHelpers.FormatSize(p.TotalBytes)}), ETR: {BenchmarkHelpers.FormatDuration(p.EstimatedRemaining)}")))
         {
             _state.ExecuteStopwatch.Start();
-            if (directWriteThresholdBytes > 0 || bufferBatchBytes > 0)
+            _state.Results = await executor.ExecuteAsync(new PipelineJob
             {
-                _state.Results = await BenchmarkCopyRunner.RunAsync(new PipelineJob
-                {
-                    RootNode = _state.Root!,
-                    SourceProvider = _sourceProvider!,
-                    ProviderRegistry = _registry!,
-                    Progress = executeProgress,
-                    CancellationToken = _ct,
-                    OperationalSettings = providerOptions,
-                }, _destinationPath, overwriteMode, directWriteThresholdBytes, bufferBatchBytes, batchEligibilityThresholdBytes, skipExistsCheckForOverwrite, providerOptions.CopyBufferSizeBytes, _ct);
-            }
-            else
-            {
-                _state.Results = await pipelineRunner.ExecuteAsync(new PipelineJob
-                {
-                    RootNode = _state.Root!,
-                    SourceProvider = _sourceProvider!,
-                    ProviderRegistry = _registry!,
-                    Progress = executeProgress,
-                    CancellationToken = _ct,
-                    OperationalSettings = providerOptions,
-                }, _ct);
-            }
+                RootNode = _state.Root!,
+                SourceProvider = _sourceProvider!,
+                ProviderRegistry = _registry!,
+                Progress = executeProgress,
+                CancellationToken = _ct,
+                OperationalSettings = providerOptions,
+            }, _ct);
             _state.ExecuteStopwatch.Stop();
         }
         BenchmarkHelpers.UpdateProgress("");
@@ -275,11 +367,14 @@ internal sealed class BenchmarkTask
             _ct);
     }
 
+    private bool ShouldWriteJournal() => _variant.WriteJournal;
+
     private async Task WriteSuccessRecordAsync(DateTime runStartedUtc)
     {
         var record = BenchmarkRunRecord.CreateSuccess(
             _scenario, _variant, _sourcePath, _destinationPath,
-            _paths.ArtifactDirectory, runStartedUtc, _state, _cliOptions.Notes, _nextRunIndex);
+            _paths.ArtifactDirectory, runStartedUtc, _state, _cliOptions.Notes, _nextRunIndex,
+            GetRecordedSettings());
 
         await AppendJsonLineAsync(_paths.ResultsPath, record, _ct);
         await AppendFileCopyRecordsAsync(_paths.FileResultsPath, record, _state.Results, _ct);
@@ -295,7 +390,9 @@ internal sealed class BenchmarkTask
         
         Console.WriteLine($"Results: {_paths.ResultsPath}");
         Console.WriteLine($"File results: {_paths.FileResultsPath}");
-        Console.WriteLine($"Journal: {_state.JournalPath}");
+        Console.WriteLine(ShouldWriteJournal()
+            ? $"Journal: {_state.JournalPath}"
+            : "Journal: disabled");
 
         var convergenceStatus = BenchmarkConvergence.Check(_historicalRuns, _scenario.Name, _variant, _config);
         var spread = BenchmarkConvergence.GetCurrentSpreadPercent(_historicalRuns, _scenario.Name, _variant, _config);
@@ -315,7 +412,8 @@ internal sealed class BenchmarkTask
     {
         var record = BenchmarkRunRecord.CreateFailure(
             _scenario, _variant, _sourcePath, _destinationPath,
-            _paths.ArtifactDirectory, runStartedUtc, _state, _cliOptions.Notes, _nextRunIndex, ex);
+            _paths.ArtifactDirectory, runStartedUtc, _state, _cliOptions.Notes, _nextRunIndex, ex,
+            GetRecordedSettings());
 
         await AppendJsonLineAsync(_paths.ResultsPath, record, _ct);
         await AppendFileCopyRecordsAsync(_paths.FileResultsPath, record, _state.Results, _ct);
@@ -326,8 +424,10 @@ internal sealed class BenchmarkTask
     private void ClearDestination(string message)
     {
         BenchmarkHelpers.UpdateProgress(message);
-        using var clearProgress = new ThrottledConsoleProgress<string>(s => BenchmarkHelpers.UpdateProgress($"Clearing: {s}"));
-        BenchmarkHelpers.ClearDirectoryContents(_destinationPath, clearProgress);
+        using (var clearProgress = new ThrottledConsoleProgress<string>(s => BenchmarkHelpers.UpdateProgress($"Clearing: {s}")))
+        {
+            BenchmarkHelpers.ClearDirectoryContents(_destinationPath, clearProgress);
+        }
         BenchmarkHelpers.UpdateProgress("");
     }
 
@@ -345,11 +445,17 @@ internal sealed class BenchmarkTask
 
     private Dictionary<string, string?> BuildBenchmarkJournalMetadata(DateTime runStartedUtc)
     {
-        var providerOptions = _variant.CreateOperationalSettings(_scenario);
+        var isValidation = _cliOptions.Mode == BenchmarkRunMode.Validation;
+        var usePrototypeExecutor = _variant.UsePrototypeExecutor ?? false;
+        var useProductionExecutor = isValidation && !usePrototypeExecutor;
+        var providerOptions = GetRecordedSettings();
         return new Dictionary<string, string?>
         {
             ["recordType"] = "benchmarkRun",
             ["runStatus"] = BenchmarkRunStatus.Completed,
+            ["runMode"] = _cliOptions.Mode.ToString(),
+            ["usePrototypeExecutor"] = usePrototypeExecutor.ToString(),
+            ["useProductionExecutor"] = useProductionExecutor.ToString(),
             ["scenarioName"] = _scenario.Name,
             ["variantName"] = _variant.Name,
             ["sourcePath"] = _sourcePath,
@@ -365,10 +471,15 @@ internal sealed class BenchmarkTask
             ["providerSmallFileProgressThresholdBytes"] = providerOptions.SmallFileProgressThresholdBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["providerWriteMode"] = providerOptions.WriteMode.ToString(),
             ["providerUseArrayPoolForManualLoop"] = providerOptions.UseArrayPoolForManualLoop.ToString(),
-            ["providerPreallocateDestinationFile"] = providerOptions.PreallocateDestinationFile.ToString(),
+            ["providerWriteSequentialScan"] = (_variant.ProviderWriteSequentialScan ?? _scenario.ProviderWriteSequentialScan ?? false).ToString(),
             ["bufferBatchBytes"] = (_variant.BufferBatchBytes ?? _scenario.BufferBatchBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["batchEligibilityThresholdBytes"] = (_variant.BatchEligibilityThresholdBytes ?? _scenario.BatchEligibilityThresholdBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["directWriteThresholdBytes"] = (_variant.DirectWriteThresholdBytes ?? _scenario.DirectWriteThresholdBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["destinationRoutingEnabled"] = (_variant.DestinationRoutingEnabled ?? false).ToString(),
+            ["productionBatchBufferBytes"] = providerOptions.BatchBufferBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["productionBatchEligibilityCeilingBytes"] = providerOptions.BatchEligibilityCeilingBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["productionTinyFileFastPathThresholdBytes"] = providerOptions.TinyFileFastPathThresholdBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["journalEnabled"] = ShouldWriteJournal().ToString(),
             ["scanDuration"] = _state.ScanStopwatch.Elapsed.ToString("c"),
             ["executeDuration"] = _state.ExecuteStopwatch.Elapsed.ToString("c"),
             ["copiedFiles"] = _state.Results.Sum(r => r.NumberOfFilesAffected).ToString(System.Globalization.CultureInfo.InvariantCulture),

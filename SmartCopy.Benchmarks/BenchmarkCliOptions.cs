@@ -9,6 +9,7 @@ internal sealed class BenchmarkCliOptions
     public string? VariantName { get; init; }
     public string? Notes { get; init; }
     public string ConfigPath { get; init; } = DefaultConfigFileName;
+    public string? ComparePath { get; init; }
     public bool FreshStart { get; init; }
     public bool Help { get; init; }
     public int? Runs { get; init; }
@@ -20,6 +21,7 @@ internal sealed class BenchmarkCliOptions
         string? variantName = null;
         string? notes = null;
         var configPath = DefaultConfigFileName;
+        string? comparePath = null;
         int? runs = null;
 
         var freshStart = false;
@@ -58,6 +60,10 @@ internal sealed class BenchmarkCliOptions
             {
                 freshStart = true;
             }
+            else if (string.Equals(args[i], "--compare-with", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            {
+                comparePath = args[++i];
+            }
             else if (string.Equals(args[i], "--help", StringComparison.OrdinalIgnoreCase) || 
                      string.Equals(args[i], "-h", StringComparison.OrdinalIgnoreCase) ||
                      string.Equals(args[i], "-?", StringComparison.OrdinalIgnoreCase))
@@ -73,6 +79,7 @@ internal sealed class BenchmarkCliOptions
             VariantName = variantName,
             Notes = notes,
             ConfigPath = configPath,
+            ComparePath = comparePath,
             FreshStart = freshStart,
             Help = help,
             Runs = runs,
@@ -104,7 +111,18 @@ internal sealed class BenchmarkCliOptions
             return BenchmarkRunMode.SizeScaling;
         }
 
-        throw new InvalidOperationException($"Unknown benchmark mode '{value}'. Expected 'benchmark', 'dataset-prep', 'analysis', or 'size-scaling'.");
+        if (string.Equals(value, "validation", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(value, "validate", StringComparison.OrdinalIgnoreCase))
+        {
+            return BenchmarkRunMode.Validation;
+        }
+
+        if (string.Equals(value, "compare", StringComparison.OrdinalIgnoreCase))
+        {
+            return BenchmarkRunMode.Compare;
+        }
+
+        throw new InvalidOperationException($"Unknown benchmark mode '{value}'. Expected 'benchmark', 'dataset-prep', 'analysis', 'size-scaling', 'validation', or 'compare'.");
     }
 }
 

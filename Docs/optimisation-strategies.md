@@ -45,6 +45,7 @@ An important caveat: Every file write incurs unavoidable filesystem work — MFT
 - **HDD batching is unmeasured.** The cross-drive suite (Phase 5) swept buffer/preallocation on large files; batching only ran on SSD and USB small-file datasets. Gate 2's SSDtoHDD pair (Production Validation Pass) is where it's earned.
 - **USB is too noisy for a static profile.** 1 MiB is the strongest USB signal but a *prior to be overridden by per-device learning*, not a settled finding (Phase 6). The high USB variance does **not** invalidate the SSD/HDD conclusions — it only makes USB defaults provisional.
 - **SameDrive SSD larger-buffer probe** (Phase 5, Step 3) remains open; it does not block promotion.
+- **Non-atomic move fallback bypasses batching.** Cross-volume / non-atomic moves copy each file individually via `TransferFileAsync`, not the batched `CopySelectionAsync`, so they miss the small-file phase-separation win. Deliberately deferred: only worth closing — a deferred-source-delete refactor (delete each source after its batch flushes, reconciled with `WalkAndMoveAsync`'s directory cleanup) — **if the Production Validation Pass promotes the bundle**. Wiring batching into a second code path before batching has earned its place in the copy path would propagate an unvalidated optimisation. The fix inherits correct per-file timing for free (Architecture §2.4.1).
 
 ## 3. Design Principles
 
@@ -139,12 +140,17 @@ Use these when deciding which strategy belongs to which file-size range:
 
 - File count, byte count, `% files`, `% bytes`.
 - Mean, median, and P95 per-file copy duration.
+- **`% Copy Time` per bucket**: each bucket's share of the summed per-file durations (≈ the copy-phase wall clock), exposing where time is actually spent — e.g. whether tiny-file overhead dominates the run while contributing almost no bytes.
 - Aggregate bucket throughput: `sum(bytes) / sum(copy durations)`.
 - Mean, median, and P95 MiB/s from `benchmark-file-results.ndjson`.
 - Delta versus matched controls within the same bucket.
 - Variance or spread across runs for the same bucket/variant.
 
 Bucket comparisons must be within the same file-size bucket. Total wall-clock time is misleading for comparing buckets because buckets intentionally contain different file counts and total bytes. Bucket metrics are the discovery engine for adaptive routing; whole-run wall-clock is the final reality check.
+
+> [!CAUTION]
+> **Batched per-file timing: fixed 2026-06-21 and refined after Gate 1 for new runs; data recorded before those dates carries the older attribution model.** Aggregate bucket throughput divides bucket bytes by the *sum of per-file copy durations*. For **streaming** variants each file's recorded duration ≈ its own transfer time, so the sum ≈ wall-clock and the figure is meaningful. For **batched** variants the write phase is not directly measurable per file (batching reads many files before any write; OS write-back decouples a WriteAsync return from bytes-to-disk — the batch write is the only real unit). The pipeline records each file's destination-check + read time exactly, times the batch write phase as a unit, then adds an **even share of the shared write phase** to each file (Architecture §2.4.1). The per-file `ExistsAsync` ceremony is included too, so batched timing matches the streaming control (whose cadence already includes it) — bucket comparisons are apples-to-apples. Per-file durations sum to the batch's elapsed time, so **run-level and scenario-level aggregate throughput are conserved and cross-strategy comparable**.
+> **Two caveats remain.** (1) *Data recorded before 2026-06-21* used yield-cadence attribution, which dumped the whole batch's read cost on the first file flushed — for that data batched per-bucket throughput is an attribution artefact and only intra-strategy comparisons hold; re-run rather than mine it. (2) Data recorded between the first timing fix and the post-Gate-1 refinement split destination-check + read + write evenly across every file in the batch; it is conserved at run level but over-smooths per-file/bucket attribution. **Gate 2's cross-strategy verdict (Production_Routed batched vs Legacy_Baseline streaming) rests on run-level wall-clock regardless** — the simplest measure that needs no per-file attribution at all.
 
 Matched controls:
 - Direct-write threshold variants compare against `Control_BaselineAuto` in the same bucket.
@@ -576,7 +582,7 @@ The implementation follows from the conclusions above. A batching coordinator (`
 - **Batch eligibility ceiling: 512 KiB** (`OperationalSettings.BatchEligibilityCeilingBytes`, default on) — files above it bypass the batch path and route to ManualLoop. This is conclusion 4: keeping ≥2 files per flush is what makes phase separation happen, rather than a solo-file flush whose "gain" is just a large-buffer effect.
 - **Default buffer size: 1 MiB.** One progress event per buffer flush regardless of file count. Flush frequency is `(tiny-file accumulation rate) × (buffer size)`, not the eligibility ceiling — a 1 MiB buffer flushes 4× more often than 4 MiB, finer wall-time progress at a 1.3% throughput cost (59.41 s vs 58.65 s). 4 MiB is available for max-throughput workloads via `BatchBufferBytes` (flows `PipelineJob.OperationalSettings` → `IStepContext.OperationalSettings` → `CopyStep` — no provider changes).
 - Progress events per batch, not per file.
-- **Intentional depth-first walk with per-directory ascending-size sorting** (`GroupBy(n => n.Parent).SelectMany(g => g.OrderBy(n => n.Size))`) — preserves directory cohesion and optimal buffer packing. Directory coherence (constraining a batch to one directory) improves resume semantics; implemented as a user option (`CoherenceMode: None | PerDirectory`), not a hard requirement.
+- **Intentional depth-first walk with per-directory ascending-size sorting** — each directory's selected files are copied smallest-first, then each child subtree is completed before the next sibling. This preserves directory cohesion and improves resume semantics while keeping useful buffer packing. Directory coherence (constraining a batch to one directory) remains a possible user option (`CoherenceMode: None | PerDirectory`), not a hard requirement.
 
 As of 2026-06-14 this full design — measured by the `BenchmarkCopyRunner` harness — is propagated to production. Because the ceiling is already motivated on SSD by the clean-room run (conclusion 4), it does **not** need re-proving by the multi-week validation matrix; a cheap SmallFileDataset × SSDtoSSD A/B suffices if re-confirmation is ever wanted.
 
@@ -837,7 +843,9 @@ Both need to be tested with same-drive and different-drive source & target pairs
 
 ## 7. Production Validation Pass
 
-The current/next phase — the live work. The production copy path (`PipelineRunner → CopyStep → DefaultCopyStrategyPolicy → BatchedCopyStrategy`) has **never been measured with batching/routing enabled**: under `--mode benchmark` the harness diverts any variant carrying batch/direct-write settings to the `BenchmarkCopyRunner` prototype. The new **`--mode validation`** always drives the production runner, mapping each variant's batch/eligibility/direct-write fields onto `OperationalSettings` — so `Production_Routed` measures production where benchmark mode would measure the prototype. (`Legacy_Baseline` carries no batch settings, so it runs the production streaming path under either mode; `Production_Routed` is the variant that requires validation mode.) This pass validates that production *matches* the prototype (parity) and that the candidate bundle beats the legacy default (value). A PASS is what justifies *promoting* the bundle — flipping `AllowCopyOptimisations` from its off-by-default state; the bundle is unpromoted by design until this pass clears it. The MixedDataset matrix is a multi-week run, so the ladder fails fast: cheap signals before drive-weeks.
+Gate 1 ran 2026-06-21. The first (non-idle) session read PASS, but idle re-runs did not reproduce a clean equivalence verdict and the SmallFileDataset × SSDtoSSD pair does not converge to the 3% window even at 10 runs (see the Gate 1 result below). Gate 1's intent — validating that the production wrapper executes the bundle without gross regression — is carried as **provisionally met**; the live work moves to a **different source/target drive pair** and onward to the Gate 2 MixedDataset × drive matrix, where whether the policy *generalises* (and delivers value) is the actual question. A clean-environment re-run (2026-06-22, Windows Defender excluded) then reframed the baseline — AV scanning dominated prior copy-time measurements — and reopened the production-vs-prototype equivalence question; see **Result (2026-06-22)** below.
+
+The production copy path (`PipelineRunner → CopyStep → DefaultCopyStrategyPolicy → BatchedCopyStrategy`) had **never been measured with batching/routing enabled**: under `--mode benchmark` the harness diverts any variant carrying batch/direct-write settings to the `BenchmarkCopyRunner` prototype. The new **`--mode validation`** always drives the production runner, mapping each variant's batch/eligibility/direct-write fields onto `OperationalSettings` — so `Production_Routed` measures production where benchmark mode would measure the prototype. (`Legacy_Baseline` carries no batch settings, so it runs the production streaming path under either mode; `Production_Routed` is the variant that requires validation mode.) This pass validates that production *matches* the prototype (parity) and that the candidate bundle beats the legacy default (value). A PASS is what justifies *promoting* the bundle — flipping `AllowCopyOptimisations` from its off-by-default state; the bundle is unpromoted by design until this pass clears it. The MixedDataset matrix is a multi-week run, so the ladder fails fast: cheap signals before drive-weeks.
 
 **Metric.** Median `executeDuration` per scenario/variant; variance = the `ConvergenceSpreadPercent` window (`BenchmarkConvergence`); verdicts PASS / INCONCLUSIVE / REGRESSION / INVALID (and `BELOW_THRESHOLD` where the gate clears the noise floor) per §4.2.3.
 
@@ -862,10 +870,10 @@ Batching is validated on SSD (Phase 3) and shown to regress on USB (Phase 6), bu
 - **Configs + data** (authored, not code). `validation-smoke.json` (Gate 1) and `validation-matrix.json` (Gate 2). `Prototype` / `Production_Fixed` carry the candidate-bundle values (table above) as per-scenario overrides — buffer pinned to the pair, batch 1 MiB, ceiling 512 KiB, direct-write 64 KiB; the shipped `AppSettings`/policy defaults, not the discovery champion. Equivalence pairing reuses `MatchedControl` (`Production_Fixed` → `Prototype`).
 - **Reused unchanged:** convergence, analysis/report, journals, dataset-prep, cooldown/cold-cache, the §4.2.3 verdict machinery, the `BenchmarkSizeScalingAnalysis` invariants, and the existing unit suite.
 
-#### Gate 1 — Parity smoke · ~minutes
+#### Gate 1 — Parity smoke · ~45 min
 
 - **Run:** `--mode validation --config validation-smoke.json`. **Once** (not re-run for Gate 2).
-- **Scenario:** `SmallFileDataset` × SSDtoSSD. Already prepared; ~60 s/variant; its `Sub512KiB`/`Sub1MiB`/`Tail` buckets straddle the 512 KiB ceiling, so both the batch and stream-individual paths run. SSDtoSSD because wrapper overhead is most exposed on the fastest pair — pass equivalence there and it holds on slower pairs.
+- **Scenario:** `SmokeDataset` × **D→O** (SSD→SSD). Large-file-weighted (~2.1 GiB, ~23 s/run): ~46% of wall time is ≤512 KiB (batched path), the rest in 512 KiB–32 MiB files so the streamed/routed buffer is actually exercised. **Replaces the original `SmallFileDataset` smoke**, which the new `% Copy Time` metric exposed as ~90% sub-64 KiB wall time — the >512 KiB buffer/routing path was effectively unmeasured. Needs `--mode dataset-prep` before the first run. SSDtoSSD because wrapper overhead is most exposed on the fastest pair; D→O specifically because the D→R pair gave unreproducible verdicts (below).
 - **Variants** — all four, shuffled into one session (so the equivalence delta is a matched control):
 
   | Variant | Runner | Settings |
@@ -875,12 +883,95 @@ Batching is validated on SSD (Phase 3) and shown to regress on USB (Phase 6), bu
   | `Production_Routed` | `PipelineRunner` | candidate bundle via routing (`AllowCopyOptimisations` on) |
   | `Legacy_Baseline` | `PipelineRunner` | 256 KiB streaming, staged (`AllowCopyOptimisations` off) |
 
-- **Convergence:** config defaults — `ConvergenceSpreadPercent`/`GatePercent` 3%, `DesiredRunCount` 5, `MaxConvergenceRuns` 5. SSD clears 3% with margin (clean-room floor: <100 ms on ~60 s ≈ <0.2%).
+- **Convergence:** `ConvergenceSpreadPercent`/`GatePercent` 3%, `DesiredRunCount` 5, `MaxConvergenceRuns` 3; `cooldownSeconds` 90 (short copy, low thermal load). The batched variants carry intrinsic run-to-run spread above 3% on SSD (Run C below), so the pair will not converge to the window — read run-level wall clock and treat `GaveUp` as expected, not failure.
 - **PASS — all of:**
   - **Equivalence** `Production_Fixed` vs `Prototype`: non-regression — production ≤ prototype + variance.
   - **Value** `Production_Routed` vs `Legacy_Baseline`: `PASS` is the target; `BELOW_THRESHOLD` and `INCONCLUSIVE` are tolerated (a real-but-sub-gate or noise-bound delta means production is no worse); only `REGRESSION` fails here.
   - **No INVALID** — neither production copy faulted or self-reported a failure.
 - **On REGRESSION** (production slower than prototype beyond variance): **STOP**, chase wrapper overhead (per-file allocation, progress wiring, `ExistsAsync` pre-check, staging) before any drive-weeks.
+
+**Result (2026-06-21): provisional — the SSDtoSSD verdicts do not reproduce.** SmallFileDataset × SSDtoSSD, ~2m 12s–2m 49s per variant (~134,500 files after pool-clone fill, ~1 ms/file in the flat layout vs the 9 ms/file MixedDataset figure used for the original time estimate). Three sessions have now run, and they do not agree.
+
+*Run A (non-idle, the original session), 5 converged runs/variant:*
+
+| Pair | Role | Verdict | Delta vs Control | Noise Floor |
+|---|---|---|---:|---:|
+| Prototype vs Legacy_Baseline | Value (reference) | PASS | +14.9% (+25.3 s) | 9.1 s |
+| Production_Fixed vs Prototype | Equivalence | INCONCLUSIVE | +0.3% (+441 ms) | 6.6 s |
+| Production_Routed vs Production_Fixed | Equivalence | INCONCLUSIVE | -4.7% (-6.7 s) | 6.8 s |
+
+*Run B (idle machine), run-level wall clock — Prototype 2m12s, Production_Fixed 2m20s, Production_Routed 2m20s, Legacy_Baseline 2m21s:*
+
+| Pair | Role | Verdict | Delta vs Control |
+|---|---|---|---:|
+| Prototype vs Legacy_Baseline | Value (reference) | PASS | +6.2% |
+| Production_Fixed vs Prototype | Equivalence | **REGRESSION** | ≈ -6% (≈ 8 s) |
+| Production_Routed vs Production_Fixed | Equivalence | INCONCLUSIVE | ≈ 0% |
+| Production_Routed vs Legacy_Baseline | production value | INCONCLUSIVE | ≈ 0% |
+
+*Run C (non-idle), 10 runs/variant — did **not** converge:* spreads Prototype 4.05%, Production_Fixed 6.58%, Production_Routed 5.68%, Legacy_Baseline 8.30% — all above the 3% window after twice the desired run count.
+
+**What this establishes — and what it doesn't.**
+- **The equivalence leg (Production_Fixed vs Prototype) is unresolved.** Its central estimate swings from +0.3% (A) to ≈ -6% (B) — an ~8 s session-to-session swing that exceeds either session's internal spread. The verdict is a property of the session, not the code; a single session cannot settle it, and Run C shows the pair will not converge to 3% even at 10 runs.
+- **Production's measured value over legacy does not reproduce on this pair.** Production_Routed beat Legacy_Baseline by ~11% in Run A but was indistinguishable from it in the idle Run B — largely because Legacy_Baseline itself ran ~28 s faster in B (2m49s → 2m21s). The Prototype→Legacy reference leg stays positive in both (+14.9%, +6.2%); the *production* value leg is the one that evaporates.
+- **The bucket-throughput contradiction is a measurement artefact, not a regression.** Production reads <½ of legacy/prototype Sub256KiB MiB/s despite lower per-file medians because aggregate bucket throughput is invalid for batched variants (§4.2.2). It is excluded from the verdict.
+- **Parity is not contradicted by any stable signal.** The policy resolves once per job, not per file, so a structural ~8 s production penalty over 134k files is implausible; the REGRESSION reading is one idle session inside the swing band. Gate 1's parity intent is carried as *provisionally met* rather than proven.
+
+**Decision (updated 2026-06-21).** D→O was run next: equivalence was clean there (Production_Fixed ≈ Prototype, +0.8%, 2.4 s spread), confirming the D→R instability was **pair-specific**. But the `% Copy Time` metric showed this dataset is ~90% sub-64 KiB wall time, so the >512 KiB buffer/routing path — the whole point of the bundle on larger files — went unmeasured. So the smoke moves to a **large-file-weighted `SmokeDataset`** (≤512 KiB ~46% of time; 512 KiB–32 MiB the rest) on **D→O**, re-run fresh with the equal-split per-file attribution and `ExistsAsync`-inclusive batched timing now in place. Gate 1 still validates the *implementation* (parity + no regression); whether the policy *generalises* is the Gate 2 matrix's job, decided on run-level wall-clock (§4.2.2).
+
+**Result (2026-06-22): clean-environment `SmokeDataset`, Defender excluded — Value confirmed, equivalence reopened.** The large-file-weighted `SmokeDataset` was run with Windows Defender real-time exclusions on the source/target `TestData` directories (D, E, O, M, R), 120 s cooldown, and no background load. Physical pair was **D→R** (the scenario keeps the `SmokeDataset-DtoO` label from an edited `destinationPath`; D→O is pending). Five runs/variant in the converged window.
+
+The dominant finding is environmental: **a large fraction of all copy time measured before this run was Windows Defender activity.** With exclusions in place every run finished in <10 s and large-file throughput reached **>1 GiB/s** (Prototype Sub32MiB 1008 MiB/s) — multiples of the throughput recorded in the Defender-active Phase 5 cross-drive and buffer-scaling runs. **The Phase 5 absolute magnitudes — and any buffer/policy conclusion that rests on them — are therefore suspect and need re-validation under Defender exclusion.** The real headroom from the strategies is correspondingly larger than anything measured with AV in the path.
+
+| Variant | Convergence | Median | Pair | Role | Verdict | Δ vs control | Noise floor |
+|---|---|---:|---|---|---|---:|---:|
+| Legacy_Baseline | converged @1.4% | 9.7 s | — | control | — | — | — |
+| Prototype | converged @2.9% | 6.7 s | vs Legacy | Value | **PASS** | +31.1% (+3.0 s) | 168 ms |
+| Production_Fixed | gave up @3.6% | 7.2 s | vs Prototype | Equivalence | **REGRESSION\*** | -6.6% (-445 ms) | 225 ms |
+| Production_Routed | converged @2.2% | 7.2 s | vs Fixed | Equivalence | parity | -0.7% (-48 ms) | 207 ms |
+
+- **Value (Prototype vs Legacy): PASS, +31%** — unambiguous, and the largest value signal recorded for the bundle, consistent with the Defender-removal reframe.
+- **Routing parity (Routed vs Fixed): clean, -0.7% inside the 207 ms floor** — on a same-class SSD pair routing is a no-op by design, so parity is the intended result.
+- **Equivalence (Production_Fixed vs Prototype): unresolved, -6.6% / -445 ms, outside the 225 ms floor.** Production is slower than the bare prototype beyond noise. Production_Fixed is still ~26% faster than Legacy, so this is a production-vs-prototype shortfall, not a regression against baseline.
+- Distribution is **bimodal** — Production_Fixed ran 8 @ 6.9–8.8 s and 2 @ 24.4–25.1 s (the slow pair excluded from the window; likely residual AV/contention even with exclusions), which is why it gave up at 3.6%.
+
+**The ~445 ms is localized but not explained.** Per-bucket copy time (Production_Fixed − Prototype) puts the whole gap in the **staged large-file path (>64 KiB)**; the direct-write small-file buckets are even or production-faster:
+
+| Bucket | Write path | Δ throughput (Fixed vs Proto) |
+|---|---|---|
+| Sub16KiB | direct | Fixed faster |
+| Sub256KiB | direct (mostly) | ≈ even |
+| Sub512KiB | staged | -9% (P95 1.47→3.04 ms) |
+| Sub4MiB | staged | -13% (largest contributor, ~+188 ms/run) |
+| Sub32MiB | staged | -4% |
+
+Both engines stage the identical set: `CreateProductionOperationalSettings` maps `DirectWriteThresholdBytes → TinyFileFastPathThresholdBytes` (64 KiB), so production and prototype both write >64 KiB via temp-file + atomic rename with the same buffers and batch settings. This is not a config mismatch — it is two copy engines (`BenchmarkCopyRunner` vs `PipelineRunner → BatchedCopyStrategy`).
+
+**Ruled out as the cause (verified in code, not inferred):**
+- **Per-file `ExistsAsync` destination stat** — a flat per-file cost would hit the 12 k + 4 k small files hardest, and those buckets are fine. (`SkipExistsCheckForOverwrite`, the flag that suppressed it, has since been deleted end-to-end — it traded correctness for a stat no real copy should skip; `ExistsAsync` now always runs in both engines, removing it as a variable.)
+- **Preallocation / `SetLength`** — gated on `PreallocateDestinationFile`, OFF universally (`StreamCopyEngine.CopyAsync`), so it never fires.
+- **`FlushAsync` (`StreamCopyEngine.CopyAsync`)** — previously flushed the managed buffer to the OS after each file, before stream close and the rename. It was **not** `Flush(flushToDisk: true)` (no `FlushFileBuffers`), so it was functionally the same flush `FileStream.DisposeAsync` already performs on close; the redundant explicit call has been removed from production.
+
+**Open questions:**
+1. **Where does the ~445 ms actually go?** Remaining candidates are production-only work in the large-file path — the per-chunk progress path (`CopyWithManualLoopAsync` / `ProgressReportingReadStream`) vs the prototype's bare `CopyToAsync`, provider/staging ceremony, and per-file `TransformResult` yielding. None is confirmed; isolating the split needs a profiler or toggle-and-remeasure, not more reasoning over the NDJSON.
+2. **Is matching the bare prototype the right bar?** Some production-only work (progress reporting, per-file result records) is legitimately required by the app and absent from the prototype by design. Gate 1's parity intent may need restating as "no *unexplained* overhead" rather than byte-for-byte equivalence with a harness that omits production responsibilities.
+3. **What do the Phase 5 numbers look like with Defender excluded?** Buffer-scaling and cross-drive magnitudes were all measured with AV in the path; re-validation is needed before any absolute throughput figure or buffer choice rests on them.
+4. **Does the equivalence gap reproduce on D→O?** ~~The run above was physically D→R; the D→O re-run is pending.~~ **Answered (2026-06-22b, below): yes** — D→O reproduces the gap (-5.4% / -358 ms) on a converged window. Only open question 1 (where the time goes) remains.
+
+**Action items:** ~~delete `SkipExistsCheckForOverwrite` end-to-end~~ (done 2026-06-22 — removed from `CopyStep`, `ICopyStrategy`/`CopyStrategyBase`/`Streaming`/`Batched`, the benchmark models/executors/runner, and all config JSON; `DestinationResult.Written`, only ever returned by the skip branch, removed with it; 569 tests green); re-run Gate 1 on D→O; schedule a Phase 5 re-validation under Defender exclusion.
+
+**Result (2026-06-22b): D→O re-run — equivalence gap reproduces and stabilizes.** The same large-file-weighted `SmokeDataset` was re-run physically D→O (Defender excluded, 120 s cooldown). This time **Production_Fixed converged** (@2.9%, no bimodal split), removing the "gave up" asterisk and confirming the gap is a stable engine difference, not measurement noise.
+
+| Variant | Convergence | Median | Pair | Role | Verdict | Δ vs control | Noise floor |
+|---|---|---:|---|---|---|---:|---:|
+| Legacy_Baseline | gave up @5.8% | 10.0 s | — | control | — | — | — |
+| Prototype | gave up @4.6% | 6.7 s | vs Legacy | Value | **PASS\*** | +33.4% (+3.4 s) | 445 ms |
+| Production_Fixed | converged @2.9% | 7.0 s | vs Prototype | Equivalence | **REGRESSION** | -5.4% (-358 ms) | 259 ms |
+| Production_Routed | gave up @3.6% | 7.3 s | vs Fixed | Equivalence | **REGRESSION\*** | -3.6% (-256 ms) | 235 ms |
+
+- **Value holds: +33%** — consistent with the D→R run and the Defender reframe.
+- **Equivalence gap confirmed on a second, independent pair: -5.4% / -358 ms**, same sign and similar magnitude as D→R's -445 ms, now on a *converged* window. This answers open question 4: **yes, the gap reproduces off D→R.**
+- **Same bucket localization.** The deficit is again entirely in the staged >64 KiB path, largest in Sub4MiB (Prototype 611.6 vs Fixed 514.1 MiB/s, **-16%**); the direct-write small-file buckets are even-to-production-faster (Sub16KiB Fixed 8.22 vs Proto 7.87). Two runs, two pairs, identical shape — the localization is solid and the cause is the two-engine difference in the staged path (open question 1), not configuration, `ExistsAsync`, preallocation, or `FlushAsync`.
 
 #### Gate 2 — Full matrix, fail-fast ordered · hours → weeks
 

@@ -28,6 +28,7 @@ internal static class BenchmarkHtmlReportGenerator
         IReadOnlyList<string> variants,
         IReadOnlyList<BenchmarkFileCopyRecord> records,
         IReadOnlyList<BenchmarkRunRecord> runs,
+        IReadOnlyList<BenchmarkRunRecord> allRuns,
         IReadOnlyDictionary<string, string> matchedControlLookup)
     {
         buckets = buckets
@@ -68,10 +69,16 @@ internal static class BenchmarkHtmlReportGenerator
         sb.AppendLine("<style>");
         sb.AppendLine("body { font-family: sans-serif; margin: 2rem; background: #121212; color: #eee; }");
         sb.AppendLine(".chart-container { width: 800px; height: 400px; margin-bottom: 3rem; background: #1e1e1e; padding: 1rem; border-radius: 8px; }");
+        sb.AppendLine("table { border-collapse: collapse; margin-bottom: 2rem; min-width: 800px; }");
+        sb.AppendLine("th, td { border: 1px solid #333; padding: 0.5rem 0.7rem; text-align: left; }");
+        sb.AppendLine("th { background: #222; }");
+        sb.AppendLine(".warning { border-left: 4px solid #ff9f40; background: #241b12; padding: 0.75rem 1rem; margin-bottom: 2rem; }");
         sb.AppendLine("</style>");
         sb.AppendLine("</head>");
         sb.AppendLine("<body>");
         sb.AppendLine($"<h1>Benchmark Analysis: {scenarioName}</h1>");
+
+        AppendRunDistributionSection(sb, variants, allRuns);
 
         // --- Overall Run Duration Chart ---
         sb.AppendLine($"<h2>Overall Median Run Duration</h2>");
@@ -438,6 +445,186 @@ internal static class BenchmarkHtmlReportGenerator
 
         await File.WriteAllTextAsync(outputPath, sb.ToString(), Encoding.UTF8);
     }
+
+    private static void AppendRunDistributionSection(
+        StringBuilder sb,
+        IReadOnlyList<string> variants,
+        IReadOnlyList<BenchmarkRunRecord> allRuns)
+    {
+        var successfulRuns = allRuns
+            .Where(BenchmarkHelpers.IsSuccessfulRun)
+            .ToList();
+        if (successfulRuns.Count == 0)
+            return;
+
+        sb.AppendLine("<h2>Run Distribution (All Successful Runs)</h2>");
+        sb.AppendLine("<p>Includes every successful terminal run for each variant, including runs discarded by the converged-window selector.</p>");
+
+        var chartId = $"chart_{Guid.NewGuid():N}";
+        sb.AppendLine("<div class=\"chart-container\">");
+        sb.AppendLine($"<canvas id=\"{chartId}\"></canvas>");
+        sb.AppendLine("</div>");
+
+        var variantLabelsJs = string.Join(", ", variants.Select(JsonString));
+        var datasets = new List<string>();
+        var colorIndex = 0;
+
+        for (var variantIndex = 0; variantIndex < variants.Count; variantIndex++)
+        {
+            var variant = variants[variantIndex];
+            var color = Palette[colorIndex % Palette.Length];
+            var borderColor = color.Replace("0.7", "1.0");
+            colorIndex++;
+
+            var points = successfulRuns
+                .Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(r => r.RunIndex)
+                .Select(r =>
+                {
+                    var jitter = ((r.RunIndex % 7) - 3) * 0.025;
+                    return "{ " +
+                           $"x: {FormatInvariant(variantIndex + jitter)}, " +
+                           $"y: {FormatInvariant(r.ExecuteDuration.TotalSeconds)}, " +
+                           $"runIndex: {r.RunIndex}" +
+                           " }";
+                })
+                .ToList();
+
+            if (points.Count == 0)
+                continue;
+
+            datasets.Add($@"
+                {{
+                    label: {JsonString(variant)},
+                    data: [{string.Join(", ", points)}],
+                    backgroundColor: {color},
+                    borderColor: {borderColor},
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }}");
+        }
+
+        if (datasets.Count > 0)
+        {
+            sb.AppendLine("<script>");
+            sb.AppendLine($@"
+                const variantLabels_{chartId} = [{variantLabelsJs}];
+                new Chart(document.getElementById('{chartId}'), {{
+                    type: 'scatter',
+                    data: {{
+                        datasets: [{string.Join(", ", datasets)}]
+                    }},
+                    options: {{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {{
+                            x: {{
+                                type: 'linear',
+                                min: -0.5,
+                                max: {FormatInvariant(Math.Max(0, variants.Count - 0.5))},
+                                ticks: {{
+                                    color: '#eee',
+                                    stepSize: 1,
+                                    callback: value => variantLabels_{chartId}[Math.round(value)] ?? ''
+                                }},
+                                grid: {{ color: '#333' }}
+                            }},
+                            y: {{
+                                beginAtZero: true,
+                                title: {{ display: true, text: 'Seconds', color: '#eee' }},
+                                ticks: {{ color: '#eee' }},
+                                grid: {{ color: '#333' }}
+                            }}
+                        }},
+                        plugins: {{
+                            legend: {{ display: true, position: 'top', labels: {{ color: '#eee' }} }},
+                            tooltip: {{
+                                callbacks: {{
+                                    label: ctx => `${{ctx.dataset.label}} run ${{ctx.raw.runIndex}}: ${{ctx.raw.y.toFixed(2)}}s`
+                                }}
+                            }}
+                        }}
+                    }}
+                }});
+            ");
+            sb.AppendLine("</script>");
+        }
+
+        sb.AppendLine("<table>");
+        sb.AppendLine("<thead><tr><th>Variant</th><th>Successful/Ran</th><th>All-Run Median</th><th>All-Run Mean</th><th>Global Min</th><th>Global Max</th><th>Global Spread</th><th>Cluster Count</th><th>Clusters</th></tr></thead>");
+        sb.AppendLine("<tbody>");
+
+        var clustered = new List<(string Variant, BenchmarkConvergence.DistributionSummary Summary)>();
+        foreach (var variant in variants)
+        {
+            var variantRuns = allRuns
+                .Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (variantRuns.Count == 0)
+                continue;
+
+            var durations = variantRuns
+                .Where(BenchmarkHelpers.IsSuccessfulRun)
+                .Select(r => r.ExecuteDuration.TotalSeconds)
+                .ToList();
+            var summary = BenchmarkConvergence.BuildDistributionSummary(durations);
+            if (summary.HasSeparatedClusters)
+                clustered.Add((variant, summary));
+
+            var clusters = summary.Clusters.Count == 0
+                ? "-"
+                : string.Join("; ", summary.Clusters.Select(FormatCluster));
+
+            sb.AppendLine(
+                "<tr>" +
+                $"<td>{Html(variant)}</td>" +
+                $"<td>{durations.Count}/{variantRuns.Count}</td>" +
+                $"<td>{Html(FormatDistributionDuration(summary.MedianSeconds))}</td>" +
+                $"<td>{Html(FormatDistributionDuration(summary.MeanSeconds))}</td>" +
+                $"<td>{Html(FormatDistributionDuration(summary.MinSeconds))}</td>" +
+                $"<td>{Html(FormatDistributionDuration(summary.MaxSeconds))}</td>" +
+                $"<td>{Html(FormatDistributionDuration(summary.SpreadSeconds))}</td>" +
+                $"<td>{summary.Clusters.Count}</td>" +
+                $"<td>{Html(clusters)}</td>" +
+                "</tr>");
+        }
+
+        sb.AppendLine("</tbody></table>");
+
+        if (clustered.Count > 0)
+        {
+            sb.AppendLine("<div class=\"warning\"><strong>Clustered run distribution:</strong>");
+            sb.AppendLine("<ul>");
+            foreach (var (variant, summary) in clustered)
+            {
+                var clusters = string.Join("; ", summary.Clusters.Select(FormatCluster));
+                sb.AppendLine($"<li><strong>{Html(variant)}</strong>: {Html(clusters)}</li>");
+            }
+            sb.AppendLine("</ul></div>");
+        }
+    }
+
+    private static string FormatCluster(BenchmarkConvergence.DistributionCluster cluster)
+    {
+        var min = BenchmarkHelpers.FormatDurationHuman(cluster.MinSeconds);
+        var max = BenchmarkHelpers.FormatDurationHuman(cluster.MaxSeconds);
+        var range = Math.Abs(cluster.MaxSeconds - cluster.MinSeconds) < 0.0005
+            ? min
+            : $"{min}-{max}";
+        return $"{cluster.Count} @ {range}";
+    }
+
+    private static string FormatDistributionDuration(double seconds) =>
+        double.IsNaN(seconds) ? "-" : BenchmarkHelpers.FormatDurationHuman(seconds);
+
+    private static string JsonString(string value) =>
+        System.Text.Json.JsonSerializer.Serialize(value);
+
+    private static string Html(string value) =>
+        System.Net.WebUtility.HtmlEncode(value);
+
+    private static string FormatInvariant(double value) =>
+        value.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     public static async Task GenerateSummaryAsync(
         string outputPath,

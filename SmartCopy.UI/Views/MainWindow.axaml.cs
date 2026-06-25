@@ -43,6 +43,7 @@ public partial class MainWindow : Window
 
     // Options menu — Display
     private MenuItem? _autoOpenLogMenuItem;
+    private MenuItem? _writeOperationJournalMenuItem;
     private MenuItem? _showExcludedNodesMenuItem;
     private MenuItem? _verboseLoggingMenuItem;
 
@@ -268,6 +269,12 @@ public partial class MainWindow : Window
             () => { if (_mainVm is not null) _mainVm.AutoOpenLogOnRun = !_mainVm.AutoOpenLogOnRun; });
         OptionsMenu.Items.Add(_autoOpenLogMenuItem);
 
+        _writeOperationJournalMenuItem = Toggle(
+            "Write Operation _Journal",
+            _mainVm?.WriteOperationJournal ?? false,
+            () => { if (_mainVm is not null) _mainVm.WriteOperationJournal = !_mainVm.WriteOperationJournal; });
+        OptionsMenu.Items.Add(_writeOperationJournalMenuItem);
+
         _verboseLoggingMenuItem = Toggle(
             "_Verbose Logging (for bug reports)",
             _mainVm?.VerboseLogging ?? false,
@@ -484,6 +491,11 @@ public partial class MainWindow : Window
             case nameof(MainViewModel.AutoOpenLogOnRun):
                 if (_autoOpenLogMenuItem is not null)
                     _autoOpenLogMenuItem.IsChecked = _mainVm?.AutoOpenLogOnRun ?? true;
+                break;
+
+            case nameof(MainViewModel.WriteOperationJournal):
+                if (_writeOperationJournalMenuItem is not null)
+                    _writeOperationJournalMenuItem.IsChecked = _mainVm?.WriteOperationJournal ?? false;
                 break;
 
             case nameof(MainViewModel.VerboseLogging):

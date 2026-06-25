@@ -10,8 +10,7 @@ namespace SmartCopy.Core.Pipeline.Strategy;
 /// <see cref="OperationalSettings.DestinationRoutingEnabled"/> is set, also selects the copy
 /// buffer size from the source→destination drive pair per the benchmark-validated routing table
 /// (1 MiB for SSD/USB destinations, 512 KiB where an HDD caps the pair or the media is unknown).
-/// Preallocation is OFF universally — no drive pair showed a reliable positive effect, and it
-/// throws on non-seekable targets. This is the seam future per-device learned profiles replace.
+/// This is the seam future per-device learned profiles replace.
 /// </summary>
 public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
 {
@@ -27,10 +26,7 @@ public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
 
     public ICopyStrategy Resolve(CopyStrategyInputs inputs)
     {
-        // Preallocation is OFF universally (no validated win, and it throws on non-seekable targets),
-        // so clamp it regardless of routing — not only on the routed path.
-        var resolved = inputs.Base.WithProviderConstraints(inputs.SourceCaps, inputs.TargetCaps)
-            with { PreallocateDestinationFile = false };
+        var resolved = inputs.Base.WithProviderConstraints(inputs.SourceCaps, inputs.TargetCaps);
 
         if (resolved.DestinationRoutingEnabled)
         {

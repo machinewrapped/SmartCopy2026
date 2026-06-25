@@ -1,0 +1,152 @@
+{
+  "sourcePath": "D:\\TestData\\SmokeDataset",
+  "artifactPath": "C:\\benchmark-artifacts",
+  "includeHidden": false,
+  "convergenceSpreadPercent": 3,
+  "gatePercent": 3,
+  "maxConvergenceRuns": 7,
+  "converge": true,
+  "scenarios": [
+    {
+      "name": "SmokeDataset-DtoO",
+      "destinationPath": "O:\\TestData\\SmokeDataset_ValidationSmoke",
+      "sourcePath": "D:\\TestData\\SmokeDataset",
+      "enabled": true,
+      "clearDestinationBeforeRun": true,
+      "clearDestinationAfterRun": true,
+      "overwriteMode": 1,
+      "providerCopyBufferSizeBytes": null,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": null,
+      "bufferBatchBytes": null,
+      "batchEligibilityThresholdBytes": null,
+      "usePathPool": true,
+      "variants": null
+    }
+  ],
+  "scenarioExecutionOrder": [
+    "SmokeDataset-DtoO"
+  ],
+  "variants": [
+    {
+      "name": "Prototype",
+      "notes": "Prototype reference (BenchmarkCopyRunner) with promoted defaults: 64 KiB direct write, 1 MiB batch, 512 KiB eligibility ceiling. Normal write options (no SequentialScan).",
+      "enabled": true,
+      "desiredRunCount": 5,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": 1048576,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": 65536,
+      "bufferBatchBytes": 1048576,
+      "batchEligibilityThresholdBytes": 524288,
+      "destinationRoutingEnabled": false,
+      "providerWriteSequentialScan": false,
+      "usePrototypeExecutor": true,
+      "matchedControl": null,
+      "validationRole": null
+    },
+    {
+      "name": "Prototype_Seq",
+      "notes": "Prototype with SequentialScan enabled on write stream. Tests if adding SequentialScan matches the Production_Fixed performance drop.",
+      "enabled": true,
+      "desiredRunCount": 5,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": 1048576,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": 65536,
+      "bufferBatchBytes": 1048576,
+      "batchEligibilityThresholdBytes": 524288,
+      "destinationRoutingEnabled": false,
+      "providerWriteSequentialScan": true,
+      "usePrototypeExecutor": true,
+      "matchedControl": "Prototype",
+      "validationRole": "Equivalence"
+    }
+  ],
+  "datasetPreparation": {
+    "sourcePath": "D:\\Games",
+    "destinationPath": "D:\\TestData\\SmokeDataset",
+    "organizeByBucket": true,
+    "poolCloneCount": 32,
+    "buckets": [
+      {
+        "name": "Sub16KiB",
+        "minimumFileSizeBytes": 16,
+        "maximumFileSizeBytes": 16384,
+        "targetTotalBytes": 12582912
+      },
+      {
+        "name": "Sub256KiB",
+        "minimumFileSizeBytes": 16385,
+        "maximumFileSizeBytes": 262144,
+        "targetTotalBytes": 62914560
+      },
+      {
+        "name": "Sub512KiB",
+        "minimumFileSizeBytes": 262145,
+        "maximumFileSizeBytes": 524288,
+        "targetTotalBytes": 251658240
+      },
+      {
+        "name": "Sub4MiB",
+        "minimumFileSizeBytes": 524289,
+        "maximumFileSizeBytes": 4194304,
+        "targetTotalBytes": 786432000
+      },
+      {
+        "name": "Sub32MiB",
+        "minimumFileSizeBytes": 4194305,
+        "maximumFileSizeBytes": 33554432,
+        "targetTotalBytes": 2359296000
+      }
+    ]
+  },
+  "cooldownSeconds": 60,
+  "clearCacheBetweenRuns": false,
+  "ramMapPath": "D:\\Development\\Github\\SmartCopy2026\\Tools\\RAMMap\\RAMMap64.exe",
+  "sourcePools": {
+    "D:\\TestData\\SmokeDataset": [
+      "D:\\TestData\\SmokeDataset_1",
+      "D:\\TestData\\SmokeDataset_2",
+      "D:\\TestData\\SmokeDataset_3",
+      "D:\\TestData\\SmokeDataset_4",
+      "D:\\TestData\\SmokeDataset_5",
+      "D:\\TestData\\SmokeDataset_6",
+      "D:\\TestData\\SmokeDataset_7",
+      "D:\\TestData\\SmokeDataset_8",
+      "D:\\TestData\\SmokeDataset_9",
+      "D:\\TestData\\SmokeDataset_10",
+      "D:\\TestData\\SmokeDataset_11",
+      "D:\\TestData\\SmokeDataset_12",
+      "D:\\TestData\\SmokeDataset_13",
+      "D:\\TestData\\SmokeDataset_14",
+      "D:\\TestData\\SmokeDataset_15",
+      "D:\\TestData\\SmokeDataset_16",
+      "D:\\TestData\\SmokeDataset_17",
+      "D:\\TestData\\SmokeDataset_18",
+      "D:\\TestData\\SmokeDataset_19",
+      "D:\\TestData\\SmokeDataset_20",
+      "D:\\TestData\\SmokeDataset_21",
+      "D:\\TestData\\SmokeDataset_22",
+      "D:\\TestData\\SmokeDataset_23",
+      "D:\\TestData\\SmokeDataset_24",
+      "D:\\TestData\\SmokeDataset_25",
+      "D:\\TestData\\SmokeDataset_26",
+      "D:\\TestData\\SmokeDataset_27",
+      "D:\\TestData\\SmokeDataset_28",
+      "D:\\TestData\\SmokeDataset_29",
+      "D:\\TestData\\SmokeDataset_30",
+      "D:\\TestData\\SmokeDataset_31",
+      "D:\\TestData\\SmokeDataset_32"
+    ]
+  }
+}

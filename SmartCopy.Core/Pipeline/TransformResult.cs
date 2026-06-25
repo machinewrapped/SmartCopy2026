@@ -4,7 +4,7 @@ namespace SmartCopy.Core.Pipeline;
 
 public enum SourceResult { None, Skipped, Copied, Moved, Trashed, Deleted }
 
-public enum DestinationResult { None, Created, Overwritten, Written }
+public enum DestinationResult { None, Created, Overwritten }
 
 public readonly record struct TransformResult(
     bool IsSuccess,

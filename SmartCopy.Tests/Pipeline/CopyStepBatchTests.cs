@@ -173,6 +173,32 @@ public sealed class CopyStepBatchTests
         Assert.False(await provider.ExistsAsync("/dest/music/drop.txt", CancellationToken.None));
     }
 
+    [Fact]
+    public async Task BatchCopy_AttributesExecutionDurationPerFile()
+    {
+        // The strategy supplies producer-attributed timings for every batched file:
+        // destination check + read time plus the entry's measured flush write time.
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithFile("/src/a.bin", new byte[1024])
+            .WithFile("/src/b.bin", new byte[4096])
+            .WithFile("/src/c.bin", new byte[16384])
+            .WithDirectory("/dest"));
+
+        var root = await provider.BuildDirectoryTree("/src");
+        SelectAllFiles(root);
+
+        var results = await RunCopyAsync(root, provider, batchBufferBytes: 512 * 1024);
+
+        var durations = results
+            .Where(r => r.SourceNodeResult == SourceResult.Copied && r.IsSuccess)
+            .Select(r => r.ExecutionDuration)
+            .ToList();
+
+        Assert.Equal(3, durations.Count);
+        Assert.All(durations, d => Assert.NotNull(d));
+        Assert.All(durations, d => Assert.True(d > TimeSpan.Zero));
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static void SelectAllFiles(DirectoryNode dir)
@@ -209,7 +235,7 @@ public sealed class CopyStepBatchTests
 
     private static async Task<byte[]> ReadAllBytesAsync(MemoryFileSystemProvider provider, string path)
     {
-        await using var stream = await provider.OpenReadAsync(path, CancellationToken.None);
+        await using var stream = await provider.OpenReadAsync(path, ct: CancellationToken.None);
         using var ms = new MemoryStream();
         await stream.CopyToAsync(ms);
         return ms.ToArray();

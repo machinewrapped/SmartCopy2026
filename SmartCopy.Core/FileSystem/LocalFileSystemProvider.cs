@@ -119,7 +119,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         }, ct);
     }
 
-    public Task<Stream> OpenReadAsync(string path, CancellationToken ct)
+    public Task<Stream> OpenReadAsync(string path, int? bufferSize = null, CancellationToken ct = default)
     {
         return Task.Run<Stream>(() =>
         {
@@ -133,7 +133,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                     Mode = FileMode.Open,
                     Access = FileAccess.Read,
                     Share = FileShare.Read,
-                    BufferSize = DefaultBufferSize,
+                    BufferSize = bufferSize ?? DefaultBufferSize,
                     Options = FileOptions.Asynchronous | FileOptions.SequentialScan
                 });
         }, ct);
@@ -178,7 +178,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                         Access = FileAccess.Write,
                         Share = FileShare.None,
                         BufferSize = opts.CopyBufferSizeBytes,
-                        Options = FileOptions.Asynchronous | FileOptions.SequentialScan
+                        Options = FileOptions.Asynchronous
                     }))
                 {
                     fileOpened = true;
@@ -280,7 +280,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                         Access = FileAccess.Write,
                         Share = FileShare.None,
                         BufferSize = bufferSizeBytes,
-                        Options = FileOptions.Asynchronous | FileOptions.SequentialScan
+                        Options = FileOptions.Asynchronous
                     });
 
                 stagedPath = candidate;
