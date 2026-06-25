@@ -69,7 +69,8 @@ internal sealed class BenchmarkTask
             await ResolveAndValidateRunSettingsAsync();
             await ScanAsync();
             await RunCopyAsync();
-            await WriteJournalAsync(runStartedUtc);
+            if (ShouldWriteJournal())
+                await WriteJournalAsync(runStartedUtc);
             await WriteSuccessRecordAsync(runStartedUtc);
 
             Console.WriteLine();
@@ -366,6 +367,8 @@ internal sealed class BenchmarkTask
             _ct);
     }
 
+    private bool ShouldWriteJournal() => _variant.WriteJournal;
+
     private async Task WriteSuccessRecordAsync(DateTime runStartedUtc)
     {
         var record = BenchmarkRunRecord.CreateSuccess(
@@ -387,7 +390,9 @@ internal sealed class BenchmarkTask
         
         Console.WriteLine($"Results: {_paths.ResultsPath}");
         Console.WriteLine($"File results: {_paths.FileResultsPath}");
-        Console.WriteLine($"Journal: {_state.JournalPath}");
+        Console.WriteLine(ShouldWriteJournal()
+            ? $"Journal: {_state.JournalPath}"
+            : "Journal: disabled");
 
         var convergenceStatus = BenchmarkConvergence.Check(_historicalRuns, _scenario.Name, _variant, _config);
         var spread = BenchmarkConvergence.GetCurrentSpreadPercent(_historicalRuns, _scenario.Name, _variant, _config);
@@ -474,6 +479,7 @@ internal sealed class BenchmarkTask
             ["productionBatchBufferBytes"] = providerOptions.BatchBufferBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["productionBatchEligibilityCeilingBytes"] = providerOptions.BatchEligibilityCeilingBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["productionTinyFileFastPathThresholdBytes"] = providerOptions.TinyFileFastPathThresholdBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["journalEnabled"] = ShouldWriteJournal().ToString(),
             ["scanDuration"] = _state.ScanStopwatch.Elapsed.ToString("c"),
             ["executeDuration"] = _state.ExecuteStopwatch.Elapsed.ToString("c"),
             ["copiedFiles"] = _state.Results.Sum(r => r.NumberOfFilesAffected).ToString(System.Globalization.CultureInfo.InvariantCulture),

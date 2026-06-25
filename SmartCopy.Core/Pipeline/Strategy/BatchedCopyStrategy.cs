@@ -80,9 +80,14 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
                 try
                 {
                     await using var src = await context.SourceProvider.OpenReadAsync(node.FullPath, Settings.CopyBufferSizeBytes, ct);
-                    await buffer.AccumulateAsync(src, fileSize, destination, destResult.Value, node, ct);
-                    // Bank destination-check + read as this file's pre-write cost; split evenly at flush.
-                    buffer.AddPreWriteElapsed(ceremonyElapsed + Stopwatch.GetElapsedTime(readStart));
+                    await buffer.AccumulateAsync(
+                        src,
+                        fileSize,
+                        destination,
+                        destResult.Value,
+                        node,
+                        ceremonyElapsed + Stopwatch.GetElapsedTime(readStart),
+                        ct);
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
@@ -142,17 +147,9 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
     }
 
     /// <summary>
-    /// The write phase: drains every accumulated entry to the target, then attributes a per-file
-    /// <see cref="TransformResult.ExecutionDuration"/> by splitting the batch's total time (read phase +
-    /// write phase) <b>evenly across its files</b>. In the batch-eligible (small-file) regime per-file
-    /// copy time is dominated by filesystem overhead, not byte count — a 1-byte and a 100-byte file cost
-    /// essentially the same — so an even split is the honest model; apportioning by bytes would falsely
-    /// report the larger file as 100× slower. (Per-file time is in any case unmeasurable once batching
-    /// has amortised overhead and OS write-back has decoupled a WriteAsync return from bytes-to-disk; the
-    /// batch is the only real unit.) Even time per file means per-file <i>throughput</i> rises with size,
-    /// which is the genuine overhead-dominated signal. Per-file durations sum to the batch's elapsed
-    /// time, so downstream aggregates and runtime throughput stay conserved. Write failures are per-file
-    /// and do not abort the batch.
+    /// The write phase: drains every accumulated entry to the target, then attributes per-file
+    /// <see cref="TransformResult.ExecutionDuration"/> as exact destination-check + read time plus
+    /// that entry's measured flush write time. Write failures are per-file and do not abort the batch.
     /// </summary>
     private async IAsyncEnumerable<TransformResult> FlushBatchAsync(
         BatchCopyBuffer buffer,
@@ -164,17 +161,14 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
         if (!buffer.HasEntries)
             yield break;
 
-        // Write the whole batch first, timing the flush as a unit. Per-file write times are not
-        // trusted individually (write-back makes them meaningless), so outcomes are collected and the
-        // elapsed time is distributed afterwards.
-        var flushStart = Stopwatch.GetTimestamp();
-        var outcomes = new List<(BatchCopyBuffer.Entry Entry, string? Error)>(buffer.Entries.Count);
+        var outcomes = new List<(BatchCopyBuffer.Entry Entry, TimeSpan WriteElapsed, string? Error)>(buffer.Entries.Count);
         foreach (var entry in buffer.Entries)
         {
             IProgress<long>? progress = null;
             if (entry.Length > 0 && context is IFileTransferProgressSink sink)
                 progress = new DelegateProgress<long>(b => sink.ReportFileTransferBytes(entry.Node, b, entry.Length));
 
+            var writeStart = Stopwatch.GetTimestamp();
             string? error = null;
             try
             {
@@ -187,14 +181,12 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
                 error = ex.Message;
             }
 
-            outcomes.Add((entry, error));
+            outcomes.Add((entry, Stopwatch.GetElapsedTime(writeStart), error));
         }
 
-        var batchElapsed = buffer.PreWriteElapsed + Stopwatch.GetElapsedTime(flushStart);
-
-        foreach (var (entry, error) in outcomes)
+        foreach (var (entry, writeElapsed, error) in outcomes)
         {
-            var duration = AttributeBatchTime(batchElapsed, outcomes.Count);
+            var duration = entry.PreWriteElapsed + writeElapsed;
             yield return error is null
                 ? new TransformResult(IsSuccess: true, SourceNode: entry.Node,
                     SourceNodeResult: successResult, DestinationPath: entry.Destination,
@@ -206,11 +198,4 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
 
         buffer.Reset();
     }
-
-    /// <summary>
-    /// One file's share of the batch's elapsed time: an even split, since small-file copy time is
-    /// overhead-dominated rather than byte-proportional. The shares sum to <paramref name="batchElapsed"/>.
-    /// </summary>
-    private static TimeSpan AttributeBatchTime(TimeSpan batchElapsed, int fileCount)
-        => fileCount > 0 ? batchElapsed / fileCount : batchElapsed;
 }

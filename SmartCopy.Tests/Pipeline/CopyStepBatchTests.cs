@@ -174,12 +174,10 @@ public sealed class CopyStepBatchTests
     }
 
     [Fact]
-    public async Task BatchCopy_AttributesExecutionDurationEquallyPerFile()
+    public async Task BatchCopy_AttributesExecutionDurationPerFile()
     {
-        // The batch's read + flush time is split evenly across its files, so files of *different* sizes
-        // in one flush still get equal ExecutionDuration — small-file copy time is overhead-dominated,
-        // not byte-proportional. This pins the even split (a bytes-proportional split would give 1:4:16)
-        // and guards against the old attribution that dumped the batch's read cost on the first file.
+        // The strategy supplies producer-attributed timings for every batched file:
+        // destination check + read time plus the entry's measured flush write time.
         var provider = MemoryFileSystemFixtures.Create(f => f
             .WithFile("/src/a.bin", new byte[1024])
             .WithFile("/src/b.bin", new byte[4096])
@@ -198,9 +196,7 @@ public sealed class CopyStepBatchTests
 
         Assert.Equal(3, durations.Count);
         Assert.All(durations, d => Assert.NotNull(d));
-        // Different sizes, one flush → identical share (each is batchElapsed / 3).
-        Assert.Equal(durations[0], durations[1]);
-        Assert.Equal(durations[1], durations[2]);
+        Assert.All(durations, d => Assert.True(d > TimeSpan.Zero));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

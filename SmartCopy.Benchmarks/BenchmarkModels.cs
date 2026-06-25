@@ -53,6 +53,7 @@ internal sealed class BenchmarkRunRecord
     public long? ProductionBatchBufferBytes { get; init; }
     public long? ProductionBatchEligibilityCeilingBytes { get; init; }
     public long? ProductionTinyFileFastPathThresholdBytes { get; init; }
+    public bool? JournalEnabled { get; init; }
     public required TimeSpan ScanDuration { get; init; }
     public required TimeSpan ExecuteDuration { get; init; }
     public required int CopiedFiles { get; init; }
@@ -103,6 +104,7 @@ internal sealed class BenchmarkRunRecord
             ProductionBatchBufferBytes = providerOptions.BatchBufferBytes,
             ProductionBatchEligibilityCeilingBytes = providerOptions.BatchEligibilityCeilingBytes,
             ProductionTinyFileFastPathThresholdBytes = providerOptions.TinyFileFastPathThresholdBytes,
+            JournalEnabled = variant.WriteJournal,
             ScanDuration = TimeSpan.Zero,
             ExecuteDuration = TimeSpan.Zero,
             CopiedFiles = 0,
@@ -182,6 +184,7 @@ internal sealed class BenchmarkRunRecord
             ProductionBatchBufferBytes = providerOptions.BatchBufferBytes,
             ProductionBatchEligibilityCeilingBytes = providerOptions.BatchEligibilityCeilingBytes,
             ProductionTinyFileFastPathThresholdBytes = providerOptions.TinyFileFastPathThresholdBytes,
+            JournalEnabled = variant.WriteJournal,
             ScanDuration = state.ScanStopwatch.Elapsed,
             ExecuteDuration = state.ExecuteStopwatch.Elapsed,
             CopiedFiles = state.Results.Sum(r => r.NumberOfFilesAffected),

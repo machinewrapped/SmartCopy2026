@@ -23,14 +23,16 @@ public sealed class BatchCopyBufferTests
         var bytes = new byte[] { 1, 2, 3, 4, 5 };
         var node = MakeNode("file.txt", bytes.Length);
 
+        var preWrite = TimeSpan.FromMilliseconds(7);
         await buf.AccumulateAsync(new MemoryStream(bytes), bytes.Length, "/dest/file.txt",
-            DestinationResult.Created, node, CancellationToken.None);
+            DestinationResult.Created, node, preWrite, CancellationToken.None);
 
         Assert.Single(buf.Entries);
         Assert.Equal(5, buf.Entries[0].Length);
         Assert.Equal(0, buf.Entries[0].Offset);
         Assert.Equal("/dest/file.txt", buf.Entries[0].Destination);
         Assert.Equal(DestinationResult.Created, buf.Entries[0].DestResult);
+        Assert.Equal(preWrite, buf.Entries[0].PreWriteElapsed);
         Assert.Same(node, buf.Entries[0].Node);
 
         // Verify data round-trip
@@ -46,9 +48,9 @@ public sealed class BatchCopyBufferTests
         var b = new byte[] { 30, 40, 50 };
 
         await buf.AccumulateAsync(new MemoryStream(a), a.Length, "/d/a", DestinationResult.Created,
-            MakeNode("a", a.Length), CancellationToken.None);
+            MakeNode("a", a.Length), TimeSpan.FromMilliseconds(1), CancellationToken.None);
         await buf.AccumulateAsync(new MemoryStream(b), b.Length, "/d/b", DestinationResult.Created,
-            MakeNode("b", b.Length), CancellationToken.None);
+            MakeNode("b", b.Length), TimeSpan.FromMilliseconds(2), CancellationToken.None);
 
         Assert.Equal(2, buf.Entries.Count);
         Assert.Equal(0, buf.Entries[0].Offset);
@@ -65,7 +67,7 @@ public sealed class BatchCopyBufferTests
     {
         using var buf = new BatchCopyBuffer(64);
         await buf.AccumulateAsync(new MemoryStream([1, 2, 3]), 3, "/d/x", DestinationResult.Created,
-            MakeNode("x", 3), CancellationToken.None);
+            MakeNode("x", 3), TimeSpan.FromMilliseconds(1), CancellationToken.None);
 
         Assert.True(buf.HasEntries);
 
@@ -84,9 +86,9 @@ public sealed class BatchCopyBufferTests
         var data2 = new byte[] { 0xCC, 0xDD, 0xEE };
 
         await buf.AccumulateAsync(new MemoryStream(data1), data1.Length, "/a", DestinationResult.Created,
-            MakeNode("a", data1.Length), CancellationToken.None);
+            MakeNode("a", data1.Length), TimeSpan.FromMilliseconds(1), CancellationToken.None);
         await buf.AccumulateAsync(new MemoryStream(data2), data2.Length, "/b", DestinationResult.Created,
-            MakeNode("b", data2.Length), CancellationToken.None);
+            MakeNode("b", data2.Length), TimeSpan.FromMilliseconds(2), CancellationToken.None);
 
         using var s1 = buf.OpenSegmentStream(buf.Entries[0]);
         using var s2 = buf.OpenSegmentStream(buf.Entries[1]);

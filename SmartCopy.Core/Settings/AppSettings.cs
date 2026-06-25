@@ -78,9 +78,12 @@ public sealed class AppSettings
 
     public bool UseAbsolutePathsForSelectionSave { get; set; }
     public bool AutoOpenLogOnRun { get; set; } = true;
+    public bool WriteOperationJournal { get; set; } = false;
 
-    /// <summary>Show full diagnostic output (exception stack traces, etc.) in the log panel.
+    /// <summary>
+    /// Show full diagnostic output (exception stack traces, etc.) in the log panel.
     /// Useful for capturing details when reporting bugs.
+    /// </summary>
     public bool VerboseLogging { get; set; } = false;
 
     /// <summary>

@@ -9,6 +9,7 @@ internal sealed class BenchmarkVariant
     public string? Notes { get; set; }
     public bool Enabled { get; set; } = true;
     public int DesiredRunCount { get; set; } = 3;
+    public bool WriteJournal { get; set; } = true;
     public OverwriteMode? OverwriteMode { get; set; }
     public int? ProviderCopyBufferSizeBytes { get; set; }
     public long? ProviderSmallFileProgressThresholdBytes { get; set; }

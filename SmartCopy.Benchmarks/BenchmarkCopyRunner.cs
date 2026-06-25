@@ -50,11 +50,10 @@ internal static class BenchmarkCopyRunner
                 SourceNodeResult: SourceResult.None));
         }
 
-        // 2. Group and sort file nodes to maximize buffer usage while preserving directory cohesion
-        var sortedFileNodes = job.RootNode.GetSelectedDescendants()
+        // 2. Match the production batch traversal: each directory's files smallest-first,
+        // then each child subtree depth-first, preserving directory-cohesive interruption semantics.
+        var sortedFileNodes = EnumerateForBatching(job.RootNode)
             .Where(n => !n.IsDirectory)
-            .GroupBy(n => n.Parent)
-            .SelectMany(g => g.OrderBy(n => n.Size))
             .ToList();
 
         var currentBatch = new List<BatchedFile>();
@@ -485,5 +484,25 @@ internal static class BenchmarkCopyRunner
             return TimeSpan.MaxValue;
 
         return TimeSpan.FromSeconds(remainingSeconds);
+    }
+
+    private static IEnumerable<DirectoryTreeNode> EnumerateForBatching(DirectoryNode dir)
+    {
+        foreach (var file in dir.Files.Where(f => f.IsSelected).OrderBy(f => f.Size))
+            yield return file;
+
+        foreach (var child in dir.Children)
+        {
+            if (child.CheckState == CheckState.Unchecked ||
+                child.FilterResult == FilterResult.Excluded ||
+                child.IsMarkedForRemoval)
+                continue;
+
+            if (child.IsSelected)
+                yield return child;
+
+            foreach (var node in EnumerateForBatching(child))
+                yield return node;
+        }
     }
 }

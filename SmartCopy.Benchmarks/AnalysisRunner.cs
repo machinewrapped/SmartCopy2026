@@ -205,7 +205,7 @@ internal static class AnalysisRunner
             if (scenariosToAnalyze.Count > 1)
                 htmlPath = Path.Combine(Path.GetDirectoryName(htmlPath) ?? "", $"{Path.GetFileNameWithoutExtension(htmlPath)}-{scenarioName}.html");
 
-            await BenchmarkHtmlReportGenerator.GenerateAsync(htmlPath, scenarioName, buckets, variants, convergedRecords, convergedRuns, matchedControlLookup);
+            await BenchmarkHtmlReportGenerator.GenerateAsync(htmlPath, scenarioName, buckets, variants, convergedRecords, convergedRuns, runs, matchedControlLookup);
         }
 
         if (scenariosToAnalyze.Count > 1)
@@ -305,32 +305,71 @@ internal static class AnalysisRunner
             report(null);
         }
 
-        var multimodal = new List<(string Variant, BenchmarkConvergence.DistributionPartition Partition)>();
+        report("### Run Distribution (All Successful Runs)");
+        report(null);
+        report("_This table uses every successful terminal run for the variant, including runs discarded by the converged-window selector above._");
+        report(null);
+        report("| Variant | Successful/Ran | All-Run Median | All-Run Mean | Global Min | Global Max | Global Spread | Cluster Count | Clusters |");
+        report("|---|---:|---:|---:|---:|---:|---:|---:|---|");
+
+        var clustered = new List<(string Variant, BenchmarkConvergence.DistributionSummary Summary)>();
         foreach (var variant in variants)
         {
-            var durations = terminalRuns
+            var variantTerminal = terminalRuns
                 .Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (variantTerminal.Count == 0)
+                continue;
+
+            var durations = variantTerminal
                 .Where(BenchmarkHelpers.IsSuccessfulRun)
                 .Select(r => r.ExecuteDuration.TotalSeconds)
                 .ToList();
 
-            var partition = BenchmarkConvergence.DetectMultimodal(durations);
-            if (partition is not null)
-                multimodal.Add((variant, partition));
+            var summary = BenchmarkConvergence.BuildDistributionSummary(durations);
+            if (summary.HasSeparatedClusters)
+                clustered.Add((variant, summary));
+
+            var successful = durations.Count;
+            var runCount = variantTerminal.Count;
+            var clustersText = summary.Clusters.Count == 0
+                ? "-"
+                : string.Join("; ", summary.Clusters.Select(FormatCluster));
+
+            report(
+                $"| {BenchmarkHelpers.EscapeTable(variant)} | {successful}/{runCount} | " +
+                $"{FormatDistributionDuration(summary.MedianSeconds)} | " +
+                $"{FormatDistributionDuration(summary.MeanSeconds)} | " +
+                $"{FormatDistributionDuration(summary.MinSeconds)} | " +
+                $"{FormatDistributionDuration(summary.MaxSeconds)} | " +
+                $"{FormatDistributionDuration(summary.SpreadSeconds)} | " +
+                $"{summary.Clusters.Count} | {BenchmarkHelpers.EscapeTable(clustersText)} |");
         }
 
-        if (multimodal.Count > 0)
+        report(null);
+        if (clustered.Count > 0)
         {
-            report("> ⚠ **Multimodal run distribution** — these variants' runs split into separated clusters, so convergence may be selecting a single mode (e.g. cache-warm vs cold). A verdict drawn from one cluster is not trustworthy until the split is explained:");
-            foreach (var (variant, p) in multimodal)
+            report("> ⚠ **Clustered run distribution** — these variants' successful runs split into separated clusters, so convergence may be selecting one mode (e.g. cache-warm vs cold). A verdict drawn from one cluster is not trustworthy until the split is explained:");
+            foreach (var (variant, summary) in clustered)
             {
                 report(
                     $">   - `{BenchmarkHelpers.EscapeTable(variant)}`: " +
-                    $"{p.LowCount} @ {BenchmarkHelpers.FormatDurationHuman(p.LowMinSeconds)}–{BenchmarkHelpers.FormatDurationHuman(p.LowMaxSeconds)} | " +
-                    $"{p.HighCount} @ {BenchmarkHelpers.FormatDurationHuman(p.HighMinSeconds)}–{BenchmarkHelpers.FormatDurationHuman(p.HighMaxSeconds)} " +
-                    $"(gap {BenchmarkHelpers.FormatDurationHuman(p.GapSeconds)})");
+                    $"{BenchmarkHelpers.EscapeTable(string.Join("; ", summary.Clusters.Select(FormatCluster)))}");
             }
             report(null);
+        }
+
+        static string FormatDistributionDuration(double seconds) =>
+            double.IsNaN(seconds) ? "-" : BenchmarkHelpers.FormatDurationHuman(seconds);
+
+        static string FormatCluster(BenchmarkConvergence.DistributionCluster cluster)
+        {
+            var min = BenchmarkHelpers.FormatDurationHuman(cluster.MinSeconds);
+            var max = BenchmarkHelpers.FormatDurationHuman(cluster.MaxSeconds);
+            var range = Math.Abs(cluster.MaxSeconds - cluster.MinSeconds) < 0.0005
+                ? min
+                : $"{min}-{max}";
+            return $"{cluster.Count} @ {range}";
         }
     }
 

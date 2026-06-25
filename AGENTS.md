@@ -44,6 +44,10 @@ dotnet run --project .\SmartCopy.Benchmarks
 dotnet run --project .\SmartCopy.Benchmarks --mode analyze
 ```
 
+## Codex Environment Notes
+
+- Codex should read repository files with `node:fs` via the Node REPL MCP when available. In this Windows sandbox, simple PowerShell reads can fail with `CreateProcessAsUserW failed: 1312`; do not ask for elevated permissions just to read files.
+
 ## Error Handling
 
 **Thou Shalt Not Crash** The app must never crash to desktop. All operations (pipeline execution, preview generation, scanning) must catch exceptions at the top level and surface errors through the UI (log panel, banners, validation messages). Never let an exception propagate unhandled.

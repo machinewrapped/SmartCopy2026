@@ -30,9 +30,9 @@ internal static class StreamCopyEngine
     }
 
     /// <summary>
-    /// Copies <paramref name="source"/> into <paramref name="destination"/> and flushes. When the
-    /// length is known it is passed as <paramref name="remainingBytes"/> so the write mode and
-    /// preallocation heuristics can apply; pass null for unknown-length streams.
+    /// Copies <paramref name="source"/> into <paramref name="destination"/>. When the length is known
+    /// it is passed as <paramref name="remainingBytes"/> so the write mode heuristics can apply; pass
+    /// null for unknown-length streams. The caller owns stream disposal, which flushes managed buffers.
     /// </summary>
     public static async Task CopyAsync(
         Stream source,
@@ -70,7 +70,6 @@ internal static class StreamCopyEngine
             await CopyWithManualLoopAsync(source, destination, progress, opts, ct);
         }
 
-        await destination.FlushAsync(ct);
     }
 
     private static LocalFileSystemWriteMode DetermineWriteMode(
