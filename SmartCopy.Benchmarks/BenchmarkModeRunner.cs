@@ -31,46 +31,20 @@ internal static class BenchmarkModeRunner
         var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
         var configName = Path.GetFileNameWithoutExtension(configPath);
         var archiveDirName = $"{timestamp}_{configName}";
-        var archiveDirectory = Path.Combine(artifactDirectory, "archive", archiveDirName);
+        var archiveDirectory = GetUniqueArchiveDirectory(Path.Combine(artifactDirectory, "archive", archiveDirName));
 
         Directory.CreateDirectory(archiveDirectory);
-        Console.WriteLine($"Created archive directory: {archiveDirectory}");
+        var copiedCount = 0;
 
-        var filesToMove = new[]
+        foreach (var src in EnumerateActiveArtifactFiles(artifactDirectory, fileNames))
         {
-            fileNames.Results,
-            fileNames.FileResults,
-            fileNames.Analysis,
-            fileNames.TaskList
-        };
-
-        foreach (var fileName in filesToMove)
-        {
-            var src = Path.Combine(artifactDirectory, fileName);
-            if (File.Exists(src))
-            {
-                var dest = Path.Combine(archiveDirectory, fileName);
-                try
-                {
-                    File.Move(src, dest, overwrite: true);
-                    Console.WriteLine($"Archived file: {fileName}");
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"Error archiving {fileName}: {ex.Message}");
-                }
-            }
-        }
-
-        var baseAnalysisName = Path.GetFileNameWithoutExtension(fileNames.Analysis);
-        var htmlFiles = Directory.GetFiles(artifactDirectory, $"{baseAnalysisName}*.html");
-        foreach (var htmlFile in htmlFiles)
-        {
-            var fileName = Path.GetFileName(htmlFile);
+            ct.ThrowIfCancellationRequested();
+            var fileName = Path.GetFileName(src);
             var dest = Path.Combine(archiveDirectory, fileName);
             try
             {
-                File.Move(htmlFile, dest, overwrite: true);
+                File.Copy(src, dest, overwrite: true);
+                copiedCount++;
                 Console.WriteLine($"Archived file: {fileName}");
             }
             catch (Exception ex)
@@ -85,7 +59,8 @@ internal static class BenchmarkModeRunner
             var journalDest = Path.Combine(archiveDirectory, JournalDirectoryName);
             try
             {
-                Directory.Move(journalSrc, journalDest);
+                CopyDirectory(journalSrc, journalDest, ct);
+                copiedCount++;
                 Console.WriteLine("Archived journals directory.");
             }
             catch (Exception ex)
@@ -94,6 +69,121 @@ internal static class BenchmarkModeRunner
             }
         }
 
+        if (copiedCount == 0)
+        {
+            Directory.Delete(archiveDirectory, recursive: true);
+            Console.WriteLine("No benchmark artifacts found to archive.");
+        }
+        else
+        {
+            Console.WriteLine($"Archive snapshot: {archiveDirectory}");
+        }
+
         await Task.CompletedTask;
+    }
+
+    internal static async Task ClearActiveArtifactsAsync(string artifactDirectory, string configPath, CancellationToken ct)
+    {
+        if (!Directory.Exists(artifactDirectory))
+        {
+            await Task.CompletedTask;
+            return;
+        }
+
+        var fileNames = FileNamesResolver.GetFileNames(configPath);
+        var deletedCount = 0;
+        foreach (var file in EnumerateActiveArtifactFiles(artifactDirectory, fileNames))
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                File.Delete(file);
+                deletedCount++;
+                Console.WriteLine($"Cleared active artifact: {Path.GetFileName(file)}");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error clearing {Path.GetFileName(file)}: {ex.Message}");
+            }
+        }
+
+        var journalDirectory = Path.Combine(artifactDirectory, JournalDirectoryName);
+        if (Directory.Exists(journalDirectory))
+        {
+            try
+            {
+                Directory.Delete(journalDirectory, recursive: true);
+                deletedCount++;
+                Console.WriteLine("Cleared active journals directory.");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error clearing journals directory: {ex.Message}");
+            }
+        }
+
+        if (deletedCount == 0)
+            Console.WriteLine("No active benchmark artifacts found to clear.");
+
+        await Task.CompletedTask;
+    }
+
+    private static IEnumerable<string> EnumerateActiveArtifactFiles(string artifactDirectory, BenchmarkFileNames fileNames)
+    {
+        if (!Directory.Exists(artifactDirectory))
+            yield break;
+
+        var activeFileNames = new[]
+        {
+            fileNames.Results,
+            fileNames.FileResults,
+            fileNames.Analysis,
+            fileNames.SizeScaling,
+            fileNames.TaskList
+        };
+
+        foreach (var fileName in activeFileNames)
+        {
+            var path = Path.Combine(artifactDirectory, fileName);
+            if (File.Exists(path))
+                yield return path;
+        }
+
+        var baseAnalysisName = Path.GetFileNameWithoutExtension(fileNames.Analysis);
+        foreach (var htmlFile in Directory.EnumerateFiles(artifactDirectory, $"{baseAnalysisName}*.html"))
+            yield return htmlFile;
+    }
+
+    private static string GetUniqueArchiveDirectory(string baseArchiveDirectory)
+    {
+        if (!Directory.Exists(baseArchiveDirectory))
+            return baseArchiveDirectory;
+
+        var suffix = 2;
+        string candidate;
+        do
+        {
+            candidate = $"{baseArchiveDirectory}-{suffix}";
+            suffix++;
+        } while (Directory.Exists(candidate));
+
+        return candidate;
+    }
+
+    private static void CopyDirectory(string sourceDirectory, string destinationDirectory, CancellationToken ct)
+    {
+        Directory.CreateDirectory(destinationDirectory);
+
+        foreach (var file in Directory.EnumerateFiles(sourceDirectory))
+        {
+            ct.ThrowIfCancellationRequested();
+            File.Copy(file, Path.Combine(destinationDirectory, Path.GetFileName(file)), overwrite: true);
+        }
+
+        foreach (var directory in Directory.EnumerateDirectories(sourceDirectory))
+        {
+            ct.ThrowIfCancellationRequested();
+            CopyDirectory(directory, Path.Combine(destinationDirectory, Path.GetFileName(directory)), ct);
+        }
     }
 }

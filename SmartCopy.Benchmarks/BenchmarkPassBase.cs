@@ -127,7 +127,7 @@ internal abstract class BenchmarkPassBase
                 Console.WriteLine();
                 Console.WriteLine("-------------------------------------------------------------------");
                 Console.WriteLine("Fresh start requested via --fresh flag with a scenario/variant filter.");
-                Console.WriteLine("Bypassing archive to preserve existing runs. Will force an additional run.");
+                Console.WriteLine("Bypassing active artifact cleanup to preserve existing runs. Will force an additional run.");
                 Console.WriteLine("-------------------------------------------------------------------");
             }
             else
@@ -135,9 +135,9 @@ internal abstract class BenchmarkPassBase
                 Console.WriteLine();
                 Console.WriteLine("-------------------------------------------------------------------");
                 Console.WriteLine("Fresh start requested via --fresh flag.");
-                Console.WriteLine("Archiving completed runs to a dated subfolder to start fresh...");
+                Console.WriteLine("Clearing previously archived active artifacts to start fresh...");
                 Console.WriteLine("-------------------------------------------------------------------");
-                await BenchmarkModeRunner.ArchiveResultsAsync(Paths.ArtifactDirectory, Selection.ConfigPath, Ct);
+                await BenchmarkModeRunner.ClearActiveArtifactsAsync(Paths.ArtifactDirectory, Selection.ConfigPath, Ct);
                 HistoricalRuns = await BenchmarkHelpers.ReadExistingRunsAsync<BenchmarkRunRecord>(Paths.ResultsPath, Ct);
             }
             return;
@@ -148,9 +148,9 @@ internal abstract class BenchmarkPassBase
             Console.WriteLine();
             Console.WriteLine("-------------------------------------------------------------------");
             Console.WriteLine("All previous benchmark runs in the active scenarios are completed/converged.");
-            Console.WriteLine("Archiving completed runs to a dated subfolder to start fresh...");
+            Console.WriteLine("Clearing previously archived active artifacts to start fresh...");
             Console.WriteLine("-------------------------------------------------------------------");
-            await BenchmarkModeRunner.ArchiveResultsAsync(Paths.ArtifactDirectory, Selection.ConfigPath, Ct);
+            await BenchmarkModeRunner.ClearActiveArtifactsAsync(Paths.ArtifactDirectory, Selection.ConfigPath, Ct);
             HistoricalRuns = await BenchmarkHelpers.ReadExistingRunsAsync<BenchmarkRunRecord>(Paths.ResultsPath, Ct);
         }
     }

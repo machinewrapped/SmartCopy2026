@@ -60,6 +60,7 @@ try
     if (selection.Mode == BenchmarkRunMode.Validation)
     {
         await ValidationModeRunner.RunAsync(workingDirectory, config, selection, ct);
+        await ArchiveLatestRunAsync();
         return 0;
     }
 
@@ -70,9 +71,16 @@ try
     }
 
     await BenchmarkModeRunner.RunAsync(workingDirectory, config, selection, ct);
+    await ArchiveLatestRunAsync();
     return 0;
 }
 finally
 {
     SystemSleepController.AllowSleep();
+}
+
+async Task ArchiveLatestRunAsync()
+{
+    var artifactDirectory = BenchmarkHelpers.ResolveArtifactDirectory(workingDirectory, config.SourcePath, config.ArtifactPath);
+    await BenchmarkModeRunner.ArchiveResultsAsync(artifactDirectory, selection.ConfigPath, ct);
 }
