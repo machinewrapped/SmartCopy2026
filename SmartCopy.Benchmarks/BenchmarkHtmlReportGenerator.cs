@@ -78,7 +78,7 @@ internal static class BenchmarkHtmlReportGenerator
         sb.AppendLine("<body>");
         sb.AppendLine($"<h1>Benchmark Analysis: {scenarioName}</h1>");
 
-        AppendRunDistributionSection(sb, variants, allRuns);
+        AppendRunDistributionSection(sb, variants, allRuns, matchedControlLookup);
 
         // --- Overall Run Duration Chart ---
         sb.AppendLine($"<h2>Overall Median Run Duration</h2>");
@@ -449,7 +449,8 @@ internal static class BenchmarkHtmlReportGenerator
     private static void AppendRunDistributionSection(
         StringBuilder sb,
         IReadOnlyList<string> variants,
-        IReadOnlyList<BenchmarkRunRecord> allRuns)
+        IReadOnlyList<BenchmarkRunRecord> allRuns,
+        IReadOnlyDictionary<string, string> matchedControlLookup)
     {
         var successfulRuns = allRuns
             .Where(BenchmarkHelpers.IsSuccessfulRun)
@@ -555,6 +556,7 @@ internal static class BenchmarkHtmlReportGenerator
         sb.AppendLine("<tbody>");
 
         var clustered = new List<(string Variant, BenchmarkConvergence.DistributionSummary Summary)>();
+        var distributionSummaries = new Dictionary<string, BenchmarkConvergence.DistributionSummary>(StringComparer.OrdinalIgnoreCase);
         foreach (var variant in variants)
         {
             var variantRuns = allRuns
@@ -568,6 +570,7 @@ internal static class BenchmarkHtmlReportGenerator
                 .Select(r => r.ExecuteDuration.TotalSeconds)
                 .ToList();
             var summary = BenchmarkConvergence.BuildDistributionSummary(durations);
+            distributionSummaries[variant] = summary;
             if (summary.HasSeparatedClusters)
                 clustered.Add((variant, summary));
 
@@ -593,6 +596,38 @@ internal static class BenchmarkHtmlReportGenerator
 
         if (clustered.Count > 0)
         {
+            sb.AppendLine("<h2>Run Mode Summary (All Successful Runs)</h2>");
+            sb.AppendLine("<p>Only variants with separated duration clusters are listed here. Fast and slow bands are the first and last clusters for each variant. Delta compares the same band against the variant's configured matched control when both variants have separated clusters.</p>");
+            sb.AppendLine("<table>");
+            sb.AppendLine("<thead><tr><th>Variant</th><th>Fast Runs</th><th>Fast Median</th><th>Fast Range</th><th>Fast Delta vs Control</th><th>Slow Runs</th><th>Slow Median</th><th>Slow Range</th><th>Slow Delta vs Control</th></tr></thead>");
+            sb.AppendLine("<tbody>");
+
+            foreach (var variant in variants)
+            {
+                if (!distributionSummaries.TryGetValue(variant, out var summary) || !summary.HasSeparatedClusters)
+                    continue;
+
+                var fast = summary.Clusters[0];
+                var slow = summary.Clusters[^1];
+                var fastDelta = FormatBandDelta(variant, RunBandSelector.Fast, distributionSummaries, matchedControlLookup);
+                var slowDelta = FormatBandDelta(variant, RunBandSelector.Slow, distributionSummaries, matchedControlLookup);
+
+                sb.AppendLine(
+                    "<tr>" +
+                    $"<td>{Html(variant)}</td>" +
+                    $"<td>{fast.Count}</td>" +
+                    $"<td>{Html(FormatDistributionDuration(fast.MedianSeconds))}</td>" +
+                    $"<td>{Html(FormatClusterRange(fast))}</td>" +
+                    $"<td>{Html(fastDelta)}</td>" +
+                    $"<td>{slow.Count}</td>" +
+                    $"<td>{Html(FormatDistributionDuration(slow.MedianSeconds))}</td>" +
+                    $"<td>{Html(FormatClusterRange(slow))}</td>" +
+                    $"<td>{Html(slowDelta)}</td>" +
+                    "</tr>");
+            }
+
+            sb.AppendLine("</tbody></table>");
+
             sb.AppendLine("<div class=\"warning\"><strong>Clustered run distribution:</strong>");
             sb.AppendLine("<ul>");
             foreach (var (variant, summary) in clustered)
@@ -602,20 +637,140 @@ internal static class BenchmarkHtmlReportGenerator
             }
             sb.AppendLine("</ul></div>");
         }
+
+        AppendGcEvidenceSection(sb, variants, allRuns);
+    }
+
+    private static void AppendGcEvidenceSection(
+        StringBuilder sb,
+        IReadOnlyList<string> variants,
+        IReadOnlyList<BenchmarkRunRecord> allRuns)
+    {
+        if (!allRuns.Any(r => BenchmarkHelpers.IsSuccessfulRun(r) && r.ExecuteAllocatedBytes.HasValue))
+            return;
+
+        sb.AppendLine("<h2>Execute GC Evidence (All Successful Runs)</h2>");
+        sb.AppendLine("<p>Captured around the execute window only. Allocation bytes are process counters, so they include work on benchmark/reporting threads during that window. Collection counts are reported as per-run medians/means so variants with different completed-run counts remain comparable.</p>");
+        sb.AppendLine("<table>");
+        sb.AppendLine("<thead><tr><th>Variant</th><th>Runs with GC</th><th>Median Allocated</th><th>Mean Allocated</th><th>Max Allocated</th><th>Median Gen0</th><th>Mean Gen0</th><th>Median Gen1</th><th>Mean Gen1</th><th>Median Gen2</th><th>Mean Gen2</th><th>Median Heap Delta</th><th>Median Fragmentation Delta</th></tr></thead>");
+        sb.AppendLine("<tbody>");
+
+        foreach (var variant in variants)
+        {
+            var runs = allRuns
+                .Where(BenchmarkHelpers.IsSuccessfulRun)
+                .Where(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase))
+                .Where(r => r.ExecuteAllocatedBytes.HasValue)
+                .ToList();
+            if (runs.Count == 0)
+                continue;
+
+            var allocated = runs.Select(r => (double)r.ExecuteAllocatedBytes!.Value).OrderBy(v => v).ToList();
+            var gen0 = runs.Select(r => (double)(r.ExecuteGen0Collections ?? 0)).OrderBy(v => v).ToList();
+            var gen1 = runs.Select(r => (double)(r.ExecuteGen1Collections ?? 0)).OrderBy(v => v).ToList();
+            var gen2 = runs.Select(r => (double)(r.ExecuteGen2Collections ?? 0)).OrderBy(v => v).ToList();
+            var heapDeltas = runs
+                .Where(r => r.ExecuteHeapSizeDeltaBytes.HasValue)
+                .Select(r => (double)r.ExecuteHeapSizeDeltaBytes!.Value)
+                .OrderBy(v => v)
+                .ToList();
+            var fragmentedDeltas = runs
+                .Where(r => r.ExecuteFragmentedDeltaBytes.HasValue)
+                .Select(r => (double)r.ExecuteFragmentedDeltaBytes!.Value)
+                .OrderBy(v => v)
+                .ToList();
+
+            sb.AppendLine(
+                "<tr>" +
+                $"<td>{Html(variant)}</td>" +
+                $"<td>{runs.Count}</td>" +
+                $"<td>{Html(FormatBytes(BenchmarkHelpers.Percentile(allocated, 0.5)))}</td>" +
+                $"<td>{Html(FormatBytes(allocated.Average()))}</td>" +
+                $"<td>{Html(FormatBytes(allocated[^1]))}</td>" +
+                $"<td>{Html(FormatCount(BenchmarkHelpers.Percentile(gen0, 0.5)))}</td>" +
+                $"<td>{Html(FormatCount(gen0.Average()))}</td>" +
+                $"<td>{Html(FormatCount(BenchmarkHelpers.Percentile(gen1, 0.5)))}</td>" +
+                $"<td>{Html(FormatCount(gen1.Average()))}</td>" +
+                $"<td>{Html(FormatCount(BenchmarkHelpers.Percentile(gen2, 0.5)))}</td>" +
+                $"<td>{Html(FormatCount(gen2.Average()))}</td>" +
+                $"<td>{Html(FormatSignedBytes(heapDeltas.Count == 0 ? double.NaN : BenchmarkHelpers.Percentile(heapDeltas, 0.5)))}</td>" +
+                $"<td>{Html(FormatSignedBytes(fragmentedDeltas.Count == 0 ? double.NaN : BenchmarkHelpers.Percentile(fragmentedDeltas, 0.5)))}</td>" +
+                "</tr>");
+        }
+
+        sb.AppendLine("</tbody></table>");
+
+        static string FormatBytes(double bytes) =>
+            double.IsNaN(bytes) ? "-" : BenchmarkHelpers.FormatSize((long)Math.Round(bytes));
+
+        static string FormatCount(double value) =>
+            double.IsNaN(value) ? "-" : value.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+
+        static string FormatSignedBytes(double bytes)
+        {
+            if (double.IsNaN(bytes))
+                return "-";
+
+            var rounded = (long)Math.Round(bytes);
+            if (rounded > 0)
+                return $"+{BenchmarkHelpers.FormatSize(rounded)}";
+            if (rounded < 0)
+                return $"-{BenchmarkHelpers.FormatSize(Math.Abs(rounded))}";
+            return "0 B";
+        }
     }
 
     private static string FormatCluster(BenchmarkConvergence.DistributionCluster cluster)
     {
+        return $"{cluster.Count} @ {FormatClusterRange(cluster)}";
+    }
+
+    private static string FormatClusterRange(BenchmarkConvergence.DistributionCluster cluster)
+    {
         var min = BenchmarkHelpers.FormatDurationHuman(cluster.MinSeconds);
         var max = BenchmarkHelpers.FormatDurationHuman(cluster.MaxSeconds);
-        var range = Math.Abs(cluster.MaxSeconds - cluster.MinSeconds) < 0.0005
+        return Math.Abs(cluster.MaxSeconds - cluster.MinSeconds) < 0.0005
             ? min
             : $"{min}-{max}";
-        return $"{cluster.Count} @ {range}";
+    }
+
+    private static string FormatBandDelta(
+        string variant,
+        RunBandSelector selector,
+        IReadOnlyDictionary<string, BenchmarkConvergence.DistributionSummary> summaries,
+        IReadOnlyDictionary<string, string> controls)
+    {
+        if (!controls.TryGetValue(variant, out var controlVariant))
+            return "-";
+        if (!summaries.TryGetValue(variant, out var candidateSummary) ||
+            !summaries.TryGetValue(controlVariant, out var controlSummary))
+            return "-";
+        if (candidateSummary.Clusters.Count < 2 || controlSummary.Clusters.Count < 2)
+            return "-";
+
+        var candidate = selector == RunBandSelector.Fast
+            ? candidateSummary.Clusters[0]
+            : candidateSummary.Clusters[^1];
+        var control = selector == RunBandSelector.Fast
+            ? controlSummary.Clusters[0]
+            : controlSummary.Clusters[^1];
+
+        if (control.MedianSeconds <= 0)
+            return "-";
+
+        var deltaSeconds = control.MedianSeconds - candidate.MedianSeconds;
+        var percent = deltaSeconds / control.MedianSeconds * 100.0;
+        return $"{BenchmarkComparison.FormatSignedPercent(percent)} ({BenchmarkComparison.FormatSignedDurationSeconds(deltaSeconds)})";
     }
 
     private static string FormatDistributionDuration(double seconds) =>
         double.IsNaN(seconds) ? "-" : BenchmarkHelpers.FormatDurationHuman(seconds);
+
+    private enum RunBandSelector
+    {
+        Fast,
+        Slow,
+    }
 
     private static string JsonString(string value) =>
         System.Text.Json.JsonSerializer.Serialize(value);

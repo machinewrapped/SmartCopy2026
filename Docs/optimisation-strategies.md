@@ -18,7 +18,7 @@ An important caveat: Every file write incurs unavoidable filesystem work — MFT
 
 ## 2. Current Policy & Open Questions
 
-*The one place to read for "what do we currently believe." The dated evidence and per-phase history live in §6; this is the signal extracted from them. Last updated 2026-06-20.*
+*The one place to read for "what do we currently believe." The dated evidence and per-phase history live in §6; this is the signal extracted from them. Last updated 2026-06-27.*
 
 **Shipping policy (the candidate bundle).** Encoded in code, gated behind `AllowCopyOptimisations` (default **OFF**) pending the production-path validation (§6, Production Validation Pass):
 
@@ -27,6 +27,7 @@ An important caveat: Every file write incurs unavoidable filesystem work — MFT
 | Copy buffer | SSD/USB 1 MiB · HDD/Unknown 512 KiB | `DefaultCopyStrategyPolicy.SelectBufferBytes` |
 | Batch buffer | 1 MiB (eligibility ceiling 512 KiB) | `AppSettings.BatchBufferKb`, `OperationalSettings` |
 | Direct-write threshold | 64 KiB | `AppSettings.TinyFileFastPathKb` |
+| Manual-loop byte buffer | ArrayPool-rented | `OperationalSettings.UseArrayPoolForManualLoop` |
 | Preallocation | OFF (universal) | `DefaultCopyStrategyPolicy` |
 
 **Confidence — what's earned vs assumed:**
@@ -37,7 +38,8 @@ An important caveat: Every file write incurs unavoidable filesystem work — MFT
 | Preallocation OFF | **Validated** — null or regresses everywhere (an earlier +11.6% SSD→HDD finding was retracted) | Phase 5 |
 | Tiny-file direct write ≤ 64 KiB | **Validated on SSD**; assumed on HDD/USB | Phase 2 |
 | Batching (1 MiB / 512 KiB ceiling) | **SSD validated** (small — see below); **OFF on USB** (regresses); **HDD never measured** | Phase 3, Phase 6 |
-| Whole bundle on the production path | **Unmeasured — pending the Production Validation Pass** | — |
+| Operation journal I/O | **Ruled out** as the production/prototype gap; disabling benchmark journals was consistently slightly slower | Production Validation Pass |
+| Whole bundle on the production path | **Validation in progress** — value over legacy confirmed in smoke; production/prototype parity gap persists but narrows on MixedDataset R→D | Production Validation Pass |
 
 **Batching is a small effect, easy to over-read.** Its genuine contribution above a 512 KiB buffer is **1–2% on SSD**, concentrated in sub-16 KiB files (Phase 3, key conclusion 1). The often-cited +8.5% "champion" is mostly the buffer/chunk-size win — which the buffer-routing policy already captures independently. Worth keeping, not worth headlining.
 
@@ -127,6 +129,8 @@ Use these when deciding whether a complete routing policy should be promoted:
 - `failedFiles` and exception counts.
 - `copiedFiles + failedFiles + skippedFiles` versus expected selected file count.
 - Destination free-space sanity, source/destination paths, path-pool usage, cold/warm notes.
+- Execute-window GC counters (`executeAllocatedBytes`, Gen0/Gen1/Gen2 collection deltas,
+  heap-size delta, fragmentation delta) to distinguish copy-path overhead from allocation/GC pressure.
 
 Verdict rules:
 - **Strong improvement:** median `executeDuration` improvement exceeds the gate and is larger than run-to-run variance.
@@ -149,7 +153,7 @@ Use these when deciding which strategy belongs to which file-size range:
 Bucket comparisons must be within the same file-size bucket. Total wall-clock time is misleading for comparing buckets because buckets intentionally contain different file counts and total bytes. Bucket metrics are the discovery engine for adaptive routing; whole-run wall-clock is the final reality check.
 
 > [!CAUTION]
-> **Batched per-file timing: fixed 2026-06-21 and refined after Gate 1 for new runs; data recorded before those dates carries the older attribution model.** Aggregate bucket throughput divides bucket bytes by the *sum of per-file copy durations*. For **streaming** variants each file's recorded duration ≈ its own transfer time, so the sum ≈ wall-clock and the figure is meaningful. For **batched** variants the write phase is not directly measurable per file (batching reads many files before any write; OS write-back decouples a WriteAsync return from bytes-to-disk — the batch write is the only real unit). The pipeline records each file's destination-check + read time exactly, times the batch write phase as a unit, then adds an **even share of the shared write phase** to each file (Architecture §2.4.1). The per-file `ExistsAsync` ceremony is included too, so batched timing matches the streaming control (whose cadence already includes it) — bucket comparisons are apples-to-apples. Per-file durations sum to the batch's elapsed time, so **run-level and scenario-level aggregate throughput are conserved and cross-strategy comparable**.
+> **Batched per-file timing: fixed 2026-06-21 and refined after Gate 1 for new runs; data recorded before those dates carries the older attribution model.** Aggregate bucket throughput divides bucket bytes by the *sum of per-file copy durations*. For **streaming** variants each file's recorded duration ≈ its own transfer time, so the sum ≈ wall-clock and the figure is meaningful. For **batched** variants the pipeline records each file's destination-check + read time before the flush, then adds that entry's measured write time during the flush. The per-file `ExistsAsync` ceremony is included too, so batched timing matches the streaming control (whose cadence already includes it) — bucket comparisons are apples-to-apples.
 > **Two caveats remain.** (1) *Data recorded before 2026-06-21* used yield-cadence attribution, which dumped the whole batch's read cost on the first file flushed — for that data batched per-bucket throughput is an attribution artefact and only intra-strategy comparisons hold; re-run rather than mine it. (2) Data recorded between the first timing fix and the post-Gate-1 refinement split destination-check + read + write evenly across every file in the batch; it is conserved at run level but over-smooths per-file/bucket attribution. **Gate 2's cross-strategy verdict (Production_Routed batched vs Legacy_Baseline streaming) rests on run-level wall-clock regardless** — the simplest measure that needs no per-file attribution at all.
 
 Matched controls:
@@ -951,6 +955,7 @@ Both engines stage the identical set: `CreateProductionOperationalSettings` maps
 - **Per-file `ExistsAsync` destination stat** — a flat per-file cost would hit the 12 k + 4 k small files hardest, and those buckets are fine. (`SkipExistsCheckForOverwrite`, the flag that suppressed it, has since been deleted end-to-end — it traded correctness for a stat no real copy should skip; `ExistsAsync` now always runs in both engines, removing it as a variable.)
 - **Preallocation / `SetLength`** — gated on `PreallocateDestinationFile`, OFF universally (`StreamCopyEngine.CopyAsync`), so it never fires.
 - **`FlushAsync` (`StreamCopyEngine.CopyAsync`)** — previously flushed the managed buffer to the OS after each file, before stream close and the rename. It was **not** `Flush(flushToDisk: true)` (no `FlushFileBuffers`), so it was functionally the same flush `FileStream.DisposeAsync` already performs on close; the redundant explicit call has been removed from production.
+- **Operation journal artifact I/O** — `ExecuteDuration` stops before the optional benchmark journal write, so the wall-clock comparison is not measuring journal serialization directly. A `Production_NoJournal` validation variant was added anyway to test later-run perturbation from post-execute journal artifacts; run records confirm it used `journalEnabled=false` and empty journal paths, while `Production_Fixed` wrote journals. The variant was consistently slightly slower and is now retired from active smoke runs (runtime `WriteOperationJournal` remains available, default OFF).
 
 **Open questions:**
 1. **Where does the ~445 ms actually go?** Remaining candidates are production-only work in the large-file path — the per-chunk progress path (`CopyWithManualLoopAsync` / `ProgressReportingReadStream`) vs the prototype's bare `CopyToAsync`, provider/staging ceremony, and per-file `TransformResult` yielding. None is confirmed; isolating the split needs a profiler or toggle-and-remeasure, not more reasoning over the NDJSON.
@@ -972,6 +977,20 @@ Both engines stage the identical set: `CreateProductionOperationalSettings` maps
 - **Value holds: +33%** — consistent with the D→R run and the Defender reframe.
 - **Equivalence gap confirmed on a second, independent pair: -5.4% / -358 ms**, same sign and similar magnitude as D→R's -445 ms, now on a *converged* window. This answers open question 4: **yes, the gap reproduces off D→R.**
 - **Same bucket localization.** The deficit is again entirely in the staged >64 KiB path, largest in Sub4MiB (Prototype 611.6 vs Fixed 514.1 MiB/s, **-16%**); the direct-write small-file buckets are even-to-production-faster (Sub16KiB Fixed 8.22 vs Proto 7.87). Two runs, two pairs, identical shape — the localization is solid and the cause is the two-engine difference in the staged path (open question 1), not configuration, `ExistsAsync`, preallocation, or `FlushAsync`.
+
+**Result (2026-06-27): MixedDataset R→D — less bimodal, journal-off retired.** The full `MixedDataset` smoke was run on **R→D**, a drive pair that had previously shown anomalous buffer-size scaling but usually converges better. This run was much less bimodal than the D→O/O→D MixedDataset sweeps: all three variants were reported as one broad duration cluster, and all three reached the 3% convergence window in the selected slice.
+
+| Variant | Runs used/ran | Convergence | Selected median | All-run median | All-run mean | Global spread |
+|---|---:|---|---:|---:|---:|---:|
+| `Prototype` | 5/10 | converged @1.6% | 56.3 s | 56.3 s | 57.3 s | 12.0 s |
+| `Production_Fixed` | 5/9 | converged @2.5% | 56.9 s | 57.8 s | 58.8 s | 6.3 s |
+| `Production_NoJournal` | 5/7 | converged @1.2% | 58.8 s | 59.3 s | 60.0 s | 7.2 s |
+
+- **Production_Fixed vs Prototype:** `INCONCLUSIVE`, -1.2% (-651 ms) with a 1.2 s noise floor. The production/prototype gap is still the same sign, but on this pair it is below the run-level noise floor and closer to ~1–3% than the earlier 5–8% smoke signal.
+- **Production_NoJournal vs Production_Fixed:** `REGRESSION`, -3.2% (-1.8 s) with a 1.1 s noise floor. It was also slightly worse or effectively equal in every bucket (Tiny through Huge), so journal artifact I/O is not the explanation for the persistent production/prototype shortfall.
+- **Decision:** retire `Production_NoJournal` from active benchmark configs. Leave the runtime `WriteOperationJournal` option in place because the product value question is separate; it defaults OFF and remains user-controllable.
+
+**Follow-up (2026-06-27): manual-loop buffer pooling default fixed.** `StreamCopyEngine.CopyWithManualLoopAsync` already supported `ArrayPool<byte>`, but `OperationalSettings.UseArrayPoolForManualLoop` defaulted to `false`. With the promoted 1 MiB copy buffer, that meant any path using the manual loop without an explicit override allocated a fresh LOH-sized array per file copy. The loop did **not** allocate per 1 MiB chunk — one buffer was reused inside each copy call — but allocating one per file is still the wrong production default. The default is now `true`; explicit benchmark variants can still force `false` when an allocation-control comparison is needed.
 
 #### Gate 2 — Full matrix, fail-fast ordered · hours → weeks
 

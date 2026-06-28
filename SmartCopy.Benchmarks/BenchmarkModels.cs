@@ -23,8 +23,56 @@ internal sealed class BenchmarkState
     public long? FreeSpaceBefore { get; set; }
     public long? FreeSpaceAfter { get; set; }
     public string? JournalPath { get; set; }
+    public BenchmarkGcStats? ExecuteGcStats { get; set; }
     public System.Diagnostics.Stopwatch ScanStopwatch { get; } = new();
     public System.Diagnostics.Stopwatch ExecuteStopwatch { get; } = new();
+}
+
+internal readonly record struct BenchmarkGcSnapshot(
+    long AllocatedBytes,
+    int Gen0Collections,
+    int Gen1Collections,
+    int Gen2Collections,
+    long HeapSizeBytes,
+    long FragmentedBytes)
+{
+    public static BenchmarkGcSnapshot Capture()
+    {
+        var memoryInfo = GC.GetGCMemoryInfo();
+        return new BenchmarkGcSnapshot(
+            GC.GetTotalAllocatedBytes(precise: false),
+            GC.CollectionCount(0),
+            GC.CollectionCount(1),
+            GC.CollectionCount(2),
+            memoryInfo.HeapSizeBytes,
+            memoryInfo.FragmentedBytes);
+    }
+}
+
+internal readonly record struct BenchmarkGcStats(
+    long AllocatedBytes,
+    int Gen0Collections,
+    int Gen1Collections,
+    int Gen2Collections,
+    long HeapSizeBeforeBytes,
+    long HeapSizeAfterBytes,
+    long HeapSizeDeltaBytes,
+    long FragmentedBeforeBytes,
+    long FragmentedAfterBytes,
+    long FragmentedDeltaBytes)
+{
+    public static BenchmarkGcStats Between(BenchmarkGcSnapshot before, BenchmarkGcSnapshot after) =>
+        new(
+            Math.Max(0, after.AllocatedBytes - before.AllocatedBytes),
+            Math.Max(0, after.Gen0Collections - before.Gen0Collections),
+            Math.Max(0, after.Gen1Collections - before.Gen1Collections),
+            Math.Max(0, after.Gen2Collections - before.Gen2Collections),
+            before.HeapSizeBytes,
+            after.HeapSizeBytes,
+            after.HeapSizeBytes - before.HeapSizeBytes,
+            before.FragmentedBytes,
+            after.FragmentedBytes,
+            after.FragmentedBytes - before.FragmentedBytes);
 }
 
 internal sealed class BenchmarkRunRecord
@@ -56,6 +104,16 @@ internal sealed class BenchmarkRunRecord
     public bool? JournalEnabled { get; init; }
     public required TimeSpan ScanDuration { get; init; }
     public required TimeSpan ExecuteDuration { get; init; }
+    public long? ExecuteAllocatedBytes { get; init; }
+    public int? ExecuteGen0Collections { get; init; }
+    public int? ExecuteGen1Collections { get; init; }
+    public int? ExecuteGen2Collections { get; init; }
+    public long? ExecuteHeapSizeBeforeBytes { get; init; }
+    public long? ExecuteHeapSizeAfterBytes { get; init; }
+    public long? ExecuteHeapSizeDeltaBytes { get; init; }
+    public long? ExecuteFragmentedBeforeBytes { get; init; }
+    public long? ExecuteFragmentedAfterBytes { get; init; }
+    public long? ExecuteFragmentedDeltaBytes { get; init; }
     public required int CopiedFiles { get; init; }
     public required int SkippedFiles { get; init; }
     public required int FailedFiles { get; init; }
@@ -107,6 +165,16 @@ internal sealed class BenchmarkRunRecord
             JournalEnabled = variant.WriteJournal,
             ScanDuration = TimeSpan.Zero,
             ExecuteDuration = TimeSpan.Zero,
+            ExecuteAllocatedBytes = null,
+            ExecuteGen0Collections = null,
+            ExecuteGen1Collections = null,
+            ExecuteGen2Collections = null,
+            ExecuteHeapSizeBeforeBytes = null,
+            ExecuteHeapSizeAfterBytes = null,
+            ExecuteHeapSizeDeltaBytes = null,
+            ExecuteFragmentedBeforeBytes = null,
+            ExecuteFragmentedAfterBytes = null,
+            ExecuteFragmentedDeltaBytes = null,
             CopiedFiles = 0,
             SkippedFiles = 0,
             FailedFiles = 0,
@@ -158,6 +226,7 @@ internal sealed class BenchmarkRunRecord
         OperationalSettings? recordedSettings = null)
     {
         var providerOptions = recordedSettings ?? variant.CreateOperationalSettings(scenario);
+        var gc = state.ExecuteGcStats;
         return new BenchmarkRunRecord
         {
             RunStatus = ex is null ? BenchmarkRunStatus.Completed : BenchmarkRunStatus.Failed,
@@ -187,6 +256,16 @@ internal sealed class BenchmarkRunRecord
             JournalEnabled = variant.WriteJournal,
             ScanDuration = state.ScanStopwatch.Elapsed,
             ExecuteDuration = state.ExecuteStopwatch.Elapsed,
+            ExecuteAllocatedBytes = gc?.AllocatedBytes,
+            ExecuteGen0Collections = gc?.Gen0Collections,
+            ExecuteGen1Collections = gc?.Gen1Collections,
+            ExecuteGen2Collections = gc?.Gen2Collections,
+            ExecuteHeapSizeBeforeBytes = gc?.HeapSizeBeforeBytes,
+            ExecuteHeapSizeAfterBytes = gc?.HeapSizeAfterBytes,
+            ExecuteHeapSizeDeltaBytes = gc?.HeapSizeDeltaBytes,
+            ExecuteFragmentedBeforeBytes = gc?.FragmentedBeforeBytes,
+            ExecuteFragmentedAfterBytes = gc?.FragmentedAfterBytes,
+            ExecuteFragmentedDeltaBytes = gc?.FragmentedDeltaBytes,
             CopiedFiles = state.Results.Sum(r => r.NumberOfFilesAffected),
             SkippedFiles = state.Results.Sum(r => r.NumberOfFilesSkipped),
             FailedFiles = state.Results.Count(r => !r.IsSuccess),

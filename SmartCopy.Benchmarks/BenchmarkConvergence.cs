@@ -22,7 +22,9 @@ internal static class BenchmarkConvergence
     internal sealed record DistributionCluster(
         int Count,
         double MinSeconds,
-        double MaxSeconds);
+        double MaxSeconds,
+        double MedianSeconds,
+        double MeanSeconds);
 
     internal sealed record DistributionSummary(
         int RunCount,
@@ -35,10 +37,11 @@ internal static class BenchmarkConvergence
         bool HasSeparatedClusters);
 
     /// <summary>
-    /// Summarises all successful run durations, splitting them at every large interior gap.
+    /// Summarises all successful run durations, splitting them at every large gap.
     /// This is intentionally less strict than <see cref="DetectMultimodal"/>: benchmark runs
     /// often show a low cluster, a bridge run, and a high cluster, where no single gap dominates.
-    /// Edge gaps are ignored so a lone slow/fast outlier does not become its own mode.
+    /// Edge gaps are allowed when the other side has enough runs, so a main band plus one
+    /// isolated fast/slow run is visible instead of being reported as one broad cluster.
     /// </summary>
     public static DistributionSummary BuildDistributionSummary(
         IReadOnlyList<double> durationsSeconds,
@@ -66,12 +69,15 @@ internal static class BenchmarkConvergence
         var splitIndexes = new List<int>();
         var gapThreshold = median > 0 ? median * minRelativeGap : double.PositiveInfinity;
 
-        if (d.Count >= 2 * minClusterSize && double.IsFinite(gapThreshold))
+        if (d.Count >= minClusterSize + 1 && double.IsFinite(gapThreshold))
         {
-            var lo = minClusterSize - 1;
-            var hi = d.Count - 1 - minClusterSize;
-            for (var i = lo; i <= hi; i++)
+            for (var i = 0; i < d.Count - 1; i++)
             {
+                var leftCount = i + 1;
+                var rightCount = d.Count - leftCount;
+                if (leftCount < minClusterSize && rightCount < minClusterSize)
+                    continue;
+
                 var gap = d[i + 1] - d[i];
                 if (gap >= gapThreshold)
                 {
@@ -84,13 +90,12 @@ internal static class BenchmarkConvergence
         var start = 0;
         foreach (var split in splitIndexes)
         {
-            clusters.Add(new DistributionCluster(split - start + 1, d[start], d[split]));
+            clusters.Add(CreateCluster(d, start, split));
             start = split + 1;
         }
 
-        clusters.Add(new DistributionCluster(d.Count - start, d[start], d[^1]));
+        clusters.Add(CreateCluster(d, start, d.Count - 1));
 
-        var substantialClusters = clusters.Count(c => c.Count >= minClusterSize);
         return new DistributionSummary(
             d.Count,
             median,
@@ -99,7 +104,18 @@ internal static class BenchmarkConvergence
             max,
             max - min,
             clusters,
-            substantialClusters >= 2);
+            clusters.Count > 1);
+    }
+
+    private static DistributionCluster CreateCluster(IReadOnlyList<double> sortedDurations, int start, int end)
+    {
+        var values = sortedDurations.Skip(start).Take(end - start + 1).ToList();
+        return new DistributionCluster(
+            values.Count,
+            values[0],
+            values[^1],
+            BenchmarkHelpers.Percentile(values, 0.5),
+            values.Average());
     }
 
     /// <summary>

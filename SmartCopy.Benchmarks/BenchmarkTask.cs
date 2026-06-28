@@ -340,17 +340,25 @@ internal sealed class BenchmarkTask
         using (var executeProgress = new ThrottledConsoleProgress<OperationProgress>(p =>
             BenchmarkHelpers.UpdateProgress($"Copying: {p.FilesCompleted}/{p.FilesTotal} files ({BenchmarkHelpers.FormatSize(p.TotalBytesCompleted)}/{BenchmarkHelpers.FormatSize(p.TotalBytes)}), ETR: {BenchmarkHelpers.FormatDuration(p.EstimatedRemaining)}")))
         {
+            var gcBefore = BenchmarkGcSnapshot.Capture();
             _state.ExecuteStopwatch.Start();
-            _state.Results = await executor.ExecuteAsync(new PipelineJob
+            try
             {
-                RootNode = _state.Root!,
-                SourceProvider = _sourceProvider!,
-                ProviderRegistry = _registry!,
-                Progress = executeProgress,
-                CancellationToken = _ct,
-                OperationalSettings = providerOptions,
-            }, _ct);
-            _state.ExecuteStopwatch.Stop();
+                _state.Results = await executor.ExecuteAsync(new PipelineJob
+                {
+                    RootNode = _state.Root!,
+                    SourceProvider = _sourceProvider!,
+                    ProviderRegistry = _registry!,
+                    Progress = executeProgress,
+                    CancellationToken = _ct,
+                    OperationalSettings = providerOptions,
+                }, _ct);
+            }
+            finally
+            {
+                _state.ExecuteStopwatch.Stop();
+                _state.ExecuteGcStats = BenchmarkGcStats.Between(gcBefore, BenchmarkGcSnapshot.Capture());
+            }
         }
         BenchmarkHelpers.UpdateProgress("");
 
@@ -383,6 +391,13 @@ internal sealed class BenchmarkTask
 
         var totalBytes = _state.Results.Sum(r => r.OutputBytes);
         Console.WriteLine($"Copied {record.CopiedFiles} files ({BenchmarkHelpers.FormatSize(totalBytes)}) in {BenchmarkHelpers.FormatDurationHuman(record.ExecuteDuration.TotalSeconds)}.");
+        if (_state.ExecuteGcStats is { } gc)
+        {
+            Console.WriteLine(
+                $"Execute GC: allocated {BenchmarkHelpers.FormatSize(gc.AllocatedBytes)}, " +
+                $"collections Gen0/1/2 = {gc.Gen0Collections}/{gc.Gen1Collections}/{gc.Gen2Collections}, " +
+                $"heap delta {FormatSignedSize(gc.HeapSizeDeltaBytes)}, fragmentation delta {FormatSignedSize(gc.FragmentedDeltaBytes)}.");
+        }
         if (record.FailedFiles > 0 || record.SkippedFiles > 0)
         {
             Console.WriteLine($"Failed: {record.FailedFiles}, Skipped: {record.SkippedFiles}");
@@ -405,6 +420,15 @@ internal sealed class BenchmarkTask
         else if (!double.IsNaN(spread))
         {
             Console.WriteLine($"Current spread: {spread:F2}%");
+        }
+
+        static string FormatSignedSize(long bytes)
+        {
+            if (bytes > 0)
+                return $"+{BenchmarkHelpers.FormatSize(bytes)}";
+            if (bytes < 0)
+                return $"-{BenchmarkHelpers.FormatSize(Math.Abs(bytes))}";
+            return "0 B";
         }
     }
 
