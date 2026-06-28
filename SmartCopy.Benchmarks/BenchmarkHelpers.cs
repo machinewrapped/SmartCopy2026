@@ -136,7 +136,6 @@ internal static class BenchmarkHelpers
 
         if (!Directory.Exists(fullDestinationPath))
         {
-            Directory.CreateDirectory(fullDestinationPath);
             return;
         }
 
@@ -151,6 +150,8 @@ internal static class BenchmarkHelpers
             progress?.Report(Path.GetFileName(directory));
             Directory.Delete(directory, recursive: true);
         }
+
+        Directory.Delete(fullDestinationPath, recursive: true);
     }
 
     public static void ClearOsFileCache(string? ramMapPath)
