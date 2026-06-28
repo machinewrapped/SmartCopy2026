@@ -31,7 +31,7 @@ public sealed record OperationalSettings
     /// <summary>Which byte-pump path the engine uses; <see cref="LocalFileSystemWriteMode.Auto"/> decides per file.</summary>
     public LocalFileSystemWriteMode WriteMode { get; init; } = LocalFileSystemWriteMode.Auto;
     /// <summary>Rent the manual-loop buffer from <c>ArrayPool</c> instead of allocating one per file.</summary>
-    public bool UseArrayPoolForManualLoop { get; init; }
+    public bool UseArrayPoolForManualLoop { get; init; } = true;
     /// <summary>Files at or below this size are written <see cref="WriteDurability.Direct"/> (no staging),
     /// the write being effectively atomic anyway. <c>0</c> disables the fast path (always stage).</summary>
     public long TinyFileFastPathThresholdBytes { get; init; }

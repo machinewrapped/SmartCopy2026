@@ -7,6 +7,14 @@ namespace SmartCopy.Tests.FileSystem;
 public sealed class LocalFileSystemProviderWriteStrategyTests
 {
     [Fact]
+    public void OperationalSettings_DefaultsToArrayPoolForManualLoop()
+    {
+        var settings = new OperationalSettings();
+
+        Assert.True(settings.UseArrayPoolForManualLoop);
+    }
+
+    [Fact]
     public async Task WriteAsync_CopyToAsyncMode_ReportsProgressAndWritesContent()
     {
         using var temp = new TempDirectory();
