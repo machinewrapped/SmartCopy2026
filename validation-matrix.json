@@ -155,7 +155,7 @@
   "variants": [
     {
       "name": "Production_Routed",
-      "notes": "Production runner with promoted defaults (64 KiB direct, 1 MiB batch, 512 KiB eligibility) and destination routing ON. The candidate policy under validation.",
+      "notes": "Production runner with promoted defaults (256 KiB direct, 1 MiB batch, 512 KiB eligibility) and destination routing ON. The candidate policy under validation.",
       "enabled": true,
       "desiredRunCount": 5,
       "overwriteMode": null,
@@ -164,7 +164,7 @@
       "providerWriteMode": null,
       "providerUseArrayPoolForManualLoop": null,
       "providerPreallocateDestinationFile": null,
-      "directWriteThresholdBytes": 65536,
+      "directWriteThresholdBytes": 262144,
       "bufferBatchBytes": 1048576,
       "batchEligibilityThresholdBytes": 524288,
       "destinationRoutingEnabled": true,

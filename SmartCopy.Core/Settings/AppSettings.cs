@@ -25,7 +25,7 @@ public sealed class AppSettings
 
     // Performance optimisations — tunable in DEBUG builds, always serialised.
     public bool AllowCopyOptimisations { get; set; } = false;
-    public int TinyFileFastPathKb { get; set; } = 64;   // 64 KiB step-change threshold
+    public int TinyFileFastPathKb { get; set; } = 256;  // Conservative direct-write threshold
     public int BatchBufferKb { get; set; } = 1024;        // 1 MiB default buffer
 
     [JsonConverter(typeof(JsonStringEnumConverter))]

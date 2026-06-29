@@ -25,10 +25,30 @@
       "providerWriteSequentialScan": null,
       "usePathPool": true,
       "variants": null
+    },
+    {
+      "name": "MixedDataset-DtoO",
+      "destinationPath": "O:\\TestData\\MixedDataset_ValidationSmoke",
+      "sourcePath": "D:\\TestData\\MixedDataset",
+      "enabled": true,
+      "clearDestinationBeforeRun": true,
+      "clearDestinationAfterRun": true,
+      "overwriteMode": 1,
+      "providerCopyBufferSizeBytes": null,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "directWriteThresholdBytes": null,
+      "bufferBatchBytes": null,
+      "batchEligibilityThresholdBytes": null,
+      "providerWriteSequentialScan": null,
+      "usePathPool": true,
+      "variants": null
     }
   ],
   "scenarioExecutionOrder": [
-    "MixedDataset-RtoD"
+    "MixedDataset-RtoD",
+    "MixedDataset-DtoO"
   ],
   "variants": [
     {
@@ -58,7 +78,7 @@
     },
     {
       "name": "Prototype",
-      "notes": "Prototype reference (BenchmarkCopyRunner) with promoted defaults: 64 KiB direct write, 1 MiB batch, 512 KiB eligibility ceiling. Runs the prototype engine even under --mode validation via usePrototypeExecutor.",
+      "notes": "Prototype reference (BenchmarkCopyRunner) with promoted defaults: 256 KiB direct write, 1 MiB batch, 512 KiB eligibility ceiling. Runs the prototype engine even under --mode validation via usePrototypeExecutor.",
       "enabled": true,
       "desiredRunCount": 5,
       "writeJournal": true,
@@ -67,7 +87,7 @@
       "providerSmallFileProgressThresholdBytes": null,
       "providerWriteMode": null,
       "providerUseArrayPoolForManualLoop": null,
-      "directWriteThresholdBytes": 65536,
+      "directWriteThresholdBytes": 262144,
       "bufferBatchBytes": 1048576,
       "batchEligibilityThresholdBytes": 524288,
       "destinationRoutingEnabled": false,
@@ -92,7 +112,7 @@
       "providerSmallFileProgressThresholdBytes": null,
       "providerWriteMode": null,
       "providerUseArrayPoolForManualLoop": null,
-      "directWriteThresholdBytes": 65536,
+      "directWriteThresholdBytes": 262144,
       "bufferBatchBytes": 1048576,
       "batchEligibilityThresholdBytes": 524288,
       "destinationRoutingEnabled": false,
@@ -102,7 +122,7 @@
       "expectedEffectiveCopyBufferSizeBytes": 1048576,
       "expectedEffectiveBatchBufferBytes": 1048576,
       "expectedEffectiveBatchEligibilityCeilingBytes": 524288,
-      "expectedEffectiveTinyFileFastPathThresholdBytes": 65536,
+      "expectedEffectiveTinyFileFastPathThresholdBytes": 262144,
       "expectedEffectiveDestinationRoutingEnabled": false,
       "validationRole": "Equivalence"
     },
@@ -117,7 +137,7 @@
       "providerSmallFileProgressThresholdBytes": null,
       "providerWriteMode": 2,
       "providerUseArrayPoolForManualLoop": null,
-      "directWriteThresholdBytes": 65536,
+      "directWriteThresholdBytes": 262144,
       "bufferBatchBytes": 1048576,
       "batchEligibilityThresholdBytes": 524288,
       "destinationRoutingEnabled": false,
@@ -127,13 +147,13 @@
       "expectedEffectiveCopyBufferSizeBytes": 1048576,
       "expectedEffectiveBatchBufferBytes": 1048576,
       "expectedEffectiveBatchEligibilityCeilingBytes": 524288,
-      "expectedEffectiveTinyFileFastPathThresholdBytes": 65536,
+      "expectedEffectiveTinyFileFastPathThresholdBytes": 262144,
       "expectedEffectiveDestinationRoutingEnabled": false,
       "validationRole": null
     },
     {
       "name": "Production_DirectAll",
-      "notes": "Diagnostic variant: same promoted defaults as Production_Fixed, but raises the direct-write threshold to long.MaxValue so benchmark-sized files bypass staged temp-file + rename. Isolates staged-write cost; not a production durability policy.",
+      "notes": "Diagnostic variant: same promoted defaults as Production_Fixed, but raises the direct-write threshold to long.MaxValue so benchmark-sized files bypass staged temp-file \u002B rename. Isolates staged-write cost; not a production durability policy.",
       "enabled": true,
       "desiredRunCount": 5,
       "writeJournal": true,
@@ -167,7 +187,7 @@
       "providerSmallFileProgressThresholdBytes": 9223372036854775807,
       "providerWriteMode": null,
       "providerUseArrayPoolForManualLoop": null,
-      "directWriteThresholdBytes": 65536,
+      "directWriteThresholdBytes": 262144,
       "bufferBatchBytes": 1048576,
       "batchEligibilityThresholdBytes": 524288,
       "destinationRoutingEnabled": false,
@@ -177,7 +197,7 @@
       "expectedEffectiveCopyBufferSizeBytes": 1048576,
       "expectedEffectiveBatchBufferBytes": 1048576,
       "expectedEffectiveBatchEligibilityCeilingBytes": 524288,
-      "expectedEffectiveTinyFileFastPathThresholdBytes": 65536,
+      "expectedEffectiveTinyFileFastPathThresholdBytes": 262144,
       "expectedEffectiveDestinationRoutingEnabled": false,
       "validationRole": "Equivalence"
     },
@@ -192,7 +212,7 @@
       "providerSmallFileProgressThresholdBytes": null,
       "providerWriteMode": null,
       "providerUseArrayPoolForManualLoop": null,
-      "directWriteThresholdBytes": 65536,
+      "directWriteThresholdBytes": 262144,
       "bufferBatchBytes": 1048576,
       "batchEligibilityThresholdBytes": 524288,
       "destinationRoutingEnabled": false,
@@ -202,13 +222,13 @@
       "expectedEffectiveCopyBufferSizeBytes": 1048576,
       "expectedEffectiveBatchBufferBytes": 1048576,
       "expectedEffectiveBatchEligibilityCeilingBytes": 524288,
-      "expectedEffectiveTinyFileFastPathThresholdBytes": 65536,
+      "expectedEffectiveTinyFileFastPathThresholdBytes": 262144,
       "expectedEffectiveDestinationRoutingEnabled": false,
       "validationRole": null
     },
     {
       "name": "Production_Routed",
-      "notes": "Production runner with promoted defaults (64 KiB direct, 1 MiB copy/batch, 512 KiB eligibility) and destination routing ON. Equivalence pair vs Production_Fixed; validation asserts the routed drive pair resolves to the same effective parameters.",
+      "notes": "Production runner with promoted defaults (256 KiB direct, 1 MiB copy/batch, 512 KiB eligibility) and destination routing ON. Equivalence pair vs Production_Fixed; validation asserts the routed drive pair resolves to the same effective parameters.",
       "enabled": false,
       "desiredRunCount": 5,
       "writeJournal": true,
@@ -217,7 +237,7 @@
       "providerSmallFileProgressThresholdBytes": null,
       "providerWriteMode": null,
       "providerUseArrayPoolForManualLoop": null,
-      "directWriteThresholdBytes": 65536,
+      "directWriteThresholdBytes": 262144,
       "bufferBatchBytes": 1048576,
       "batchEligibilityThresholdBytes": 524288,
       "destinationRoutingEnabled": true,
@@ -227,7 +247,7 @@
       "expectedEffectiveCopyBufferSizeBytes": 1048576,
       "expectedEffectiveBatchBufferBytes": 1048576,
       "expectedEffectiveBatchEligibilityCeilingBytes": 524288,
-      "expectedEffectiveTinyFileFastPathThresholdBytes": 65536,
+      "expectedEffectiveTinyFileFastPathThresholdBytes": 262144,
       "expectedEffectiveDestinationRoutingEnabled": true,
       "validationRole": "Equivalence"
     }
@@ -277,7 +297,7 @@
     ]
   },
   "cooldownSeconds": 120,
-  "clearCacheBetweenRuns": true,
+  "clearCacheBetweenRuns": false,
   "ramMapPath": "R:\\Development\\Github\\SmartCopy2026\\Tools\\RAMMap\\RAMMap64.exe",
   "sourcePools": {
     "R:\\TestData\\MixedDataset": [
@@ -289,6 +309,16 @@
       "R:\\TestData\\MixedDataset_4",
       "R:\\TestData\\MixedDataset_8",
       "R:\\TestData\\MixedDataset_7"
+    ],
+    "D:\\TestData\\MixedDataset": [
+      "D:\\TestData\\MixedDataset_7",
+      "D:\\TestData\\MixedDataset_3",
+      "D:\\TestData\\MixedDataset_2",
+      "D:\\TestData\\MixedDataset_5",
+      "D:\\TestData\\MixedDataset_1",
+      "D:\\TestData\\MixedDataset_4",
+      "D:\\TestData\\MixedDataset_8",
+      "D:\\TestData\\MixedDataset_6"
     ]
   }
 }

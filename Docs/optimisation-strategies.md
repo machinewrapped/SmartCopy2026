@@ -18,15 +18,15 @@ An important caveat: Every file write incurs unavoidable filesystem work — MFT
 
 ## 2. Current Policy & Open Questions
 
-*The one place to read for "what do we currently believe." The dated evidence and per-phase history live in §6; this is the signal extracted from them. Last updated 2026-06-27.*
+*The one place to read for "what do we currently believe." The dated evidence and per-phase history live in §6; this is the signal extracted from them. Last updated 2026-06-29.*
 
-**Shipping policy (the candidate bundle).** Encoded in code, gated behind `AllowCopyOptimisations` (default **OFF**) pending the production-path validation (§6, Production Validation Pass):
+**Shipping policy (the candidate bundle).** Encoded in code, gated behind `AllowCopyOptimisations` (default **OFF**). Gate 1 production-path validation passed on SSD MixedDataset smoke; Gate 2 cross-drive validation remains before broad default promotion (§6, Production Validation Pass):
 
 | Knob | Value | Source of record |
 |---|---|---|
 | Copy buffer | SSD/USB 1 MiB · HDD/Unknown 512 KiB | `DefaultCopyStrategyPolicy.SelectBufferBytes` |
 | Batch buffer | 1 MiB (eligibility ceiling 512 KiB) | `AppSettings.BatchBufferKb`, `OperationalSettings` |
-| Direct-write threshold | 64 KiB | `AppSettings.TinyFileFastPathKb` |
+| Direct-write threshold | 256 KiB | `AppSettings.TinyFileFastPathKb` |
 | Manual-loop byte buffer | ArrayPool-rented | `OperationalSettings.UseArrayPoolForManualLoop` |
 | Preallocation | OFF (universal) | `DefaultCopyStrategyPolicy` |
 
@@ -36,10 +36,10 @@ An important caveat: Every file write incurs unavoidable filesystem work — MFT
 |---|---|---|
 | Buffer routing (1 MiB SSD/USB, 512 KiB HDD/Unknown) | **Validated** across multiple drive pairs | Phase 5, Phase 6 |
 | Preallocation OFF | **Validated** — null or regresses everywhere (an earlier +11.6% SSD→HDD finding was retracted) | Phase 5 |
-| Tiny-file direct write ≤ 64 KiB | **Validated on SSD**; assumed on HDD/USB | Phase 2 |
+| Tiny-file direct write ≤ 256 KiB | **Validated on SSD**; assumed on HDD/USB | Phase 2 + MixedDataset validation |
 | Batching (1 MiB / 512 KiB ceiling) | **SSD validated** (small — see below); **OFF on USB** (regresses); **HDD never measured** | Phase 3, Phase 6 |
 | Operation journal I/O | **Ruled out** as the production/prototype gap; disabling benchmark journals was consistently slightly slower | Production Validation Pass |
-| Whole bundle on the production path | **Validation in progress** — value over legacy confirmed in smoke; production/prototype parity gap persists but narrows on MixedDataset R→D | Production Validation Pass |
+| Whole bundle on the production path | **Gate 1 passed** — production matches prototype within noise on MixedDataset R→D and D→O after the 256 KiB direct-write promotion; Gate 2 cross-drive matrix pending | Production Validation Pass |
 
 **Batching is a small effect, easy to over-read.** Its genuine contribution above a 512 KiB buffer is **1–2% on SSD**, concentrated in sub-16 KiB files (Phase 3, key conclusion 1). The often-cited +8.5% "champion" is mostly the buffer/chunk-size win — which the buffer-routing policy already captures independently. Worth keeping, not worth headlining.
 
@@ -72,8 +72,8 @@ The pipeline knows every file's size before execution begins. The target archite
 
 | File Size | Code Path |
 |---|---|
-| ≤ 64 KiB | Direct write (no staging), batch-eligible — Phase 2+3 |
-| 64 KiB – 512 KiB | Staged write, batch-eligible — Phase 3 |
+| ≤ 256 KiB | Direct write (no staging), batch-eligible — Phase 2+3 |
+| 256 KiB – 512 KiB | Staged write, batch-eligible — Phase 3 |
 | > 512 KiB | ManualLoop, 512 KiB–1 MiB copy buffer, destination-sensitive — Phase 5+6 |
 
 The 512 KiB boundary is the batch eligibility ceiling: files above it bypass the batch path and route directly to ManualLoop. **Evidence gap:** the 512 KiB – ~8 MiB range has no direct ManualLoop measurements (Phase 3 tested files in that range via the batch path; Phase 5 measured files above ~8 MiB). The 512 KiB copy buffer is the defensible default for that range — proven better than 4 KiB, and consistent with Phase 5 findings that 512 KiB is safe on all destination types.
@@ -421,9 +421,9 @@ Bucket-level throughput comparison (`DirectWriteBatch4MiB` vs `StagedWriteBatch4
 
 **The direct-write advantage is largest for the smallest files** (Sub4KiB: +12%, Sub16KiB: +7%) and tapers as file size increases (Sub4MiB: +2%). This is the opposite of the initial hypothesis that staging overhead matters most for large files — the temp-file create/rename lifecycle takes a proportionally larger share of elapsed time when the byte-copy component is tiny. This also means the integrity trade-off is most consequential where it matters least: very small files where the write is effectively atomic at the sector level anyway.
 
-**Integrity trade-off:** Direct write without staging leaves a partial file on power loss or device unplug. **Mitigation:** on stream error (not unplug), delete the partial destination file. The trade-off is most acceptable below 64 KiB, where writes are more likely to be effectively atomic at the firmware level (single sector or block). Above 64 KiB, files span multiple sectors and the risk of a meaningful partial write increases — staged write remains the safer default there.
+**Integrity trade-off:** Direct write without staging can leave a partial file on power loss or device unplug. **Mitigation:** on stream error (not unplug), delete the partial destination file. The trade-off is most acceptable for small files, where the staged temp-file lifecycle is proportionally expensive and partial-write cleanup is usually enough for ordinary failures. It is not a true filesystem atomicity guarantee; staged write remains the safer default for larger files.
 
-**Core integration:** `TinyFileFastPathThresholdBytes: long` in `OperationalSettings`; the struct field has no initializer (C# default **0**, so unset benchmark/test contexts do not accidentally enable the fast path). App default via `AppSettings.TinyFileFastPathKb = 64` passes **65536** (64 KiB) to every production job — the step-change threshold supported by the per-bucket evidence. Setting to 0 disables the fast path entirely (pre-Phase 2 behaviour). In `LocalFileSystemProvider.WriteAsync`, when `fileSize ≤ threshold`, write directly to the destination using `FileMode.Create`; skip staging.
+**Core integration:** `TinyFileFastPathThresholdBytes: long` in `OperationalSettings`; the struct field has no initializer (C# default **0**, so unset benchmark/test contexts do not accidentally enable the fast path). App default via `AppSettings.TinyFileFastPathKb = 256` passes **262144** (256 KiB) to every production job. The original Phase 2 threshold sweep showed the clearest step change at 64 KiB, but the later MixedDataset production-path diagnostics repeatedly localized extra production overhead in the staged 64-256 KiB path; 256 KiB is the conservative promotion that captures that bucket without applying direct writes to medium/large files. Setting to 0 disables the fast path entirely (pre-Phase 2 behaviour). In `LocalFileSystemProvider.WriteAsync`, when `fileSize ≤ threshold`, write directly to the destination using `FileMode.Create`; skip staging.
 
 **Acceptance criteria:** files bit-identical to staged baseline; no behaviour change when threshold is 0.
 
@@ -480,7 +480,7 @@ Bucket-level throughput comparison (`DirectWriteBatch4MiB` vs `StagedWriteBatch4
 
 ### Phase 3 — Buffered Read-Write Batching
 
-**Status:** Core integration complete; production-path policy validation pending (see the Production Validation Pass). The batching coordinator lives in `BatchedCopyStrategy` (with `BatchCopyBuffer`), selected by the policy when `BatchBufferBytes > 0`.
+**Status:** Core integration complete; Gate 1 production-path parity passed; Gate 2 cross-drive generalisation pending (see the Production Validation Pass). The batching coordinator lives in `BatchedCopyStrategy` (with `BatchCopyBuffer`), selected by the policy when `BatchBufferBytes > 0`.
 
 **Goal:** Replace the read-write interleave on every file with read-phase then write-phase batching, so many small files share each flush (phase separation).
 
@@ -847,34 +847,36 @@ Both need to be tested with same-drive and different-drive source & target pairs
 
 ## 7. Production Validation Pass
 
-Gate 1 ran 2026-06-21. The first (non-idle) session read PASS, but idle re-runs did not reproduce a clean equivalence verdict and the SmallFileDataset × SSDtoSSD pair does not converge to the 3% window even at 10 runs (see the Gate 1 result below). Gate 1's intent — validating that the production wrapper executes the bundle without gross regression — is carried as **provisionally met**; the live work moves to a **different source/target drive pair** and onward to the Gate 2 MixedDataset × drive matrix, where whether the policy *generalises* (and delivers value) is the actual question. A clean-environment re-run (2026-06-22, Windows Defender excluded) then reframed the baseline — AV scanning dominated prior copy-time measurements — and reopened the production-vs-prototype equivalence question; see **Result (2026-06-22)** below.
+**Current decision (2026-06-29): Gate 1 passed.** The original `SmokeDataset` Gate 1 runs exposed a real production/prototype gap in the staged >64 KiB path, but later MixedDataset validation with the promoted 256 KiB direct-write threshold removed the stable regression signal. On both SSD pairs now tested (`R→D` and `D→O`), `Production_Fixed` is within noise of `Prototype`; one pair lands slightly faster, one slightly slower, and neither shows a gate-quality regression. The remaining question is no longer "can production execute the bundle without unexplained overhead?" but "does the bundle generalise across drive classes?" — Gate 2.
 
-The production copy path (`PipelineRunner → CopyStep → DefaultCopyStrategyPolicy → BatchedCopyStrategy`) had **never been measured with batching/routing enabled**: under `--mode benchmark` the harness diverts any variant carrying batch/direct-write settings to the `BenchmarkCopyRunner` prototype. The new **`--mode validation`** always drives the production runner, mapping each variant's batch/eligibility/direct-write fields onto `OperationalSettings` — so `Production_Routed` measures production where benchmark mode would measure the prototype. (`Legacy_Baseline` carries no batch settings, so it runs the production streaming path under either mode; `Production_Routed` is the variant that requires validation mode.) This pass validates that production *matches* the prototype (parity) and that the candidate bundle beats the legacy default (value). A PASS is what justifies *promoting* the bundle — flipping `AllowCopyOptimisations` from its off-by-default state; the bundle is unpromoted by design until this pass clears it. The MixedDataset matrix is a multi-week run, so the ladder fails fast: cheap signals before drive-weeks.
+The production copy path (`PipelineRunner → CopyStep → DefaultCopyStrategyPolicy → BatchedCopyStrategy`) had **never been measured with batching/routing enabled**: under `--mode benchmark` the harness diverts any variant carrying batch/direct-write settings to the `BenchmarkCopyRunner` prototype. The new **`--mode validation`** always drives the production runner, mapping each variant's batch/eligibility/direct-write fields onto `OperationalSettings` — so `Production_Routed` measures production where benchmark mode would measure the prototype. (`Legacy_Baseline` carries no batch settings, so it runs the production streaming path under either mode; `Production_Routed` is the variant that requires validation mode.) Gate 1 validates that production *matches* the prototype (parity) with no unexplained wrapper regression. Gate 2 validates whether the candidate bundle generalises across drive classes before broad default promotion. The MixedDataset matrix is a multi-week run, so the ladder fails fast: cheap signals before drive-weeks.
 
 **Metric.** Median `executeDuration` per scenario/variant; variance = the `ConvergenceSpreadPercent` window (`BenchmarkConvergence`); verdicts PASS / INCONCLUSIVE / REGRESSION / INVALID (and `BELOW_THRESHOLD` where the gate clears the noise floor) per §4.2.3.
 
-**Candidate bundle (under validation).** The settings promotion would enable — encoded in code today as off-by-default candidates behind `AllowCopyOptimisations` (default `false`). The bundle was never promoted *by design*; this pass is the gate that justifies it. These are the shipped defaults, not the 4 MiB discovery champion from the Phase 3 clean-room run (which production did not adopt).
+**Candidate bundle.** The settings promotion would enable — encoded in code today as off-by-default candidates behind `AllowCopyOptimisations` (default `false`). Gate 1 now clears the production-wrapper/parity risk; Gate 2 is the remaining cross-drive generalisation gate. These are the shipped defaults, not the 4 MiB discovery champion from the Phase 3 clean-room run (which production did not adopt).
 
 | Knob | Value | Source of record |
 |---|---|---|
 | Copy buffer | SSD/USB 1 MiB, HDD/Unknown 512 KiB | `DefaultCopyStrategyPolicy.SelectBufferBytes` |
 | Batch buffer | 1 MiB | `AppSettings.BatchBufferKb` |
 | Batch eligibility ceiling | 512 KiB | `OperationalSettings` default |
-| Direct-write threshold | 64 KiB | `AppSettings.TinyFileFastPathKb` |
+| Direct-write threshold | 256 KiB | `AppSettings.TinyFileFastPathKb` |
 | Preallocation | OFF | `DefaultCopyStrategyPolicy` |
 
 `AllowCopyOptimisations` gates routing + batch + direct-write as one unit, so the pass validates the bundle **as shipped** — there is no production mode that enables routing alone. `Production_Routed` is this bundle reached via routing; `Prototype` and `Production_Fixed` pin the same values for the Gate 1 equivalence check.
 
 Batching is validated on SSD (Phase 3) and shown to regress on USB (Phase 6), but **never measured on HDD** — the cross-drive suite (Phase 5) swept buffer and preallocation only, not batching. The candidate bundle assumes batching-on for HDD; Gate 2's SSDtoHDD pair is where that assumption is earned rather than presumed.
 
-**Implementation — new code required.** None of the gates can run until this is built; it is the bulk of the work.
+**Implementation status.** Complete; retained here as the design checklist that made the validation pass meaningful.
 
 - **Mode + executor seam.** Add `BenchmarkRunMode.Validation`; parse `validation`/`validate` in `BenchmarkCliOptions.ParseMode`; route it in `Program.cs`. Extract the copy invocation in `BenchmarkTask.RunCopyAsync` (today's `if (directWriteThresholdBytes > 0 || bufferBatchBytes > 0)` branch) behind an `ICopyExecutor`: `PrototypeCopyExecutor` (that branch verbatim — `BenchmarkCopyRunner` when batch/direct set, else `PipelineRunner`; used by `--mode benchmark`) and `ProductionCopyExecutor` (always `PipelineRunner.ExecuteAsync`; used by `--mode validation`). `BenchmarkTask` selects the executor from the mode.
 - **Settings mapping** (the crux — today nothing maps the new fields). Add `DestinationRoutingEnabled` to `BenchmarkVariant` (`Production_Routed` sets it; `Production_Fixed` leaves it off); `BufferBatchBytes` / `BatchEligibilityThresholdBytes` / `DirectWriteThresholdBytes` / `MatchedControl` already exist. Add `BenchmarkVariant.CreateProductionOperationalSettings`: `BufferBatchBytes → BatchBufferBytes`, `BatchEligibilityThresholdBytes → BatchEligibilityCeilingBytes`, `DirectWriteThresholdBytes → TinyFileFastPathThresholdBytes`, set `DestinationRoutingEnabled`, job `CopyStrategyPolicy = DefaultCopyStrategyPolicy.Instance`. The existing `CreateOperationalSettings` (legacy provider fields only) is left for the prototype path. `ProductionCopyExecutor` logs the resolved `OperationalSettings` (+ the policy's resolved buffer) at startup — the run-1 sanity check.
-- **Configs + data** (authored, not code). `validation-smoke.json` (Gate 1) and `validation-matrix.json` (Gate 2). `Prototype` / `Production_Fixed` carry the candidate-bundle values (table above) as per-scenario overrides — buffer pinned to the pair, batch 1 MiB, ceiling 512 KiB, direct-write 64 KiB; the shipped `AppSettings`/policy defaults, not the discovery champion. Equivalence pairing reuses `MatchedControl` (`Production_Fixed` → `Prototype`).
+- **Configs + data** (authored, not code). `validation-smoke.json` (Gate 1) and `validation-matrix.json` (Gate 2). `Prototype` / `Production_Fixed` carry the candidate-bundle values (table above) as per-scenario overrides — buffer pinned to the pair, batch 1 MiB, ceiling 512 KiB, direct-write 256 KiB; the shipped `AppSettings`/policy defaults, not the discovery champion. Equivalence pairing reuses `MatchedControl` (`Production_Fixed` → `Prototype`).
 - **Reused unchanged:** convergence, analysis/report, journals, dataset-prep, cooldown/cold-cache, the §4.2.3 verdict machinery, the `BenchmarkSizeScalingAnalysis` invariants, and the existing unit suite.
 
-#### Gate 1 — Parity smoke · ~45 min
+#### Gate 1 — Production/prototype parity smoke — PASSED
+
+**Status:** **PASSED 2026-06-29** on full `MixedDataset` SSD smoke. The earlier `SmokeDataset` runs below are retained because they explain the investigation path; the decision basis is the later MixedDataset evidence after the 256 KiB direct-write threshold, directory/staging cleanup, redundant flush removal, and manual-loop ArrayPool default fix.
 
 - **Run:** `--mode validation --config validation-smoke.json`. **Once** (not re-run for Gate 2).
 - **Scenario:** `SmokeDataset` × **D→O** (SSD→SSD). Large-file-weighted (~2.1 GiB, ~23 s/run): ~46% of wall time is ≤512 KiB (batched path), the rest in 512 KiB–32 MiB files so the streamed/routed buffer is actually exercised. **Replaces the original `SmallFileDataset` smoke**, which the new `% Copy Time` metric exposed as ~90% sub-64 KiB wall time — the >512 KiB buffer/routing path was effectively unmeasured. Needs `--mode dataset-prep` before the first run. SSDtoSSD because wrapper overhead is most exposed on the fastest pair; D→O specifically because the D→R pair gave unreproducible verdicts (below).
@@ -991,6 +993,19 @@ Both engines stage the identical set: `CreateProductionOperationalSettings` maps
 - **Decision:** retire `Production_NoJournal` from active benchmark configs. Leave the runtime `WriteOperationJournal` option in place because the product value question is separate; it defaults OFF and remains user-controllable.
 
 **Follow-up (2026-06-27): manual-loop buffer pooling default fixed.** `StreamCopyEngine.CopyWithManualLoopAsync` already supported `ArrayPool<byte>`, but `OperationalSettings.UseArrayPoolForManualLoop` defaulted to `false`. With the promoted 1 MiB copy buffer, that meant any path using the manual loop without an explicit override allocated a fresh LOH-sized array per file copy. The loop did **not** allocate per 1 MiB chunk — one buffer was reused inside each copy call — but allocating one per file is still the wrong production default. The default is now `true`; explicit benchmark variants can still force `false` when an allocation-control comparison is needed.
+
+**Result (2026-06-28/29): MixedDataset SSD smoke with 256 KiB direct-write threshold — Gate 1 passed.** `validation-smoke-mixed-dataset.json` was run with RAMMap cache clearing disabled, `Prototype`, `Production_Fixed`, and diagnostic `Production_DirectAll` active. The active production candidate (`Production_Fixed`) matched `Prototype` within noise on both SSD pairs:
+
+| Scenario | Pair | Role | Verdict | Delta vs control | Noise floor | Decision |
+|---|---|---|---|---:|---:|---|
+| `MixedDataset-RtoD` | `Production_Fixed` vs `Prototype` | Equivalence | `INCONCLUSIVE` | **+2.4% (+1.4 s)** | 1.5 s | parity within noise |
+| `MixedDataset-RtoD` | `Production_DirectAll` vs `Prototype` | Diagnostic | `PASS` | **+4.6% (+2.7 s)** | 1.2 s | staged-write overhead remains, but DirectAll is not the policy |
+| `MixedDataset-DtoO` | `Production_Fixed` vs `Prototype` | Equivalence | `INCONCLUSIVE*` | **-1.8% (-736 ms)** | 3.0 s | parity within noise |
+| `MixedDataset-DtoO` | `Production_DirectAll` vs `Prototype` | Diagnostic | `INCONCLUSIVE*` | **-4.0% (-1.7 s)** | 2.7 s | no supported gain on this noisy pair |
+
+`D→O` is still bivalent and production did not converge cleanly there, but the fast-band comparison no longer reproduces the former stable 5-8% production deficit. `R→D` converged and put `Production_Fixed` slightly faster than `Prototype`; `D→O` put it slightly slower, within a much larger noise floor. The correct reading is **production/prototype parity, not a performance win**.
+
+**Decision:** Gate 1 is passed. The 256 KiB direct-write threshold is the active candidate policy because it removes the reproducible staged 64-256 KiB production shortfall without applying direct writes to medium/large files. `Production_DirectAll` remains useful as a diagnostic for staged-write overhead, but it is not promoted as a durability policy. Proceed to Gate 2; do not keep chasing prototype parity on SSD smoke unless a new run produces a gate-quality `REGRESSION`.
 
 #### Gate 2 — Full matrix, fail-fast ordered · hours → weeks
 
