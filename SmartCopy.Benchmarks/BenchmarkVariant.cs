@@ -18,13 +18,19 @@ internal sealed class BenchmarkVariant
     public long? DirectWriteThresholdBytes { get; set; }
     public long? BufferBatchBytes { get; set; }
     public long? BatchEligibilityThresholdBytes { get; set; }
+    public bool? BatchOrderByFileSize { get; set; }
     public bool? DestinationRoutingEnabled { get; set; }
     public bool? ProviderWriteSequentialScan { get; set; }
+    /// <summary>
+    /// Overrides the mode default executor. Null keeps the mode default (benchmark=prototype,
+    /// validation=production); true forces the prototype executor; false forces the production runner.
+    /// </summary>
     public bool? UsePrototypeExecutor { get; set; }
     public string? MatchedControl { get; set; }
     public int? ExpectedEffectiveCopyBufferSizeBytes { get; set; }
     public long? ExpectedEffectiveBatchBufferBytes { get; set; }
     public long? ExpectedEffectiveBatchEligibilityCeilingBytes { get; set; }
+    public bool? ExpectedEffectiveBatchOrderByFileSize { get; set; }
     public long? ExpectedEffectiveTinyFileFastPathThresholdBytes { get; set; }
     public bool? ExpectedEffectiveDestinationRoutingEnabled { get; set; }
 
@@ -67,6 +73,9 @@ internal sealed class BenchmarkVariant
             UseArrayPoolForManualLoop = ProviderUseArrayPoolForManualLoop
                 ?? scenario.ProviderUseArrayPoolForManualLoop
                 ?? defaults.UseArrayPoolForManualLoop,
+            BatchOrderByFileSize = BatchOrderByFileSize
+                ?? scenario.BatchOrderByFileSize
+                ?? defaults.BatchOrderByFileSize,
         }.Normalize();
     }
 
@@ -83,6 +92,7 @@ internal sealed class BenchmarkVariant
         var defaults = new OperationalSettings();
         var batchBufferBytes = BufferBatchBytes ?? scenario.BufferBatchBytes ?? 0L;
         var batchEligibilityCeilingBytes = BatchEligibilityThresholdBytes ?? scenario.BatchEligibilityThresholdBytes ?? defaults.BatchEligibilityCeilingBytes;
+        var batchOrderByFileSize = BatchOrderByFileSize ?? scenario.BatchOrderByFileSize ?? defaults.BatchOrderByFileSize;
         var tinyFileFastPathThresholdBytes = DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes ?? 0L;
         var destinationRoutingEnabled = DestinationRoutingEnabled ?? false;
 
@@ -102,6 +112,7 @@ internal sealed class BenchmarkVariant
                 ?? defaults.UseArrayPoolForManualLoop,
             BatchBufferBytes = batchBufferBytes,
             BatchEligibilityCeilingBytes = batchEligibilityCeilingBytes,
+            BatchOrderByFileSize = batchOrderByFileSize,
             TinyFileFastPathThresholdBytes = tinyFileFastPathThresholdBytes,
             DestinationRoutingEnabled = destinationRoutingEnabled,
         }.Normalize();

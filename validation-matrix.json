@@ -6,8 +6,6 @@
   "gatePercent": 3,
   "maxConvergenceRuns": 5,
   "converge": true,
-  "clearCacheBetweenRuns": true,
-  "ramMapPath": "D:\\Development\\Github\\SmartCopy2026\\Tools\\RAMMap\\RAMMap64.exe",
   "scenarios": [
     {
       "name": "SSDtoSSD",
@@ -21,12 +19,12 @@
       "providerSmallFileProgressThresholdBytes": null,
       "providerWriteMode": null,
       "providerUseArrayPoolForManualLoop": null,
-      "providerPreallocateDestinationFile": null,
       "directWriteThresholdBytes": null,
       "bufferBatchBytes": null,
       "batchEligibilityThresholdBytes": null,
-      "usePathPool": false,
-      "pathPool": null
+      "providerWriteSequentialScan": null,
+      "usePathPool": true,
+      "variants": null
     },
     {
       "name": "SameDriveSSD",
@@ -40,12 +38,12 @@
       "providerSmallFileProgressThresholdBytes": null,
       "providerWriteMode": null,
       "providerUseArrayPoolForManualLoop": null,
-      "providerPreallocateDestinationFile": null,
       "directWriteThresholdBytes": null,
       "bufferBatchBytes": null,
       "batchEligibilityThresholdBytes": null,
-      "usePathPool": false,
-      "pathPool": null
+      "providerWriteSequentialScan": null,
+      "usePathPool": true,
+      "variants": null
     },
     {
       "name": "SameDriveHDD",
@@ -59,12 +57,12 @@
       "providerSmallFileProgressThresholdBytes": null,
       "providerWriteMode": null,
       "providerUseArrayPoolForManualLoop": null,
-      "providerPreallocateDestinationFile": null,
       "directWriteThresholdBytes": null,
       "bufferBatchBytes": null,
       "batchEligibilityThresholdBytes": null,
-      "usePathPool": false,
-      "pathPool": null
+      "providerWriteSequentialScan": null,
+      "usePathPool": true,
+      "variants": null
     },
     {
       "name": "SSDtoHDD",
@@ -78,12 +76,12 @@
       "providerSmallFileProgressThresholdBytes": null,
       "providerWriteMode": null,
       "providerUseArrayPoolForManualLoop": null,
-      "providerPreallocateDestinationFile": null,
       "directWriteThresholdBytes": null,
       "bufferBatchBytes": null,
       "batchEligibilityThresholdBytes": null,
-      "usePathPool": false,
-      "pathPool": null
+      "providerWriteSequentialScan": null,
+      "usePathPool": true,
+      "variants": null
     },
     {
       "name": "HDDtoSSD",
@@ -97,12 +95,12 @@
       "providerSmallFileProgressThresholdBytes": null,
       "providerWriteMode": null,
       "providerUseArrayPoolForManualLoop": null,
-      "providerPreallocateDestinationFile": null,
       "directWriteThresholdBytes": null,
       "bufferBatchBytes": null,
       "batchEligibilityThresholdBytes": null,
-      "usePathPool": false,
-      "pathPool": null
+      "providerWriteSequentialScan": null,
+      "usePathPool": true,
+      "variants": null
     },
     {
       "name": "HDDtoHDD",
@@ -116,12 +114,12 @@
       "providerSmallFileProgressThresholdBytes": null,
       "providerWriteMode": null,
       "providerUseArrayPoolForManualLoop": null,
-      "providerPreallocateDestinationFile": null,
       "directWriteThresholdBytes": null,
       "bufferBatchBytes": null,
       "batchEligibilityThresholdBytes": null,
-      "usePathPool": false,
-      "pathPool": null
+      "providerWriteSequentialScan": null,
+      "usePathPool": true,
+      "variants": null
     },
     {
       "name": "SSDtoUSBFlash",
@@ -135,12 +133,31 @@
       "providerSmallFileProgressThresholdBytes": null,
       "providerWriteMode": null,
       "providerUseArrayPoolForManualLoop": null,
-      "providerPreallocateDestinationFile": null,
       "directWriteThresholdBytes": null,
       "bufferBatchBytes": null,
       "batchEligibilityThresholdBytes": null,
-      "usePathPool": false,
-      "pathPool": null
+      "providerWriteSequentialScan": null,
+      "usePathPool": true,
+      "variants": null
+    },
+    {
+      "name": "SSDtoUSBSSD",
+      "destinationPath": "G:\\TestData\\Matrix_SSDtoUSBSSD",
+      "sourcePath": null,
+      "enabled": true,
+      "clearDestinationBeforeRun": true,
+      "clearDestinationAfterRun": true,
+      "overwriteMode": 1,
+      "providerCopyBufferSizeBytes": null,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "directWriteThresholdBytes": null,
+      "bufferBatchBytes": null,
+      "batchEligibilityThresholdBytes": null,
+      "providerWriteSequentialScan": null,
+      "usePathPool": true,
+      "variants": null
     }
   ],
   "scenarioExecutionOrder": [
@@ -150,47 +167,128 @@
     "SSDtoHDD",
     "HDDtoSSD",
     "HDDtoHDD",
+    "SSDtoUSBSSD",
     "SSDtoUSBFlash"
   ],
   "variants": [
     {
-      "name": "Production_Routed",
-      "notes": "Production runner with promoted defaults (256 KiB direct, 1 MiB batch, 512 KiB eligibility) and destination routing ON. The candidate policy under validation.",
-      "enabled": true,
-      "desiredRunCount": 5,
-      "overwriteMode": null,
-      "providerCopyBufferSizeBytes": null,
-      "providerSmallFileProgressThresholdBytes": null,
-      "providerWriteMode": null,
-      "providerUseArrayPoolForManualLoop": null,
-      "providerPreallocateDestinationFile": null,
-      "directWriteThresholdBytes": 262144,
-      "bufferBatchBytes": 1048576,
-      "batchEligibilityThresholdBytes": 524288,
-      "destinationRoutingEnabled": true,
-      "usePrototypeExecutor": null,
-      "matchedControl": "Legacy_Baseline",
-      "validationRole": "Value"
-    },
-    {
       "name": "Legacy_Baseline",
-      "notes": "Production streaming path with the old 256 KiB auto default (no batch, no direct write, no routing). Legacy anchor — the before/after gain on realistic data is the headline result.",
+      "notes": "Production streaming path with the old 256 KiB auto default (no batch, no direct write, no routing). Legacy anchor \u2014 the before/after gain on realistic data is the headline result.",
       "enabled": true,
       "desiredRunCount": 5,
+      "writeJournal": true,
       "overwriteMode": null,
       "providerCopyBufferSizeBytes": 262144,
       "providerSmallFileProgressThresholdBytes": null,
       "providerWriteMode": null,
       "providerUseArrayPoolForManualLoop": null,
-      "providerPreallocateDestinationFile": null,
       "directWriteThresholdBytes": 0,
       "bufferBatchBytes": 0,
       "batchEligibilityThresholdBytes": null,
       "destinationRoutingEnabled": false,
+      "providerWriteSequentialScan": null,
       "usePrototypeExecutor": null,
-      "matchedControl": null
+      "matchedControl": null,
+      "expectedEffectiveCopyBufferSizeBytes": null,
+      "expectedEffectiveBatchBufferBytes": null,
+      "expectedEffectiveBatchEligibilityCeilingBytes": null,
+      "expectedEffectiveTinyFileFastPathThresholdBytes": null,
+      "expectedEffectiveDestinationRoutingEnabled": null,
+      "validationRole": null
+    },
+    {
+      "name": "Production_Routed",
+      "notes": "Production runner with promoted defaults (256 KiB direct, 1 MiB batch, 512 KiB eligibility) and destination routing ON. The candidate policy under validation.",
+      "enabled": true,
+      "desiredRunCount": 5,
+      "writeJournal": true,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": null,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "directWriteThresholdBytes": 262144,
+      "bufferBatchBytes": 1048576,
+      "batchEligibilityThresholdBytes": 524288,
+      "destinationRoutingEnabled": true,
+      "providerWriteSequentialScan": null,
+      "usePrototypeExecutor": null,
+      "matchedControl": "Legacy_Baseline",
+      "expectedEffectiveCopyBufferSizeBytes": null,
+      "expectedEffectiveBatchBufferBytes": null,
+      "expectedEffectiveBatchEligibilityCeilingBytes": null,
+      "expectedEffectiveTinyFileFastPathThresholdBytes": null,
+      "expectedEffectiveDestinationRoutingEnabled": null,
+      "validationRole": "Value"
     }
   ],
-  "datasetPreparation": null,
-  "cooldownSeconds": 120
+  "datasetPreparation": {
+    "sourcePath": "D:\\Games",
+    "destinationPath": "D:\\TestData\\MixedDataset",
+    "organizeByBucket": false,
+    "poolCloneCount": 8,
+    "buckets": [
+      {
+        "name": "Tiny",
+        "minimumFileSizeBytes": 16,
+        "maximumFileSizeBytes": 65536,
+        "targetTotalBytes": 268435456
+      },
+      {
+        "name": "Small",
+        "minimumFileSizeBytes": 65537,
+        "maximumFileSizeBytes": 524288,
+        "targetTotalBytes": 536870912
+      },
+      {
+        "name": "Medium",
+        "minimumFileSizeBytes": 524289,
+        "maximumFileSizeBytes": 4194304,
+        "targetTotalBytes": 2147483648
+      },
+      {
+        "name": "Large",
+        "minimumFileSizeBytes": 4194305,
+        "maximumFileSizeBytes": 33554432,
+        "targetTotalBytes": 3221225472
+      },
+      {
+        "name": "XLarge",
+        "minimumFileSizeBytes": 33554433,
+        "maximumFileSizeBytes": 268435456,
+        "targetTotalBytes": 4294967296
+      },
+      {
+        "name": "Huge",
+        "minimumFileSizeBytes": 268435457,
+        "maximumFileSizeBytes": 2147483648,
+        "targetTotalBytes": 4294967296
+      }
+    ]
+  },
+  "cooldownSeconds": 120,
+  "clearCacheBetweenRuns": true,
+  "ramMapPath": "D:\\Development\\Github\\SmartCopy2026\\Tools\\RAMMap\\RAMMap64.exe",
+  "sourcePools": {
+    "D:\\TestData\\MixedDataset": [
+      "D:\\TestData\\MixedDataset_1",
+      "D:\\TestData\\MixedDataset_2",
+      "D:\\TestData\\MixedDataset_8",
+      "D:\\TestData\\MixedDataset_5",
+      "D:\\TestData\\MixedDataset_6",
+      "D:\\TestData\\MixedDataset_4",
+      "D:\\TestData\\MixedDataset_3",
+      "D:\\TestData\\MixedDataset_7"
+    ],
+    "E:\\TestData\\MixedDataset": [
+      "E:\\TestData\\MixedDataset_5",
+      "E:\\TestData\\MixedDataset_1",
+      "E:\\TestData\\MixedDataset_4",
+      "E:\\TestData\\MixedDataset_3",
+      "E:\\TestData\\MixedDataset_2",
+      "E:\\TestData\\MixedDataset_6",
+      "E:\\TestData\\MixedDataset_8",
+      "E:\\TestData\\MixedDataset_7"
+    ]
+  }
 }

@@ -141,6 +141,34 @@ public sealed class CopyStepBatchTests
     }
 
     [Fact]
+    public async Task BatchCopy_OrderByFileSizeDisabled_PreservesDirectoryFileOrder()
+    {
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithFile("/src/A/x.txt", new byte[3])
+            .WithFile("/src/A/y.txt", new byte[1])
+            .WithFile("/src/A/z.txt", new byte[2])
+            .WithFile("/src/B/p.txt", new byte[2])
+            .WithFile("/src/B/q.txt", new byte[1])
+            .WithDirectory("/dest"));
+
+        var root = await provider.BuildDirectoryTree("/src");
+        SelectAllFiles(root);
+
+        var results = await RunCopyAsync(
+            root,
+            provider,
+            batchBufferBytes: 512 * 1024,
+            batchOrderByFileSize: false);
+
+        var copiedOrder = results
+            .Where(r => r.SourceNodeResult == SourceResult.Copied && r.IsSuccess)
+            .Select(r => r.SourceNode.Name)
+            .ToList();
+
+        Assert.Equal(new[] { "x.txt", "y.txt", "z.txt", "p.txt", "q.txt" }, copiedOrder);
+    }
+
+    [Fact]
     public async Task BatchCopy_PartiallySelectedDirectory_StillCopiesSelectedFiles()
     {
         // The "music" subdirectory holds one selected file (keep.txt) and one that is both unchecked and
@@ -219,7 +247,8 @@ public sealed class CopyStepBatchTests
     private static async Task<IReadOnlyList<TransformResult>> RunCopyAsync(
         DirectoryNode root,
         MemoryFileSystemProvider provider,
-        long batchBufferBytes = 0)
+        long batchBufferBytes = 0,
+        bool batchOrderByFileSize = true)
     {
         var step = new CopyStep("mem://dest");
         var runner = new PipelineRunner(new TransformPipeline([step]));
@@ -228,7 +257,11 @@ public sealed class CopyStepBatchTests
             RootNode = root,
             SourceProvider = provider,
             ProviderRegistry = provider.CreateRegistry(),
-            OperationalSettings = new OperationalSettings { BatchBufferBytes = batchBufferBytes },
+            OperationalSettings = new OperationalSettings
+            {
+                BatchBufferBytes = batchBufferBytes,
+                BatchOrderByFileSize = batchOrderByFileSize,
+            },
         };
         return await runner.ExecuteAsync(job);
     }

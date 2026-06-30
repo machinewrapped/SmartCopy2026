@@ -18,14 +18,15 @@ An important caveat: Every file write incurs unavoidable filesystem work — MFT
 
 ## 2. Current Policy & Open Questions
 
-*The one place to read for "what do we currently believe." The dated evidence and per-phase history live in §6; this is the signal extracted from them. Last updated 2026-06-29.*
+*The one place to read for "what do we currently believe." The dated evidence and per-phase history live in §6; this is the signal extracted from them. Last updated 2026-06-30.*
 
-**Shipping policy (the candidate bundle).** Encoded in code, gated behind `AllowCopyOptimisations` (default **OFF**). Gate 1 production-path validation passed on SSD MixedDataset smoke; Gate 2 cross-drive validation remains before broad default promotion (§6, Production Validation Pass):
+**Shipping policy (the candidate bundle).** Encoded in code, gated behind `AllowCopyOptimisations` (default **OFF**). Gate 1 production-path validation passed on SSD MixedDataset smoke. Gate 2 then failed on SameDriveHDD with the current routed HDD policy (§7, Production Validation Pass). No SameDriveHDD mitigation is currently promoted; the HDD values below remain the candidate under investigation:
 
 | Knob | Value | Source of record |
 |---|---|---|
-| Copy buffer | SSD/USB 1 MiB · HDD/Unknown 512 KiB | `DefaultCopyStrategyPolicy.SelectBufferBytes` |
+| Copy buffer | SSD/USB 1 MiB · any HDD/Unknown 512 KiB | `DefaultCopyStrategyPolicy` |
 | Batch buffer | 1 MiB (eligibility ceiling 512 KiB) | `AppSettings.BatchBufferKb`, `OperationalSettings` |
+| Batch traversal order | Order batched files by file size (default ON) | `OperationalSettings.BatchOrderByFileSize` |
 | Direct-write threshold | 256 KiB | `AppSettings.TinyFileFastPathKb` |
 | Manual-loop byte buffer | ArrayPool-rented | `OperationalSettings.UseArrayPoolForManualLoop` |
 | Preallocation | OFF (universal) | `DefaultCopyStrategyPolicy` |
@@ -34,17 +35,19 @@ An important caveat: Every file write incurs unavoidable filesystem work — MFT
 
 | Mechanism | Verdict | Where measured |
 |---|---|---|
-| Buffer routing (1 MiB SSD/USB, 512 KiB HDD/Unknown) | **Validated** across multiple drive pairs | Phase 5, Phase 6 |
+| Buffer routing (1 MiB SSD/USB, 512 KiB any HDD/Unknown) | **Partially validated**; same-volume HDD routed 512 KiB regressed on MixedDataset | Phase 5, Phase 6, Production Validation Pass |
 | Preallocation OFF | **Validated** — null or regresses everywhere (an earlier +11.6% SSD→HDD finding was retracted) | Phase 5 |
 | Tiny-file direct write ≤ 256 KiB | **Validated on SSD**; assumed on HDD/USB | Phase 2 + MixedDataset validation |
-| Batching (1 MiB / 512 KiB ceiling) | **SSD validated** (small — see below); **OFF on USB** (regresses); **HDD never measured** | Phase 3, Phase 6 |
+| Batching (1 MiB / 512 KiB ceiling) | **SSD validated** (small — see below); **OFF on USB** (regresses); **not isolated on HDD** | Phase 3, Phase 6, Production Validation Pass |
+| Batch traversal ordered by file size | **Open**; implemented as a separate knob so SameDriveHDD can test size order vs natural order | Pending SameDriveHDD ordering sweep |
 | Operation journal I/O | **Ruled out** as the production/prototype gap; disabling benchmark journals was consistently slightly slower | Production Validation Pass |
-| Whole bundle on the production path | **Gate 1 passed** — production matches prototype within noise on MixedDataset R→D and D→O after the 256 KiB direct-write promotion; Gate 2 cross-drive matrix pending | Production Validation Pass |
+| Whole bundle on the production path | **Gate 1 passed; Gate 2 stopped** — SSD pairs passed, SameDriveHDD regressed with the current routed HDD policy | Production Validation Pass |
 
 **Batching is a small effect, easy to over-read.** Its genuine contribution above a 512 KiB buffer is **1–2% on SSD**, concentrated in sub-16 KiB files (Phase 3, key conclusion 1). The often-cited +8.5% "champion" is mostly the buffer/chunk-size win — which the buffer-routing policy already captures independently. Worth keeping, not worth headlining.
 
 **Open questions:**
-- **HDD batching is unmeasured.** The cross-drive suite (Phase 5) swept buffer/preallocation on large files; batching only ran on SSD and USB small-file datasets. Gate 2's SSDtoHDD pair (Production Validation Pass) is where it's earned.
+- **Same-volume HDD needs investigation before promotion.** The first Gate 2 matrix stopped at SameDriveHDD: `Production_Routed` was slower than `Legacy_Baseline` at run level, with losses concentrated in the Medium/Large streamed ranges. Do not promote a SameDriveHDD policy change from a single failed validation pair; run targeted production-path sweeps and require at least a converged pair before changing defaults.
+- **HDD batching and traversal order are still not isolated.** The cross-drive suite (Phase 5) swept buffer/preallocation on large files; batching only ran on SSD and USB small-file datasets. Gate 2 showed tiny/small SameDriveHDD gains but did not isolate batching from buffer/traversal effects. The `BatchOrderByFileSize` knob now allows the SameDriveHDD ordering sweep to compare size-order batching against natural directory order.
 - **USB is too noisy for a static profile.** 1 MiB is the strongest USB signal but a *prior to be overridden by per-device learning*, not a settled finding (Phase 6). The high USB variance does **not** invalidate the SSD/HDD conclusions — it only makes USB defaults provisional.
 - **SameDrive SSD larger-buffer probe** (Phase 5, Step 3) remains open; it does not block promotion.
 - **Non-atomic move fallback bypasses batching.** Cross-volume / non-atomic moves copy each file individually via `TransferFileAsync`, not the batched `CopySelectionAsync`, so they miss the small-file phase-separation win. Deliberately deferred: only worth closing — a deferred-source-delete refactor (delete each source after its batch flushes, reconciled with `WalkAndMoveAsync`'s directory cleanup) — **if the Production Validation Pass promotes the bundle**. Wiring batching into a second code path before batching has earned its place in the copy path would propagate an unvalidated optimisation. The fix inherits correct per-file timing for free (Architecture §2.4.1).
@@ -857,7 +860,7 @@ The production copy path (`PipelineRunner → CopyStep → DefaultCopyStrategyPo
 
 | Knob | Value | Source of record |
 |---|---|---|
-| Copy buffer | SSD/USB 1 MiB, HDD/Unknown 512 KiB | `DefaultCopyStrategyPolicy.SelectBufferBytes` |
+| Copy buffer | SSD/USB 1 MiB, cross-drive HDD/Unknown 512 KiB, same-volume HDD keeps base 256 KiB | `DefaultCopyStrategyPolicy` |
 | Batch buffer | 1 MiB | `AppSettings.BatchBufferKb` |
 | Batch eligibility ceiling | 512 KiB | `OperationalSettings` default |
 | Direct-write threshold | 256 KiB | `AppSettings.TinyFileFastPathKb` |
@@ -865,7 +868,7 @@ The production copy path (`PipelineRunner → CopyStep → DefaultCopyStrategyPo
 
 `AllowCopyOptimisations` gates routing + batch + direct-write as one unit, so the pass validates the bundle **as shipped** — there is no production mode that enables routing alone. `Production_Routed` is this bundle reached via routing; `Prototype` and `Production_Fixed` pin the same values for the Gate 1 equivalence check.
 
-Batching is validated on SSD (Phase 3) and shown to regress on USB (Phase 6), but **never measured on HDD** — the cross-drive suite (Phase 5) swept buffer and preallocation only, not batching. The candidate bundle assumes batching-on for HDD; Gate 2's SSDtoHDD pair is where that assumption is earned rather than presumed.
+Batching is validated on SSD (Phase 3) and shown to regress on USB (Phase 6), but **never isolated on HDD** — the cross-drive suite (Phase 5) swept buffer and preallocation only, not batching. The first Gate 2 matrix found SameDriveHDD regressed with the originally routed 512 KiB HDD buffer. The candidate policy now exempts same-volume HDD from that buffer promotion; the mitigation still needs a rerun before broad promotion.
 
 **Implementation status.** Complete; retained here as the design checklist that made the validation pass meaningful.
 
@@ -1008,6 +1011,16 @@ Both engines stage the identical set: `CreateProductionOperationalSettings` maps
 **Decision:** Gate 1 is passed. The 256 KiB direct-write threshold is the active candidate policy because it removes the reproducible staged 64-256 KiB production shortfall without applying direct writes to medium/large files. `Production_DirectAll` remains useful as a diagnostic for staged-write overhead, but it is not promoted as a durability policy. Proceed to Gate 2; do not keep chasing prototype parity on SSD smoke unless a new run produces a gate-quality `REGRESSION`.
 
 #### Gate 2 — Full matrix, fail-fast ordered · hours → weeks
+
+**Status: STOPPED 2026-06-30 at SameDriveHDD.** `Production_Routed` passed the SSD pairs but regressed on SameDriveHDD, so the original candidate bundle does not promote. The Legacy_Baseline sleep outlier is excluded from the fast-cluster reading; the fast cluster still shows `Production_Routed` slower.
+
+| Scenario | Production_Routed | Legacy_Baseline | Verdict | Notes |
+|---|---:|---:|---|---|
+| `SSDtoSSD` | 41.8 s | 48.7 s | `PASS` | +14.3% selected-window gain |
+| `SameDriveSSD` | 30.8 s | 42.4 s | `PASS*` | +27.4%; both variants gave up convergence |
+| `SameDriveHDD` | 7m 47s | 6m 48s | `REGRESSION*` | -14.4%; fast-cluster median still -9.6% |
+
+SameDriveHDD bucket evidence explains the failure shape: Tiny/Small improved strongly, but Medium regressed (-15.3%) and Large was slightly slower (-2.2%). Those streamed ranges are above the 512 KiB batch ceiling, so the first mitigation is to stop routing same-volume HDD copies from the legacy 256 KiB base buffer to the 512 KiB HDD buffer. The batching traversal remains a secondary suspect because the batched strategy sorts each directory's files smallest-first; do not claim the mitigation passed until SameDriveHDD is rerun.
 
 - **Run:** `--mode validation --config validation-matrix.json`. **Resumes across cold boots** — `BenchmarkPass` schedules only unconverged scenario/variant pairs, so a restart continues where it left off.
 - **Scenarios:** `MixedDataset` × drive pairs **in this order** (cheapest / most-likely-to-fail first, so SSDtoSSD ~hours gates the multi-week HDD/USB pairs): `SSDtoSSD → SameDriveTest → SSDtoHDD → SSDtoUSBFlash`.

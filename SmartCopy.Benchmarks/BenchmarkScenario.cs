@@ -19,6 +19,7 @@ internal sealed class BenchmarkScenario
     public long? DirectWriteThresholdBytes { get; set; }
     public long? BufferBatchBytes { get; set; }
     public long? BatchEligibilityThresholdBytes { get; set; }
+    public bool? BatchOrderByFileSize { get; set; }
     public bool? ProviderWriteSequentialScan { get; set; }
     public bool UsePathPool { get; set; }
     public List<string>? Variants { get; set; }
@@ -45,6 +46,7 @@ internal sealed class BenchmarkScenario
             WriteMode = ProviderWriteMode ?? defaults.WriteMode,
             UseArrayPoolForManualLoop = ProviderUseArrayPoolForManualLoop
                 ?? defaults.UseArrayPoolForManualLoop,
+            BatchOrderByFileSize = BatchOrderByFileSize ?? defaults.BatchOrderByFileSize,
         }.Normalize();
     }
 }

@@ -42,6 +42,9 @@ public sealed record OperationalSettings
     /// buffer capacity, so the default 512 KiB keeps ≥2 files per flush of a 1 MiB+ buffer — which is
     /// what makes phase separation happen. <c>0</c> disables the ceiling (use buffer capacity).</summary>
     public long BatchEligibilityCeilingBytes { get; init; } = 512 * 1024;
+    /// <summary>When true, batch traversal copies each directory's selected files in ascending size
+    /// order for better buffer packing. When false, preserves the directory tree's natural file order.</summary>
+    public bool BatchOrderByFileSize { get; init; } = true;
     /// <summary>Per-file durability intent (set by the strategy). Default <see cref="WriteDurability.Staged"/>
     /// keeps direct <c>WriteAsync</c> callers crash-safe.</summary>
     public WriteDurability WriteDurability { get; init; } = WriteDurability.Staged;

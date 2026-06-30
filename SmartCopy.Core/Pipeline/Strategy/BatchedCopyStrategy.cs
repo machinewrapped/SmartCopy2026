@@ -33,7 +33,7 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
         var ceiling = Settings.BatchEligibilityCeilingBytes;
         var effectiveCeiling = ceiling <= 0 ? buffer.Capacity : Math.Min(ceiling, buffer.Capacity);
 
-        foreach (var node in EnumerateForBatching(context.RootNode))
+        foreach (var node in EnumerateForBatching(context.RootNode, Settings.BatchOrderByFileSize))
         {
             ct.ThrowIfCancellationRequested();
             if (context.IsNodeFailed(node)) continue;
@@ -86,7 +86,8 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
                         destination,
                         destResult.Value,
                         node,
-                        ceremonyElapsed + Stopwatch.GetElapsedTime(readStart),
+                        ceremonyElapsed,
+                        readStart,
                         ct);
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -118,16 +119,20 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
     }
 
     /// <summary>
-    /// Intentional depth-first enumeration for batching: each directory's own selected files
-    /// smallest-first (optimal buffer packing), then each child subtree completed in full before the
+    /// Intentional depth-first enumeration for batching: each directory's own selected files are
+    /// optionally smallest-first (optimal buffer packing), then each child subtree completed in full before the
     /// next sibling (the resume property — accumulation and flush share this order). Recurses into
     /// partially-selected directories but prunes subtrees that can hold no selected node. The traversal,
     /// selection, and prune-polarity rules are documented in <c>Docs/Architecture.md</c> §2.4.1
     /// ("Traversal selection &amp; pruning").
     /// </summary>
-    private static IEnumerable<DirectoryTreeNode> EnumerateForBatching(DirectoryNode dir)
+    private static IEnumerable<DirectoryTreeNode> EnumerateForBatching(DirectoryNode dir, bool orderFilesBySize)
     {
-        foreach (var file in dir.Files.Where(f => f.IsSelected).OrderBy(f => f.Size))
+        var files = dir.Files.Where(f => f.IsSelected);
+        if (orderFilesBySize)
+            files = files.OrderBy(f => f.Size);
+
+        foreach (var file in files)
             yield return file;
 
         foreach (var child in dir.Children)
@@ -141,7 +146,7 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
 
             if (child.IsSelected)
                 yield return child;
-            foreach (var node in EnumerateForBatching(child))
+            foreach (var node in EnumerateForBatching(child, orderFilesBySize))
                 yield return node;
         }
     }

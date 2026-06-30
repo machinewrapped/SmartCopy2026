@@ -33,6 +33,7 @@ internal sealed class PrototypeCopyExecutor : ICopyExecutor
     private readonly long _directWriteThresholdBytes;
     private readonly long _bufferBatchBytes;
     private readonly long _batchEligibilityThresholdBytes;
+    private readonly bool _batchOrderByFileSize;
     private readonly bool _writeSequentialScan;
 
     public PrototypeCopyExecutor(
@@ -41,6 +42,7 @@ internal sealed class PrototypeCopyExecutor : ICopyExecutor
         long directWriteThresholdBytes,
         long bufferBatchBytes,
         long batchEligibilityThresholdBytes,
+        bool batchOrderByFileSize,
         bool writeSequentialScan)
     {
         _destinationPath = destinationPath;
@@ -48,6 +50,7 @@ internal sealed class PrototypeCopyExecutor : ICopyExecutor
         _directWriteThresholdBytes = directWriteThresholdBytes;
         _bufferBatchBytes = bufferBatchBytes;
         _batchEligibilityThresholdBytes = batchEligibilityThresholdBytes;
+        _batchOrderByFileSize = batchOrderByFileSize;
         _writeSequentialScan = writeSequentialScan;
     }
 
@@ -63,6 +66,7 @@ internal sealed class PrototypeCopyExecutor : ICopyExecutor
                 _bufferBatchBytes,
                 _batchEligibilityThresholdBytes,
                 job.OperationalSettings.CopyBufferSizeBytes,
+                _batchOrderByFileSize,
                 _writeSequentialScan,
                 ct);
         }

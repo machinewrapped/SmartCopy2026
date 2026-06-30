@@ -97,6 +97,7 @@ internal sealed class BenchmarkRunRecord
     public long? DirectWriteThresholdBytes { get; init; }
     public long? BufferBatchBytes { get; init; }
     public long? BatchEligibilityThresholdBytes { get; init; }
+    public bool? BatchOrderByFileSize { get; init; }
     public bool? DestinationRoutingEnabled { get; init; }
     public long? ProductionBatchBufferBytes { get; init; }
     public long? ProductionBatchEligibilityCeilingBytes { get; init; }
@@ -158,6 +159,7 @@ internal sealed class BenchmarkRunRecord
             DirectWriteThresholdBytes = variant.DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes,
             BufferBatchBytes = variant.BufferBatchBytes ?? scenario.BufferBatchBytes,
             BatchEligibilityThresholdBytes = variant.BatchEligibilityThresholdBytes ?? scenario.BatchEligibilityThresholdBytes,
+            BatchOrderByFileSize = providerOptions.BatchOrderByFileSize,
             DestinationRoutingEnabled = providerOptions.DestinationRoutingEnabled,
             ProductionBatchBufferBytes = providerOptions.BatchBufferBytes,
             ProductionBatchEligibilityCeilingBytes = providerOptions.BatchEligibilityCeilingBytes,
@@ -249,6 +251,7 @@ internal sealed class BenchmarkRunRecord
             DirectWriteThresholdBytes = variant.DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes,
             BufferBatchBytes = variant.BufferBatchBytes ?? scenario.BufferBatchBytes,
             BatchEligibilityThresholdBytes = variant.BatchEligibilityThresholdBytes ?? scenario.BatchEligibilityThresholdBytes,
+            BatchOrderByFileSize = providerOptions.BatchOrderByFileSize,
             DestinationRoutingEnabled = providerOptions.DestinationRoutingEnabled,
             ProductionBatchBufferBytes = providerOptions.BatchBufferBytes,
             ProductionBatchEligibilityCeilingBytes = providerOptions.BatchEligibilityCeilingBytes,

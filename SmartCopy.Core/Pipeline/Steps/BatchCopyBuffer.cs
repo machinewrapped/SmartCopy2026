@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics;
 using SmartCopy.Core.DirectoryTree;
 
 namespace SmartCopy.Core.Pipeline.Steps;
@@ -45,10 +46,12 @@ internal sealed class BatchCopyBuffer : IDisposable
         string destination,
         DestinationResult destResult,
         DirectoryTreeNode node,
-        TimeSpan preWriteElapsed,
+        TimeSpan preReadElapsed,
+        long readStartTimestamp,
         CancellationToken ct)
     {
         await source.ReadExactlyAsync(_data.AsMemory(_used, fileSize), ct);
+        var preWriteElapsed = preReadElapsed + Stopwatch.GetElapsedTime(readStartTimestamp);
         _entries.Add(new Entry(node, destination, destResult, _used, fileSize, preWriteElapsed));
         _used += fileSize;
     }

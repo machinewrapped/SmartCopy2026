@@ -1,13 +1,13 @@
 namespace SmartCopy.Benchmarks;
 
 /// <summary>
-/// Depth-first, fail-fast scheduler for <c>--mode validation</c>. Runs scenarios in execution
+/// Depth-first validation scheduler for <c>--mode validation</c>. Runs scenarios in execution
 /// order: advances the first unconverged scenario's lowest-run-count variants (so matched pairs
 /// interleave + shuffle in one round), then gate-checks each fully-converged scenario before
-/// advancing. Halts the whole pass on REGRESSION/INVALID so a regression on a cheap pair stops
-/// before the expensive pairs run. Re-derived from <see cref="BenchmarkPassBase.HistoricalRuns"/>
-/// each call, so a cold-boot resume re-checks earlier scenarios and halts immediately if one had
-/// already regressed.
+/// advancing. When <see cref="BenchmarkConfig.FailFast"/> is true, halts the whole pass on
+/// REGRESSION/INVALID so a regression on a cheap pair stops before the expensive pairs run. Re-derived
+/// from <see cref="BenchmarkPassBase.HistoricalRuns"/> each call, so a cold-boot resume re-checks
+/// earlier scenarios and halts immediately if one had already regressed.
 /// </summary>
 internal sealed class ValidationPass : BenchmarkPassBase
 {
@@ -27,8 +27,8 @@ internal sealed class ValidationPass : BenchmarkPassBase
     {
         // --variant and --runs bypass the scheduler (one-shot invocation).
         // --scenario only filters the scenario list — the validation scheduler still runs
-        // (depth-first, gate-check after convergence, halt on REGRESSION/INVALID), so
-        // `--mode validate --scenario X` means "validate X to convergence, fail-fast".
+        // (depth-first, gate-check after convergence, optional fail-fast), so
+        // `--mode validate --scenario X` means "validate X to convergence".
         var isExplicit = !string.IsNullOrWhiteSpace(Selection.VariantName)
                       || Selection.Runs.HasValue;
         var explicitRuns = Selection.Runs ?? 1;
@@ -72,7 +72,8 @@ internal sealed class ValidationPass : BenchmarkPassBase
                 .Where(BenchmarkHelpers.IsTerminalRun)
                 .ToList();
 
-            if (ValidationGate.ScenarioFailedGate(Config, scenarioRuns, out var failVariant, out var failVerdict))
+            if (Config.FailFast &&
+                ValidationGate.ScenarioFailedGate(Config, scenarioRuns, out var failVariant, out var failVerdict))
             {
                 _validationHalt = (group.Scenario.Name, failVariant ?? "?", failVerdict);
                 return [];
