@@ -10,9 +10,13 @@ namespace SmartCopy.Tests.Pipeline;
 /// </summary>
 public sealed class DefaultCopyStrategyPolicyTests
 {
-    private static ICopyStrategy Resolve(OperationalSettings settings, DriveClassification source, DriveClassification target) =>
+    private static ICopyStrategy Resolve(
+        OperationalSettings settings,
+        DriveClassification source,
+        DriveClassification target,
+        bool sameVolume = false) =>
         DefaultCopyStrategyPolicy.Instance.Resolve(new CopyStrategyInputs(
-            settings, source, target, ProviderCapabilities.Full, ProviderCapabilities.Full, SameVolume: false));
+            settings, source, target, ProviderCapabilities.Full, ProviderCapabilities.Full, sameVolume));
 
     [Theory] // the benchmark-validated routing table: 1 MiB for SSD/USB, 512 KiB where an HDD caps the pair
     [InlineData(DriveMediaType.SSD, DriveInterfaceType.NVMe, DriveMediaType.SSD, DriveInterfaceType.NVMe, DefaultCopyStrategyPolicy.FastBufferBytes)]          // SSD↔SSD
@@ -52,5 +56,53 @@ public sealed class DefaultCopyStrategyPolicyTests
             new DriveClassification(DriveMediaType.HDD, DriveInterfaceType.SATA));
 
         Assert.Equal(baseSettings.CopyBufferSizeBytes, strategy.Settings.CopyBufferSizeBytes);
+    }
+
+    [Fact]
+    public void RoutingEnabled_SameVolumeHdd_DisablesBatchOrderBySize()
+    {
+        var strategy = Resolve(
+            new OperationalSettings
+            {
+                DestinationRoutingEnabled = true,
+                BatchOrderByFileSize = true,
+            },
+            new DriveClassification(DriveMediaType.HDD, DriveInterfaceType.SATA),
+            new DriveClassification(DriveMediaType.HDD, DriveInterfaceType.SATA),
+            sameVolume: true);
+
+        Assert.False(strategy.Settings.BatchOrderByFileSize);
+    }
+
+    [Fact]
+    public void RoutingEnabled_CrossDriveHdd_KeepsBatchOrderBySize()
+    {
+        var strategy = Resolve(
+            new OperationalSettings
+            {
+                DestinationRoutingEnabled = true,
+                BatchOrderByFileSize = true,
+            },
+            new DriveClassification(DriveMediaType.HDD, DriveInterfaceType.SATA),
+            new DriveClassification(DriveMediaType.HDD, DriveInterfaceType.SATA),
+            sameVolume: false);
+
+        Assert.True(strategy.Settings.BatchOrderByFileSize);
+    }
+
+    [Fact]
+    public void RoutingDisabled_SameVolumeHdd_KeepsRequestedBatchOrder()
+    {
+        var strategy = Resolve(
+            new OperationalSettings
+            {
+                DestinationRoutingEnabled = false,
+                BatchOrderByFileSize = true,
+            },
+            new DriveClassification(DriveMediaType.HDD, DriveInterfaceType.SATA),
+            new DriveClassification(DriveMediaType.HDD, DriveInterfaceType.SATA),
+            sameVolume: true);
+
+        Assert.True(strategy.Settings.BatchOrderByFileSize);
     }
 }

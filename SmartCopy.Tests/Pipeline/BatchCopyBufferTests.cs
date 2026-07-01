@@ -1,3 +1,4 @@
+using System.Buffers;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
@@ -84,6 +85,83 @@ public sealed class BatchCopyBufferTests
     }
 
     [Fact]
+    public async Task Reset_ClearsPooledEntryReferences()
+    {
+        var entryPool = new TrackingEntryPool();
+        using var buf = new BatchCopyBuffer(
+            64,
+            ArrayPool<byte>.Shared,
+            entryPool,
+            initialEntryCapacity: 4);
+
+        await buf.AccumulateAsync(new MemoryStream([1, 2, 3]), 3, "/d/x", DestinationResult.Created,
+            MakeNode("x", 3), TimeSpan.FromMilliseconds(1),
+            System.Diagnostics.Stopwatch.GetTimestamp(), CancellationToken.None);
+
+        Assert.NotNull(entryPool.LastRented[0].Node);
+        Assert.NotNull(entryPool.LastRented[0].Destination);
+
+        buf.Reset();
+
+        Assert.Null(entryPool.LastRented[0].Node);
+        Assert.Null(entryPool.LastRented[0].Destination);
+    }
+
+    [Fact]
+    public async Task HasCapacityFor_ReflectsEntryLimit()
+    {
+        using var buf = new BatchCopyBuffer(
+            64,
+            ArrayPool<byte>.Shared,
+            ArrayPool<BatchCopyBuffer.Entry>.Shared,
+            initialEntryCapacity: 2,
+            maxEntriesPerFlush: 2);
+
+        Assert.True(buf.HasCapacityFor(0));
+
+        await buf.AccumulateAsync(new MemoryStream([]), 0, "/d/a", DestinationResult.Created,
+            MakeNode("a", 0), TimeSpan.FromMilliseconds(1),
+            System.Diagnostics.Stopwatch.GetTimestamp(), CancellationToken.None);
+        await buf.AccumulateAsync(new MemoryStream([]), 0, "/d/b", DestinationResult.Created,
+            MakeNode("b", 0), TimeSpan.FromMilliseconds(2),
+            System.Diagnostics.Stopwatch.GetTimestamp(), CancellationToken.None);
+
+        Assert.True(buf.HasSpaceFor(0));
+        Assert.False(buf.HasCapacityFor(0));
+
+        buf.Reset();
+
+        Assert.True(buf.HasCapacityFor(0));
+    }
+
+    [Fact]
+    public async Task Entries_AreReturnedToPoolOnGrowthAndDispose()
+    {
+        var entryPool = new TrackingEntryPool();
+        var buf = new BatchCopyBuffer(
+            64,
+            ArrayPool<byte>.Shared,
+            entryPool,
+            initialEntryCapacity: 1);
+
+        await buf.AccumulateAsync(new MemoryStream([1]), 1, "/d/a", DestinationResult.Created,
+            MakeNode("a", 1), TimeSpan.FromMilliseconds(1),
+            System.Diagnostics.Stopwatch.GetTimestamp(), CancellationToken.None);
+        await buf.AccumulateAsync(new MemoryStream([2]), 1, "/d/b", DestinationResult.Created,
+            MakeNode("b", 1), TimeSpan.FromMilliseconds(2),
+            System.Diagnostics.Stopwatch.GetTimestamp(), CancellationToken.None);
+
+        Assert.Equal(2, entryPool.RentCount);
+        Assert.Single(entryPool.ReturnClearFlags);
+        Assert.True(entryPool.ReturnClearFlags[0]);
+
+        buf.Dispose();
+
+        Assert.Equal(2, entryPool.ReturnCount);
+        Assert.All(entryPool.ReturnClearFlags, Assert.True);
+    }
+
+    [Fact]
     public async Task OpenSegmentStream_ReturnsCorrectSlice()
     {
         using var buf = new BatchCopyBuffer(16);
@@ -119,6 +197,29 @@ public sealed class BatchCopyBufferTests
         {
             await Task.Delay(delay, cancellationToken);
             return await base.ReadAsync(destination, cancellationToken);
+        }
+    }
+
+    private sealed class TrackingEntryPool : ArrayPool<BatchCopyBuffer.Entry>
+    {
+        public int RentCount { get; private set; }
+        public int ReturnCount { get; private set; }
+        public BatchCopyBuffer.Entry[] LastRented { get; private set; } = [];
+        public List<bool> ReturnClearFlags { get; } = [];
+
+        public override BatchCopyBuffer.Entry[] Rent(int minimumLength)
+        {
+            RentCount++;
+            LastRented = new BatchCopyBuffer.Entry[Math.Max(1, minimumLength)];
+            return LastRented;
+        }
+
+        public override void Return(BatchCopyBuffer.Entry[] array, bool clearArray = false)
+        {
+            ReturnCount++;
+            ReturnClearFlags.Add(clearArray);
+            if (clearArray)
+                Array.Clear(array);
         }
     }
 }

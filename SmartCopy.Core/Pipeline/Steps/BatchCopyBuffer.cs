@@ -9,8 +9,10 @@ namespace SmartCopy.Core.Pipeline.Steps;
 /// I/O: all reads happen first, then all writes, avoiding read-write interleaving per file.
 /// Dispose returns the buffer to <see cref="ArrayPool{T}.Shared"/>.
 /// </summary>
-internal sealed class BatchCopyBuffer : IDisposable
+internal sealed partial class BatchCopyBuffer : IDisposable
 {
+    private const int DefaultInitialEntryCapacity = 1024;
+
     internal readonly record struct Entry(
         DirectoryTreeNode Node,
         string Destination,
@@ -19,22 +21,61 @@ internal sealed class BatchCopyBuffer : IDisposable
         int Length,
         TimeSpan PreWriteElapsed);
 
+    private readonly ArrayPool<byte> _dataPool;
     private readonly byte[] _data;
-    private readonly List<Entry> _entries = new();
+    private readonly PooledEntryBuffer _entries;
+    private readonly int _maxEntriesPerFlush;
     private int _used;
+    private bool _disposed;
 
     public long Capacity { get; }
     public bool HasEntries => _entries.Count > 0;
     public IReadOnlyList<Entry> Entries => _entries;
 
     public BatchCopyBuffer(long capacityBytes)
+        : this(
+            capacityBytes,
+            ArrayPool<byte>.Shared,
+            ArrayPool<Entry>.Shared,
+            initialEntryCapacity: DefaultInitialEntryCapacity,
+            maxEntriesPerFlush: DefaultInitialEntryCapacity)
     {
+    }
+
+    internal BatchCopyBuffer(
+        long capacityBytes,
+        ArrayPool<byte> dataPool,
+        ArrayPool<Entry> entryPool,
+        int initialEntryCapacity,
+        int? maxEntriesPerFlush = null)
+    {
+        if (capacityBytes <= 0 || capacityBytes > int.MaxValue)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(capacityBytes),
+                "Batch buffer size must be between 1 and Int32.MaxValue bytes.");
+        }
+
+        var maxEntries = maxEntriesPerFlush ?? initialEntryCapacity;
+        if (maxEntries <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxEntriesPerFlush), "Max entries per flush must be positive.");
+
         Capacity = capacityBytes;
-        _data = ArrayPool<byte>.Shared.Rent((int)capacityBytes);
+        _dataPool = dataPool;
+        _data = _dataPool.Rent((int)capacityBytes);
+        _entries = new PooledEntryBuffer(entryPool, initialEntryCapacity);
+        _maxEntriesPerFlush = maxEntries;
     }
 
     /// <summary>Returns true if <paramref name="fileSize"/> bytes fit in the remaining space.</summary>
     public bool HasSpaceFor(int fileSize) => _used + fileSize <= (int)Capacity;
+
+    /// <summary>
+    /// Returns true when both the byte buffer and entry table can accept another file.
+    /// The entry cap prevents huge batches of zero-byte or very tiny files from retaining
+    /// unbounded destination strings before the next flush.
+    /// </summary>
+    public bool HasCapacityFor(int fileSize) => HasSpaceFor(fileSize) && _entries.Count < _maxEntriesPerFlush;
 
     /// <summary>
     /// Reads exactly <paramref name="fileSize"/> bytes from <paramref name="source"/> into
@@ -66,5 +107,14 @@ internal sealed class BatchCopyBuffer : IDisposable
         _used = 0;
     }
 
-    public void Dispose() => ArrayPool<byte>.Shared.Return(_data);
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+
+        _entries.Dispose();
+        _dataPool.Return(_data);
+        _disposed = true;
+    }
+
 }

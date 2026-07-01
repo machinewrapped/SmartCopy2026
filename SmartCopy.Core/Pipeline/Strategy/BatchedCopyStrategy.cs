@@ -68,7 +68,7 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
                 var fileSize = (int)node.Size;
 
                 // No room left for this file — drain what we have, then start filling again.
-                if (!buffer.HasSpaceFor(fileSize))
+                if (!buffer.HasCapacityFor(fileSize))
                 {
                     await foreach (var r in FlushBatchAsync(buffer, targetProvider, context, successResult, ct))
                         yield return r;

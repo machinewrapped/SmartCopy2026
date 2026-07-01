@@ -33,6 +33,11 @@ public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
             resolved = resolved with
             {
                 CopyBufferSizeBytes = SelectBufferBytes(inputs.Source, inputs.Target),
+                BatchOrderByFileSize = SelectBatchOrderByFileSize(
+                    inputs.Source,
+                    inputs.Target,
+                    inputs.SameVolume,
+                    resolved.BatchOrderByFileSize),
             };
         }
 
@@ -81,5 +86,19 @@ public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
 
         // Unknown / Memory / MTP / ambiguous: do not assume fast media.
         return ConservativeBufferBytes;
+    }
+
+    internal static bool SelectBatchOrderByFileSize(
+        DriveClassification source,
+        DriveClassification target,
+        bool sameVolume,
+        bool requested)
+    {
+        if (!requested)
+            return false;
+
+        return !(sameVolume &&
+                 source.MediaType == DriveMediaType.HDD &&
+                 target.MediaType == DriveMediaType.HDD);
     }
 }
