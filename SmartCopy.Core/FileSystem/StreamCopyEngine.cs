@@ -55,9 +55,19 @@ internal static class StreamCopyEngine
                  autoBytesRemaining <= opts.SmallFileProgressThresholdBytes)
         {
             // Small-file optimisation: for files whose full size fits in memory we know
-            // exactly how many bytes will be written, so we let the framework copy without
-            // overhead and report progress in one shot at the end instead of per-chunk.
-            await source.CopyToAsync(destination, opts.CopyBufferSizeBytes, ct);
+            // exactly how many bytes will be written, so report progress in one shot at the end
+            // instead of per-chunk. When pooling is enabled, still use the manual loop here:
+            // Stream.CopyToAsync rents/allocates its own per-call buffer, which turns buffer-size
+            // sweeps into allocation-size sweeps for directories with many small files.
+            if (opts.UseArrayPoolForManualLoop)
+            {
+                await CopyWithManualLoopAsync(source, destination, progress: null, opts, ct);
+            }
+            else
+            {
+                await source.CopyToAsync(destination, opts.CopyBufferSizeBytes, ct);
+            }
+
             if (progress is not null && autoBytesRemaining > 0)
             {
                 progress.Report(autoBytesRemaining);
