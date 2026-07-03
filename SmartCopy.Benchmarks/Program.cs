@@ -14,10 +14,13 @@ if (selection.Help)
     Console.WriteLine("Options:");
     Console.WriteLine("  --help, -h, -?       Show this help message and exit");
     Console.WriteLine("  --config <path>      Path to benchmark configuration file (default: benchmark-scenarios.json)");
-    Console.WriteLine("  --mode <mode>        Execution mode: benchmark, dataset-prep, analysis, size-scaling, validation, compare");
+    Console.WriteLine("  --mode <mode>        Execution mode: benchmark, dataset-prep, analysis, size-scaling, validation, compare, remove-records");
     Console.WriteLine("  --compare-with <dir> Directory containing benchmark-file-results.ndjson to compare against");
     Console.WriteLine("  --scenario <name>    Filter execution to a specific scenario name");
     Console.WriteLine("  --variant <name>     Filter execution to a specific variant name");
+    Console.WriteLine("  --remove, --prune    Shorthand for --mode remove-records");
+    Console.WriteLine("  --mode remove-records --scenario <name> [--variant <name>]");
+    Console.WriteLine("                       Remove matching run-level and file-level result records");
     Console.WriteLine("  --notes <text>       Add notes to the run");
     Console.WriteLine("  --fresh              Start fresh, ignoring any existing results");
     return 0;
@@ -67,6 +70,12 @@ try
     if (selection.Mode == BenchmarkRunMode.Compare)
     {
         await CompareRunner.RunAsync(workingDirectory, config, selection, ct);
+        return 0;
+    }
+
+    if (selection.Mode == BenchmarkRunMode.RemoveRecords)
+    {
+        await BenchmarkRecordRemovalRunner.RunAsync(workingDirectory, config, selection, ct);
         return 0;
     }
 

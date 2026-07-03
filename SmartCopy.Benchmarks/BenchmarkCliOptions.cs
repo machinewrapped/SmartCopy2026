@@ -29,46 +29,57 @@ internal sealed class BenchmarkCliOptions
 
         for (var i = 0; i < args.Length; i++)
         {
-            if (string.Equals(args[i], "--scenario", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            var arg = args[i];
+            if (string.Equals(arg, "--scenario", StringComparison.OrdinalIgnoreCase))
             {
-                scenarioName = args[++i];
+                scenarioName = ReadRequiredValue(args, ref i, arg);
             }
-            else if (string.Equals(args[i], "--variant", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            else if (string.Equals(arg, "--variant", StringComparison.OrdinalIgnoreCase))
             {
-                variantName = args[++i];
+                variantName = ReadRequiredValue(args, ref i, arg);
             }
-            else if (string.Equals(args[i], "--notes", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            else if (string.Equals(arg, "--notes", StringComparison.OrdinalIgnoreCase))
             {
-                notes = args[++i];
+                notes = ReadRequiredValue(args, ref i, arg);
             }
-            else if (string.Equals(args[i], "--mode", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            else if (string.Equals(arg, "--mode", StringComparison.OrdinalIgnoreCase))
             {
-                mode = ParseMode(args[++i]);
+                mode = ParseMode(ReadRequiredValue(args, ref i, arg));
             }
-            else if (string.Equals(args[i], "--config", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            else if (string.Equals(arg, "--config", StringComparison.OrdinalIgnoreCase))
             {
-                configPath = args[++i];
+                configPath = ReadRequiredValue(args, ref i, arg);
             }
-            else if (string.Equals(args[i], "--runs", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            else if (string.Equals(arg, "--runs", StringComparison.OrdinalIgnoreCase))
             {
-                var raw = args[++i];
+                var raw = ReadRequiredValue(args, ref i, arg);
                 if (!int.TryParse(raw, out var parsedRuns) || parsedRuns < 1)
                     throw new InvalidOperationException($"--runs must be a positive integer, got '{raw}'.");
                 runs = parsedRuns;
             }
-            else if (string.Equals(args[i], "--fresh", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(arg, "--fresh", StringComparison.OrdinalIgnoreCase))
             {
                 freshStart = true;
             }
-            else if (string.Equals(args[i], "--compare-with", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            else if (string.Equals(arg, "--compare-with", StringComparison.OrdinalIgnoreCase))
             {
-                comparePath = args[++i];
+                comparePath = ReadRequiredValue(args, ref i, arg);
             }
-            else if (string.Equals(args[i], "--help", StringComparison.OrdinalIgnoreCase) || 
-                     string.Equals(args[i], "-h", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(args[i], "-?", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(arg, "--remove", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(arg, "--remove-records", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(arg, "--prune", StringComparison.OrdinalIgnoreCase))
+            {
+                mode = BenchmarkRunMode.RemoveRecords;
+            }
+            else if (string.Equals(arg, "--help", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(arg, "-h", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(arg, "-?", StringComparison.OrdinalIgnoreCase))
             {
                 help = true;
+            }
+            else
+            {
+                throw new InvalidOperationException($"Unknown benchmark option '{arg}'. Use --help to see supported options.");
             }
         }
 
@@ -84,6 +95,14 @@ internal sealed class BenchmarkCliOptions
             Help = help,
             Runs = runs,
         };
+    }
+
+    private static string ReadRequiredValue(string[] args, ref int index, string optionName)
+    {
+        if (index + 1 >= args.Length)
+            throw new InvalidOperationException($"{optionName} requires a value.");
+
+        return args[++index];
     }
 
     private static BenchmarkRunMode ParseMode(string value)
@@ -122,7 +141,14 @@ internal sealed class BenchmarkCliOptions
             return BenchmarkRunMode.Compare;
         }
 
-        throw new InvalidOperationException($"Unknown benchmark mode '{value}'. Expected 'benchmark', 'dataset-prep', 'analysis', 'size-scaling', 'validation', or 'compare'.");
+        if (string.Equals(value, "remove-records", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(value, "remove", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(value, "prune", StringComparison.OrdinalIgnoreCase))
+        {
+            return BenchmarkRunMode.RemoveRecords;
+        }
+
+        throw new InvalidOperationException($"Unknown benchmark mode '{value}'. Expected 'benchmark', 'dataset-prep', 'analysis', 'size-scaling', 'validation', 'compare', or 'remove-records'.");
     }
 }
 

@@ -14,6 +14,7 @@ internal enum BenchmarkRunMode
     SizeScaling,
     Validation,
     Compare,
+    RemoveRecords,
 }
 
 internal sealed class BenchmarkState
