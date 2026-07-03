@@ -1,6 +1,7 @@
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
+using SmartCopy.Core.Pipeline.Strategy;
 using SmartCopy.Core.Trash;
 
 namespace SmartCopy.Tests.TestInfrastructure;
@@ -25,18 +26,21 @@ internal sealed class FakeStepContext : IStepContext
     public bool AllowDeleteReadOnly { get; }
     public ITrashService TrashService { get; }
     public OperationalSettings OperationalSettings { get; }
+    public ICopyStrategyPolicy CopyStrategyPolicy { get; }
 
     public FakeStepContext(
         DirectoryNode root,
         IFileSystemProvider source,
         IFileSystemProvider? target = null,
         ITrashService? trashService = null,
-        OperationalSettings? settings = null)
+        OperationalSettings? settings = null,
+        ICopyStrategyPolicy? copyStrategyPolicy = null)
     {
         RootNode = root;
         SourceProvider = source;
         TrashService = trashService ?? new NullTrashService();
         OperationalSettings = settings ?? new OperationalSettings();
+        CopyStrategyPolicy = copyStrategyPolicy ?? DefaultCopyStrategyPolicy.Instance;
 
         ProviderRegistry = new FileSystemProviderRegistry();
         ProviderRegistry.Register(source);

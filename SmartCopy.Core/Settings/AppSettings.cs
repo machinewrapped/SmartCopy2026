@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 
 namespace SmartCopy.Core.Settings;
@@ -27,6 +28,11 @@ public sealed class AppSettings
     public bool AllowCopyOptimisations { get; set; } = false;
     public int TinyFileFastPathKb { get; set; } = 256;  // Conservative direct-write threshold
     public int BatchBufferKb { get; set; } = 1024;        // 1 MiB default buffer
+    public int CopyRoutingSsdBufferKb { get; set; } = 1024;
+    public int CopyRoutingUsbBufferKb { get; set; } = 1024;
+    public int CopyRoutingHddBufferKb { get; set; } = 512;
+    public int CopyRoutingSameVolumeHddBufferKb { get; set; } = 256;
+    public int CopyRoutingUnknownBufferKb { get; set; } = 512;
 
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public OverwriteMode DefaultOverwriteMode { get; set; } = OverwriteMode.Skip;
@@ -85,6 +91,81 @@ public sealed class AppSettings
     /// Useful for capturing details when reporting bugs.
     /// </summary>
     public bool VerboseLogging { get; set; } = false;
+
+    public OperationalSettings CreateOperationalSettings()
+    {
+        var appDefaults = new AppSettings();
+        var defaults = new OperationalSettings();
+        var settings = defaults with
+        {
+            CopyBufferSizeBytes = PositiveKbToIntBytesOrDefault(
+                CopyChunkSizeKb,
+                defaults.CopyBufferSizeBytes),
+            RoutedSsdCopyBufferSizeBytes = PositiveKbToIntBytesOrDefault(
+                CopyRoutingSsdBufferKb,
+                defaults.RoutedSsdCopyBufferSizeBytes),
+            RoutedUsbCopyBufferSizeBytes = PositiveKbToIntBytesOrDefault(
+                CopyRoutingUsbBufferKb,
+                defaults.RoutedUsbCopyBufferSizeBytes),
+            RoutedHddCopyBufferSizeBytes = PositiveKbToIntBytesOrDefault(
+                CopyRoutingHddBufferKb,
+                defaults.RoutedHddCopyBufferSizeBytes),
+            RoutedSameVolumeHddCopyBufferSizeBytes = PositiveKbToIntBytesOrDefault(
+                CopyRoutingSameVolumeHddBufferKb,
+                defaults.RoutedSameVolumeHddCopyBufferSizeBytes),
+            RoutedUnknownCopyBufferSizeBytes = PositiveKbToIntBytesOrDefault(
+                CopyRoutingUnknownBufferKb,
+                defaults.RoutedUnknownCopyBufferSizeBytes),
+        };
+
+        if (!AllowCopyOptimisations)
+        {
+            return settings.Normalize();
+        }
+
+        return (settings with
+        {
+            TinyFileFastPathThresholdBytes = NonNegativeKbToLongBytesOrDefault(
+                TinyFileFastPathKb,
+                (long)appDefaults.TinyFileFastPathKb * 1024),
+            BatchBufferBytes = NonNegativeKbToIntBoundedBytesOrDefault(
+                BatchBufferKb,
+                (long)appDefaults.BatchBufferKb * 1024),
+            DestinationRoutingEnabled = true,
+        }).Normalize();
+    }
+
+    private static int PositiveKbToIntBytesOrDefault(int valueKb, int defaultBytes)
+    {
+        if (valueKb <= 0)
+        {
+            return defaultBytes;
+        }
+
+        var bytes = (long)valueKb * 1024;
+        return bytes <= int.MaxValue ? (int)bytes : defaultBytes;
+    }
+
+    private static long NonNegativeKbToLongBytesOrDefault(int valueKb, long defaultBytes)
+    {
+        if (valueKb < 0)
+        {
+            return defaultBytes;
+        }
+
+        return (long)valueKb * 1024;
+    }
+
+    private static long NonNegativeKbToIntBoundedBytesOrDefault(int valueKb, long defaultBytes)
+    {
+        if (valueKb < 0)
+        {
+            return defaultBytes;
+        }
+
+        var bytes = (long)valueKb * 1024;
+        return bytes <= int.MaxValue ? bytes : defaultBytes;
+    }
 
     /// <summary>
     /// Copies all persisted properties from <paramref name="saved"/> into this instance,

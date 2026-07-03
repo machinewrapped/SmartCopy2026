@@ -51,6 +51,16 @@ public sealed record OperationalSettings
     /// <summary>When true, the copy strategy policy selects the copy buffer from the
     /// source→destination drive pair. Default false preserves the fixed-buffer behaviour.</summary>
     public bool DestinationRoutingEnabled { get; init; }
+    /// <summary>Routed copy buffer for SSD→SSD pairs.</summary>
+    public int RoutedSsdCopyBufferSizeBytes { get; init; } = 1024 * 1024;
+    /// <summary>Routed copy buffer for USB destinations, unless same-volume HDD rules apply.</summary>
+    public int RoutedUsbCopyBufferSizeBytes { get; init; } = 1024 * 1024;
+    /// <summary>Routed copy buffer for cross-volume pairs where either side is HDD.</summary>
+    public int RoutedHddCopyBufferSizeBytes { get; init; } = 512 * 1024;
+    /// <summary>Routed copy buffer for same-volume HDD copies.</summary>
+    public int RoutedSameVolumeHddCopyBufferSizeBytes { get; init; } = 256 * 1024;
+    /// <summary>Routed copy buffer for unknown, memory, MTP, or otherwise ambiguous media pairs.</summary>
+    public int RoutedUnknownCopyBufferSizeBytes { get; init; } = 512 * 1024;
     /// <summary>Minimum interval between completion-progress reports, in milliseconds. 0 disables the time gate.</summary>
     public int CompletionProgressIntervalMs { get; init; } = 100;
     /// <summary>Minimum number of files between completion-progress reports. 0 disables the file-count gate.</summary>
@@ -119,7 +129,21 @@ public sealed record OperationalSettings
                 "Completion progress batch size must be zero or greater.");
         }
 
+        ValidatePositiveBuffer(RoutedSsdCopyBufferSizeBytes, nameof(RoutedSsdCopyBufferSizeBytes));
+        ValidatePositiveBuffer(RoutedUsbCopyBufferSizeBytes, nameof(RoutedUsbCopyBufferSizeBytes));
+        ValidatePositiveBuffer(RoutedHddCopyBufferSizeBytes, nameof(RoutedHddCopyBufferSizeBytes));
+        ValidatePositiveBuffer(RoutedSameVolumeHddCopyBufferSizeBytes, nameof(RoutedSameVolumeHddCopyBufferSizeBytes));
+        ValidatePositiveBuffer(RoutedUnknownCopyBufferSizeBytes, nameof(RoutedUnknownCopyBufferSizeBytes));
+
         return this;
+    }
+
+    private static void ValidatePositiveBuffer(int value, string parameterName)
+    {
+        if (value <= 0)
+        {
+            throw new ArgumentOutOfRangeException(parameterName, "Copy buffer size must be positive.");
+        }
     }
 
     /// <summary>

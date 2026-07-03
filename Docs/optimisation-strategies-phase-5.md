@@ -2,7 +2,7 @@
 
 Back to [Optimisation Strategies](optimisation-strategies.md#5-detail-index). Current policy summary lives in [Current Policy & Open Questions](optimisation-strategies.md#2-current-policy--open-questions).
 
-**Status:** Cross-drive validation complete (2026-06-07, 8 scenarios, 519 runs); USB validation complete (2026-06-08, see Phase 6). The cross-drive suite confirmed: preallocation retracted universally; 1 MiB for SSD; 512 KiB for HDD and unknown. USB validation found 1 MiB is also the USB optimum, but for different reasons (non-monotonic response; 512KiB regresses on USB). The optional SameDriveSSD larger-buffer probe (Step 3 below) remains open.
+**Status:** Cross-drive validation complete (2026-06-07, 8 scenarios, 519 runs); USB validation complete (2026-06-08, see Phase 6). The cross-drive suite confirmed: preallocation retracted universally; 1 MiB for SSD; 512 KiB for HDD and unknown. USB validation found 1 MiB is also the USB optimum, but for different reasons (non-monotonic response; 512 KiB regresses on USB). Later SameDriveHDD production-path stream-only sweeps (2026-07-02) show drive-specific behavior below 512 KiB: one mechanical drive weakly favoured 64 KiB, another favoured 256 KiB and made 64 KiB slowest. The optional SameDriveSSD larger-buffer probe (Step 3 below) remains open.
 
 **Goal:** Find the optimal buffer size for large-file streaming. The MixedDataset cannot isolate this — buffer changes are lost in the noise of 13,000 tiny files.
 
@@ -62,12 +62,14 @@ We have weak evidence for a destination-sensitive routing policy (Phase 6):
 
 5. **SSD_R_to_SSD_D over-represented the SSD opportunity in prior phases.** It is a real data point for high-throughput NVMe-to-NVMe pairs, but reversing the same two drives halves the observed gain (19% → 5.5%), and a third SSD pair shows only 3.7%. The strong curve seen in earlier phases was partially a property of that specific drive pair, not a general SSD characteristic.
 
+6. **SameDriveHDD buffer response is drive-specific below 512 KiB.** A 2026-07-02 production-path sweep on `LargeFileDataset` isolated streaming by disabling direct-write and batching. Drive A formed one tight cluster and weakly favoured `64 KiB` (3m 7s median), with `128/256 KiB` at 3m 10s and `512 KiB/1 MiB` at 3m 14s. Drive B did not repeat that: `256 KiB` led at 1m 41s, `512 KiB` followed at 1m 43s, `128 KiB` at 1m 44s, `1 MiB` at 1m 45s, and `64 KiB` was slowest at 1m 49s. The shared conclusion is that `2/4 MiB` is not useful for SameDriveHDD and `64 KiB` is not a safe default. If SameDriveHDD gets a special buffer, `256 KiB` is the only smaller-buffer candidate still worth validating against the current 512 KiB fallback.
+
 **Revised provisional policy (SSD/HDD/Unknown — USB added in Phase 6):**
 
 | Destination Profile | Buffer | Preallocation | Notes |
 |---|---|---|---|
 | SSD destination | 1 MiB | **OFF** | 4 MiB may benefit on fast NVMe pairs but cannot be classified from software |
-| HDD destination | 512 KiB | **OFF** | 1 MiB provides no consistent benefit; regresses on some HDD pairs |
+| HDD destination | 512 KiB | **OFF** | 1 MiB provides no consistent benefit; regresses on some HDD pairs. Same-volume HDD has conflicting sub-512 KiB signals; 256 KiB is the only smaller-buffer challenger worth full-policy validation. |
 | Unknown / ambiguous | 512 KiB | **OFF** | Conservative; does not assume SSD behaviour |
 
 **Preallocation is OFF universally.** No drive pair or scenario in this suite shows a reliable positive preallocation effect at run level. Do not re-enable preallocation without a controlled rerun that isolates the `SetLength` contribution for a specific destination type.

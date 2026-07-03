@@ -19,6 +19,7 @@ public sealed class AppSettingsStoreTests
             LastSourcePath = "/music",
             ShowHiddenFiles = true,
             CopyChunkSizeKb = 1024,
+            CopyRoutingSameVolumeHddBufferKb = 256,
             RecentSources = ["/one", "/two"],
         };
 
@@ -28,6 +29,7 @@ public sealed class AppSettingsStoreTests
         Assert.Equal("/music", loaded.LastSourcePath);
         Assert.True(loaded.ShowHiddenFiles);
         Assert.Equal(1024, loaded.CopyChunkSizeKb);
+        Assert.Equal(256, loaded.CopyRoutingSameVolumeHddBufferKb);
         Assert.Equal(2, loaded.RecentSources.Count);
     }
 

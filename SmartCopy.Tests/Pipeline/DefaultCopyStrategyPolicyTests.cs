@@ -10,6 +10,13 @@ namespace SmartCopy.Tests.Pipeline;
 /// </summary>
 public sealed class DefaultCopyStrategyPolicyTests
 {
+    private const int BaseBuffer = 384 * 1024;
+    private const int SsdBuffer = 1536 * 1024;
+    private const int UsbBuffer = 1792 * 1024;
+    private const int HddBuffer = 640 * 1024;
+    private const int SameVolumeHddBuffer = 256 * 1024;
+    private const int UnknownBuffer = 320 * 1024;
+
     private static ICopyStrategy Resolve(
         OperationalSettings settings,
         DriveClassification source,
@@ -18,19 +25,29 @@ public sealed class DefaultCopyStrategyPolicyTests
         DefaultCopyStrategyPolicy.Instance.Resolve(new CopyStrategyInputs(
             settings, source, target, ProviderCapabilities.Full, ProviderCapabilities.Full, sameVolume));
 
-    [Theory] // the benchmark-validated routing table: 1 MiB for SSD/USB, 512 KiB where an HDD caps the pair
-    [InlineData(DriveMediaType.SSD, DriveInterfaceType.NVMe, DriveMediaType.SSD, DriveInterfaceType.NVMe, DefaultCopyStrategyPolicy.FastBufferBytes)]          // SSD↔SSD
-    [InlineData(DriveMediaType.SSD, DriveInterfaceType.NVMe, DriveMediaType.SSD, DriveInterfaceType.USB, DefaultCopyStrategyPolicy.FastBufferBytes)]           // USB target
-    [InlineData(DriveMediaType.SSD, DriveInterfaceType.NVMe, DriveMediaType.HDD, DriveInterfaceType.SATA, DefaultCopyStrategyPolicy.ConservativeBufferBytes)]  // HDD target
-    [InlineData(DriveMediaType.HDD, DriveInterfaceType.SATA, DriveMediaType.SSD, DriveInterfaceType.NVMe, DefaultCopyStrategyPolicy.ConservativeBufferBytes)]  // HDD source
-    [InlineData(DriveMediaType.Unknown, DriveInterfaceType.Unknown, DriveMediaType.Unknown, DriveInterfaceType.Unknown, DefaultCopyStrategyPolicy.ConservativeBufferBytes)]
+    public static TheoryData<DriveMediaType, DriveInterfaceType, DriveMediaType, DriveInterfaceType, bool, int>
+        RoutingCases => new()
+        {
+            { DriveMediaType.SSD, DriveInterfaceType.NVMe, DriveMediaType.SSD, DriveInterfaceType.NVMe, false, SsdBuffer },
+            { DriveMediaType.SSD, DriveInterfaceType.NVMe, DriveMediaType.SSD, DriveInterfaceType.USB, false, UsbBuffer },
+            { DriveMediaType.SSD, DriveInterfaceType.NVMe, DriveMediaType.HDD, DriveInterfaceType.SATA, false, HddBuffer },
+            { DriveMediaType.HDD, DriveInterfaceType.SATA, DriveMediaType.SSD, DriveInterfaceType.NVMe, false, HddBuffer },
+            { DriveMediaType.HDD, DriveInterfaceType.SATA, DriveMediaType.HDD, DriveInterfaceType.SATA, true, SameVolumeHddBuffer },
+            { DriveMediaType.Unknown, DriveInterfaceType.Unknown, DriveMediaType.Unknown, DriveInterfaceType.Unknown, false, UnknownBuffer },
+        };
+
+    [Theory]
+    [MemberData(nameof(RoutingCases))]
     public void RoutingEnabled_SelectsBufferFromDrivePair(
         DriveMediaType srcMedia, DriveInterfaceType srcIface,
-        DriveMediaType dstMedia, DriveInterfaceType dstIface, int expectedBuffer)
+        DriveMediaType dstMedia, DriveInterfaceType dstIface,
+        bool sameVolume, int expectedBuffer)
     {
         var strategy = Resolve(
-            new OperationalSettings { DestinationRoutingEnabled = true },
-            new DriveClassification(srcMedia, srcIface), new DriveClassification(dstMedia, dstIface));
+            RoutedSettings(),
+            new DriveClassification(srcMedia, srcIface),
+            new DriveClassification(dstMedia, dstIface),
+            sameVolume);
 
         Assert.Equal(expectedBuffer, strategy.Settings.CopyBufferSizeBytes);
     }
@@ -56,6 +73,18 @@ public sealed class DefaultCopyStrategyPolicyTests
             new DriveClassification(DriveMediaType.HDD, DriveInterfaceType.SATA));
 
         Assert.Equal(baseSettings.CopyBufferSizeBytes, strategy.Settings.CopyBufferSizeBytes);
+    }
+
+    [Fact]
+    public void RoutingEnabled_SameVolumeHdd_UsesCanonical256KiBBuffer()
+    {
+        var strategy = Resolve(
+            RoutedSettings(),
+            new DriveClassification(DriveMediaType.HDD, DriveInterfaceType.SATA),
+            new DriveClassification(DriveMediaType.HDD, DriveInterfaceType.SATA),
+            sameVolume: true);
+
+        Assert.Equal(256 * 1024, strategy.Settings.CopyBufferSizeBytes);
     }
 
     [Fact]
@@ -105,4 +134,15 @@ public sealed class DefaultCopyStrategyPolicyTests
 
         Assert.True(strategy.Settings.BatchOrderByFileSize);
     }
+
+    private static OperationalSettings RoutedSettings() => new()
+    {
+        CopyBufferSizeBytes = BaseBuffer,
+        DestinationRoutingEnabled = true,
+        RoutedSsdCopyBufferSizeBytes = SsdBuffer,
+        RoutedUsbCopyBufferSizeBytes = UsbBuffer,
+        RoutedHddCopyBufferSizeBytes = HddBuffer,
+        RoutedSameVolumeHddCopyBufferSizeBytes = SameVolumeHddBuffer,
+        RoutedUnknownCopyBufferSizeBytes = UnknownBuffer,
+    };
 }

@@ -12,6 +12,8 @@ namespace SmartCopy.Tests.Pipeline;
 /// </summary>
 public sealed class CopyStrategySeamTests
 {
+    private const int RoutedUsbBuffer = 123 * 1024;
+
     // The one behaviour nothing else covers: the seam fetches the source and target classifications
     // and forwards them to the policy — in the right slots. The pair is deliberately ASYMMETRIC:
     // "target interface == USB" is the only routing rule that distinguishes source from target, so an
@@ -26,23 +28,66 @@ public sealed class CopyStrategySeamTests
         var (ctx, target) = await BuildAsync(
             sourceClass: new(DriveMediaType.HDD, DriveInterfaceType.SATA),
             targetClass: new(DriveMediaType.SSD, DriveInterfaceType.USB),
-            routing: true);
+            routing: true,
+            sourceVolumeId: "source-volume",
+            targetVolumeId: "target-volume");
 
         var strategy = await ctx.ResolveCopyStrategyAsync(target, CancellationToken.None);
 
-        Assert.Equal(DefaultCopyStrategyPolicy.FastBufferBytes, strategy.Settings.CopyBufferSizeBytes);
+        Assert.Equal(RoutedUsbBuffer, strategy.Settings.CopyBufferSizeBytes);
+    }
+
+    [Fact]
+    public async Task ResolveCopyStrategyAsync_ForwardsVolumeIdsAndSameVolume()
+    {
+        var policy = new CapturingPolicy();
+        var (ctx, target) = await BuildAsync(
+            sourceClass: new(DriveMediaType.HDD, DriveInterfaceType.SATA),
+            targetClass: new(DriveMediaType.HDD, DriveInterfaceType.SATA),
+            routing: true,
+            sourceVolumeId: "volume-a",
+            targetVolumeId: "volume-a",
+            policy: policy);
+
+        await ctx.ResolveCopyStrategyAsync(target, CancellationToken.None);
+
+        Assert.True(policy.Captured.HasValue);
+        var inputs = policy.Captured.Value;
+        Assert.True(inputs.SameVolume);
+        Assert.Equal("volume-a", inputs.SourceVolumeId);
+        Assert.Equal("volume-a", inputs.TargetVolumeId);
     }
 
     private static async Task<(IStepContext ctx, IFileSystemProvider target)> BuildAsync(
-        DriveClassification sourceClass, DriveClassification targetClass, bool routing)
+        DriveClassification sourceClass,
+        DriveClassification targetClass,
+        bool routing,
+        string? sourceVolumeId = null,
+        string? targetVolumeId = null,
+        ICopyStrategyPolicy? policy = null)
     {
         var memory = MemoryFileSystemFixtures.Create(f => f.WithFile("/src/a.txt", "x"u8).WithDirectory("/dest"));
         var root = await memory.BuildDirectoryTree("/src");
 
-        var source = new CapabilityOverrideProvider(memory, ProviderCapabilities.Full, sourceClass);
-        var target = new CapabilityOverrideProvider(memory, ProviderCapabilities.Full, targetClass);
-        var settings = new OperationalSettings { DestinationRoutingEnabled = routing };
+        var source = new CapabilityOverrideProvider(memory, ProviderCapabilities.Full, sourceClass, sourceVolumeId);
+        var target = new CapabilityOverrideProvider(memory, ProviderCapabilities.Full, targetClass, targetVolumeId);
+        var settings = new OperationalSettings
+        {
+            DestinationRoutingEnabled = routing,
+            RoutedUsbCopyBufferSizeBytes = RoutedUsbBuffer,
+        };
 
-        return (new FakeStepContext(root, source, settings: settings), target);
+        return (new FakeStepContext(root, source, settings: settings, copyStrategyPolicy: policy), target);
+    }
+
+    private sealed class CapturingPolicy : ICopyStrategyPolicy
+    {
+        public CopyStrategyInputs? Captured { get; private set; }
+
+        public ICopyStrategy Resolve(CopyStrategyInputs inputs)
+        {
+            Captured = inputs;
+            return DefaultCopyStrategyPolicy.Instance.Resolve(inputs);
+        }
     }
 }

@@ -1231,14 +1231,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             SourceProvider       = sourceProvider,
             ProviderRegistry     = _providerRegistry,
             TrashService         = _trashService,
-            OperationalSettings  = _settings.AllowCopyOptimisations
-                ? new OperationalSettings
-                  {
-                      TinyFileFastPathThresholdBytes = (long)_settings.TinyFileFastPathKb * 1024,
-                      BatchBufferBytes               = (long)_settings.BatchBufferKb * 1024,
-                      DestinationRoutingEnabled      = true,
-                  }.Normalize()
-                : new OperationalSettings(),
+            OperationalSettings  = _settings.CreateOperationalSettings(),
         };
 
         // Put the view into "preparing" state and open the dialog immediately
@@ -1335,14 +1328,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             SourceProvider       = sourceProvider,
             ProviderRegistry     = _providerRegistry,
             TrashService         = _trashService,
-            OperationalSettings  = _settings.AllowCopyOptimisations
-                ? new OperationalSettings
-                  {
-                      TinyFileFastPathThresholdBytes = (long)_settings.TinyFileFastPathKb * 1024,
-                      BatchBufferBytes               = (long)_settings.BatchBufferKb * 1024,
-                      DestinationRoutingEnabled      = true,
-                  }.Normalize()
-                : new OperationalSettings(),
+            OperationalSettings  = _settings.CreateOperationalSettings(),
         };
 
         await ExecutePipelineAsync(runner, job);

@@ -18,13 +18,13 @@ An important caveat: Every file write incurs unavoidable filesystem work — MFT
 
 ## 2. Current Policy & Open Questions
 
-*The one place to read for "what do we currently believe." The dated evidence and per-phase history live in the files indexed in §5; this is the signal extracted from them. Last updated 2026-07-01.*
+*The one place to read for "what do we currently believe." The dated evidence and per-phase history live in the files indexed in §5; this is the signal extracted from them. Last updated 2026-07-02.*
 
-**Shipping policy (the candidate bundle).** Encoded in code, gated behind `AllowCopyOptimisations` (default **OFF**). Gate 1 production-path validation passed on SSD MixedDataset smoke. Gate 2 then failed on SameDriveHDD with the current routed HDD policy ([Production Validation Pass](optimisation-strategies-production-validation.md)). Same-volume HDD now disables batch size ordering, but the streamed-copy buffer remains under investigation:
+**Shipping policy (the candidate bundle).** Encoded in code, gated behind `AllowCopyOptimisations` (default **OFF**). Gate 1 production-path validation passed on SSD MixedDataset smoke. Gate 2 then failed on SameDriveHDD with the previous routed 512 KiB HDD policy ([Production Validation Pass](optimisation-strategies-production-validation.md)). Same-volume HDD now uses a 256 KiB copy buffer and disables batch size ordering. Stream-only `LargeFileDataset` sweeps on two SameDriveHDD devices show the response is drive-specific: one drive weakly favoured `64 KiB`, while the second favoured `256 KiB` and made `64 KiB` the slowest. The shared conclusion is that `2/4 MiB` is not useful and `256 KiB` is the defensible SameDriveHDD baseline until the policy is revalidated end-to-end:
 
 | Knob | Value | Source of record |
 |---|---|---|
-| Copy buffer | SSD/USB 1 MiB · any HDD/Unknown 512 KiB | `DefaultCopyStrategyPolicy` |
+| Copy buffer | SSD/USB 1 MiB · cross-volume HDD/Unknown 512 KiB · same-volume HDD 256 KiB | `AppSettings` → `OperationalSettings`, applied by `DefaultCopyStrategyPolicy` |
 | Batch buffer | 1 MiB (eligibility ceiling 512 KiB) | `AppSettings.BatchBufferKb`, `OperationalSettings` |
 | Batch traversal order | Order batched files by file size except same-volume HDD, which preserves natural order | `DefaultCopyStrategyPolicy`, `OperationalSettings.BatchOrderByFileSize` |
 | Direct-write threshold | 256 KiB | `AppSettings.TinyFileFastPathKb` |
@@ -35,18 +35,18 @@ An important caveat: Every file write incurs unavoidable filesystem work — MFT
 
 | Mechanism | Verdict | Where measured |
 |---|---|---|
-| Buffer routing (1 MiB SSD/USB, 512 KiB any HDD/Unknown) | **Partially validated**; same-volume HDD routed 512 KiB regressed on MixedDataset | Phase 5, Phase 6, Production Validation Pass |
+| Buffer routing (1 MiB SSD/USB, 512 KiB cross-volume HDD/Unknown, 256 KiB same-volume HDD) | **Partially validated**; same-volume HDD 512 KiB regressed on MixedDataset, so the policy now canonises 256 KiB pending end-to-end rerun | Phase 5, Phase 6, Production Validation Pass |
 | Preallocation OFF | **Validated** — null or regresses everywhere (an earlier +11.6% SSD→HDD finding was retracted) | Phase 5 |
 | Tiny-file direct write ≤ 256 KiB | **Validated on SSD**; assumed on HDD/USB | Phase 2 + MixedDataset validation |
 | Batching (1 MiB / 512 KiB ceiling) | **SSD validated** (small — see below); **OFF on USB** (regresses); **not isolated on HDD** | Phase 3, Phase 6, Production Validation Pass |
 | Batch traversal ordered by file size | **Disabled for same-volume HDD**; SameDriveHDD diagnostic sweep shows size ordering is a clear regression there | Production Validation Pass |
 | Operation journal I/O | **Ruled out** as the production/prototype gap; disabling benchmark journals was consistently slightly slower | Production Validation Pass |
-| Whole bundle on the production path | **Gate 1 passed; Gate 2 stopped** — SSD pairs passed, SameDriveHDD regressed with the current routed HDD policy | Production Validation Pass |
+| Whole bundle on the production path | **Gate 1 passed; Gate 2 stopped** — SSD pairs passed, SameDriveHDD regressed with the previous 512 KiB same-volume HDD policy | Production Validation Pass |
 
 **Batching is a small effect, easy to over-read.** Its genuine contribution above a 512 KiB buffer is **1–2% on SSD**, concentrated in sub-16 KiB files (Phase 3, key conclusion 1). The often-cited +8.5% "champion" is mostly the buffer/chunk-size win — which the buffer-routing policy already captures independently. Worth keeping, not worth headlining.
 
 **Open questions:**
-- **Same-volume HDD streamed buffer needs investigation before promotion.** The first Gate 2 matrix stopped at SameDriveHDD: `Production_Routed` was slower than `Legacy_Baseline` at run level, with losses concentrated in the Medium/Large streamed ranges. Same-volume HDD size ordering is now disabled, but the 512 KiB conservative routed buffer still needs a targeted production-path sweep against 256 KiB and 1 MiB before changing defaults.
+- **Same-volume HDD streamed buffer is drive-specific below 512 KiB.** The first Gate 2 matrix stopped at SameDriveHDD: `Production_Routed` was slower than `Legacy_Baseline` at run level, with losses concentrated in the Medium/Large streamed ranges. Same-volume HDD size ordering is now disabled. Two follow-up `LargeFileDataset` stream-only sweeps were both well clustered, but they disagree: drive A weakly favoured `64 KiB`; drive B favoured `256 KiB` and made `64 KiB` slowest. That argues against a `64 KiB` default. `256 KiB` is now the only smaller-buffer candidate worth testing against the current `512 KiB` HDD fallback in a full-policy SameDriveHDD validation.
 - **HDD batching and traversal order are still only partially isolated.** The SameDriveHDD ordering sweep shows size ordering is bad for same-drive HDD, but HDDtoHDD remains untested. Cross-drive Phase 5 swept buffer/preallocation on large files; batching itself only ran on SSD and USB small-file datasets.
 - **USB is too noisy for a static profile.** 1 MiB is the strongest USB signal but a *prior to be overridden by per-device learning*, not a settled finding (Phase 6). The high USB variance does **not** invalidate the SSD/HDD conclusions — it only makes USB defaults provisional.
 - **SameDrive SSD larger-buffer probe** (Phase 5, Step 3) remains open; it does not block promotion.
@@ -79,7 +79,7 @@ The pipeline knows every file's size before execution begins. The target archite
 | 256 KiB – 512 KiB | Staged write, batch-eligible — Phase 3 |
 | > 512 KiB | ManualLoop, 512 KiB–1 MiB copy buffer, destination-sensitive — Phase 5+6 |
 
-The 512 KiB boundary is the batch eligibility ceiling: files above it bypass the batch path and route directly to ManualLoop. **Evidence gap:** the 512 KiB – ~8 MiB range has no direct ManualLoop measurements (Phase 3 tested files in that range via the batch path; Phase 5 measured files above ~8 MiB). The 512 KiB copy buffer is the defensible default for that range — proven better than 4 KiB, and consistent with Phase 5 findings that 512 KiB is safe on all destination types.
+The 512 KiB boundary is the batch eligibility ceiling: files above it bypass the batch path and route directly to ManualLoop. **Evidence gap:** the 512 KiB – ~8 MiB range has no direct ManualLoop measurements (Phase 3 tested files in that range via the batch path; Phase 5 measured files above ~8 MiB). The 512 KiB copy buffer is the defensible default for that range — proven better than 4 KiB, and consistent with Phase 5 findings that 512 KiB is safe on most destination types. Same-volume HDD is the current exception under investigation: the 2026-07-02 stream-only LargeFileDataset sweeps suggest `256 KiB` may be competitive with `512 KiB`, but do not support a universal smaller buffer.
 
 This should be a routing function operating on already-known data (`node.Size`, `overwriteMode`, `providerCapabilities`) — no I/O in the hot path.
 

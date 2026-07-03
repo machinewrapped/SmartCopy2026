@@ -215,9 +215,18 @@ internal sealed class BenchmarkTask
             ?? throw new InvalidOperationException($"No destination provider for {_destinationPath}.");
         var source = await _sourceProvider!.GetClassificationAsync(_ct);
         var target = await destinationProvider.GetClassificationAsync(_ct);
-        var sameVolume = _sourceProvider.VolumeId is { } vid && destinationProvider.VolumeId == vid;
+        var sourceVolumeId = _sourceProvider.VolumeId;
+        var targetVolumeId = destinationProvider.VolumeId;
+        var sameVolume = sourceVolumeId is { } vid && targetVolumeId == vid;
         var strategy = DefaultCopyStrategyPolicy.Instance.Resolve(new CopyStrategyInputs(
-            _executionSettings, source, target, _sourceProvider.Capabilities, destinationProvider.Capabilities, sameVolume));
+            _executionSettings,
+            source,
+            target,
+            _sourceProvider.Capabilities,
+            destinationProvider.Capabilities,
+            sameVolume,
+            sourceVolumeId,
+            targetVolumeId));
 
         _recordedSettings = strategy is CopyStrategyBase baseStrategy
             ? baseStrategy.Settings

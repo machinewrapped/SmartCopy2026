@@ -12,7 +12,7 @@ The production copy path (`PipelineRunner → CopyStep → DefaultCopyStrategyPo
 
 | Knob | Value | Source of record |
 |---|---|---|
-| Copy buffer | SSD/USB 1 MiB, cross-drive HDD/Unknown 512 KiB, same-volume HDD keeps base 256 KiB | `DefaultCopyStrategyPolicy` |
+| Copy buffer | SSD/USB 1 MiB, cross-drive HDD/Unknown 512 KiB, same-volume HDD 256 KiB | `AppSettings` → `OperationalSettings`, applied by `DefaultCopyStrategyPolicy` |
 | Batch buffer | 1 MiB | `AppSettings.BatchBufferKb` |
 | Batch eligibility ceiling | 512 KiB | `OperationalSettings` default |
 | Direct-write threshold | 256 KiB | `AppSettings.TinyFileFastPathKb` |
@@ -20,7 +20,7 @@ The production copy path (`PipelineRunner → CopyStep → DefaultCopyStrategyPo
 
 `AllowCopyOptimisations` gates routing + batch + direct-write as one unit, so the pass validates the bundle **as shipped** — there is no production mode that enables routing alone. `Production_Routed` is this bundle reached via routing; `Prototype` and `Production_Fixed` pin the same values for the Gate 1 equivalence check.
 
-Batching is validated on SSD (Phase 3) and shown to regress on USB (Phase 6), but **never isolated on HDD** — the cross-drive suite (Phase 5) swept buffer and preallocation only, not batching. The first Gate 2 matrix found SameDriveHDD regressed with the originally routed 512 KiB HDD buffer. The candidate policy now exempts same-volume HDD from that buffer promotion; the mitigation still needs a rerun before broad promotion.
+Batching is validated on SSD (Phase 3) and shown to regress on USB (Phase 6), but **never isolated on HDD** — the cross-drive suite (Phase 5) swept buffer and preallocation only, not batching. The first Gate 2 matrix found SameDriveHDD regressed with the originally routed 512 KiB HDD buffer. The candidate policy now canonises same-volume HDD at 256 KiB and preserves natural file order there; the mitigation still needs a rerun before broad promotion.
 
 **Implementation status.** Complete; retained here as the design checklist that made the validation pass meaningful.
 
@@ -186,7 +186,35 @@ Allocation/GC counters also stayed elevated for both routed variants:
 
 Natural order's slightly higher GC count is consistent with more frequent flushes as small and large files interleave in directory order, but total allocation is effectively identical. That points to the routed production path's per-file plumbing rather than the ordering flag alone. Immediate action: disable `BatchOrderByFileSize` for same-volume HDD. Deferred action: test HDDtoHDD separately, because the same seek/read-write ordering mechanisms may apply there too.
 
-**Next diagnostic:** run `benchmark-samedrivehdd-stream-buffer-sweep.json` before changing the HDD buffer policy. It isolates streamed copy by disabling direct-write and batching, then compares 256 KiB, 512 KiB, and 1 MiB production-path manual-loop buffers on SameDriveHDD. This answers whether the current conservative 512 KiB buffer is helping or hurting independent of batching traversal.
+**Follow-up (2026-07-02): SameDriveHDD streamed-buffer sweeps — smaller than 512 KiB is drive-specific.** `benchmark-samedrivehdd-stream-buffer-sweep.json` was retargeted to `LargeFileDataset` on SameDriveHDD and run with direct-write and batching disabled. This isolates production-path `StreamCopyEngine` manual-loop buffer size from batching traversal and tiny-file overhead. The earlier MixedDataset NoBatch sweep was not decisive because most files were measured in KiB; it did expose an allocation issue where the Auto small-file path still called `Stream.CopyToAsync` and rented/allocated a per-file buffer despite `UseArrayPoolForManualLoop=true`. That has been fixed: pooled Auto small-file copies now use the manual loop and report completion once.
+
+The first LargeFileDataset run was the cleanest SameDriveHDD cluster observed so far. The effect was small, but directionally suggested larger buffers do not help same-volume mechanical copies and may be slightly worse.
+
+| Variant | Successful/Ran | Median | Mean | Global spread | Cluster count | Cluster |
+|---|---:|---:|---:|---:|---:|---|
+| `Stream_64K_NoBatch` | 3/3 | 3m 7s | 3m 8s | 6.3 s | 1 | 3 @ 3m 6s-3m 12s |
+| `Stream_128K_NoBatch` | 3/3 | 3m 10s | 3m 10s | 2.5 s | 1 | 3 @ 3m 9s-3m 12s |
+| `Stream_256K_NoBatch` | 3/3 | 3m 10s | 3m 10s | 4.2 s | 1 | 3 @ 3m 8s-3m 12s |
+| `Stream_512K_NoBatch` | 3/3 | 3m 14s | 3m 14s | 6.0 s | 1 | 3 @ 3m 12s-3m 18s |
+| `Stream_1MiB_NoBatch` | 3/3 | 3m 14s | 3m 14s | 1.7 s | 1 | 3 @ 3m 13s-3m 15s |
+| `Stream_2MiB_NoBatch` | 3/3 | 3m 22s | 3m 20s | 6.7 s | 1 | 3 @ 3m 16s-3m 22s |
+| `Stream_4MiB_NoBatch` | 3/3 | 3m 19s | 3m 19s | 4.1 s | 1 | 3 @ 3m 17s-3m 21s |
+
+Reading for drive A: `64 KiB` led by ~3 s over `128/256 KiB`, ~7 s over `512 KiB/1 MiB`, and ~12-15 s over `2/4 MiB`. On a ~3 minute run this was not a headline win, but the one-cluster shape across all variants made it more credible than the earlier MixedDataset sweep. We did **not** change `DefaultCopyStrategyPolicy` from this single drive.
+
+The second-drive validation did **not** repeat the `64 KiB` result. It was also well clustered, but `256 KiB` led, `512 KiB` was close, and `64 KiB` was slowest:
+
+| Variant | Successful/Ran | Median | Mean | Global spread | Cluster count | Cluster |
+|---|---:|---:|---:|---:|---:|---|
+| `Stream_64K_NoBatch` | 3/3 | 1m 49s | 1m 50s | 3.7 s | 1 | 3 @ 1m 49s-1m 53s |
+| `Stream_128K_NoBatch` | 3/3 | 1m 44s | 1m 45s | 4.1 s | 1 | 3 @ 1m 43s-1m 48s |
+| `Stream_256K_NoBatch` | 5/5 | 1m 41s | 1m 44s | 7.8 s | 1 | 5 @ 1m 40s-1m 48s |
+| `Stream_512K_NoBatch` | 3/3 | 1m 43s | 1m 44s | 3.6 s | 1 | 3 @ 1m 43s-1m 46s |
+| `Stream_1MiB_NoBatch` | 4/4 | 1m 45s | 1m 45s | 7.5 s | 1 | 4 @ 1m 42s-1m 50s |
+
+Combined reading: same-volume HDD buffer response is real but drive-specific below 512 KiB. `2/4 MiB` should stay disabled for this diagnostic; they were slower on drive A and add no useful signal. `64 KiB` is not a safe default candidate because it regressed on drive B. If we test a smaller SameDriveHDD policy, `256 KiB` is the only plausible challenger to the current `512 KiB` fallback, and it needs a full-policy validation run rather than another isolated stream-only result.
+
+**Gate 2 matrix protocol retained for the next full-policy validation attempt:**
 
 - **Run:** `--mode validation --config validation-matrix.json`. **Resumes across cold boots** — `BenchmarkPass` schedules only unconverged scenario/variant pairs, so a restart continues where it left off.
 - **Scenarios:** `MixedDataset` × drive pairs **in this order** (cheapest / most-likely-to-fail first, so SSDtoSSD ~hours gates the multi-week HDD/USB pairs): `SSDtoSSD → SameDriveTest → SSDtoHDD → SSDtoUSBFlash`.

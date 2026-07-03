@@ -8,21 +8,16 @@ namespace SmartCopy.Core.Pipeline.Strategy;
 /// <summary>
 /// Static, evidence-based copy-strategy policy. Always clamps to provider capabilities; when
 /// <see cref="OperationalSettings.DestinationRoutingEnabled"/> is set, also selects the copy
-/// buffer size from the source→destination drive pair per the benchmark-validated routing table
-/// (1 MiB for SSD/USB destinations, 512 KiB where an HDD caps the pair or the media is unknown).
-/// This is the seam future per-device learned profiles replace.
+/// buffer size from the configurable routing table on <see cref="OperationalSettings"/>. The
+/// baseline table keeps same-volume HDD at 256 KiB, routes cross-volume HDD and unknown media to
+/// 512 KiB, and routes SSD/USB pairs to 1 MiB. This is the seam future per-device learned profiles
+/// replace.
 /// </summary>
 public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
 {
     public static readonly DefaultCopyStrategyPolicy Instance = new();
 
     private readonly ILogger<DefaultCopyStrategyPolicy> _logger = AppLog.CreateLogger<DefaultCopyStrategyPolicy>();
-
-    /// <summary>Buffer for fast destinations (SSD/NVMe and USB removable) — benchmark-validated.</summary>
-    public const int FastBufferBytes = 1024 * 1024;
-
-    /// <summary>Conservative buffer for HDD-limited or unclassified pairs — benchmark-validated.</summary>
-    public const int ConservativeBufferBytes = 512 * 1024;
 
     public ICopyStrategy Resolve(CopyStrategyInputs inputs)
     {
@@ -32,7 +27,11 @@ public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
         {
             resolved = resolved with
             {
-                CopyBufferSizeBytes = SelectBufferBytes(inputs.Source, inputs.Target),
+                CopyBufferSizeBytes = SelectBufferBytes(
+                    inputs.Source,
+                    inputs.Target,
+                    inputs.SameVolume,
+                    resolved),
                 BatchOrderByFileSize = SelectBatchOrderByFileSize(
                     inputs.Source,
                     inputs.Target,
@@ -65,27 +64,35 @@ public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
     }
 
     /// <summary>
-    /// Picks the copy buffer size from the drive pair. The limiting device decides:
-    /// any HDD on the pair caps throughput regardless of buffer, so the conservative buffer is
-    /// used; fast pairs and USB use the larger buffer.
+    /// Picks the copy buffer size from the drive pair using the settings-backed baseline table.
+    /// Same-volume HDD is intentionally separate from cross-volume HDD because the source and
+    /// destination contend for the same spindle.
     /// </summary>
-    internal static int SelectBufferBytes(DriveClassification source, DriveClassification target)
+    internal static int SelectBufferBytes(
+        DriveClassification source,
+        DriveClassification target,
+        bool sameVolume,
+        OperationalSettings settings)
     {
-        // USB / removable destination: 1 MiB is the validated prior (largest, most stable USB gain).
-        if (target.InterfaceType == DriveInterfaceType.USB)
-            return FastBufferBytes;
+        // Same-volume HDD contends for one spindle; profiling canonises 256 KiB as the baseline.
+        if (sameVolume && IsHddPair(source, target))
+            return settings.RoutedSameVolumeHddCopyBufferSizeBytes;
 
-        // Any HDD on either side caps throughput — larger buffers give no consistent benefit, so stay conservative.
-        if (source.MediaType == DriveMediaType.HDD || target.MediaType == DriveMediaType.HDD)
-            return ConservativeBufferBytes;
+        // USB / removable destination: 1 MiB is the validated prior outside same-volume HDD.
+        if (target.InterfaceType == DriveInterfaceType.USB)
+            return settings.RoutedUsbCopyBufferSizeBytes;
+
+        // Cross-volume HDD remains conservative.
+        if (IsHddPair(source, target))
+            return settings.RoutedHddCopyBufferSizeBytes;
 
         // SSD↔SSD: 1 MiB is the safe universal default. Same-volume SSD may benefit from a larger
         // buffer but that probe is unrun, so stay at 1 MiB.
         if (source.MediaType == DriveMediaType.SSD && target.MediaType == DriveMediaType.SSD)
-            return FastBufferBytes;
+            return settings.RoutedSsdCopyBufferSizeBytes;
 
         // Unknown / Memory / MTP / ambiguous: do not assume fast media.
-        return ConservativeBufferBytes;
+        return settings.RoutedUnknownCopyBufferSizeBytes;
     }
 
     internal static bool SelectBatchOrderByFileSize(
@@ -97,8 +104,9 @@ public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
         if (!requested)
             return false;
 
-        return !(sameVolume &&
-                 source.MediaType == DriveMediaType.HDD &&
-                 target.MediaType == DriveMediaType.HDD);
+        return !(sameVolume && IsHddPair(source, target));
     }
+
+    private static bool IsHddPair(DriveClassification source, DriveClassification target) =>
+        source.MediaType == DriveMediaType.HDD || target.MediaType == DriveMediaType.HDD;
 }

@@ -41,7 +41,9 @@ public interface IStepContext
     {
         var source = await SourceProvider.GetClassificationAsync(ct);
         var target = await targetProvider.GetClassificationAsync(ct);
-        var sameVolume = SourceProvider.VolumeId is { } vid && targetProvider.VolumeId == vid;
+        var sourceVolumeId = SourceProvider.VolumeId;
+        var targetVolumeId = targetProvider.VolumeId;
+        var sameVolume = sourceVolumeId is { } vid && targetVolumeId == vid;
         
         return CopyStrategyPolicy.Resolve(
             new CopyStrategyInputs(
@@ -50,7 +52,9 @@ public interface IStepContext
                 target,
                 SourceProvider.Capabilities, 
                 targetProvider.Capabilities, 
-                sameVolume)
+                sameVolume,
+                sourceVolumeId,
+                targetVolumeId)
                 );
     }
 }
