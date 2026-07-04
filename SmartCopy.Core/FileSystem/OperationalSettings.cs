@@ -1,16 +1,5 @@
 namespace SmartCopy.Core.FileSystem;
 
-/// <summary>Selects the byte-pump path in <see cref="StreamCopyEngine"/>.</summary>
-public enum LocalFileSystemWriteMode
-{
-    /// <summary>Choose per file from size and whether progress is wired.</summary>
-    Auto,
-    /// <summary>Force the per-chunk loop (reports progress per chunk).</summary>
-    ManualLoop,
-    /// <summary>Force the framework <c>Stream.CopyToAsync</c>.</summary>
-    CopyToAsync,
-}
-
 /// <summary>Per-write durability intent, decided by the copy strategy and executed by the provider
 /// (full design: <c>Docs/Architecture.md</c> §2.4.1).</summary>
 public enum WriteDurability
@@ -33,14 +22,10 @@ public sealed record OperationalSettings
     public const long DefaultEnabledTinyFileFastPathThresholdBytes = 256 * 1024;
     public const long DefaultEnabledBatchBufferBytes = 1024 * 1024;
 
-    /// <summary>Size of the per-file copy buffer (and the ArrayPool rent size for the manual loop).</summary>
+    /// <summary>Size of the per-file copy buffer and ArrayPool rent size.</summary>
     public int CopyBufferSizeBytes { get; init; } = DefaultCopyBufferSizeBytes;
     /// <summary>Files at or below this size report progress once on completion rather than per chunk.</summary>
     public long SmallFileProgressThresholdBytes { get; init; } = DefaultSmallFileProgressThresholdBytes;
-    /// <summary>Which byte-pump path the engine uses; <see cref="LocalFileSystemWriteMode.Auto"/> decides per file.</summary>
-    public LocalFileSystemWriteMode WriteMode { get; init; } = LocalFileSystemWriteMode.Auto;
-    /// <summary>Rent the manual-loop buffer from <c>ArrayPool</c> instead of allocating one per file.</summary>
-    public bool UseArrayPoolForManualLoop { get; init; } = true;
     /// <summary>Files at or below this size are written <see cref="WriteDurability.Direct"/> (no staging).
     /// <c>0</c> disables the fast path (always stage).</summary>
     public long TinyFileFastPathThresholdBytes { get; init; }
@@ -79,11 +64,6 @@ public sealed record OperationalSettings
             throw new ArgumentOutOfRangeException(
                 nameof(SmallFileProgressThresholdBytes),
                 "Small-file progress threshold must be zero or greater.");
-        }
-
-        if (!Enum.IsDefined(WriteMode))
-        {
-            throw new ArgumentOutOfRangeException(nameof(WriteMode), "Write mode must be a defined value.");
         }
 
         if (TinyFileFastPathThresholdBytes < 0)

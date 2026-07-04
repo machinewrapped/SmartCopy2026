@@ -13,8 +13,6 @@ internal sealed class BenchmarkVariant
     public OverwriteMode? OverwriteMode { get; set; }
     public int? ProviderCopyBufferSizeBytes { get; set; }
     public long? ProviderSmallFileProgressThresholdBytes { get; set; }
-    public LocalFileSystemWriteMode? ProviderWriteMode { get; set; }
-    public bool? ProviderUseArrayPoolForManualLoop { get; set; }
     public long? DirectWriteThresholdBytes { get; set; }
     public long? BufferBatchBytes { get; set; }
     public long? BatchEligibilityThresholdBytes { get; set; }
@@ -67,12 +65,6 @@ internal sealed class BenchmarkVariant
             SmallFileProgressThresholdBytes = ProviderSmallFileProgressThresholdBytes
                 ?? scenario.ProviderSmallFileProgressThresholdBytes
                 ?? defaults.SmallFileProgressThresholdBytes,
-            WriteMode = ProviderWriteMode
-                ?? scenario.ProviderWriteMode
-                ?? defaults.WriteMode,
-            UseArrayPoolForManualLoop = ProviderUseArrayPoolForManualLoop
-                ?? scenario.ProviderUseArrayPoolForManualLoop
-                ?? defaults.UseArrayPoolForManualLoop,
             BatchOrderByFileSize = BatchOrderByFileSize
                 ?? scenario.BatchOrderByFileSize
                 ?? defaults.BatchOrderByFileSize,
@@ -104,12 +96,6 @@ internal sealed class BenchmarkVariant
             SmallFileProgressThresholdBytes = ProviderSmallFileProgressThresholdBytes
                 ?? scenario.ProviderSmallFileProgressThresholdBytes
                 ?? defaults.SmallFileProgressThresholdBytes,
-            WriteMode = ProviderWriteMode
-                ?? scenario.ProviderWriteMode
-                ?? defaults.WriteMode,
-            UseArrayPoolForManualLoop = ProviderUseArrayPoolForManualLoop
-                ?? scenario.ProviderUseArrayPoolForManualLoop
-                ?? defaults.UseArrayPoolForManualLoop,
             BatchBufferBytes = batchBufferBytes,
             BatchEligibilityCeilingBytes = batchEligibilityCeilingBytes,
             BatchOrderByFileSize = batchOrderByFileSize,

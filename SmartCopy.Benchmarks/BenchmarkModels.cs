@@ -92,8 +92,6 @@ internal sealed class BenchmarkRunRecord
     public required int RunIndex { get; init; }
     public int? ProviderCopyBufferSizeBytes { get; init; }
     public long? ProviderSmallFileProgressThresholdBytes { get; init; }
-    public LocalFileSystemWriteMode? ProviderWriteMode { get; init; }
-    public bool? ProviderUseArrayPoolForManualLoop { get; init; }
     public bool? ProviderWriteSequentialScan { get; init; }
     public long? DirectWriteThresholdBytes { get; init; }
     public long? BufferBatchBytes { get; init; }
@@ -154,8 +152,6 @@ internal sealed class BenchmarkRunRecord
             RunIndex = runIndex,
             ProviderCopyBufferSizeBytes = providerOptions.CopyBufferSizeBytes,
             ProviderSmallFileProgressThresholdBytes = providerOptions.SmallFileProgressThresholdBytes,
-            ProviderWriteMode = providerOptions.WriteMode,
-            ProviderUseArrayPoolForManualLoop = providerOptions.UseArrayPoolForManualLoop,
             ProviderWriteSequentialScan = variant.ProviderWriteSequentialScan ?? scenario.ProviderWriteSequentialScan,
             DirectWriteThresholdBytes = variant.DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes,
             BufferBatchBytes = variant.BufferBatchBytes ?? scenario.BufferBatchBytes,
@@ -246,8 +242,6 @@ internal sealed class BenchmarkRunRecord
             RunIndex = runIndex,
             ProviderCopyBufferSizeBytes = providerOptions.CopyBufferSizeBytes,
             ProviderSmallFileProgressThresholdBytes = providerOptions.SmallFileProgressThresholdBytes,
-            ProviderWriteMode = providerOptions.WriteMode,
-            ProviderUseArrayPoolForManualLoop = providerOptions.UseArrayPoolForManualLoop,
             ProviderWriteSequentialScan = variant.ProviderWriteSequentialScan ?? scenario.ProviderWriteSequentialScan,
             DirectWriteThresholdBytes = variant.DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes,
             BufferBatchBytes = variant.BufferBatchBytes ?? scenario.BufferBatchBytes,

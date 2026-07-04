@@ -28,7 +28,7 @@ An important caveat: Every file write incurs unavoidable filesystem work — MFT
 | Batch buffer | 1 MiB (eligibility ceiling 512 KiB) | `AppSettings.BatchBufferKb`, `OperationalSettings` |
 | Batch traversal order | Order batched files by file size except same-volume HDD, which preserves natural order | `DefaultCopyStrategyPolicy`, `OperationalSettings.BatchOrderByFileSize` |
 | Direct-write threshold | 256 KiB | `AppSettings.TinyFileFastPathKb` |
-| Manual-loop byte buffer | ArrayPool-rented | `OperationalSettings.UseArrayPoolForManualLoop` |
+| Manual-loop byte buffer | Always ArrayPool-rented | `StreamCopyEngine` |
 | Preallocation | OFF (universal) | `DefaultCopyStrategyPolicy` |
 
 **Confidence — what's earned vs assumed:**

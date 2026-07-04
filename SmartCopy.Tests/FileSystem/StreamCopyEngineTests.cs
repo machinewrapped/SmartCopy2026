@@ -6,7 +6,7 @@ namespace SmartCopy.Tests.FileSystem;
 public sealed class StreamCopyEngineTests
 {
     [Fact]
-    public async Task CopyAsync_AutoSmallFileWithArrayPool_UsesManualLoopAndReportsCompletionOnce()
+    public async Task CopyAsync_SmallFile_UsesManualLoopAndReportsCompletionOnce()
     {
         var payload = "auto-small-pooled"u8.ToArray();
         var reported = new List<long>();
@@ -16,8 +16,6 @@ public sealed class StreamCopyEngineTests
         {
             CopyBufferSizeBytes = 4,
             SmallFileProgressThresholdBytes = payload.LongLength,
-            WriteMode = LocalFileSystemWriteMode.Auto,
-            UseArrayPoolForManualLoop = true,
         };
 
         await using var source = new CopyToAsyncFailingMemoryStream(payload);

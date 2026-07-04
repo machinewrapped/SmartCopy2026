@@ -2,7 +2,7 @@ namespace SmartCopy.Core.FileSystem;
 
 /// <summary>
 /// Provider-agnostic stream pump: copies bytes from a source stream to an already-opened destination
-/// stream, honouring the buffer size, write mode, preallocation, ArrayPool, and progress settings in
+/// stream, honouring the buffer size and progress settings in
 /// <see cref="OperationalSettings"/>.
 /// <para>
 /// This is the generic half of a file write. Providers keep ownership of the provider-specific half —
@@ -31,8 +31,8 @@ internal static class StreamCopyEngine
 
     /// <summary>
     /// Copies <paramref name="source"/> into <paramref name="destination"/>. When the length is known
-    /// it is passed as <paramref name="remainingBytes"/> so the write mode heuristics can apply; pass
-    /// null for unknown-length streams. The caller owns stream disposal, which flushes managed buffers.
+    /// it is passed as <paramref name="remainingBytes"/> so small files can report completion once;
+    /// pass null for unknown-length streams. The caller owns stream disposal, which flushes managed buffers.
     /// </summary>
     public static async Task CopyAsync(
         Stream source,
@@ -42,31 +42,13 @@ internal static class StreamCopyEngine
         OperationalSettings opts,
         CancellationToken ct)
     {
-        var writeMode = DetermineWriteMode(remainingBytes, opts);
-
-        if (writeMode == LocalFileSystemWriteMode.CopyToAsync)
-        {
-            // CopyToAsync mode: wraps the source in a ProgressReportingReadStream so the
-            // framework's internal buffer loop reports progress without a manual loop here.
-            await CopyViaCopyToAsync(source, destination, progress, opts, ct);
-        }
-        else if (writeMode == LocalFileSystemWriteMode.Auto &&
-                 remainingBytes is long autoBytesRemaining &&
-                 autoBytesRemaining <= opts.SmallFileProgressThresholdBytes)
+        if (remainingBytes is long autoBytesRemaining &&
+            autoBytesRemaining <= opts.SmallFileProgressThresholdBytes)
         {
             // Small-file optimisation: for files whose full size fits in memory we know
             // exactly how many bytes will be written, so report progress in one shot at the end
-            // instead of per-chunk. When pooling is enabled, still use the manual loop here:
-            // Stream.CopyToAsync rents/allocates its own per-call buffer, which turns buffer-size
-            // sweeps into allocation-size sweeps for directories with many small files.
-            if (opts.UseArrayPoolForManualLoop)
-            {
-                await CopyWithManualLoopAsync(source, destination, progress: null, opts, ct);
-            }
-            else
-            {
-                await source.CopyToAsync(destination, opts.CopyBufferSizeBytes, ct);
-            }
+            // instead of per-chunk.
+            await CopyWithManualLoopAsync(source, destination, progress: null, opts, ct);
 
             if (progress is not null && autoBytesRemaining > 0)
             {
@@ -79,36 +61,6 @@ internal static class StreamCopyEngine
             // which keeps UI responsive during long transfers without adding a stream wrapper.
             await CopyWithManualLoopAsync(source, destination, progress, opts, ct);
         }
-
-    }
-
-    private static LocalFileSystemWriteMode DetermineWriteMode(
-        long? remainingBytes,
-        OperationalSettings opts)
-    {
-        if (opts.WriteMode != LocalFileSystemWriteMode.Auto)
-            return opts.WriteMode;
-        // Unknown length: can't apply the small-file optimisation, go straight to manual loop.
-        if (remainingBytes is null)
-            return LocalFileSystemWriteMode.ManualLoop;
-        // Known length: the size heuristic in CopyAsync resolves the path inline.
-        return LocalFileSystemWriteMode.Auto;
-    }
-
-    private static async Task CopyViaCopyToAsync(
-        Stream data,
-        Stream output,
-        IProgress<long>? progress,
-        OperationalSettings opts,
-        CancellationToken ct)
-    {
-        Stream source = data;
-        if (progress is not null)
-        {
-            source = new ProgressReportingReadStream(data, progress);
-        }
-
-        await source.CopyToAsync(output, opts.CopyBufferSizeBytes, ct);
     }
 
     private static async Task CopyWithManualLoopAsync(
@@ -118,23 +70,15 @@ internal static class StreamCopyEngine
         OperationalSettings opts,
         CancellationToken ct)
     {
-        if (opts.UseArrayPoolForManualLoop)
+        var rentedBuffer = System.Buffers.ArrayPool<byte>.Shared.Rent(opts.CopyBufferSizeBytes);
+        try
         {
-            var rentedBuffer = System.Buffers.ArrayPool<byte>.Shared.Rent(opts.CopyBufferSizeBytes);
-            try
-            {
-                await CopyWithManualLoopCoreAsync(data, output, rentedBuffer, progress, ct);
-            }
-            finally
-            {
-                System.Buffers.ArrayPool<byte>.Shared.Return(rentedBuffer);
-            }
-
-            return;
+            await CopyWithManualLoopCoreAsync(data, output, rentedBuffer, progress, ct);
         }
-
-        var buffer = new byte[opts.CopyBufferSizeBytes];
-        await CopyWithManualLoopCoreAsync(data, output, buffer, progress, ct);
+        finally
+        {
+            System.Buffers.ArrayPool<byte>.Shared.Return(rentedBuffer);
+        }
     }
 
     private static async Task CopyWithManualLoopCoreAsync(

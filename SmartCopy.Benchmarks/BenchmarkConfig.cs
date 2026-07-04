@@ -54,20 +54,10 @@ internal sealed class BenchmarkConfig
                 },
                 new BenchmarkVariant
                 {
-                    Name = "CopyToAsync512KiB",
-                    Notes = "Always uses Stream.CopyToAsync with a 512 KiB buffer.",
+                    Name = "Buffer512KiB",
+                    Notes = "Uses a 512 KiB copy buffer.",
                     DesiredRunCount = 3,
                     ProviderCopyBufferSizeBytes = 512 * 1024,
-                    ProviderWriteMode = LocalFileSystemWriteMode.CopyToAsync,
-                },
-                new BenchmarkVariant
-                {
-                    Name = "ManualLoop512KiBArrayPool",
-                    Notes = "Manual loop with a 512 KiB buffer and pooled buffers.",
-                    DesiredRunCount = 3,
-                    ProviderCopyBufferSizeBytes = 512 * 1024,
-                    ProviderWriteMode = LocalFileSystemWriteMode.ManualLoop,
-                    ProviderUseArrayPoolForManualLoop = true,
                 },
             ],
             DatasetPreparation = new DatasetPreparationConfig

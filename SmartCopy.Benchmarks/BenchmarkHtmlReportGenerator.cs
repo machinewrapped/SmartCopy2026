@@ -37,7 +37,6 @@ internal static class BenchmarkHtmlReportGenerator
 
         // Map each variant to its batch category using the run data config
         var variantCategories = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var variantWriteModes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var variant in variants)
         {
             var runForVariant = runs.FirstOrDefault(r => string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase));
@@ -50,14 +49,6 @@ internal static class BenchmarkHtmlReportGenerator
             {
                 variantCategories[variant] = "Unbatched";
             }
-
-            variantWriteModes[variant] = runForVariant?.ProviderWriteMode switch
-            {
-                LocalFileSystemWriteMode.ManualLoop => "Manual Loop",
-                LocalFileSystemWriteMode.CopyToAsync => "Stream Copy",
-                LocalFileSystemWriteMode.Auto => "Auto",
-                _ => variant,
-            };
         }
 
         var sb = new StringBuilder();
@@ -374,7 +365,6 @@ internal static class BenchmarkHtmlReportGenerator
 
             foreach (var variant in categoryVariants)
             {
-                var mode = variantWriteModes.TryGetValue(variant, out var wm) ? wm : variant;
                 var color = Palette[colorIndex % Palette.Length];
                 colorIndex++;
                 var dataAvg = new List<double>();
@@ -396,7 +386,7 @@ internal static class BenchmarkHtmlReportGenerator
                 var dataAvgStr = string.Join(", ", dataAvg);
                 datasetsJs.Add($@"
                     {{
-                        label: '{mode} ({variant})',
+                        label: '{variant}',
                         data: [{dataAvgStr}],
                         backgroundColor: {color},
                         borderColor: 'rgba(255, 255, 255, 0.2)',

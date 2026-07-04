@@ -7,44 +7,12 @@ namespace SmartCopy.Tests.FileSystem;
 public sealed class LocalFileSystemProviderWriteStrategyTests
 {
     [Fact]
-    public void OperationalSettings_DefaultsToArrayPoolForManualLoop()
-    {
-        var settings = new OperationalSettings();
-
-        Assert.True(settings.UseArrayPoolForManualLoop);
-    }
-
-    [Fact]
-    public async Task WriteAsync_CopyToAsyncMode_ReportsProgressAndWritesContent()
+    public async Task WriteAsync_WritesContentAndReportsProgress()
     {
         using var temp = new TempDirectory();
         var provider = new LocalFileSystemProvider(temp.Path);
 
-        var destination = Path.Combine(temp.Path, "copytoasync.txt");
-        var payload = Encoding.UTF8.GetBytes("progress-check");
-        var reportedBytes = 0L;
-        IProgress<long> progress = new SyncProgress<long>(bytes => reportedBytes += bytes);
-
-        var settings = new OperationalSettings
-        {
-            CopyBufferSizeBytes = 4,
-            WriteMode = LocalFileSystemWriteMode.CopyToAsync,
-        };
-
-        await using var source = new MemoryStream(payload);
-        await provider.WriteAsync(destination, source, progress, settings, CancellationToken.None);
-
-        Assert.Equal(payload.LongLength, reportedBytes);
-        Assert.Equal("progress-check", await File.ReadAllTextAsync(destination));
-    }
-
-    [Fact]
-    public async Task WriteAsync_ManualLoopWithArrayPool_WritesContentAndReportsProgress()
-    {
-        using var temp = new TempDirectory();
-        var provider = new LocalFileSystemProvider(temp.Path);
-
-        var destination = Path.Combine(temp.Path, "manualloop.txt");
+        var destination = Path.Combine(temp.Path, "copy.txt");
         var payload = Encoding.UTF8.GetBytes("arraypool-check");
         var reportedBytes = 0L;
         IProgress<long> progress = new SyncProgress<long>(bytes => reportedBytes += bytes);
@@ -52,8 +20,6 @@ public sealed class LocalFileSystemProviderWriteStrategyTests
         var settings = new OperationalSettings
         {
             CopyBufferSizeBytes = 3,
-            WriteMode = LocalFileSystemWriteMode.ManualLoop,
-            UseArrayPoolForManualLoop = true,
         };
 
         await using var source = new MemoryStream(payload);

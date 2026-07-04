@@ -171,8 +171,6 @@ internal sealed class BenchmarkTask
         Console.WriteLine("Provider Settings:");
         Console.WriteLine($"  Buffer:                  {BenchmarkHelpers.FormatSize(providerOptions.CopyBufferSizeBytes)}");
         Console.WriteLine($"  Small file threshold:    {BenchmarkHelpers.FormatSize(providerOptions.SmallFileProgressThresholdBytes)}");
-        Console.WriteLine($"  Write mode:              {providerOptions.WriteMode}");
-        Console.WriteLine($"  Array pool:              {providerOptions.UseArrayPoolForManualLoop}");
         Console.WriteLine($"  Batch order by size:     {providerOptions.BatchOrderByFileSize}");
     }
 
@@ -510,8 +508,6 @@ internal sealed class BenchmarkTask
             ["runIndex"] = _nextRunIndex.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["providerCopyBufferSizeBytes"] = providerOptions.CopyBufferSizeBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["providerSmallFileProgressThresholdBytes"] = providerOptions.SmallFileProgressThresholdBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["providerWriteMode"] = providerOptions.WriteMode.ToString(),
-            ["providerUseArrayPoolForManualLoop"] = providerOptions.UseArrayPoolForManualLoop.ToString(),
             ["providerWriteSequentialScan"] = (_variant.ProviderWriteSequentialScan ?? _scenario.ProviderWriteSequentialScan ?? false).ToString(),
             ["bufferBatchBytes"] = (_variant.BufferBatchBytes ?? _scenario.BufferBatchBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["batchEligibilityThresholdBytes"] = (_variant.BatchEligibilityThresholdBytes ?? _scenario.BatchEligibilityThresholdBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),

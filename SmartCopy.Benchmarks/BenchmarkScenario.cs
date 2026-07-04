@@ -14,8 +14,6 @@ internal sealed class BenchmarkScenario
     public OverwriteMode OverwriteMode { get; set; } = OverwriteMode.Always;
     public int? ProviderCopyBufferSizeBytes { get; set; }
     public long? ProviderSmallFileProgressThresholdBytes { get; set; }
-    public LocalFileSystemWriteMode? ProviderWriteMode { get; set; }
-    public bool? ProviderUseArrayPoolForManualLoop { get; set; }
     public long? DirectWriteThresholdBytes { get; set; }
     public long? BufferBatchBytes { get; set; }
     public long? BatchEligibilityThresholdBytes { get; set; }
@@ -43,9 +41,6 @@ internal sealed class BenchmarkScenario
             CopyBufferSizeBytes = ProviderCopyBufferSizeBytes ?? defaults.CopyBufferSizeBytes,
             SmallFileProgressThresholdBytes = ProviderSmallFileProgressThresholdBytes
                 ?? defaults.SmallFileProgressThresholdBytes,
-            WriteMode = ProviderWriteMode ?? defaults.WriteMode,
-            UseArrayPoolForManualLoop = ProviderUseArrayPoolForManualLoop
-                ?? defaults.UseArrayPoolForManualLoop,
             BatchOrderByFileSize = BatchOrderByFileSize ?? defaults.BatchOrderByFileSize,
         }.Normalize();
     }
