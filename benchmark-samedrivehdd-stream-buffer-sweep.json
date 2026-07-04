@@ -38,8 +38,6 @@
       "overwriteMode": 1,
       "providerCopyBufferSizeBytes": null,
       "providerSmallFileProgressThresholdBytes": null,
-      "providerWriteMode": null,
-      "providerUseArrayPoolForManualLoop": true,
       "directWriteThresholdBytes": null,
       "bufferBatchBytes": null,
       "batchEligibilityThresholdBytes": null,
