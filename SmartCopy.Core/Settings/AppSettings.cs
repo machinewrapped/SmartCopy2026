@@ -22,17 +22,19 @@ public sealed class AppSettings
     public bool FullPreScan { get; set; }
     public bool FollowSymlinks { get; set; }
     public bool EnableFilesystemWatcher { get; set; } = true;
-    public int CopyChunkSizeKb { get; set; } = 256;
+    public int CopyChunkSizeKb { get; set; } = OperationalSettings.DefaultCopyBufferSizeBytes / 1024;
 
     // Performance optimisations — tunable in DEBUG builds, always serialised.
     public bool AllowCopyOptimisations { get; set; } = false;
-    public int TinyFileFastPathKb { get; set; } = 256;  // Conservative direct-write threshold
-    public int BatchBufferKb { get; set; } = 1024;        // 1 MiB default buffer
-    public int CopyRoutingSsdBufferKb { get; set; } = 1024;
-    public int CopyRoutingUsbBufferKb { get; set; } = 1024;
-    public int CopyRoutingHddBufferKb { get; set; } = 512;
-    public int CopyRoutingSameVolumeHddBufferKb { get; set; } = 256;
-    public int CopyRoutingUnknownBufferKb { get; set; } = 512;
+    public int TinyFileFastPathKb { get; set; } =
+        (int)(OperationalSettings.DefaultEnabledTinyFileFastPathThresholdBytes / 1024);
+    public int BatchBufferKb { get; set; } =
+        (int)(OperationalSettings.DefaultEnabledBatchBufferBytes / 1024);
+    public int CopyRoutingSsdBufferKb { get; set; } = CopyBufferRoutingSettings.DefaultSsdBytes / 1024;
+    public int CopyRoutingUsbBufferKb { get; set; } = CopyBufferRoutingSettings.DefaultUsbBytes / 1024;
+    public int CopyRoutingHddBufferKb { get; set; } = CopyBufferRoutingSettings.DefaultHddBytes / 1024;
+    public int CopyRoutingSameVolumeHddBufferKb { get; set; } = CopyBufferRoutingSettings.DefaultSameVolumeHddBytes / 1024;
+    public int CopyRoutingUnknownBufferKb { get; set; } = CopyBufferRoutingSettings.DefaultUnknownBytes / 1024;
 
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public OverwriteMode DefaultOverwriteMode { get; set; } = OverwriteMode.Skip;
@@ -94,28 +96,30 @@ public sealed class AppSettings
 
     public OperationalSettings CreateOperationalSettings()
     {
-        var appDefaults = new AppSettings();
-        var defaults = new OperationalSettings();
-        var settings = defaults with
+        var settings = new OperationalSettings
         {
             CopyBufferSizeBytes = PositiveKbToIntBytesOrDefault(
                 CopyChunkSizeKb,
-                defaults.CopyBufferSizeBytes),
-            RoutedSsdCopyBufferSizeBytes = PositiveKbToIntBytesOrDefault(
-                CopyRoutingSsdBufferKb,
-                defaults.RoutedSsdCopyBufferSizeBytes),
-            RoutedUsbCopyBufferSizeBytes = PositiveKbToIntBytesOrDefault(
-                CopyRoutingUsbBufferKb,
-                defaults.RoutedUsbCopyBufferSizeBytes),
-            RoutedHddCopyBufferSizeBytes = PositiveKbToIntBytesOrDefault(
-                CopyRoutingHddBufferKb,
-                defaults.RoutedHddCopyBufferSizeBytes),
-            RoutedSameVolumeHddCopyBufferSizeBytes = PositiveKbToIntBytesOrDefault(
-                CopyRoutingSameVolumeHddBufferKb,
-                defaults.RoutedSameVolumeHddCopyBufferSizeBytes),
-            RoutedUnknownCopyBufferSizeBytes = PositiveKbToIntBytesOrDefault(
-                CopyRoutingUnknownBufferKb,
-                defaults.RoutedUnknownCopyBufferSizeBytes),
+                OperationalSettings.DefaultCopyBufferSizeBytes),
+
+            CopyBufferRouting = new CopyBufferRoutingSettings
+            {
+                SsdBytes = PositiveKbToIntBytesOrDefault(
+                    CopyRoutingSsdBufferKb,
+                    CopyBufferRoutingSettings.DefaultSsdBytes),
+                UsbBytes = PositiveKbToIntBytesOrDefault(
+                    CopyRoutingUsbBufferKb,
+                    CopyBufferRoutingSettings.DefaultUsbBytes),
+                HddBytes = PositiveKbToIntBytesOrDefault(
+                    CopyRoutingHddBufferKb,
+                    CopyBufferRoutingSettings.DefaultHddBytes),
+                SameVolumeHddBytes = PositiveKbToIntBytesOrDefault(
+                    CopyRoutingSameVolumeHddBufferKb,
+                    CopyBufferRoutingSettings.DefaultSameVolumeHddBytes),
+                UnknownBytes = PositiveKbToIntBytesOrDefault(
+                    CopyRoutingUnknownBufferKb,
+                    CopyBufferRoutingSettings.DefaultUnknownBytes),
+            },
         };
 
         if (!AllowCopyOptimisations)
@@ -127,10 +131,10 @@ public sealed class AppSettings
         {
             TinyFileFastPathThresholdBytes = NonNegativeKbToLongBytesOrDefault(
                 TinyFileFastPathKb,
-                (long)appDefaults.TinyFileFastPathKb * 1024),
+                OperationalSettings.DefaultEnabledTinyFileFastPathThresholdBytes),
             BatchBufferBytes = NonNegativeKbToIntBoundedBytesOrDefault(
                 BatchBufferKb,
-                (long)appDefaults.BatchBufferKb * 1024),
+                OperationalSettings.DefaultEnabledBatchBufferBytes),
             DestinationRoutingEnabled = true,
         }).Normalize();
     }
@@ -183,4 +187,3 @@ public sealed class AppSettings
         }
     }
 }
-

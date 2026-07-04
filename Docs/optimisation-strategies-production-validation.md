@@ -12,7 +12,7 @@ The production copy path (`PipelineRunner → CopyStep → DefaultCopyStrategyPo
 
 | Knob | Value | Source of record |
 |---|---|---|
-| Copy buffer | SSD/USB 1 MiB, cross-drive HDD/Unknown 512 KiB, same-volume HDD 256 KiB | `AppSettings` → `OperationalSettings`, applied by `DefaultCopyStrategyPolicy` |
+| Copy buffer | SSD/USB 1 MiB, cross-drive HDD/Unknown 512 KiB, same-volume HDD 256 KiB | `AppSettings` → `OperationalSettings.CopyBufferRouting`, applied by `DefaultCopyStrategyPolicy` |
 | Batch buffer | 1 MiB | `AppSettings.BatchBufferKb` |
 | Batch eligibility ceiling | 512 KiB | `OperationalSettings` default |
 | Direct-write threshold | 256 KiB | `AppSettings.TinyFileFastPathKb` |

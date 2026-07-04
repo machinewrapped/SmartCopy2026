@@ -24,7 +24,7 @@ An important caveat: Every file write incurs unavoidable filesystem work — MFT
 
 | Knob | Value | Source of record |
 |---|---|---|
-| Copy buffer | SSD/USB 1 MiB · cross-volume HDD/Unknown 512 KiB · same-volume HDD 256 KiB | `AppSettings` → `OperationalSettings`, applied by `DefaultCopyStrategyPolicy` |
+| Copy buffer | SSD/USB 1 MiB · cross-volume HDD/Unknown 512 KiB · same-volume HDD 256 KiB | `AppSettings` → `OperationalSettings.CopyBufferRouting`, applied by `DefaultCopyStrategyPolicy` |
 | Batch buffer | 1 MiB (eligibility ceiling 512 KiB) | `AppSettings.BatchBufferKb`, `OperationalSettings` |
 | Batch traversal order | Order batched files by file size except same-volume HDD, which preserves natural order | `DefaultCopyStrategyPolicy`, `OperationalSettings.BatchOrderByFileSize` |
 | Direct-write threshold | 256 KiB | `AppSettings.TinyFileFastPathKb` |

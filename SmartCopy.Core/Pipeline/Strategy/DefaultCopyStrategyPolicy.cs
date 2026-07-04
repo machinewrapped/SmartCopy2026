@@ -76,23 +76,23 @@ public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
     {
         // Same-volume HDD contends for one spindle; profiling canonises 256 KiB as the baseline.
         if (sameVolume && IsHddPair(source, target))
-            return settings.RoutedSameVolumeHddCopyBufferSizeBytes;
+            return settings.CopyBufferRouting.SameVolumeHddBytes;
 
         // USB / removable destination: 1 MiB is the validated prior outside same-volume HDD.
         if (target.InterfaceType == DriveInterfaceType.USB)
-            return settings.RoutedUsbCopyBufferSizeBytes;
+            return settings.CopyBufferRouting.UsbBytes;
 
         // Cross-volume HDD remains conservative.
         if (IsHddPair(source, target))
-            return settings.RoutedHddCopyBufferSizeBytes;
+            return settings.CopyBufferRouting.HddBytes;
 
         // SSD↔SSD: 1 MiB is the safe universal default. Same-volume SSD may benefit from a larger
         // buffer but that probe is unrun, so stay at 1 MiB.
         if (source.MediaType == DriveMediaType.SSD && target.MediaType == DriveMediaType.SSD)
-            return settings.RoutedSsdCopyBufferSizeBytes;
+            return settings.CopyBufferRouting.SsdBytes;
 
         // Unknown / Memory / MTP / ambiguous: do not assume fast media.
-        return settings.RoutedUnknownCopyBufferSizeBytes;
+        return settings.CopyBufferRouting.UnknownBytes;
     }
 
     internal static bool SelectBatchOrderByFileSize(

@@ -139,10 +139,13 @@ public sealed class DefaultCopyStrategyPolicyTests
     {
         CopyBufferSizeBytes = BaseBuffer,
         DestinationRoutingEnabled = true,
-        RoutedSsdCopyBufferSizeBytes = SsdBuffer,
-        RoutedUsbCopyBufferSizeBytes = UsbBuffer,
-        RoutedHddCopyBufferSizeBytes = HddBuffer,
-        RoutedSameVolumeHddCopyBufferSizeBytes = SameVolumeHddBuffer,
-        RoutedUnknownCopyBufferSizeBytes = UnknownBuffer,
+        CopyBufferRouting = new CopyBufferRoutingSettings
+        {
+            SsdBytes = SsdBuffer,
+            UsbBytes = UsbBuffer,
+            HddBytes = HddBuffer,
+            SameVolumeHddBytes = SameVolumeHddBuffer,
+            UnknownBytes = UnknownBuffer,
+        },
     };
 }

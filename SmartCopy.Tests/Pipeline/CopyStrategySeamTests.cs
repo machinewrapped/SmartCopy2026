@@ -74,7 +74,10 @@ public sealed class CopyStrategySeamTests
         var settings = new OperationalSettings
         {
             DestinationRoutingEnabled = routing,
-            RoutedUsbCopyBufferSizeBytes = RoutedUsbBuffer,
+            CopyBufferRouting = new CopyBufferRoutingSettings
+            {
+                UsbBytes = RoutedUsbBuffer,
+            },
         };
 
         return (new FakeStepContext(root, source, settings: settings, copyStrategyPolicy: policy), target);

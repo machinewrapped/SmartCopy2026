@@ -45,11 +45,11 @@ public sealed class AppSettingsOperationalSettingsTests
         Assert.True(operational.DestinationRoutingEnabled);
         Assert.Equal(64 * 1024, operational.TinyFileFastPathThresholdBytes);
         Assert.Equal(2048 * 1024, operational.BatchBufferBytes);
-        Assert.Equal(1536 * 1024, operational.RoutedSsdCopyBufferSizeBytes);
-        Assert.Equal(1792 * 1024, operational.RoutedUsbCopyBufferSizeBytes);
-        Assert.Equal(640 * 1024, operational.RoutedHddCopyBufferSizeBytes);
-        Assert.Equal(256 * 1024, operational.RoutedSameVolumeHddCopyBufferSizeBytes);
-        Assert.Equal(320 * 1024, operational.RoutedUnknownCopyBufferSizeBytes);
+        Assert.Equal(1536 * 1024, operational.CopyBufferRouting.SsdBytes);
+        Assert.Equal(1792 * 1024, operational.CopyBufferRouting.UsbBytes);
+        Assert.Equal(640 * 1024, operational.CopyBufferRouting.HddBytes);
+        Assert.Equal(256 * 1024, operational.CopyBufferRouting.SameVolumeHddBytes);
+        Assert.Equal(320 * 1024, operational.CopyBufferRouting.UnknownBytes);
     }
 
     [Fact]
@@ -74,10 +74,10 @@ public sealed class AppSettingsOperationalSettingsTests
         Assert.True(operational.DestinationRoutingEnabled);
         Assert.Equal(256 * 1024, operational.TinyFileFastPathThresholdBytes);
         Assert.Equal(1024 * 1024, operational.BatchBufferBytes);
-        Assert.Equal(1024 * 1024, operational.RoutedSsdCopyBufferSizeBytes);
-        Assert.Equal(1024 * 1024, operational.RoutedUsbCopyBufferSizeBytes);
-        Assert.Equal(512 * 1024, operational.RoutedHddCopyBufferSizeBytes);
-        Assert.Equal(256 * 1024, operational.RoutedSameVolumeHddCopyBufferSizeBytes);
-        Assert.Equal(512 * 1024, operational.RoutedUnknownCopyBufferSizeBytes);
+        Assert.Equal(1024 * 1024, operational.CopyBufferRouting.SsdBytes);
+        Assert.Equal(1024 * 1024, operational.CopyBufferRouting.UsbBytes);
+        Assert.Equal(512 * 1024, operational.CopyBufferRouting.HddBytes);
+        Assert.Equal(256 * 1024, operational.CopyBufferRouting.SameVolumeHddBytes);
+        Assert.Equal(512 * 1024, operational.CopyBufferRouting.UnknownBytes);
     }
 }
