@@ -1,5 +1,5 @@
 {
-  "sourcePath": "R:\\TestData\\MixedDataset",
+  "sourcePath": "E:\\TestData\\LargeFileDataset",
   "artifactPath": "C:\\benchmark-artifacts",
   "includeHidden": false,
   "convergenceSpreadPercent": 4.5,
