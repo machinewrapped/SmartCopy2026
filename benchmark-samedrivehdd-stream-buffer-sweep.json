@@ -250,11 +250,11 @@
   "ramMapPath": "D:\\Development\\Github\\SmartCopy2026\\Tools\\RAMMap\\RAMMap64.exe",
   "sourcePools": {
     "E:\\TestData\\LargeFileDataset": [
-      "M:\\TestData\\LargeFileDataset_2",
-      "M:\\TestData\\LargeFileDataset_5",
-      "M:\\TestData\\LargeFileDataset_4",
-      "M:\\TestData\\LargeFileDataset_3",
-      "M:\\TestData\\LargeFileDataset_1"
+      "E:\\TestData\\LargeFileDataset_2",
+      "E:\\TestData\\LargeFileDataset_5",
+      "E:\\TestData\\LargeFileDataset_4",
+      "E:\\TestData\\LargeFileDataset_3",
+      "E:\\TestData\\LargeFileDataset_1"
     ],
     "M:\\TestData\\LargeFileDataset": [
       "M:\\TestData\\LargeFileDataset_1",
