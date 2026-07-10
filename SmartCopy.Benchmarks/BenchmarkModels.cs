@@ -10,289 +10,11 @@ internal enum BenchmarkRunMode
 {
     Benchmark,
     DatasetPreparation,
-}
-
-internal sealed class BenchmarkCliOptions
-{
-    public BenchmarkRunMode Mode { get; init; } = BenchmarkRunMode.Benchmark;
-    public string? ScenarioName { get; init; }
-    public string? VariantName { get; init; }
-    public string? Notes { get; init; }
-
-    public static BenchmarkCliOptions Parse(string[] args)
-    {
-        var mode = BenchmarkRunMode.Benchmark;
-        string? scenarioName = null;
-        string? variantName = null;
-        string? notes = null;
-
-        for (var i = 0; i < args.Length; i++)
-        {
-            if (string.Equals(args[i], "--scenario", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
-            {
-                scenarioName = args[++i];
-            }
-            else if (string.Equals(args[i], "--variant", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
-            {
-                variantName = args[++i];
-            }
-            else if (string.Equals(args[i], "--notes", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
-            {
-                notes = args[++i];
-            }
-            else if (string.Equals(args[i], "--mode", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
-            {
-                mode = ParseMode(args[++i]);
-            }
-        }
-
-        return new BenchmarkCliOptions
-        {
-            Mode = mode,
-            ScenarioName = scenarioName,
-            VariantName = variantName,
-            Notes = notes,
-        };
-    }
-
-    private static BenchmarkRunMode ParseMode(string value)
-    {
-        if (string.Equals(value, "benchmark", StringComparison.OrdinalIgnoreCase))
-        {
-            return BenchmarkRunMode.Benchmark;
-        }
-
-        if (string.Equals(value, "dataset-prep", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(value, "dataset-preparation", StringComparison.OrdinalIgnoreCase))
-        {
-            return BenchmarkRunMode.DatasetPreparation;
-        }
-
-        throw new InvalidOperationException($"Unknown benchmark mode '{value}'. Expected 'benchmark' or 'dataset-prep'.");
-    }
-}
-
-internal sealed class BenchmarkConfig
-{
-    public string SourcePath { get; set; } = @"R:\TestData\MixedDataset";
-    public string? ArtifactPath { get; set; }
-    public bool IncludeHidden { get; set; }
-    public List<BenchmarkScenario> Scenarios { get; set; } = [];
-    public List<BenchmarkVariant> Variants { get; set; } = [];
-    public DatasetPreparationConfig? DatasetPreparation { get; set; }
-
-    public static BenchmarkConfig CreateTemplate() =>
-        new()
-        {
-            Scenarios =
-            [
-                new BenchmarkScenario { Name = "SameDriveTest", DestinationPath = @"R:\TestData\SameDriveTest" },
-                new BenchmarkScenario { Name = "SSDtoSSD", DestinationPath = @"D:\TestData\SSDtoSSD" },
-                new BenchmarkScenario { Name = "SSDtoHDD", DestinationPath = @"L:\TestData\SSDtoHDD" },
-                new BenchmarkScenario { Name = "SSDtoUSBFlash", DestinationPath = @"T:\TestData\SSDtoUSBFlash" },
-            ],
-            Variants =
-            [
-                new BenchmarkVariant
-                {
-                    Name = "BaselineAuto",
-                    Notes = "Current heuristic defaults.",
-                    DesiredRunCount = 3,
-                },
-                new BenchmarkVariant
-                {
-                    Name = "CopyToAsync512KiB",
-                    Notes = "Always uses Stream.CopyToAsync with a 512 KiB buffer.",
-                    DesiredRunCount = 1,
-                    ProviderCopyBufferSizeBytes = 512 * 1024,
-                    ProviderWriteMode = LocalFileSystemWriteMode.CopyToAsync,
-                },
-                new BenchmarkVariant
-                {
-                    Name = "ManualLoop512KiBArrayPool",
-                    Notes = "Manual loop with a 512 KiB buffer and pooled buffers.",
-                    DesiredRunCount = 1,
-                    ProviderCopyBufferSizeBytes = 512 * 1024,
-                    ProviderWriteMode = LocalFileSystemWriteMode.ManualLoop,
-                    ProviderUseArrayPoolForManualLoop = true,
-                },
-                new BenchmarkVariant
-                {
-                    Name = "ManualLoop1MiBPreallocate",
-                    Notes = "Manual loop with a 1 MiB buffer and destination preallocation.",
-                    DesiredRunCount = 1,
-                    ProviderCopyBufferSizeBytes = 1024 * 1024,
-                    ProviderWriteMode = LocalFileSystemWriteMode.ManualLoop,
-                    ProviderUseArrayPoolForManualLoop = true,
-                    ProviderPreallocateDestinationFile = true,
-                },
-            ],
-            DatasetPreparation = new DatasetPreparationConfig
-            {
-                SourcePath = @"R:\CandidateData",
-                DestinationPath = @"R:\TestData\MixedDataset",
-                Buckets =
-                [
-                    new DatasetPreparationBucketConfig
-                    {
-                        Name = "Tiny",
-                        MinimumFileSizeBytes = 0,
-                        MaximumFileSizeBytes = 64 * 1024,
-                        TargetTotalBytes = 256L * 1024 * 1024,
-                    },
-                    new DatasetPreparationBucketConfig
-                    {
-                        Name = "Small",
-                        MinimumFileSizeBytes = 64 * 1024 + 1,
-                        MaximumFileSizeBytes = 512 * 1024,
-                        TargetTotalBytes = 512L * 1024 * 1024,
-                    },
-                    new DatasetPreparationBucketConfig
-                    {
-                        Name = "Medium",
-                        MinimumFileSizeBytes = 512 * 1024 + 1,
-                        MaximumFileSizeBytes = 4 * 1024 * 1024,
-                        TargetTotalBytes = 2L * 1024 * 1024 * 1024,
-                    },
-                    new DatasetPreparationBucketConfig
-                    {
-                        Name = "Large",
-                        MinimumFileSizeBytes = 4 * 1024 * 1024 + 1,
-                        MaximumFileSizeBytes = 32 * 1024 * 1024,
-                        TargetTotalBytes = 3L * 1024 * 1024 * 1024,
-                    },
-                    new DatasetPreparationBucketConfig
-                    {
-                        Name = "XLarge",
-                        MinimumFileSizeBytes = 32 * 1024 * 1024 + 1,
-                        MaximumFileSizeBytes = 256 * 1024 * 1024,
-                        TargetTotalBytes = 4L * 1024 * 1024 * 1024,
-                    },
-                    new DatasetPreparationBucketConfig
-                    {
-                        Name = "Huge",
-                        MinimumFileSizeBytes = 256 * 1024 * 1024 + 1,
-                        MaximumFileSizeBytes = 2L * 1024 * 1024 * 1024,
-                        TargetTotalBytes = 4L * 1024 * 1024 * 1024,
-                    },
-                ],
-            },
-        };
-
-    public void Normalize()
-    {
-        SourcePath = Path.GetFullPath(SourcePath);
-        ArtifactPath = string.IsNullOrWhiteSpace(ArtifactPath)
-            ? null
-            : Path.GetFullPath(ArtifactPath);
-
-        foreach (var scenario in Scenarios)
-        {
-            scenario.Normalize();
-        }
-
-        if (Variants.Count == 0)
-        {
-            Variants.Add(new BenchmarkVariant
-            {
-                Name = "ScenarioDefaults",
-                Notes = "Synthesized for legacy configs without a variants section.",
-                DesiredRunCount = 1,
-            });
-        }
-
-        foreach (var variant in Variants)
-        {
-            variant.Normalize();
-        }
-
-        DatasetPreparation?.Normalize();
-    }
-}
-
-internal sealed class BenchmarkScenario
-{
-    public string Name { get; set; } = string.Empty;
-    public string DestinationPath { get; set; } = string.Empty;
-    public bool Enabled { get; set; } = true;
-    public bool ClearDestinationBeforeRun { get; set; } = true;
-    public OverwriteMode OverwriteMode { get; set; } = OverwriteMode.Always;
-    public int? ProviderCopyBufferSizeBytes { get; set; }
-    public long? ProviderSmallFileProgressThresholdBytes { get; set; }
-    public LocalFileSystemWriteMode? ProviderWriteMode { get; set; }
-    public bool? ProviderUseArrayPoolForManualLoop { get; set; }
-    public bool? ProviderPreallocateDestinationFile { get; set; }
-
-    public void Normalize()
-    {
-        Name = Name.Trim();
-        DestinationPath = Path.GetFullPath(DestinationPath);
-    }
-
-    public LocalFileSystemProviderOptions CreateProviderOptions()
-    {
-        return new LocalFileSystemProviderOptions
-        {
-            CopyBufferSizeBytes = ProviderCopyBufferSizeBytes ?? LocalFileSystemProviderOptions.Default.CopyBufferSizeBytes,
-            SmallFileProgressThresholdBytes = ProviderSmallFileProgressThresholdBytes
-                ?? LocalFileSystemProviderOptions.Default.SmallFileProgressThresholdBytes,
-            WriteMode = ProviderWriteMode ?? LocalFileSystemProviderOptions.Default.WriteMode,
-            UseArrayPoolForManualLoop = ProviderUseArrayPoolForManualLoop
-                ?? LocalFileSystemProviderOptions.Default.UseArrayPoolForManualLoop,
-            PreallocateDestinationFile = ProviderPreallocateDestinationFile
-                ?? LocalFileSystemProviderOptions.Default.PreallocateDestinationFile,
-        }.Normalize();
-    }
-}
-
-internal sealed class BenchmarkVariant
-{
-    public string Name { get; set; } = string.Empty;
-    public string? Notes { get; set; }
-    public bool Enabled { get; set; } = true;
-    public int DesiredRunCount { get; set; } = 3;
-    public OverwriteMode? OverwriteMode { get; set; }
-    public int? ProviderCopyBufferSizeBytes { get; set; }
-    public long? ProviderSmallFileProgressThresholdBytes { get; set; }
-    public LocalFileSystemWriteMode? ProviderWriteMode { get; set; }
-    public bool? ProviderUseArrayPoolForManualLoop { get; set; }
-    public bool? ProviderPreallocateDestinationFile { get; set; }
-
-    public void Normalize()
-    {
-        Name = Name.Trim();
-        if (string.IsNullOrWhiteSpace(Name))
-        {
-            throw new InvalidOperationException("benchmark variant name is required.");
-        }
-
-        if (DesiredRunCount <= 0)
-        {
-            throw new InvalidOperationException($"benchmark variant '{Name}' must have desiredRunCount > 0.");
-        }
-    }
-
-    public LocalFileSystemProviderOptions CreateProviderOptions(BenchmarkScenario scenario)
-    {
-        return new LocalFileSystemProviderOptions
-        {
-            CopyBufferSizeBytes = ProviderCopyBufferSizeBytes
-                ?? scenario.ProviderCopyBufferSizeBytes
-                ?? LocalFileSystemProviderOptions.Default.CopyBufferSizeBytes,
-            SmallFileProgressThresholdBytes = ProviderSmallFileProgressThresholdBytes
-                ?? scenario.ProviderSmallFileProgressThresholdBytes
-                ?? LocalFileSystemProviderOptions.Default.SmallFileProgressThresholdBytes,
-            WriteMode = ProviderWriteMode
-                ?? scenario.ProviderWriteMode
-                ?? LocalFileSystemProviderOptions.Default.WriteMode,
-            UseArrayPoolForManualLoop = ProviderUseArrayPoolForManualLoop
-                ?? scenario.ProviderUseArrayPoolForManualLoop
-                ?? LocalFileSystemProviderOptions.Default.UseArrayPoolForManualLoop,
-            PreallocateDestinationFile = ProviderPreallocateDestinationFile
-                ?? scenario.ProviderPreallocateDestinationFile
-                ?? LocalFileSystemProviderOptions.Default.PreallocateDestinationFile,
-        }.Normalize();
-    }
+    Analysis,
+    SizeScaling,
+    Validation,
+    Compare,
+    RemoveRecords,
 }
 
 internal sealed class BenchmarkState
@@ -302,12 +24,61 @@ internal sealed class BenchmarkState
     public long? FreeSpaceBefore { get; set; }
     public long? FreeSpaceAfter { get; set; }
     public string? JournalPath { get; set; }
+    public BenchmarkGcStats? ExecuteGcStats { get; set; }
     public System.Diagnostics.Stopwatch ScanStopwatch { get; } = new();
     public System.Diagnostics.Stopwatch ExecuteStopwatch { get; } = new();
 }
 
+internal readonly record struct BenchmarkGcSnapshot(
+    long AllocatedBytes,
+    int Gen0Collections,
+    int Gen1Collections,
+    int Gen2Collections,
+    long HeapSizeBytes,
+    long FragmentedBytes)
+{
+    public static BenchmarkGcSnapshot Capture()
+    {
+        var memoryInfo = GC.GetGCMemoryInfo();
+        return new BenchmarkGcSnapshot(
+            GC.GetTotalAllocatedBytes(precise: false),
+            GC.CollectionCount(0),
+            GC.CollectionCount(1),
+            GC.CollectionCount(2),
+            memoryInfo.HeapSizeBytes,
+            memoryInfo.FragmentedBytes);
+    }
+}
+
+internal readonly record struct BenchmarkGcStats(
+    long AllocatedBytes,
+    int Gen0Collections,
+    int Gen1Collections,
+    int Gen2Collections,
+    long HeapSizeBeforeBytes,
+    long HeapSizeAfterBytes,
+    long HeapSizeDeltaBytes,
+    long FragmentedBeforeBytes,
+    long FragmentedAfterBytes,
+    long FragmentedDeltaBytes)
+{
+    public static BenchmarkGcStats Between(BenchmarkGcSnapshot before, BenchmarkGcSnapshot after) =>
+        new(
+            Math.Max(0, after.AllocatedBytes - before.AllocatedBytes),
+            Math.Max(0, after.Gen0Collections - before.Gen0Collections),
+            Math.Max(0, after.Gen1Collections - before.Gen1Collections),
+            Math.Max(0, after.Gen2Collections - before.Gen2Collections),
+            before.HeapSizeBytes,
+            after.HeapSizeBytes,
+            after.HeapSizeBytes - before.HeapSizeBytes,
+            before.FragmentedBytes,
+            after.FragmentedBytes,
+            after.FragmentedBytes - before.FragmentedBytes);
+}
+
 internal sealed class BenchmarkRunRecord
 {
+    public string RunStatus { get; init; } = BenchmarkRunStatus.Completed;
     public required string ScenarioName { get; init; }
     public required string VariantName { get; init; }
     public required string SourcePath { get; init; }
@@ -321,11 +92,28 @@ internal sealed class BenchmarkRunRecord
     public required int RunIndex { get; init; }
     public int? ProviderCopyBufferSizeBytes { get; init; }
     public long? ProviderSmallFileProgressThresholdBytes { get; init; }
-    public LocalFileSystemWriteMode? ProviderWriteMode { get; init; }
-    public bool? ProviderUseArrayPoolForManualLoop { get; init; }
-    public bool? ProviderPreallocateDestinationFile { get; init; }
+    public bool? ProviderWriteSequentialScan { get; init; }
+    public long? DirectWriteThresholdBytes { get; init; }
+    public long? BufferBatchBytes { get; init; }
+    public long? BatchEligibilityThresholdBytes { get; init; }
+    public bool? BatchOrderByFileSize { get; init; }
+    public bool? DestinationRoutingEnabled { get; init; }
+    public long? ProductionBatchBufferBytes { get; init; }
+    public long? ProductionBatchEligibilityCeilingBytes { get; init; }
+    public long? ProductionTinyFileFastPathThresholdBytes { get; init; }
+    public bool? JournalEnabled { get; init; }
     public required TimeSpan ScanDuration { get; init; }
     public required TimeSpan ExecuteDuration { get; init; }
+    public long? ExecuteAllocatedBytes { get; init; }
+    public int? ExecuteGen0Collections { get; init; }
+    public int? ExecuteGen1Collections { get; init; }
+    public int? ExecuteGen2Collections { get; init; }
+    public long? ExecuteHeapSizeBeforeBytes { get; init; }
+    public long? ExecuteHeapSizeAfterBytes { get; init; }
+    public long? ExecuteHeapSizeDeltaBytes { get; init; }
+    public long? ExecuteFragmentedBeforeBytes { get; init; }
+    public long? ExecuteFragmentedAfterBytes { get; init; }
+    public long? ExecuteFragmentedDeltaBytes { get; init; }
     public required int CopiedFiles { get; init; }
     public required int SkippedFiles { get; init; }
     public required int FailedFiles { get; init; }
@@ -336,44 +124,21 @@ internal sealed class BenchmarkRunRecord
     public required string? ExceptionType { get; init; }
     public required string? ExceptionMessage { get; init; }
 
-    public static BenchmarkRunRecord CreateSuccess(
+    public static BenchmarkRunRecord CreateInProgress(
         BenchmarkScenario scenario,
         BenchmarkVariant variant,
         string sourcePath,
         string destinationPath,
         string artifactPath,
         DateTime runStartedUtc,
-        BenchmarkState state,
-        string? notes,
-        int runIndex) => Create(scenario, variant, sourcePath, destinationPath, artifactPath, runStartedUtc, state, notes, runIndex, ex: null);
-
-    public static BenchmarkRunRecord CreateFailure(
-        BenchmarkScenario scenario,
-        BenchmarkVariant variant,
-        string sourcePath,
-        string destinationPath,
-        string artifactPath,
-        DateTime runStartedUtc,
-        BenchmarkState state,
         string? notes,
         int runIndex,
-        Exception ex) => Create(scenario, variant, sourcePath, destinationPath, artifactPath, runStartedUtc, state, notes, runIndex, ex);
-
-    private static BenchmarkRunRecord Create(
-        BenchmarkScenario scenario,
-        BenchmarkVariant variant,
-        string sourcePath,
-        string destinationPath,
-        string artifactPath,
-        DateTime runStartedUtc,
-        BenchmarkState state,
-        string? notes,
-        int runIndex,
-        Exception? ex)
+        OperationalSettings? recordedSettings = null)
     {
-        var providerOptions = variant.CreateProviderOptions(scenario);
+        var providerOptions = recordedSettings ?? variant.CreateOperationalSettings(scenario);
         return new BenchmarkRunRecord
         {
+            RunStatus = BenchmarkRunStatus.InProgress,
             ScenarioName = scenario.Name,
             VariantName = variant.Name,
             SourcePath = sourcePath,
@@ -387,11 +152,118 @@ internal sealed class BenchmarkRunRecord
             RunIndex = runIndex,
             ProviderCopyBufferSizeBytes = providerOptions.CopyBufferSizeBytes,
             ProviderSmallFileProgressThresholdBytes = providerOptions.SmallFileProgressThresholdBytes,
-            ProviderWriteMode = providerOptions.WriteMode,
-            ProviderUseArrayPoolForManualLoop = providerOptions.UseArrayPoolForManualLoop,
-            ProviderPreallocateDestinationFile = providerOptions.PreallocateDestinationFile,
+            ProviderWriteSequentialScan = variant.ProviderWriteSequentialScan ?? scenario.ProviderWriteSequentialScan,
+            DirectWriteThresholdBytes = variant.DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes,
+            BufferBatchBytes = variant.BufferBatchBytes ?? scenario.BufferBatchBytes,
+            BatchEligibilityThresholdBytes = variant.BatchEligibilityThresholdBytes ?? scenario.BatchEligibilityThresholdBytes,
+            BatchOrderByFileSize = providerOptions.BatchOrderByFileSize,
+            DestinationRoutingEnabled = providerOptions.DestinationRoutingEnabled,
+            ProductionBatchBufferBytes = providerOptions.BatchBufferBytes,
+            ProductionBatchEligibilityCeilingBytes = providerOptions.BatchEligibilityCeilingBytes,
+            ProductionTinyFileFastPathThresholdBytes = providerOptions.TinyFileFastPathThresholdBytes,
+            JournalEnabled = variant.WriteJournal,
+            ScanDuration = TimeSpan.Zero,
+            ExecuteDuration = TimeSpan.Zero,
+            ExecuteAllocatedBytes = null,
+            ExecuteGen0Collections = null,
+            ExecuteGen1Collections = null,
+            ExecuteGen2Collections = null,
+            ExecuteHeapSizeBeforeBytes = null,
+            ExecuteHeapSizeAfterBytes = null,
+            ExecuteHeapSizeDeltaBytes = null,
+            ExecuteFragmentedBeforeBytes = null,
+            ExecuteFragmentedAfterBytes = null,
+            ExecuteFragmentedDeltaBytes = null,
+            CopiedFiles = 0,
+            SkippedFiles = 0,
+            FailedFiles = 0,
+            OutputBytes = 0,
+            DestinationFreeSpaceBeforeBytes = null,
+            DestinationFreeSpaceAfterBytes = null,
+            JournalPath = string.Empty,
+            ExceptionType = null,
+            ExceptionMessage = null,
+        };
+    }
+
+    public static BenchmarkRunRecord CreateSuccess(
+        BenchmarkScenario scenario,
+        BenchmarkVariant variant,
+        string sourcePath,
+        string destinationPath,
+        string artifactPath,
+        DateTime runStartedUtc,
+        BenchmarkState state,
+        string? notes,
+        int runIndex,
+        OperationalSettings? recordedSettings = null) => Create(scenario, variant, sourcePath, destinationPath, artifactPath, runStartedUtc, state, notes, runIndex, ex: null, recordedSettings: recordedSettings);
+
+    public static BenchmarkRunRecord CreateFailure(
+        BenchmarkScenario scenario,
+        BenchmarkVariant variant,
+        string sourcePath,
+        string destinationPath,
+        string artifactPath,
+        DateTime runStartedUtc,
+        BenchmarkState state,
+        string? notes,
+        int runIndex,
+        Exception ex,
+        OperationalSettings? recordedSettings = null) => Create(scenario, variant, sourcePath, destinationPath, artifactPath, runStartedUtc, state, notes, runIndex, ex, recordedSettings);
+
+    private static BenchmarkRunRecord Create(
+        BenchmarkScenario scenario,
+        BenchmarkVariant variant,
+        string sourcePath,
+        string destinationPath,
+        string artifactPath,
+        DateTime runStartedUtc,
+        BenchmarkState state,
+        string? notes,
+        int runIndex,
+        Exception? ex,
+        OperationalSettings? recordedSettings = null)
+    {
+        var providerOptions = recordedSettings ?? variant.CreateOperationalSettings(scenario);
+        var gc = state.ExecuteGcStats;
+        return new BenchmarkRunRecord
+        {
+            RunStatus = ex is null ? BenchmarkRunStatus.Completed : BenchmarkRunStatus.Failed,
+            ScenarioName = scenario.Name,
+            VariantName = variant.Name,
+            SourcePath = sourcePath,
+            DestinationPath = destinationPath,
+            ArtifactPath = artifactPath,
+            RunStartedUtc = runStartedUtc,
+            HostName = Environment.MachineName,
+            OsDescription = RuntimeInformation.OSDescription,
+            FrameworkDescription = RuntimeInformation.FrameworkDescription,
+            Notes = notes,
+            RunIndex = runIndex,
+            ProviderCopyBufferSizeBytes = providerOptions.CopyBufferSizeBytes,
+            ProviderSmallFileProgressThresholdBytes = providerOptions.SmallFileProgressThresholdBytes,
+            ProviderWriteSequentialScan = variant.ProviderWriteSequentialScan ?? scenario.ProviderWriteSequentialScan,
+            DirectWriteThresholdBytes = variant.DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes,
+            BufferBatchBytes = variant.BufferBatchBytes ?? scenario.BufferBatchBytes,
+            BatchEligibilityThresholdBytes = variant.BatchEligibilityThresholdBytes ?? scenario.BatchEligibilityThresholdBytes,
+            BatchOrderByFileSize = providerOptions.BatchOrderByFileSize,
+            DestinationRoutingEnabled = providerOptions.DestinationRoutingEnabled,
+            ProductionBatchBufferBytes = providerOptions.BatchBufferBytes,
+            ProductionBatchEligibilityCeilingBytes = providerOptions.BatchEligibilityCeilingBytes,
+            ProductionTinyFileFastPathThresholdBytes = providerOptions.TinyFileFastPathThresholdBytes,
+            JournalEnabled = variant.WriteJournal,
             ScanDuration = state.ScanStopwatch.Elapsed,
             ExecuteDuration = state.ExecuteStopwatch.Elapsed,
+            ExecuteAllocatedBytes = gc?.AllocatedBytes,
+            ExecuteGen0Collections = gc?.Gen0Collections,
+            ExecuteGen1Collections = gc?.Gen1Collections,
+            ExecuteGen2Collections = gc?.Gen2Collections,
+            ExecuteHeapSizeBeforeBytes = gc?.HeapSizeBeforeBytes,
+            ExecuteHeapSizeAfterBytes = gc?.HeapSizeAfterBytes,
+            ExecuteHeapSizeDeltaBytes = gc?.HeapSizeDeltaBytes,
+            ExecuteFragmentedBeforeBytes = gc?.FragmentedBeforeBytes,
+            ExecuteFragmentedAfterBytes = gc?.FragmentedAfterBytes,
+            ExecuteFragmentedDeltaBytes = gc?.FragmentedDeltaBytes,
             CopiedFiles = state.Results.Sum(r => r.NumberOfFilesAffected),
             SkippedFiles = state.Results.Sum(r => r.NumberOfFilesSkipped),
             FailedFiles = state.Results.Count(r => !r.IsSuccess),
@@ -405,146 +277,24 @@ internal sealed class BenchmarkRunRecord
     }
 }
 
-internal sealed class DatasetPreparationConfig
+internal static class BenchmarkRunStatus
 {
-    public string SourcePath { get; set; } = string.Empty;
-    public string DestinationPath { get; set; } = string.Empty;
-    public List<DatasetPreparationBucketConfig> Buckets { get; set; } = [];
-
-    public void Normalize()
-    {
-        if (string.IsNullOrWhiteSpace(SourcePath))
-        {
-            throw new InvalidOperationException("datasetPreparation.sourcePath is required.");
-        }
-
-        if (string.IsNullOrWhiteSpace(DestinationPath))
-        {
-            throw new InvalidOperationException("datasetPreparation.destinationPath is required.");
-        }
-
-        SourcePath = Path.GetFullPath(SourcePath);
-        DestinationPath = Path.GetFullPath(DestinationPath);
-
-        if (Buckets.Count == 0)
-        {
-            throw new InvalidOperationException("datasetPreparation.buckets must contain at least one bucket.");
-        }
-
-        foreach (var bucket in Buckets)
-        {
-            bucket.Normalize();
-        }
-
-        var duplicateName = Buckets
-            .GroupBy(b => b.Name, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault(g => g.Count() > 1);
-        if (duplicateName is not null)
-        {
-            throw new InvalidOperationException($"datasetPreparation bucket name '{duplicateName.Key}' is duplicated.");
-        }
-
-        var orderedBuckets = Buckets.OrderBy(b => b.MinimumFileSizeBytes).ToList();
-        for (var i = 1; i < orderedBuckets.Count; i++)
-        {
-            if (orderedBuckets[i].MinimumFileSizeBytes <= orderedBuckets[i - 1].MaximumFileSizeBytes)
-            {
-                throw new InvalidOperationException(
-                    $"datasetPreparation bucket '{orderedBuckets[i].Name}' overlaps '{orderedBuckets[i - 1].Name}'.");
-            }
-        }
-    }
-
-    public DatasetPreparationBucketConfig? FindBucket(long sizeBytes) =>
-        Buckets.FirstOrDefault(b => b.Contains(sizeBytes));
-
+    public const string InProgress = "inProgress";
+    public const string Completed = "completed";
+    public const string Failed = "failed";
 }
 
-internal sealed class DatasetPreparationBucketConfig
-{
-    public string Name { get; set; } = string.Empty;
-    public long MinimumFileSizeBytes { get; set; }
-    public long MaximumFileSizeBytes { get; set; }
-    public long TargetTotalBytes { get; set; }
-
-    public void Normalize()
-    {
-        Name = Name.Trim();
-        if (string.IsNullOrWhiteSpace(Name))
-        {
-            throw new InvalidOperationException("datasetPreparation bucket name is required.");
-        }
-
-        if (MinimumFileSizeBytes < 0)
-        {
-            throw new InvalidOperationException($"datasetPreparation bucket '{Name}' has a negative minimum size.");
-        }
-
-        if (MaximumFileSizeBytes < MinimumFileSizeBytes)
-        {
-            throw new InvalidOperationException($"datasetPreparation bucket '{Name}' has max size below min size.");
-        }
-
-        if (TargetTotalBytes <= 0)
-        {
-            throw new InvalidOperationException($"datasetPreparation bucket '{Name}' targetTotalBytes must be positive.");
-        }
-    }
-
-    public bool Contains(long sizeBytes) =>
-        sizeBytes >= MinimumFileSizeBytes && sizeBytes <= MaximumFileSizeBytes;
-
-    public bool Matches(DatasetPreparationBucketConfig other) =>
-        string.Equals(Name, other.Name, StringComparison.OrdinalIgnoreCase) &&
-        MinimumFileSizeBytes == other.MinimumFileSizeBytes &&
-        MaximumFileSizeBytes == other.MaximumFileSizeBytes &&
-        TargetTotalBytes == other.TargetTotalBytes;
-}
-
-internal sealed class DatasetPreparationBucketState
-{
-    public string BucketName { get; set; } = string.Empty;
-    public int ActualFileCount { get; set; }
-    public long ActualTotalBytes { get; set; }
-}
-
-internal sealed class DatasetPreparationImportedFileRecord
-{
-    public required string SourcePath { get; init; }
-    public required string RelativePath { get; init; }
-    public required string DestinationPath { get; init; }
-    public required string BucketName { get; init; }
-    public required long SizeBytes { get; init; }
-    public required DateTime ImportedUtc { get; init; }
-}
-
-internal sealed class DatasetPreparationRunSummary
+internal sealed class BenchmarkFileCopyRecord
 {
     public required DateTime RunStartedUtc { get; init; }
-    public required DateTime RunCompletedUtc { get; init; }
-    public required string SourcePath { get; init; }
+    public required int RunIndex { get; init; }
+    public required string ScenarioName { get; init; }
+    public required string VariantName { get; init; }
+    public required string SourceRelativePath { get; init; }
     public required string DestinationPath { get; init; }
-    public required string SummaryPath { get; init; }
-    public string? Notes { get; init; }
-    public required int ImportedFileCount { get; init; }
-    public required long ImportedTotalBytes { get; init; }
-    public required int DuplicateSourceSkips { get; init; }
-    public required int ExistingDestinationSkips { get; init; }
-    public required List<DatasetPreparationImportedFileRecord> ImportedFiles { get; init; }
-    public required List<DatasetPreparationBucketProgress> Buckets { get; init; }
-}
-
-internal sealed class DatasetPreparationBucketProgress
-{
-    public required string BucketName { get; init; }
-    public required long TargetTotalBytes { get; init; }
-    public required int BeforeFileCount { get; init; }
-    public required long BeforeTotalBytes { get; init; }
-    public required int AddedFileCount { get; init; }
-    public required long AddedTotalBytes { get; init; }
-    public required int AfterFileCount { get; init; }
-    public required long AfterTotalBytes { get; init; }
-    public required bool IsFull { get; init; }
+    public required long FileSizeBytes { get; init; }
+    public required double CopyDurationMilliseconds { get; init; }
+    public double? ThroughputMiBPerSecond { get; init; }
 }
 
 internal static class JsonOptions
@@ -581,3 +331,70 @@ internal static class BenchmarkJson
         await JsonSerializer.SerializeAsync(stream, value, JsonOptions.Indented, ct);
     }
 }
+
+internal sealed record BenchmarkScenarioGroup(
+    BenchmarkScenario Scenario,
+    IReadOnlyList<BenchmarkSelection> Variants);
+
+internal sealed record BenchmarkSelection(
+    BenchmarkScenario Scenario,
+    BenchmarkVariant Variant,
+    int SuccessfulRunCount,
+    int TotalRunCount,
+    DateTime LastRunUtc,
+    int NextRunIndex);
+
+internal sealed record FileSizeBucket(long MinBytesInclusive, long MaxBytesInclusive, string Label)
+{
+    public bool Contains(long value) => value >= MinBytesInclusive && value <= MaxBytesInclusive;
+}
+
+internal sealed record RunVariantEvidence(
+    string VariantName,
+    int TotalRuns,
+    int ValidRuns,
+    int InvalidRuns,
+    double MedianSeconds,
+    double MeanSeconds,
+    double MinSeconds,
+    double MaxSeconds,
+    double SpreadSeconds);
+
+internal sealed record BucketVariantEvidence(
+    string BucketLabel,
+    string VariantName,
+    int RecordCount,
+    long TotalBytes,
+    double TotalCopyDurationMilliseconds,
+    double MeanDurationMilliseconds,
+    double MedianDurationMilliseconds,
+    double P95DurationMilliseconds,
+    double AggregateThroughputMiBPerSecond,
+    double RunMedianSpreadMilliseconds,
+    double RunThroughputSpreadMiBPerSecond)
+{
+    public static BucketVariantEvidence Empty(string bucketLabel, string variantName) =>
+        new(bucketLabel, variantName, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+}
+
+internal static class FileSizeBuckets
+{
+    public static IReadOnlyList<FileSizeBucket> All { get; } =
+    [
+        new FileSizeBucket(0, 4 * 1024, "Sub4KiB"),
+        new FileSizeBucket(4 * 1024 + 1, 16 * 1024, "Sub16KiB"),
+        new FileSizeBucket(16 * 1024 + 1, 64 * 1024, "Sub64KiB"),
+        new FileSizeBucket(64 * 1024 + 1, 256 * 1024, "Sub256KiB"),
+        new FileSizeBucket(256 * 1024 + 1, 512 * 1024, "Sub512KiB"),
+        new FileSizeBucket(512 * 1024 + 1, 1024 * 1024, "Sub1MiB"),
+        new FileSizeBucket(1024 * 1024 + 1, 4L * 1024 * 1024, "Sub4MiB"),
+        new FileSizeBucket(4L * 1024 * 1024 + 1, long.MaxValue, "Tail"),
+    ];
+}
+
+internal sealed record SessionPaths(
+    string ArtifactDirectory,
+    string ResultsPath,
+    string FileResultsPath,
+    string TaskListPath,
+    string JournalDirectory);

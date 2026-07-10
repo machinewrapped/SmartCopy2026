@@ -44,7 +44,7 @@ internal sealed class DatasetPreparationService
             ct);
 
         long totalBytesImported = 0;
-        
+
         foreach (var bucket in config.Buckets)
         {
             var bucketState = bucketStates[bucket.Name];
@@ -125,7 +125,90 @@ internal sealed class DatasetPreparationService
         };
 
         await BenchmarkJson.WriteAsync(summaryPath, summary, ct);
+
+        EnsurePoolClones(config.DestinationPath, config.PoolCloneCount, ct);
+
         return summary;
+    }
+
+    private static void EnsurePoolClones(string sourceDir, int cloneCount, CancellationToken ct)
+    {
+        if (cloneCount <= 0)
+        {
+            return;
+        }
+
+        Console.WriteLine($"\nEnsuring {cloneCount} dataset clones exist for pool rotation...");
+        var normalizedSource = Path.GetFullPath(sourceDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        for (var i = 1; i <= cloneCount; i++)
+        {
+            var cloneDir = $"{normalizedSource}_{i}";
+            Console.WriteLine($"  Verifying clone {i} of {cloneCount}: {cloneDir}...");
+            CloneDirectoryIncremental(normalizedSource, cloneDir, ct);
+        }
+    }
+
+    private static void CloneDirectoryIncremental(string sourceDir, string destinationDir, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        Directory.CreateDirectory(destinationDir);
+
+        foreach (var file in Directory.GetFiles(sourceDir))
+        {
+            ct.ThrowIfCancellationRequested();
+            var destFile = Path.Combine(destinationDir, Path.GetFileName(file));
+            var sourceInfo = new FileInfo(file);
+            var destInfo = new FileInfo(destFile);
+
+            if (!destInfo.Exists || destInfo.Length != sourceInfo.Length)
+            {
+                File.Copy(file, destFile, overwrite: true);
+            }
+        }
+
+        foreach (var directory in Directory.GetDirectories(sourceDir))
+        {
+            var destDir = Path.Combine(destinationDir, Path.GetFileName(directory));
+            CloneDirectoryIncremental(directory, destDir, ct);
+        }
+    }
+
+    /// <summary>
+    /// Replicates pool clones from the primary dataset location to each target path.
+    /// Only clones (_1 through _N) are copied — the base dataset is not replicated
+    /// since it is not included in path pools. Uses incremental cloning so
+    /// interrupted runs can be safely resumed.
+    /// </summary>
+    internal static void ReplicatePoolClonesToTargets(
+        string primaryBaseDir,
+        int poolCloneCount,
+        IReadOnlyList<string> targets,
+        CancellationToken ct)
+    {
+        if (targets.Count == 0 || poolCloneCount <= 0)
+            return;
+
+        var normalizedPrimary = Path.GetFullPath(primaryBaseDir)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        Console.WriteLine();
+        Console.WriteLine($"Replicating {poolCloneCount} pool clone(s) to {targets.Count} target drive(s)...");
+
+        foreach (var target in targets)
+        {
+            ct.ThrowIfCancellationRequested();
+            var normalizedTarget = Path.GetFullPath(target)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+            for (var i = 1; i <= poolCloneCount; i++)
+            {
+                var targetClone = $"{normalizedTarget}_{i}";
+                Console.WriteLine($"  [{normalizedTarget}] Cloning pool {i}/{poolCloneCount}...");
+                CloneDirectoryIncremental(normalizedPrimary, targetClone, ct);
+            }
+        }
+
+        Console.WriteLine("Pool clone replication complete.");
     }
 
     private static async Task CopyFileAsync(string sourcePath, string destinationPath, CancellationToken ct)
@@ -188,7 +271,7 @@ internal sealed class DatasetPreparationService
         {
             ct.ThrowIfCancellationRequested();
             var fullPath = Path.GetFullPath(path);
-            
+
             scannedCount++;
             if (scannedCount % 100 == 0)
                 progress?.Report(new DatasetPreparationProgress(scannedCount, 0, 0, Path.GetRelativePath(config.SourcePath, fullPath)));
@@ -205,12 +288,18 @@ internal sealed class DatasetPreparationService
                 continue;
             }
 
-            var relativePath = Path.GetRelativePath(config.SourcePath, fullPath);
+            var relativePath = config.OrganizeByBucket
+                ? Path.Combine(bucket.Name, Path.GetFileName(fullPath))
+                : Path.GetRelativePath(config.SourcePath, fullPath);
+
             if (existingRelativePaths.Contains(relativePath))
             {
                 duplicateSourceSkips++;
                 continue;
             }
+
+            // Reserve/deduplicate this destination path for this candidate during this prep run.
+            existingRelativePaths.Add(relativePath);
 
             result[bucket.Name].Add(new DatasetCandidate(
                 fullPath,
