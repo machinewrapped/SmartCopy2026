@@ -91,6 +91,10 @@ internal static class BenchmarkHelpers
 
     public static bool IsSameOrNestedPath(string parentPath, string childPath)
     {
+        // Assumes case-insensitive (Windows) path semantics. On a case-sensitive filesystem this
+        // may treat paths that differ only in case as nested; the only effects are rejecting a run
+        // (in ValidatePaths) or relocating artifacts (in ResolveArtifactDirectory), never a wrong
+        // overwrite.
         var normalizedParent = EnsureTrailingSeparator(Path.GetFullPath(parentPath));
         var normalizedChild = EnsureTrailingSeparator(Path.GetFullPath(childPath));
         return normalizedChild.StartsWith(normalizedParent, StringComparison.OrdinalIgnoreCase);

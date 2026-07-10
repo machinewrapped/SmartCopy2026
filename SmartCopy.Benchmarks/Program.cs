@@ -15,6 +15,7 @@ if (selection.Help)
     Console.WriteLine("  --compare-with <dir> Directory containing benchmark-file-results.ndjson to compare against");
     Console.WriteLine("  --scenario <name>    Filter execution to a specific scenario name");
     Console.WriteLine("  --variant <name>     Filter execution to a specific variant name");
+    Console.WriteLine("  --runs <n>           Run a fixed number of rounds (explicit mode; skips convergence)");
     Console.WriteLine("  --remove, --prune    Shorthand for --mode remove-records");
     Console.WriteLine("  --mode remove-records --scenario <name> [--variant <name>]");
     Console.WriteLine("                       Remove matching run-level and file-level result records");
