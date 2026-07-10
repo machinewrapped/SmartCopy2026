@@ -658,7 +658,7 @@ Possible
 - [x] Added a dedicated `SmartCopy.Benchmarks` console runner for manual, real-disk copy benchmarking outside the unit-test suite.
 - [x] Runner writes a scenario template, append-only NDJSON timing results, a markdown task list, and per-run operation journals in the current working directory.
 - [x] Each execution performs at most one benchmark scenario so cache-sensitive runs can be spaced out over time and annotated with manual notes.
-- [x] First baseline captured across four destination scenarios and documented in `Docs/Benchmark-Baseline-2026-03.md`.
+- [x] First baseline captured across four destination scenarios and documented in `Docs/archive/optimisation/Benchmark-Baseline-2026-03.md`.
 - [x] Runner now isolates artifacts from the source dataset by default and supports per-scenario `LocalFileSystemProvider` tuning for write-path experiments.
 - [x] Runner now supports incremental dataset preparation with size buckets and a durable manifest so benchmark datasets can be assembled across multiple source paths.
 - [x] Runner now supports a scenario/variant matrix with repeated runs, so `LocalFileSystemProvider` write strategies can be compared on the same destination target instead of only comparing drive classes.
