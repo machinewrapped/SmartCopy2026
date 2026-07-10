@@ -215,8 +215,10 @@ internal static class BenchmarkCopyRunner
             batch.Clear();
         }
 
-        foreach (var node in sortedFileNodes)
+        try
         {
+            foreach (var node in sortedFileNodes)
+            {
             ct.ThrowIfCancellationRequested();
 
             if (job.PauseToken is not null)
@@ -458,17 +460,23 @@ internal static class BenchmarkCopyRunner
                         EstimatedRemaining: remaining));
                 }
             }
-        }
+            }
 
-        // Flush any remaining batched files at the end
-        if (currentBatch.Count > 0)
+            // Flush any remaining batched files at the end.
+            if (currentBatch.Count > 0)
+            {
+                await FlushBatchAsync(currentBatch, sharedBatchBuffer!);
+            }
+
+            return results;
+        }
+        finally
         {
-            await FlushBatchAsync(currentBatch, sharedBatchBuffer!);
-            ArrayPool<byte>.Shared.Return(sharedBatchBuffer!);
-            sharedBatchBuffer = null;
+            if (sharedBatchBuffer is not null)
+            {
+                ArrayPool<byte>.Shared.Return(sharedBatchBuffer);
+            }
         }
-
-        return results;
     }
 
     private static TimeSpan EstimateRemaining(TimeSpan elapsed, long completed, long total)
