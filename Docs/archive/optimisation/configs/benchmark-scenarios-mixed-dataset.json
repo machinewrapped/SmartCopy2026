@@ -1,0 +1,185 @@
+{
+  "sourcePath": "R:\\TestData\\MixedDataset",
+  "artifactPath": "C:\\benchmark-artifacts",
+  "includeHidden": false,
+  "convergenceSpreadPercent": 3,
+  "maxRunsPerVariant": 5,
+  "scenarios": [
+    {
+      "name": "SameDriveTest",
+      "destinationPath": "R:\\TestData\\SameDriveTest",
+      "sourcePath": null,
+      "enabled": true,
+      "clearDestinationBeforeRun": true,
+      "overwriteMode": 1,
+      "providerCopyBufferSizeBytes": null,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": null,
+      "bufferBatchBytes": null,
+      "usePathPool": false
+    },
+    {
+      "name": "SSDtoSSD",
+      "destinationPath": "D:\\TestData\\SSDtoSSD",
+      "sourcePath": null,
+      "enabled": true,
+      "clearDestinationBeforeRun": true,
+      "overwriteMode": 1,
+      "providerCopyBufferSizeBytes": null,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": null,
+      "bufferBatchBytes": null,
+      "usePathPool": false
+    },
+    {
+      "name": "SSDtoHDD",
+      "destinationPath": "L:\\TestData\\SSDtoHDD",
+      "sourcePath": null,
+      "enabled": true,
+      "clearDestinationBeforeRun": true,
+      "overwriteMode": 1,
+      "providerCopyBufferSizeBytes": null,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": null,
+      "bufferBatchBytes": null,
+      "usePathPool": false
+    },
+    {
+      "name": "SSDtoUSBFlash",
+      "destinationPath": "T:\\TestData\\SSDtoUSBFlash",
+      "sourcePath": null,
+      "enabled": true,
+      "clearDestinationBeforeRun": true,
+      "overwriteMode": 1,
+      "providerCopyBufferSizeBytes": null,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": null,
+      "bufferBatchBytes": null,
+      "usePathPool": false
+    }
+  ],
+  "scenarioExecutionOrder": [
+    "SSDtoSSD",
+    "SameDriveTest",
+    "SSDtoHDD",
+    "SSDtoUSBFlash"
+  ],
+  "variants": [
+    {
+      "name": "BaselineAuto",
+      "notes": "Current heuristic defaults.",
+      "enabled": true,
+      "desiredRunCount": 5,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": null,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": null,
+      "bufferBatchBytes": null,
+      "matchedControl": null
+    },
+    {
+      "name": "CopyToAsync512KiB",
+      "notes": "Always uses Stream.CopyToAsync with a 512 KiB buffer.",
+      "enabled": true,
+      "desiredRunCount": 3,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": 524288,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": 2,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": null,
+      "bufferBatchBytes": null,
+      "matchedControl": null
+    },
+    {
+      "name": "ManualLoop512KiBArrayPool",
+      "notes": "Manual loop with a 512 KiB buffer and pooled buffers.",
+      "enabled": true,
+      "desiredRunCount": 3,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": 524288,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": 1,
+      "providerUseArrayPoolForManualLoop": true,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": null,
+      "bufferBatchBytes": null,
+      "matchedControl": null
+    },
+    {
+      "name": "ManualLoop1MiBPreallocate",
+      "notes": "Manual loop with a 1 MiB buffer and destination preallocation.",
+      "enabled": true,
+      "desiredRunCount": 3,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": 1048576,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": 1,
+      "providerUseArrayPoolForManualLoop": true,
+      "providerPreallocateDestinationFile": true,
+      "directWriteThresholdBytes": null,
+      "bufferBatchBytes": null,
+      "matchedControl": null
+    }
+  ],
+  "datasetPreparation": {
+    "sourcePath": "R:\\CandidateData",
+    "destinationPath": "R:\\TestData\\MixedDataset",
+    "organizeByBucket": false,
+    "buckets": [
+      {
+        "name": "Tiny",
+        "minimumFileSizeBytes": 0,
+        "maximumFileSizeBytes": 65536,
+        "targetTotalBytes": 268435456
+      },
+      {
+        "name": "Small",
+        "minimumFileSizeBytes": 65537,
+        "maximumFileSizeBytes": 524288,
+        "targetTotalBytes": 536870912
+      },
+      {
+        "name": "Medium",
+        "minimumFileSizeBytes": 524289,
+        "maximumFileSizeBytes": 4194304,
+        "targetTotalBytes": 2147483648
+      },
+      {
+        "name": "Large",
+        "minimumFileSizeBytes": 4194305,
+        "maximumFileSizeBytes": 33554432,
+        "targetTotalBytes": 3221225472
+      },
+      {
+        "name": "XLarge",
+        "minimumFileSizeBytes": 33554433,
+        "maximumFileSizeBytes": 268435456,
+        "targetTotalBytes": 4294967296
+      },
+      {
+        "name": "Huge",
+        "minimumFileSizeBytes": 268435457,
+        "maximumFileSizeBytes": 2147483648,
+        "targetTotalBytes": 4294967296
+      }
+    ]
+  },
+  "cooldownSeconds": 60
+}

@@ -1,0 +1,182 @@
+{
+  "sourcePath": "D:\\TestData\\SmokeDataset",
+  "artifactPath": "C:\\benchmark-artifacts",
+  "includeHidden": false,
+  "convergenceSpreadPercent": 3,
+  "gatePercent": 3,
+  "maxConvergenceRuns": 5,
+  "converge": true,
+  "scenarios": [
+    {
+      "name": "SmokeDataset-DtoO",
+      "destinationPath": "O:\\TestData\\SmokeDataset_ValidationSmoke",
+      "sourcePath": "D:\\TestData\\SmokeDataset",
+      "enabled": true,
+      "clearDestinationBeforeRun": true,
+      "clearDestinationAfterRun": true,
+      "overwriteMode": 1,
+      "providerCopyBufferSizeBytes": null,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": null,
+      "bufferBatchBytes": null,
+      "batchEligibilityThresholdBytes": null,
+      "usePathPool": true,
+      "variants": null
+    }
+  ],
+  "scenarioExecutionOrder": [
+    "SmokeDataset-DtoO"
+  ],
+  "variants": [
+    {
+      "name": "Legacy_Baseline",
+      "notes": "Production streaming path with the old 256 KiB auto default (no batch, no direct write, no routing). Legacy anchor.",
+      "enabled": true,
+      "desiredRunCount": 5,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": 262144,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": 0,
+      "bufferBatchBytes": 0,
+      "batchEligibilityThresholdBytes": null,
+      "destinationRoutingEnabled": false,
+      "usePrototypeExecutor": null,
+      "matchedControl": null,
+      "validationRole": null
+    },
+    {
+      "name": "Prototype",
+      "notes": "Prototype reference (BenchmarkCopyRunner) with promoted defaults: 256 KiB direct write, 1 MiB batch, 512 KiB eligibility ceiling. Runs the prototype engine even under --mode validation via usePrototypeExecutor.",
+      "enabled": true,
+      "desiredRunCount": 5,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": 1048576,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": 262144,
+      "bufferBatchBytes": 1048576,
+      "batchEligibilityThresholdBytes": 524288,
+      "destinationRoutingEnabled": false,
+      "usePrototypeExecutor": true,
+      "matchedControl": "Legacy_Baseline",
+      "validationRole": "Value"
+    },
+    {
+      "name": "Production_Fixed",
+      "notes": "Production runner (PipelineRunner) with promoted defaults pinned, routing off. Equivalence pair with Prototype.",
+      "enabled": true,
+      "desiredRunCount": 5,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": 1048576,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": 262144,
+      "bufferBatchBytes": 1048576,
+      "batchEligibilityThresholdBytes": 524288,
+      "destinationRoutingEnabled": false,
+      "usePrototypeExecutor": null,
+      "matchedControl": "Prototype",
+      "validationRole": "Equivalence",
+      "expectedEffectiveCopyBufferSizeBytes": 1048576,
+      "expectedEffectiveBatchBufferBytes": 1048576,
+      "expectedEffectiveBatchEligibilityCeilingBytes": 524288,
+      "expectedEffectiveTinyFileFastPathThresholdBytes": 262144,
+      "expectedEffectiveDestinationRoutingEnabled": false
+    },
+    {
+      "name": "Production_Routed",
+      "notes": "Production runner with promoted defaults (256 KiB direct, 1 MiB copy/batch, 512 KiB eligibility) and destination routing ON. Equivalence pair vs Production_Fixed; validation asserts the routed drive pair resolves to the same effective parameters.",
+      "enabled": true,
+      "desiredRunCount": 5,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": 1048576,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": 262144,
+      "bufferBatchBytes": 1048576,
+      "batchEligibilityThresholdBytes": 524288,
+      "destinationRoutingEnabled": true,
+      "usePrototypeExecutor": null,
+      "matchedControl": "Production_Fixed",
+      "validationRole": "Equivalence",
+      "expectedEffectiveCopyBufferSizeBytes": 1048576,
+      "expectedEffectiveBatchBufferBytes": 1048576,
+      "expectedEffectiveBatchEligibilityCeilingBytes": 524288,
+      "expectedEffectiveTinyFileFastPathThresholdBytes": 262144,
+      "expectedEffectiveDestinationRoutingEnabled": true
+    }
+  ],
+  "datasetPreparation": {
+    "sourcePath": "D:\\Games",
+    "destinationPath": "D:\\TestData\\SmokeDataset",
+    "organizeByBucket": true,
+    "poolCloneCount": 16,
+    "buckets": [
+      {
+        "name": "Sub16KiB",
+        "minimumFileSizeBytes": 16,
+        "maximumFileSizeBytes": 16384,
+        "targetTotalBytes": 25165824
+      },
+      {
+        "name": "Sub256KiB",
+        "minimumFileSizeBytes": 16385,
+        "maximumFileSizeBytes": 262144,
+        "targetTotalBytes": 125829120
+      },
+      {
+        "name": "Sub512KiB",
+        "minimumFileSizeBytes": 262145,
+        "maximumFileSizeBytes": 524288,
+        "targetTotalBytes": 503316480
+      },
+      {
+        "name": "Sub4MiB",
+        "minimumFileSizeBytes": 524289,
+        "maximumFileSizeBytes": 4194304,
+        "targetTotalBytes": 1572864000
+      },
+      {
+        "name": "Sub32MiB",
+        "minimumFileSizeBytes": 4194305,
+        "maximumFileSizeBytes": 33554432,
+        "targetTotalBytes": 3538944000
+      }
+    ]
+  },
+  "cooldownSeconds": 90,
+  "clearCacheBetweenRuns": false,
+  "ramMapPath": "D:\\Development\\Github\\SmartCopy2026\\Tools\\RAMMap\\RAMMap64.exe",
+  "sourcePools": {
+    "D:\\TestData\\SmokeDataset": [
+      "D:\\TestData\\SmokeDataset_13",
+      "D:\\TestData\\SmokeDataset_16",
+      "D:\\TestData\\SmokeDataset_7",
+      "D:\\TestData\\SmokeDataset_5",
+      "D:\\TestData\\SmokeDataset_10",
+      "D:\\TestData\\SmokeDataset_15",
+      "D:\\TestData\\SmokeDataset_4",
+      "D:\\TestData\\SmokeDataset_1",
+      "D:\\TestData\\SmokeDataset_12",
+      "D:\\TestData\\SmokeDataset_6",
+      "D:\\TestData\\SmokeDataset_3",
+      "D:\\TestData\\SmokeDataset_14",
+      "D:\\TestData\\SmokeDataset_8",
+      "D:\\TestData\\SmokeDataset_9",
+      "D:\\TestData\\SmokeDataset_11",
+      "D:\\TestData\\SmokeDataset_2"
+    ]
+  }
+}

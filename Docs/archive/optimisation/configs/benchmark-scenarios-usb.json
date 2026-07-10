@@ -1,0 +1,229 @@
+{
+  "sourcePath": "R:\\TestData\\MixedDataset",
+  "artifactPath": "C:\\benchmark-artifacts",
+  "includeHidden": false,
+  "convergenceSpreadPercent": 10,
+  "gatePercent": 5,
+  "maxConvergenceRuns": 5,
+  "converge": true,
+  "scenarios": [
+    {
+      "name": "SSD_O_to_USB_T_LFD",
+      "destinationPath": "T:\\TestData\\SSD_O_to_USB_T_LFD",
+      "sourcePath": "O:\\TestData\\LargeFileDataset",
+      "enabled": true,
+      "clearDestinationBeforeRun": true,
+      "clearDestinationAfterRun": true,
+      "overwriteMode": 1,
+      "providerCopyBufferSizeBytes": null,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": null,
+      "bufferBatchBytes": null,
+      "batchEligibilityThresholdBytes": null,
+      "usePathPool": true,
+      "variants": [
+        "BaselineAuto256KiB",
+        "ManualLoop512KiBArrayPool",
+        "ManualLoop1MiBArrayPool",
+        "ManualLoop4MiBArrayPool"
+      ]
+    },
+    {
+      "name": "SSD_O_to_USB_T_SFD",
+      "destinationPath": "T:\\TestData\\SSD_O_to_USB_T_SFD",
+      "sourcePath": "O:\\TestData\\SmallestFileDataset",
+      "enabled": true,
+      "clearDestinationBeforeRun": true,
+      "clearDestinationAfterRun": true,
+      "overwriteMode": 1,
+      "providerCopyBufferSizeBytes": null,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": null,
+      "bufferBatchBytes": null,
+      "batchEligibilityThresholdBytes": null,
+      "usePathPool": true,
+      "variants": [
+        "BaselineAuto256KiB",
+        "Batch256KiB",
+        "Batch1MiB",
+        "Batch2MiB"
+      ]
+    }
+  ],
+  "scenarioExecutionOrder": [],
+  "variants": [
+    {
+      "name": "BaselineAuto256KiB",
+      "notes": null,
+      "enabled": true,
+      "desiredRunCount": 3,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": 262144,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": 0,
+      "providerUseArrayPoolForManualLoop": null,
+      "providerPreallocateDestinationFile": null,
+      "directWriteThresholdBytes": null,
+      "bufferBatchBytes": null,
+      "batchEligibilityThresholdBytes": null,
+      "matchedControl": null
+    },
+    {
+      "name": "ManualLoop512KiBArrayPool",
+      "notes": null,
+      "enabled": true,
+      "desiredRunCount": 3,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": 524288,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": 1,
+      "providerUseArrayPoolForManualLoop": true,
+      "providerPreallocateDestinationFile": false,
+      "directWriteThresholdBytes": null,
+      "bufferBatchBytes": null,
+      "batchEligibilityThresholdBytes": null,
+      "matchedControl": "BaselineAuto256KiB"
+    },
+    {
+      "name": "ManualLoop1MiBArrayPool",
+      "notes": null,
+      "enabled": true,
+      "desiredRunCount": 3,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": 1048576,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": 1,
+      "providerUseArrayPoolForManualLoop": true,
+      "providerPreallocateDestinationFile": false,
+      "directWriteThresholdBytes": null,
+      "bufferBatchBytes": null,
+      "batchEligibilityThresholdBytes": null,
+      "matchedControl": "BaselineAuto256KiB"
+    },
+    {
+      "name": "ManualLoop4MiBArrayPool",
+      "notes": null,
+      "enabled": true,
+      "desiredRunCount": 3,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": 4194304,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": 1,
+      "providerUseArrayPoolForManualLoop": true,
+      "providerPreallocateDestinationFile": false,
+      "directWriteThresholdBytes": null,
+      "bufferBatchBytes": null,
+      "batchEligibilityThresholdBytes": null,
+      "matchedControl": "BaselineAuto256KiB"
+    },
+    {
+      "name": "Batch256KiB",
+      "notes": null,
+      "enabled": true,
+      "desiredRunCount": 3,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": 524288,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": 1,
+      "providerUseArrayPoolForManualLoop": true,
+      "providerPreallocateDestinationFile": false,
+      "directWriteThresholdBytes": 65536,
+      "bufferBatchBytes": 262144,
+      "batchEligibilityThresholdBytes": 524288,
+      "matchedControl": "BaselineAuto256KiB"
+    },
+    {
+      "name": "Batch1MiB",
+      "notes": null,
+      "enabled": true,
+      "desiredRunCount": 3,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": 524288,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": 1,
+      "providerUseArrayPoolForManualLoop": true,
+      "providerPreallocateDestinationFile": false,
+      "directWriteThresholdBytes": 65536,
+      "bufferBatchBytes": 1048576,
+      "batchEligibilityThresholdBytes": 524288,
+      "matchedControl": "BaselineAuto256KiB"
+    },
+    {
+      "name": "Batch2MiB",
+      "notes": null,
+      "enabled": true,
+      "desiredRunCount": 3,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": 524288,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": 1,
+      "providerUseArrayPoolForManualLoop": true,
+      "providerPreallocateDestinationFile": false,
+      "directWriteThresholdBytes": 65536,
+      "bufferBatchBytes": 2097152,
+      "batchEligibilityThresholdBytes": 524288,
+      "matchedControl": "BaselineAuto256KiB"
+    }
+  ],
+  "datasetPreparation": {
+    "sourcePath": "R:\\TestData\\MixedDataset",
+    "destinationPath": "O:\\TestData\\SmallestFileDataset",
+    "organizeByBucket": true,
+    "poolCloneCount": 4,
+    "buckets": [
+      {
+        "name": "Sub4KiB",
+        "minimumFileSizeBytes": 0,
+        "maximumFileSizeBytes": 4096,
+        "targetTotalBytes": 41943040
+      },
+      {
+        "name": "Sub16KiB",
+        "minimumFileSizeBytes": 4097,
+        "maximumFileSizeBytes": 16384,
+        "targetTotalBytes": 83886080
+      },
+      {
+        "name": "Sub64KiB",
+        "minimumFileSizeBytes": 16385,
+        "maximumFileSizeBytes": 65536,
+        "targetTotalBytes": 125829120
+      },
+      {
+        "name": "Sub256KiB",
+        "minimumFileSizeBytes": 65537,
+        "maximumFileSizeBytes": 262144,
+        "targetTotalBytes": 167772160
+      },
+      {
+        "name": "Sub512KiB",
+        "minimumFileSizeBytes": 262145,
+        "maximumFileSizeBytes": 524288,
+        "targetTotalBytes": 209715200
+      }
+    ]
+  },
+  "cooldownSeconds": 120,
+  "clearCacheBetweenRuns": true,
+  "ramMapPath": "D:\\Development\\Github\\SmartCopy2026\\Tools\\RAMMap\\RAMMap64.exe",
+  "sourcePools": {
+    "O:\\TestData\\LargeFileDataset": [
+      "O:\\TestData\\LargeFileDataset_4",
+      "O:\\TestData\\LargeFileDataset_3",
+      "O:\\TestData\\LargeFileDataset_2",
+      "O:\\TestData\\LargeFileDataset_1"
+    ],
+    "O:\\TestData\\SmallestFileDataset": [
+      "O:\\TestData\\SmallestFileDataset_4",
+      "O:\\TestData\\SmallestFileDataset_1",
+      "O:\\TestData\\SmallestFileDataset_3",
+      "O:\\TestData\\SmallestFileDataset_2"
+    ]
+  }
+}

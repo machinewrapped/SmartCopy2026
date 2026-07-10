@@ -1,0 +1,138 @@
+{
+  "sourcePath": "D:\\TestData\\MixedDatasetUsbFlash",
+  "artifactPath": "C:\\benchmark-artifacts",
+  "includeHidden": false,
+  "convergenceSpreadPercent": 10,
+  "gatePercent": 3,
+  "maxConvergenceRuns": 5,
+  "converge": true,
+  "scenarios": [
+    {
+      "name": "SSDtoUSBFlash",
+      "destinationPath": "T:\\TestData\\Matrix_SSDtoUSBFlash",
+      "sourcePath": null,
+      "enabled": true,
+      "clearDestinationBeforeRun": true,
+      "clearDestinationAfterRun": true,
+      "overwriteMode": 1,
+      "providerCopyBufferSizeBytes": null,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "directWriteThresholdBytes": null,
+      "bufferBatchBytes": null,
+      "batchEligibilityThresholdBytes": null,
+      "providerWriteSequentialScan": null,
+      "usePathPool": true,
+      "variants": null
+    }
+  ],
+  "scenarioExecutionOrder": [
+    "SSDtoUSBFlash"
+  ],
+  "variants": [
+    {
+      "name": "Legacy_Baseline",
+      "notes": "Production streaming path with the old 256 KiB auto default (no batch, no direct write, no routing). USB Flash closure control on the reduced MixedDatasetUsbFlash dataset.",
+      "enabled": true,
+      "desiredRunCount": 3,
+      "writeJournal": true,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": 262144,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "directWriteThresholdBytes": 0,
+      "bufferBatchBytes": 0,
+      "batchEligibilityThresholdBytes": null,
+      "destinationRoutingEnabled": false,
+      "providerWriteSequentialScan": null,
+      "usePrototypeExecutor": null,
+      "matchedControl": null,
+      "expectedEffectiveCopyBufferSizeBytes": null,
+      "expectedEffectiveBatchBufferBytes": null,
+      "expectedEffectiveBatchEligibilityCeilingBytes": null,
+      "expectedEffectiveTinyFileFastPathThresholdBytes": null,
+      "expectedEffectiveDestinationRoutingEnabled": null,
+      "validationRole": null
+    },
+    {
+      "name": "Production_Routed",
+      "notes": "Production runner with promoted defaults (256 KiB direct, 1 MiB batch, 512 KiB eligibility) and destination routing ON. USB Flash closure candidate on the reduced MixedDatasetUsbFlash dataset.",
+      "enabled": true,
+      "desiredRunCount": 3,
+      "writeJournal": true,
+      "overwriteMode": null,
+      "providerCopyBufferSizeBytes": null,
+      "providerSmallFileProgressThresholdBytes": null,
+      "providerWriteMode": null,
+      "providerUseArrayPoolForManualLoop": null,
+      "directWriteThresholdBytes": 262144,
+      "bufferBatchBytes": 1048576,
+      "batchEligibilityThresholdBytes": 524288,
+      "destinationRoutingEnabled": true,
+      "providerWriteSequentialScan": null,
+      "usePrototypeExecutor": null,
+      "matchedControl": "Legacy_Baseline",
+      "expectedEffectiveCopyBufferSizeBytes": null,
+      "expectedEffectiveBatchBufferBytes": null,
+      "expectedEffectiveBatchEligibilityCeilingBytes": null,
+      "expectedEffectiveTinyFileFastPathThresholdBytes": null,
+      "expectedEffectiveDestinationRoutingEnabled": null,
+      "validationRole": "Value"
+    }
+  ],
+  "datasetPreparation": {
+    "sourcePath": "D:\\Games",
+    "destinationPath": "D:\\TestData\\MixedDatasetUsbFlash",
+    "organizeByBucket": false,
+    "poolCloneCount": 8,
+    "buckets": [
+      {
+        "name": "Tiny",
+        "minimumFileSizeBytes": 16,
+        "maximumFileSizeBytes": 65536,
+        "targetTotalBytes": 26843546
+      },
+      {
+        "name": "Small",
+        "minimumFileSizeBytes": 65537,
+        "maximumFileSizeBytes": 524288,
+        "targetTotalBytes": 53687091
+      },
+      {
+        "name": "Medium",
+        "minimumFileSizeBytes": 524289,
+        "maximumFileSizeBytes": 4194304,
+        "targetTotalBytes": 214748365
+      },
+      {
+        "name": "Large",
+        "minimumFileSizeBytes": 4194305,
+        "maximumFileSizeBytes": 33554432,
+        "targetTotalBytes": 322122547
+      },
+      {
+        "name": "XLarge",
+        "minimumFileSizeBytes": 33554433,
+        "maximumFileSizeBytes": 268435456,
+        "targetTotalBytes": 671088640
+      }
+    ]
+  },
+  "cooldownSeconds": 120,
+  "clearCacheBetweenRuns": true,
+  "ramMapPath": "D:\\Development\\Github\\SmartCopy2026\\Tools\\RAMMap\\RAMMap64.exe",
+  "sourcePools": {
+    "D:\\TestData\\MixedDatasetUsbFlash": [
+      "D:\\TestData\\MixedDatasetUsbFlash_1",
+      "D:\\TestData\\MixedDatasetUsbFlash_2",
+      "D:\\TestData\\MixedDatasetUsbFlash_8",
+      "D:\\TestData\\MixedDatasetUsbFlash_5",
+      "D:\\TestData\\MixedDatasetUsbFlash_6",
+      "D:\\TestData\\MixedDatasetUsbFlash_4",
+      "D:\\TestData\\MixedDatasetUsbFlash_3",
+      "D:\\TestData\\MixedDatasetUsbFlash_7"
+    ]
+  }
+}
