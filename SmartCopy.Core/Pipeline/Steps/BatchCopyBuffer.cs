@@ -49,11 +49,11 @@ internal sealed partial class BatchCopyBuffer : IDisposable
         int initialEntryCapacity,
         int? maxEntriesPerFlush = null)
     {
-        if (capacityBytes <= 0 || capacityBytes > int.MaxValue)
+        if (capacityBytes <= 0 || capacityBytes > Array.MaxLength)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(capacityBytes),
-                "Batch buffer size must be between 1 and Int32.MaxValue bytes.");
+                $"Batch buffer size must be between 1 and {Array.MaxLength} bytes.");
         }
 
         var maxEntries = maxEntriesPerFlush ?? initialEntryCapacity;

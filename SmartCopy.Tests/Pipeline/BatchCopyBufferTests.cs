@@ -9,6 +9,22 @@ namespace SmartCopy.Tests.Pipeline;
 public sealed class BatchCopyBufferTests
 {
     [Fact]
+    public void Constructor_WhenCapacityExceedsArrayMaxLength_ThrowsBeforeRent()
+    {
+        var dataPool = new ThrowingDataPool();
+
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new BatchCopyBuffer(
+                (long)Array.MaxLength + 1,
+                dataPool,
+                ArrayPool<BatchCopyBuffer.Entry>.Shared,
+                initialEntryCapacity: 1));
+
+        Assert.Equal("capacityBytes", ex.ParamName);
+        Assert.False(dataPool.RentCalled);
+    }
+
+    [Fact]
     public void HasSpaceFor_ReflectsUsedBytes()
     {
         using var buf = new BatchCopyBuffer(100);
@@ -220,6 +236,21 @@ public sealed class BatchCopyBufferTests
             ReturnClearFlags.Add(clearArray);
             if (clearArray)
                 Array.Clear(array);
+        }
+    }
+
+    private sealed class ThrowingDataPool : ArrayPool<byte>
+    {
+        public bool RentCalled { get; private set; }
+
+        public override byte[] Rent(int minimumLength)
+        {
+            RentCalled = true;
+            throw new InvalidOperationException("Validation should reject before renting.");
+        }
+
+        public override void Return(byte[] array, bool clearArray = false)
+        {
         }
     }
 }
