@@ -6,7 +6,11 @@ public readonly record struct ProviderCapabilities(
     bool CanWatch,
     int MaxPathLength,
     bool CanTrash = false,
-    bool CanQueryFreeSpace = false)
+    bool CanQueryFreeSpace = false,
+    bool AllowBatchRead = true,
+    bool AllowBatchWrite = true,
+    long MaxBatchBufferBytes = 0,
+    bool AllowStagedWrite = true)
 {
     /// <summary>Full capabilities; used as a safe default before a source path is configured.</summary>
     public static ProviderCapabilities Full { get; } =

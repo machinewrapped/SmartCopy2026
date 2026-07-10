@@ -12,17 +12,16 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     private const string StagedFileSuffix = ".smartcopy.tmp.";
     private const string CompactStagedFilePrefix = ".smartcopy.staging.";
     private const int GuidNLength = 32;
+    private const int DefaultBufferSize = 256 * 1024;
 
     private readonly bool _isNetworkPath;
     private readonly ProviderCapabilities _capabilities;
-    private readonly LocalFileSystemProviderOptions _options;
+
     public LocalFileSystemProvider(
         string rootPath,
-        Func<string>? readLinuxMountInfo = null,
-        LocalFileSystemProviderOptions? options = null)
+        Func<string>? readLinuxMountInfo = null)
     {
         RootPath = NormalizePath(rootPath);
-        _options = (options ?? LocalFileSystemProviderOptions.Default).Normalize();
         _isNetworkPath = LocalPathNetworkClassifier.IsNetworkPath(RootPath, readLinuxMountInfo);
         _capabilities = new ProviderCapabilities(
             CanSeek: true,
@@ -119,17 +118,12 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         }, ct);
     }
 
-    public Task<Stream> OpenReadAsync(string path, CancellationToken ct)
+    public Task<Stream> OpenReadAsync(string path, int? bufferSize = null, CancellationToken ct = default)
     {
         return Task.Run<Stream>(() =>
         {
             ct.ThrowIfCancellationRequested();
             var fullPath = Resolve(path);
-
-            if (!File.Exists(fullPath))
-            {
-                throw new FileNotFoundException($"File does not exist: {fullPath}", fullPath);
-            }
 
             return new FileStream(
                 fullPath,
@@ -138,21 +132,94 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                     Mode = FileMode.Open,
                     Access = FileAccess.Read,
                     Share = FileShare.Read,
-                    BufferSize = _options.CopyBufferSizeBytes,
+                    BufferSize = bufferSize ?? DefaultBufferSize,
                     Options = FileOptions.Asynchronous | FileOptions.SequentialScan
                 });
         }, ct);
     }
 
-    public async Task WriteAsync(string path, Stream data, IProgress<long>? progress, CancellationToken ct)
+    public async Task WriteAsync(
+        string path,
+        Stream data,
+        IProgress<long>? progress,
+        OperationalSettings? settings,
+        CancellationToken ct) =>
+        await WriteAsync(path, data, progress, settings, directoryTracker: null, ct);
+
+    private async Task WriteAsync(
+        string path,
+        Stream data,
+        IProgress<long>? progress,
+        OperationalSettings? settings,
+        FreshDirectoryTracker? directoryTracker,
+        CancellationToken ct)
     {
+        var opts = settings ?? new OperationalSettings();
         var fullPath = Resolve(path);
         var directory = Path.GetDirectoryName(fullPath);
         if (!string.IsNullOrEmpty(directory))
         {
-            Directory.CreateDirectory(directory);
+            if (directoryTracker is null)
+            {
+                if (!Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+            }
+            else if (!directoryTracker.IsKnown(directory))
+            {
+                if (!Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                    directoryTracker.MarkCreated(directory);
+                }
+                else
+                {
+                    directoryTracker.MarkKnown(directory);
+                }
+            }
         }
 
+        long? remainingBytes = StreamCopyEngine.TryGetRemainingLength(data, out var knownRemainingBytes)
+            ? knownRemainingBytes
+            : null;
+
+        // Direct write (no staging): the strategy requests this for tiny files (where the write is
+        // effectively atomic anyway) and the provider must obey. A partial file is best-effort
+        // cleaned up on error.
+        if (opts.WriteDurability == WriteDurability.Direct)
+        {
+            var fileOpened = false;
+            try
+            {
+                await using (var output = new FileStream(
+                    fullPath,
+                    new FileStreamOptions
+                    {
+                        Mode = FileMode.Create,
+                        Access = FileAccess.Write,
+                        Share = FileShare.None,
+                        BufferSize = opts.CopyBufferSizeBytes,
+                        Options = FileOptions.Asynchronous
+                    }))
+                {
+                    fileOpened = true;
+                    await StreamCopyEngine.CopyAsync(data, output, remainingBytes, progress, opts, ct);
+                }
+            }
+            catch
+            {
+                if (fileOpened)
+                {
+                    TryDeleteStagedFile(fullPath);
+                }
+                throw;
+            }
+
+            return;
+        }
+
+        // Staged write (atomic rename) — the crash-safe default.
         var tempPath = string.Empty;
         var stagedOutsideDestinationDirectory = false;
         var committed = false;
@@ -160,50 +227,11 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         {
             await using (var output = CreateStagedWriteStream(
                 fullPath,
-                _options.CopyBufferSizeBytes,
+                opts.CopyBufferSizeBytes,
                 out tempPath,
                 out stagedOutsideDestinationDirectory))
             {
-                long? remainingBytes = TryGetRemainingLength(data, out var knownRemainingBytes)
-                    ? knownRemainingBytes
-                    : null;
-
-                if (remainingBytes is long bytesRemaining &&
-                    _options.PreallocateDestinationFile &&
-                    bytesRemaining > 0)
-                {
-                    output.SetLength(bytesRemaining);
-                }
-
-                var writeMode = DetermineWriteMode(progress, remainingBytes);
-
-                if (writeMode == LocalFileSystemWriteMode.CopyToAsync)
-                {
-                    // CopyToAsync mode: wraps the source in a ProgressReportingReadStream so the
-                    // framework's internal buffer loop reports progress without a manual loop here.
-                    await CopyViaCopyToAsync(data, output, progress, ct);
-                }
-                else if (writeMode == LocalFileSystemWriteMode.Auto &&
-                         remainingBytes is long autoBytesRemaining &&
-                         autoBytesRemaining <= _options.SmallFileProgressThresholdBytes)
-                {
-                    // Small-file optimisation: for files whose full size fits in memory we know
-                    // exactly how many bytes will be written, so we let the framework copy without
-                    // overhead and report progress in one shot at the end instead of per-chunk.
-                    await data.CopyToAsync(output, _options.CopyBufferSizeBytes, ct);
-                    if (progress is not null && autoBytesRemaining > 0)
-                    {
-                        progress.Report(autoBytesRemaining);
-                    }
-                }
-                else
-                {
-                    // Large files and unknown-length streams: manual loop reports progress per chunk,
-                    // which keeps UI responsive during long transfers without adding a stream wrapper.
-                    await CopyWithManualLoopAsync(data, output, progress, ct);
-                }
-
-                await output.FlushAsync(ct);
+                await StreamCopyEngine.CopyAsync(data, output, remainingBytes, progress, opts, ct);
             }
 
             CommitStagedWrite(tempPath, fullPath, stagedOutsideDestinationDirectory);
@@ -216,95 +244,6 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                 TryDeleteStagedFile(tempPath);
             }
         }
-    }
-
-    // Write strategy — private helpers for WriteAsync above.
-
-    private LocalFileSystemWriteMode DetermineWriteMode(IProgress<long>? progress, long? remainingBytes)
-    {
-        if (_options.WriteMode != LocalFileSystemWriteMode.Auto)
-            return _options.WriteMode;
-        // No progress handler: CopyToAsync with no wrapper is the fastest path.
-        if (progress is null)
-            return LocalFileSystemWriteMode.CopyToAsync;
-        // Unknown length: can't apply the small-file optimisation, go straight to manual loop.
-        if (remainingBytes is null)
-            return LocalFileSystemWriteMode.ManualLoop;
-        // Known length with progress: WriteAsync resolves the heuristic inline.
-        return LocalFileSystemWriteMode.Auto;
-    }
-
-    private async Task CopyViaCopyToAsync(
-        Stream data,
-        Stream output,
-        IProgress<long>? progress,
-        CancellationToken ct)
-    {
-        Stream source = data;
-        if (progress is not null)
-        {
-            source = new ProgressReportingReadStream(data, progress);
-        }
-
-        await source.CopyToAsync(output, _options.CopyBufferSizeBytes, ct);
-    }
-
-    private async Task CopyWithManualLoopAsync(
-        Stream data,
-        Stream output,
-        IProgress<long>? progress,
-        CancellationToken ct)
-    {
-        if (_options.UseArrayPoolForManualLoop)
-        {
-            var rentedBuffer = System.Buffers.ArrayPool<byte>.Shared.Rent(_options.CopyBufferSizeBytes);
-            try
-            {
-                await CopyWithManualLoopCoreAsync(data, output, rentedBuffer, progress, ct);
-            }
-            finally
-            {
-                System.Buffers.ArrayPool<byte>.Shared.Return(rentedBuffer);
-            }
-
-            return;
-        }
-
-        var buffer = new byte[_options.CopyBufferSizeBytes];
-        await CopyWithManualLoopCoreAsync(data, output, buffer, progress, ct);
-    }
-
-    private static async Task CopyWithManualLoopCoreAsync(
-        Stream data,
-        Stream output,
-        byte[] buffer,
-        IProgress<long>? progress,
-        CancellationToken ct)
-    {
-        while (true)
-        {
-            ct.ThrowIfCancellationRequested();
-            var read = await data.ReadAsync(buffer.AsMemory(0, buffer.Length), ct);
-            if (read == 0)
-            {
-                break;
-            }
-
-            await output.WriteAsync(buffer.AsMemory(0, read), ct);
-            progress?.Report(read);
-        }
-    }
-
-    private static bool TryGetRemainingLength(Stream data, out long remainingBytes)
-    {
-        if (!data.CanSeek)
-        {
-            remainingBytes = 0;
-            return false;
-        }
-
-        remainingBytes = Math.Max(0, data.Length - data.Position);
-        return true;
     }
 
     private static string BuildStagedWritePath(string destinationPath)
@@ -343,51 +282,81 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         out string stagedPath,
         out bool stagedOutsideDestinationDirectory)
     {
-        var candidates = new[]
-        {
-            BuildStagedWritePath(destinationPath),
-            BuildCompactStagedWritePath(destinationPath),
-            BuildSystemTempStagedWritePath(),
-        };
-
         Exception? lastException = null;
-        foreach (var candidate in candidates)
-        {
-            try
-            {
-                var stream = new FileStream(
-                    candidate,
-                    new FileStreamOptions
-                    {
-                        Mode = FileMode.CreateNew,
-                        Access = FileAccess.Write,
-                        Share = FileShare.None,
-                        BufferSize = bufferSizeBytes,
-                        Options = FileOptions.Asynchronous | FileOptions.SequentialScan
-                    });
 
-                stagedPath = candidate;
-                stagedOutsideDestinationDirectory = !AreSameDirectory(candidate, destinationPath);
-                return stream;
-            }
-            catch (PathTooLongException ex)
-            {
-                lastException = ex;
-            }
-            catch (DirectoryNotFoundException ex)
-            {
-                lastException = ex;
-            }
-            catch (IOException ex)
-            {
-                // CreateNew may race on name collisions; long paths may also surface as IO exceptions.
-                lastException = ex;
-            }
+        var candidate = BuildStagedWritePath(destinationPath);
+        if (TryCreateStagedWriteStream(candidate, bufferSizeBytes, out var stream, out lastException))
+        {
+            stagedPath = candidate;
+            stagedOutsideDestinationDirectory = false;
+            return stream;
         }
 
+        candidate = BuildCompactStagedWritePath(destinationPath);
+        if (TryCreateStagedWriteStream(candidate, bufferSizeBytes, out stream, out var compactException))
+        {
+            stagedPath = candidate;
+            stagedOutsideDestinationDirectory = false;
+            return stream;
+        }
+
+        lastException = compactException ?? lastException;
+
+        candidate = BuildSystemTempStagedWritePath();
+        if (TryCreateStagedWriteStream(candidate, bufferSizeBytes, out stream, out var tempException))
+        {
+            stagedPath = candidate;
+            stagedOutsideDestinationDirectory = true;
+            return stream;
+        }
+
+        lastException = tempException ?? lastException;
         throw new IOException(
             $"Unable to create a staged file for destination '{destinationPath}'.",
             lastException);
+    }
+
+    private static bool TryCreateStagedWriteStream(
+        string candidate,
+        int bufferSizeBytes,
+        out FileStream stream,
+        out Exception? exception)
+    {
+        try
+        {
+            stream = new FileStream(
+                candidate,
+                new FileStreamOptions
+                {
+                    Mode = FileMode.CreateNew,
+                    Access = FileAccess.Write,
+                    Share = FileShare.None,
+                    BufferSize = bufferSizeBytes,
+                    Options = FileOptions.Asynchronous
+                });
+
+            exception = null;
+            return true;
+        }
+        catch (PathTooLongException ex)
+        {
+            stream = null!;
+            exception = ex;
+            return false;
+        }
+        catch (DirectoryNotFoundException ex)
+        {
+            stream = null!;
+            exception = ex;
+            return false;
+        }
+        catch (IOException ex)
+        {
+            // CreateNew may race on name collisions; long paths may also surface as IO exceptions.
+            stream = null!;
+            exception = ex;
+            return false;
+        }
     }
 
     private static void CommitStagedWrite(string stagedPath, string destinationPath, bool stagedOutsideDestinationDirectory)
@@ -402,16 +371,6 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
             File.Copy(stagedPath, destinationPath, overwrite: true);
             File.Delete(stagedPath);
         }
-    }
-
-    private static bool AreSameDirectory(string pathA, string pathB)
-    {
-        var dirA = Path.GetDirectoryName(pathA) ?? string.Empty;
-        var dirB = Path.GetDirectoryName(pathB) ?? string.Empty;
-        var comparison = OperatingSystem.IsWindows()
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal;
-        return string.Equals(NormalizePath(dirA), NormalizePath(dirB), comparison);
     }
 
     private static void TryDeleteStagedFile(string stagedPath)
@@ -502,14 +461,45 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         }, ct);
     }
 
-    public Task<bool> ExistsAsync(string path, CancellationToken ct)
+    public Task<bool> ExistsAsync(string path, CancellationToken ct) =>
+        ExistsAsync(path, directoryTracker: null, ct);
+
+    private Task<bool> ExistsAsync(string path, FreshDirectoryTracker? directoryTracker, CancellationToken ct)
     {
         return Task.Run(() =>
         {
             ct.ThrowIfCancellationRequested();
             var fullPath = Resolve(path);
+            // A directory we just created is empty by definition, so nothing inside it exists yet.
+            if (directoryTracker is not null &&
+                directoryTracker.IsFreshlyCreated(Path.GetDirectoryName(fullPath)))
+            {
+                return false;
+            }
+
             return File.Exists(fullPath) || Directory.Exists(fullPath);
         }, ct);
+    }
+
+    public IBulkWriteSession BeginBulkWrite() => new BulkWriteSession(this);
+
+    private sealed class BulkWriteSession(LocalFileSystemProvider owner) : IBulkWriteSession
+    {
+        // Ordinal matches the historical behaviour of the inline directory cache this replaced.
+        private readonly FreshDirectoryTracker _directoryTracker = new(StringComparison.Ordinal);
+
+        public Task WriteAsync(
+            string path,
+            Stream data,
+            IProgress<long>? progress,
+            OperationalSettings? settings,
+            CancellationToken ct) =>
+            owner.WriteAsync(path, data, progress, settings, _directoryTracker, ct);
+
+        public Task<bool> ExistsAsync(string path, CancellationToken ct) =>
+            owner.ExistsAsync(path, _directoryTracker, ct);
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     public Task<long?> GetAvailableFreeSpaceAsync(CancellationToken ct)

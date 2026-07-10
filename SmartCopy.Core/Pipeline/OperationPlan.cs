@@ -20,6 +20,12 @@ public sealed class OperationPlan
     public IReadOnlyList<string> Warnings { get; init; } = [];
     public IReadOnlyList<string> InfoMessages { get; init; } = [];
     public IReadOnlyList<string> Errors { get; init; } = [];
+    /// <summary>Per-step copy/move transfer-strategy summaries, shown in the preview so the
+    /// resolved policy decision is visible without running the operation.</summary>
+    public IReadOnlyList<string> StrategyNotes { get; init; } = [];
+    /// <summary>Plan-wide copy-optimisations status (routing on/off), shown alongside
+    /// <see cref="StrategyNotes"/>. Empty when the plan has no byte-transfer steps.</summary>
+    public string StrategyStatus { get; init; } = "";
     public int TotalFilesAffected   => Actions.Sum(a => a.NumberOfFilesAffected);
     public int TotalFoldersAffected => Actions.Sum(a => a.NumberOfFoldersAffected);
     public int TotalFilesSkipped    => Actions.Sum(a => a.NumberOfFilesSkipped);

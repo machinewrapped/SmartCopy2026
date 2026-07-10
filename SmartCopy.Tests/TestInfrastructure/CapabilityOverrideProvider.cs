@@ -6,17 +6,22 @@ namespace SmartCopy.Tests.TestInfrastructure;
 /// Wraps an <see cref="IFileSystemProvider"/> and overrides <see cref="Capabilities"/>
 /// to exercise capability-gated code paths in tests without a real cross-volume setup.
 /// </summary>
-internal sealed class CapabilityOverrideProvider(IFileSystemProvider inner, ProviderCapabilities capabilities) : IFileSystemProvider
+internal sealed class CapabilityOverrideProvider(
+    IFileSystemProvider inner,
+    ProviderCapabilities capabilities,
+    DriveClassification? classification = null,
+    string? volumeId = null) : IFileSystemProvider
 {
     public ProviderCapabilities Capabilities => capabilities;
-    
-    public ValueTask<DriveClassification> GetClassificationAsync(CancellationToken ct = default) => inner.GetClassificationAsync(ct);
+
+    public ValueTask<DriveClassification> GetClassificationAsync(CancellationToken ct = default) =>
+        classification is { } c ? ValueTask.FromResult(c) : inner.GetClassificationAsync(ct);
     
     public StringComparer PathComparer => inner.PathComparer;
     
     public StringComparison PathComparison => inner.PathComparison;
     
-    public string? VolumeId => inner.VolumeId;
+    public string? VolumeId => volumeId ?? inner.VolumeId;
     
     public string RootPath => inner.RootPath;
 
@@ -26,12 +31,10 @@ internal sealed class CapabilityOverrideProvider(IFileSystemProvider inner, Prov
     public Task<FileSystemNode> GetNodeAsync(string path, CancellationToken ct) =>
         inner.GetNodeAsync(path, ct);
         
-    public Task<Stream> OpenReadAsync(string path, CancellationToken ct) =>
-        inner.OpenReadAsync(path, ct);
-        
-    public Task WriteAsync(string path, Stream data, IProgress<long>? progress, CancellationToken ct) =>
-        inner.WriteAsync(path, data, progress, ct);
-        
+    public Task<Stream> OpenReadAsync(string path, int? bufferSize = null, CancellationToken ct = default) =>
+        inner.OpenReadAsync(path, bufferSize, ct);
+    public Task WriteAsync(string path, Stream data, IProgress<long>? progress, OperationalSettings? settings, CancellationToken ct) =>
+        inner.WriteAsync(path, data, progress, settings, ct);
     public Task DeleteAsync(string path, CancellationToken ct) =>
         inner.DeleteAsync(path, ct);
         
@@ -43,6 +46,9 @@ internal sealed class CapabilityOverrideProvider(IFileSystemProvider inner, Prov
         
     public Task<bool> ExistsAsync(string path, CancellationToken ct) =>
         inner.ExistsAsync(path, ct);
+
+    public IBulkWriteSession BeginBulkWrite() =>
+        inner.BeginBulkWrite();
         
     public string GetRelativePath(string basePath, string fullPath) =>
         inner.GetRelativePath(basePath, fullPath);

@@ -48,7 +48,7 @@ public interface IFileSystemProvider
     /// <summary>
     /// Opens a readable stream for the file at <paramref name="path"/>.
     /// </summary>
-    Task<Stream> OpenReadAsync(string path, CancellationToken ct);
+    Task<Stream> OpenReadAsync(string path, int? bufferSize = null, CancellationToken ct = default);
 
     /// <summary>
     /// Writes <paramref name="data"/> to <paramref name="path"/>.
@@ -57,7 +57,7 @@ public interface IFileSystemProvider
     /// interrupted. When transactional commit is unavailable, implementations should
     /// still best-effort clean up partial output before returning an error.
     /// </summary>
-    Task WriteAsync(string path, Stream data, IProgress<long>? progress, CancellationToken ct);
+    Task WriteAsync(string path, Stream data, IProgress<long>? progress, OperationalSettings? settings, CancellationToken ct);
 
     /// <summary>
     /// Deletes a file or directory at <paramref name="path"/>.
@@ -106,6 +106,13 @@ public interface IFileSystemProvider
         var segments = SplitPath(path);
         return segments.LastOrDefault(s => !string.IsNullOrEmpty(s)) ?? string.Empty;
     }
+
+    /// <summary>
+    /// Opens a bulk-write scope that spans a multi-file operation. Dispose when done.
+    /// Providers may use this to reset write-optimisation caches or establish
+    /// protocol-level bulk-transfer sessions (e.g. MTP). Default: no-op.
+    /// </summary>
+    IBulkWriteSession BeginBulkWrite() => new ProviderBulkWriteSession(this);
 
     /// <summary>
     /// Returns the available free bytes on the volume hosting this provider,

@@ -2,11 +2,21 @@ using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
-using SmartCopy.Core.Progress;
 using SmartCopy.Core.Pipeline.Validation;
 
 namespace SmartCopy.Core.Pipeline.Steps;
 
+/// <summary>
+/// Executable pipeline step that copies the selected files into a destination tree, preserving
+/// each node's (possibly transformed) relative path.
+/// <para>
+/// The step itself owns only <em>orchestration</em>: it resolves the destination provider, opens a
+/// bulk-write scope, and enumerates the selection. The actual byte transfer — buffer sizing,
+/// batching, progress, IO-error handling — is delegated to an <see cref="Strategy.ICopyStrategy"/>
+/// chosen per source→destination pair by the policy on <see cref="IStepContext"/>. This keeps the
+/// transfer mechanics shared with <see cref="MoveStep"/>'s copy-then-delete fallback.
+/// </para>
+/// </summary>
 public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpaceCheck
 {
     public StepKind StepType => StepKind.Copy;
@@ -18,14 +28,17 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
         OverwriteMode = overwriteMode;
     }
 
+    /// <summary>How to treat a file that already exists at the destination (Skip / Overwrite).</summary>
     public OverwriteMode OverwriteMode { get; set; }
 
+    /// <summary>Rebuilds a step from its serialized config (workflow presets, .sc2 pipelines).</summary>
     internal static CopyStep FromConfig(TransformStepConfig config) =>
         new(config.GetRequired("destinationPath"),
             config.ParseEnum("overwriteMode", OverwriteMode.Skip));
 
-    public TransformStepConfig Config => new(StepType, new JsonObject 
-    { 
+    /// <summary>Serializes this step's destination and overwrite mode for persistence.</summary>
+    public TransformStepConfig Config => new(StepType, new JsonObject
+    {
         ["destinationPath"] = DestinationPath,
         ["overwriteMode"] = OverwriteMode.ToString()
     });
@@ -34,14 +47,21 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
     public string Description => HasDestinationPath ? $"Copy to {DestinationPath} ({OverwriteMode})" : "Destination required";
 
     private string? _destinationPath;
-    public string? DestinationPath 
-    { 
-        get => _destinationPath; 
-        set => _destinationPath = value; 
+
+    /// <summary>Root path of the destination tree; files land at <c>DestinationPath + relativeSegments</c>.</summary>
+    public string? DestinationPath
+    {
+        get => _destinationPath;
+        set => _destinationPath = value;
     }
 
     public bool HasDestinationPath => !string.IsNullOrWhiteSpace(DestinationPath);
 
+    /// <summary>
+    /// Pre-execution free-space check (drives the amber warning on the step card). Returns null when
+    /// there is nothing to validate — no bytes selected, no destination, an unresolvable provider, or
+    /// a provider that cannot report free space — so the caller treats it as "no warning".
+    /// </summary>
     public FreeSpaceValidationResult? ValidateFreeSpace(
         long bytesNeeded,
         IFileSystemProvider source,
@@ -54,12 +74,17 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
         var target = registry.ResolveProvider(DestinationPath);
         if (target is null) return null;
 
+        // Free space is cached per provider so repeated validations during editing stay cheap.
         var cachedFreeSpace = freeSpaceCache.GetForProvider(target);
         if (cachedFreeSpace is null) return null;
 
         return new FreeSpaceValidationResult(bytesNeeded, cachedFreeSpace.Value, target.RootPath);
     }
 
+    /// <summary>
+    /// Static validation run before execution: a copy needs at least one selected input and a
+    /// destination path. Also surfaces the free-space warning. Does no I/O beyond the cached check.
+    /// </summary>
     public Task Validate(StepValidationContext context, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -73,6 +98,11 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Produces the planned actions for the preview pane without touching any bytes. Mirrors the
+    /// per-file decisions <see cref="ApplyAsync"/> will make (skip vs create vs overwrite) so the user
+    /// sees an accurate plan before confirming a destructive run.
+    /// </summary>
     public async IAsyncEnumerable<TransformResult> PreviewAsync(
         IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
@@ -86,6 +116,7 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
             ct.ThrowIfCancellationRequested();
             if (context.IsNodeFailed(node)) continue;
 
+            // Directories are structure, not bytes — report a no-op so the tree renders but nothing copies.
             if (node is DirectoryNode)
             {
                 yield return new TransformResult(
@@ -95,12 +126,15 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
                 continue;
             }
 
+            // Resolve the provider per node: PathSegments may have been rewritten by earlier steps
+            // (flatten/rename), so the destination depends on the node's current context, not the source.
             var nodeCtx = context.GetNodeContext(node);
             var targetProvider = nodeCtx.ResolveProvider(DestinationPath)
                 ?? throw new InvalidOperationException($"No IFileSystemProvider for path {DestinationPath}");
 
             var destination = targetProvider.JoinPath(DestinationPath, nodeCtx.PathSegments);
 
+            // A pre-existing destination under Skip means the file is left untouched — preview it as skipped.
             var destinationExists = await targetProvider.ExistsAsync(destination, ct);
             if (destinationExists && OverwriteMode == OverwriteMode.Skip)
             {
@@ -114,6 +148,8 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
                 continue;
             }
 
+            // Otherwise the file will be written; flag whether that overwrites existing data so the
+            // preview can highlight destructive actions.
             var destResult = destinationExists
                 ? DestinationResult.Overwritten
                 : DestinationResult.Created;
@@ -130,6 +166,10 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
         }
     }
 
+    /// <summary>
+    /// Executes the copy. Resolves the destination provider and copy strategy once, then streams the
+    /// whole selection through the strategy, relaying one <see cref="TransformResult"/> per file.
+    /// </summary>
     public async IAsyncEnumerable<TransformResult> ApplyAsync(
         IStepContext context, [EnumeratorCancellation] CancellationToken ct)
     {
@@ -138,77 +178,22 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
             throw new InvalidOperationException("DestinationPath must be set for CopyStep.");
         }
 
-        foreach (var node in context.RootNode.GetSelectedDescendants())
+        // Every selected file shares one destination provider, resolved from the root.
+        var targetProvider = context.GetNodeContext(context.RootNode).ResolveProvider(DestinationPath)
+            ?? throw new InvalidOperationException("TargetProvider must be set for CopyStep.");
+
+        // Bulk-write scope lets providers establish protocol-level transfer sessions (e.g. MTP).
+        await using var targetSession = targetProvider.BeginBulkWrite();
+
+        // The policy resolves buffer size + batching from the source/destination drive pair and
+        // returns the strategy that performs the byte transfer. Copy keeps no transfer logic of
+        // its own — it just labels the outcome (Copied) and forwards the strategy's results.
+        var strategy = await context.ResolveCopyStrategyAsync(targetProvider, ct);
+
+        await foreach (var result in strategy.CopySelectionAsync(
+            context, targetProvider, targetSession, DestinationPath, OverwriteMode, SourceResult.Copied, ct))
         {
-            ct.ThrowIfCancellationRequested();
-            if (context.IsNodeFailed(node)) continue;
-
-            if (node.IsDirectory)
-            {
-                yield return new TransformResult(
-                    IsSuccess: true,
-                    SourceNode: node,
-                    SourceNodeResult: SourceResult.None);
-                continue;
-            }
-
-            var nodeCtx = context.GetNodeContext(node);
-            var targetProvider = nodeCtx.ResolveProvider(DestinationPath)
-                ?? throw new InvalidOperationException("TargetProvider must be set for CopyStep.");
-
-            var destination = targetProvider.JoinPath(DestinationPath, nodeCtx.PathSegments);
-            var destinationExists = await targetProvider.ExistsAsync(destination, ct);
-
-            if (destinationExists && OverwriteMode == OverwriteMode.Skip)
-            {
-                yield return new TransformResult(
-                    IsSuccess: true,
-                    SourceNode: node,
-                    SourceNodeResult: SourceResult.Skipped,
-                    DestinationPath: destination,
-                    NumberOfFilesSkipped: 1,
-                    InputBytes: node.Size);
-                continue;
-            }
-
-            string? copyError = null;
-            try
-            {
-                IProgress<long>? writeProgress = null;
-                if (context is IFileTransferProgressSink progressSink)
-                {
-                    writeProgress = new DelegateProgress<long>(
-                        bytes => progressSink.ReportFileTransferBytes(node, bytes, node.Size));
-                }
-
-                await using var sourceStream = await context.SourceProvider.OpenReadAsync(node.FullPath, ct);
-                await targetProvider.WriteAsync(destination, sourceStream, writeProgress, ct);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                copyError = ex.Message;
-            }
-
-            if (copyError is not null)
-            {
-                context.MarkFailed(node);
-                yield return new TransformResult(
-                    IsSuccess: false,
-                    SourceNode: node,
-                    SourceNodeResult: SourceResult.Skipped,
-                    ErrorMessage: copyError);
-                continue;
-            }
-
-            yield return new TransformResult(
-                IsSuccess: true,
-                SourceNode: node,
-                SourceNodeResult: SourceResult.Copied,
-                DestinationPath: destination,
-                DestinationResult: destinationExists ? DestinationResult.Overwritten : DestinationResult.Created,
-                NumberOfFilesAffected: 1,
-                InputBytes: node.Size,
-                OutputBytes: node.Size);
+            yield return result;
         }
     }
 }
