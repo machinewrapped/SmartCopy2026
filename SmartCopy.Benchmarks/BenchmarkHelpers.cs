@@ -91,6 +91,10 @@ internal static class BenchmarkHelpers
 
     public static bool IsSameOrNestedPath(string parentPath, string childPath)
     {
+        // Assumes case-insensitive (Windows) path semantics. On a case-sensitive filesystem this
+        // may treat paths that differ only in case as nested; the only effects are rejecting a run
+        // (in ValidatePaths) or relocating artifacts (in ResolveArtifactDirectory), never a wrong
+        // overwrite.
         var normalizedParent = EnsureTrailingSeparator(Path.GetFullPath(parentPath));
         var normalizedChild = EnsureTrailingSeparator(Path.GetFullPath(childPath));
         return normalizedChild.StartsWith(normalizedParent, StringComparison.OrdinalIgnoreCase);
@@ -152,34 +156,6 @@ internal static class BenchmarkHelpers
         }
 
         Directory.Delete(fullDestinationPath, recursive: true);
-    }
-
-    public static void ClearOsFileCache(string? ramMapPath)
-    {
-        if (string.IsNullOrWhiteSpace(ramMapPath) || !File.Exists(ramMapPath))
-            return;
-
-        UpdateProgress("");
-        Console.WriteLine("Clearing OS file cache via RAMMap...");
-
-        var psi = new ProcessStartInfo
-        {
-            FileName = ramMapPath,
-            Arguments = "-Ew -Es -Em -E0 -AcceptEula",
-            UseShellExecute = true,
-            Verb = "runas"
-        };
-
-        try
-        {
-            using var process = Process.Start(psi);
-            process?.WaitForExit();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine();
-            Console.Error.WriteLine($"Warning: Failed to invoke RAMMap to clear file cache: {ex.Message}");
-        }
     }
 
     public static async Task<List<T>> ReadExistingRunsAsync<T>(string resultsPath, CancellationToken ct)

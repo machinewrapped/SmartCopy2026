@@ -20,21 +20,8 @@ dotnet run --project .\SmartCopy.Benchmarks --config <path-to-scenario.json> --m
 All modes require an explicit `--config <path>` argument. Prepare a configuration
 for the machine, dataset fixtures, and workload being measured.
 
-## OS File Cache / RAMMap Configuration
+## OS File Cache Boundaries
 
-To accurately measure I/O performance, the benchmark requires a cold OS file cache between scenarios (and optionally between variants). By default, the console will pause and ask you to reboot.
-
-To automate this, you can configure the suite to use Sysinternals [RAMMap](https://learn.microsoft.com/en-us/sysinternals/downloads/rammap) to instantly flush the standby list.
-
-**Configuration (`BenchmarkConfig.json`):**
-```json
-{
-  "clearCacheBetweenRuns": true,
-  "ramMapPath": "D:\\Tools\\RAMMap\\RAMMap64.exe"
-}
-```
-
-**Running with RAMMap:**
-RAMMap requires **Administrator privileges** to clear the standby list. You must run the `dotnet run` benchmark command from an **elevated (Administrator) command prompt or PowerShell instance**.
-
-If you run from a standard non-elevated terminal, Windows UAC will intercept the RAMMap execution and prompt you to click "Yes" every single time the cache is cleared, pausing your automated benchmark!
+To accurately measure I/O performance, the benchmark requires a cold OS file
+cache when crossing path-pool boundaries. The console pauses at those boundaries
+and asks you to reboot before continuing.

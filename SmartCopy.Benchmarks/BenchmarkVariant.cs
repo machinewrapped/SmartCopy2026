@@ -82,11 +82,11 @@ internal sealed class BenchmarkVariant
     public OperationalSettings CreateProductionOperationalSettings(BenchmarkScenario scenario)
     {
         var defaults = new OperationalSettings();
-        var batchBufferBytes = BufferBatchBytes ?? scenario.BufferBatchBytes ?? 0L;
+        var batchBufferBytes = BufferBatchBytes ?? scenario.BufferBatchBytes ?? defaults.BatchBufferBytes;
         var batchEligibilityCeilingBytes = BatchEligibilityThresholdBytes ?? scenario.BatchEligibilityThresholdBytes ?? defaults.BatchEligibilityCeilingBytes;
         var batchOrderByFileSize = BatchOrderByFileSize ?? scenario.BatchOrderByFileSize ?? defaults.BatchOrderByFileSize;
-        var tinyFileFastPathThresholdBytes = DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes ?? 0L;
-        var destinationRoutingEnabled = DestinationRoutingEnabled ?? false;
+        var tinyFileFastPathThresholdBytes = DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes ?? defaults.TinyFileFastPathThresholdBytes;
+        var destinationRoutingEnabled = DestinationRoutingEnabled ?? defaults.DestinationRoutingEnabled;
 
         return new OperationalSettings
         {

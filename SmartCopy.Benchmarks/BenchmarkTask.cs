@@ -98,16 +98,11 @@ internal sealed class BenchmarkTask
 
         Console.WriteLine();
         Console.WriteLine($"--- Cold cache boundary before {_scenario.Name} ---");
-
-        if (!string.IsNullOrWhiteSpace(_config.RamMapPath) && File.Exists(_config.RamMapPath))
+        Console.WriteLine(_scenario.UsePathPool
+            ? "Returning to path-pool runs. Reboot to clear the OS file cache, then run again..."
+            : "Switching to a non-pool run. Reboot to clear the OS file cache, then run again...");
+        if (!Console.IsInputRedirected)
         {
-            BenchmarkHelpers.ClearOsFileCache(_config.RamMapPath);
-        }
-        else
-        {
-            Console.WriteLine(_scenario.UsePathPool
-                ? "Returning to path-pool runs. Reboot to clear the OS file cache, then run again..."
-                : "Switching to a non-pool run. Reboot to clear the OS file cache, then run again...");
             Console.ReadKey(intercept: true);
         }
         Console.WriteLine();
@@ -344,9 +339,7 @@ internal sealed class BenchmarkTask
         var writeSequentialScan = _variant.ProviderWriteSequentialScan ?? _scenario.ProviderWriteSequentialScan ?? false;
 
         ICopyExecutor executor = useProductionExecutor
-            ? new ProductionCopyExecutor(
-                _destinationPath, overwriteMode,
-                providerOptions, _sourceProvider!, resolvedDestinationProvider)
+            ? new ProductionCopyExecutor(_destinationPath, overwriteMode)
             : new PrototypeCopyExecutor(
                 _destinationPath, overwriteMode,
                 directWriteThresholdBytes, bufferBatchBytes, batchEligibilityThresholdBytes,

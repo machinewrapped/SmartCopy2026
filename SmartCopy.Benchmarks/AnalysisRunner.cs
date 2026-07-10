@@ -16,27 +16,14 @@ internal static class AnalysisRunner
         var resultsPath = Path.Combine(artifactDirectory, fileNames.Results);
         var fileResultsPath = Path.Combine(artifactDirectory, fileNames.FileResults);
         var analysisPath = Path.Combine(artifactDirectory, fileNames.Analysis);
-        var reportBuilder = new StringBuilder();
-
-        void Report(string? line = null)
-        {
-            var text = line ?? string.Empty;
-            Console.WriteLine(text);
-            reportBuilder.AppendLine(text);
-        }
-
-        async Task FlushReportAsync()
-        {
-            Directory.CreateDirectory(artifactDirectory);
-            await File.WriteAllTextAsync(analysisPath, reportBuilder.ToString(), ct);
-        }
+        var report = new AnalysisReport();
 
         if (!File.Exists(fileResultsPath) && !File.Exists(resultsPath))
         {
-            Report($"No benchmark results found: {resultsPath}");
-            Report($"No file-level results found: {fileResultsPath}");
-            Report("Run benchmark mode first to produce benchmark-results.ndjson and benchmark-file-results.ndjson.");
-            await FlushReportAsync();
+            report.Write($"No benchmark results found: {resultsPath}");
+            report.Write($"No file-level results found: {fileResultsPath}");
+            report.Write("Run benchmark mode first to produce benchmark-results.ndjson and benchmark-file-results.ndjson.");
+            await report.FlushAsync(artifactDirectory, analysisPath, ct);
             return;
         }
 
@@ -49,8 +36,8 @@ internal static class AnalysisRunner
 
         if (allRuns.Count == 0 && allRecords.Count == 0)
         {
-            Report("No benchmark records available.");
-            await FlushReportAsync();
+            report.Write("No benchmark records available.");
+            await report.FlushAsync(artifactDirectory, analysisPath, ct);
             return;
         }
 
@@ -90,14 +77,14 @@ internal static class AnalysisRunner
         if (filteredRecords.Count == 0 && filteredRuns.Count == 0)
         {
             if (!string.IsNullOrWhiteSpace(selection.ScenarioName))
-                Report($"No records found for scenario '{selection.ScenarioName.Trim()}'.");
+                report.Write($"No records found for scenario '{selection.ScenarioName.Trim()}'.");
             else
-                Report("No records found for the selected scenarios.");
+                report.Write("No records found for the selected scenarios.");
 
             if (!string.IsNullOrWhiteSpace(selection.VariantName))
-                Report($"Variant filter: '{selection.VariantName}'.");
+                report.Write($"Variant filter: '{selection.VariantName}'.");
 
-            await FlushReportAsync();
+            await report.FlushAsync(artifactDirectory, analysisPath, ct);
             return;
         }
 
@@ -117,17 +104,17 @@ internal static class AnalysisRunner
             .ThenBy(v => v, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        Report("## Analysis Summary");
-        Report($"- **Mode:** `analysis`");
-        Report($"- **Source:** `{Path.GetFullPath(config.SourcePath)}`");
-        Report($"- **Scenario filter:** `{(string.IsNullOrWhiteSpace(selection.ScenarioName) ? "all (configured order)" : selection.ScenarioName.Trim())}`");
-        Report($"- **Scenario count:** `{scenariosToAnalyze.Count}`");
-        Report($"- **Run records:** `{filteredRuns.Count}`");
-        Report($"- **File records:** `{filteredRecords.Count}`");
-        Report($"- **Variants:** {string.Join(", ", allVariants.Select(v => $"`{v}`"))}");
-        Report($"- **Run input:** `{resultsPath}`");
-        Report($"- **File input:** `{fileResultsPath}`");
-        Report();
+        report.Write("## Analysis Summary");
+        report.Write($"- **Mode:** `analysis`");
+        report.Write($"- **Source:** `{Path.GetFullPath(config.SourcePath)}`");
+        report.Write($"- **Scenario filter:** `{(string.IsNullOrWhiteSpace(selection.ScenarioName) ? "all (configured order)" : selection.ScenarioName.Trim())}`");
+        report.Write($"- **Scenario count:** `{scenariosToAnalyze.Count}`");
+        report.Write($"- **Run records:** `{filteredRuns.Count}`");
+        report.Write($"- **File records:** `{filteredRecords.Count}`");
+        report.Write($"- **Variants:** {string.Join(", ", allVariants.Select(v => $"`{v}`"))}");
+        report.Write($"- **Run input:** `{resultsPath}`");
+        report.Write($"- **File input:** `{fileResultsPath}`");
+        report.Write();
 
         var buckets = config.DatasetPreparation?.Buckets?.Select(b => new FileSizeBucket(b.MinimumFileSizeBytes, b.MaximumFileSizeBytes, b.Name)).ToList()
                       ?? FileSizeBuckets.All.ToList();
@@ -150,12 +137,12 @@ internal static class AnalysisRunner
                 .Where(BenchmarkHelpers.IsTerminalRun)
                 .ToList();
 
-            Report($"## Scenario: `{scenarioName}`");
+            report.Write($"## Scenario: `{scenarioName}`");
 
             if (records.Count == 0 && runs.Count == 0)
             {
-                Report("No records for this scenario.");
-                Report();
+                report.Write("No records for this scenario.");
+                report.Write();
                 continue;
             }
 
@@ -167,10 +154,10 @@ internal static class AnalysisRunner
                 .ThenBy(v => v, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            Report($"- **Run records:** `{runs.Count}`");
-            Report($"- **File records:** `{records.Count}`");
-            Report($"- **Variants:** {string.Join(", ", variants.Select(v => $"`{v}`"))}");
-            Report();
+            report.Write($"- **Run records:** `{runs.Count}`");
+            report.Write($"- **File records:** `{records.Count}`");
+            report.Write($"- **Variants:** {string.Join(", ", variants.Select(v => $"`{v}`"))}");
+            report.Write();
 
             var warnings = BuildMissingControlWarnings(variants, matchedControlLookup);
 
@@ -183,23 +170,23 @@ internal static class AnalysisRunner
                 .Where(r => convergedIndexesByVariant.TryGetValue(r.VariantName, out var idx) && idx.Contains(r.RunIndex))
                 .ToList();
 
-            ReportRunEvidence(Report, config, scenarioName, runs, convergedRuns, variants, config.GatePercent, matchedControlLookup);
-            ReportBucketRecommendations(Report, convergedRecords, buckets, variants, warnings, matchedControlLookup, config.GatePercent);
-            ReportBucketMetrics(Report, convergedRecords, buckets, variants);
-            ReportBatchingIsolationEvidence(Report, convergedRecords, buckets, variants, config.GatePercent);
+            ReportRunEvidence(report.Write, config, scenarioName, runs, convergedRuns, variants, config.GatePercent, matchedControlLookup);
+            ReportBucketRecommendations(report.Write, convergedRecords, buckets, variants, warnings, matchedControlLookup, config.GatePercent);
+            ReportBucketMetrics(report.Write, convergedRecords, buckets, variants);
+            ReportBatchingIsolationEvidence(report.Write, convergedRecords, buckets, variants, config.GatePercent);
 
             allConvergedRuns.AddRange(convergedRuns);
             allConvergedRecords.AddRange(convergedRecords);
 
             if (warnings.Count > 0)
             {
-                Report("### Missing Matched Controls");
+                report.Write("### Missing Matched Controls");
                 foreach (var warning in warnings)
-                    Report($"- {warning}");
-                Report();
+                    report.Write($"- {warning}");
+                report.Write();
             }
 
-            Report();
+            report.Write();
 
             var htmlPath = Path.ChangeExtension(analysisPath, ".html");
             if (scenariosToAnalyze.Count > 1)
@@ -210,13 +197,13 @@ internal static class AnalysisRunner
 
         if (scenariosToAnalyze.Count > 1)
         {
-            ReportCrossScenarioSummary(Report, config, allConvergedRuns, allConvergedRecords, buckets, allVariants, scenariosToAnalyze);
+            CrossScenarioAnalysisReporter.Write(report.Write, config, allConvergedRuns, allConvergedRecords, buckets, allVariants, scenariosToAnalyze);
 
             var summaryHtmlPath = Path.Combine(Path.GetDirectoryName(analysisPath) ?? "", $"{Path.GetFileNameWithoutExtension(analysisPath)}-summary.html");
             await BenchmarkHtmlReportGenerator.GenerateSummaryAsync(summaryHtmlPath, buckets, allVariants, allConvergedRecords, allConvergedRuns, scenariosToAnalyze, matchedControlLookup);
         }
 
-        await FlushReportAsync();
+        await report.FlushAsync(artifactDirectory, analysisPath, ct);
         Console.WriteLine($"Analysis: {analysisPath}");
     }
 
@@ -771,169 +758,4 @@ internal static class AnalysisRunner
         return variants.FirstOrDefault(v => string.Equals(v, controlName, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static void ReportCrossScenarioSummary(
-        Action<string?> report,
-        BenchmarkConfig config,
-        IReadOnlyList<BenchmarkRunRecord> runs,
-        IReadOnlyList<BenchmarkFileCopyRecord> records,
-        IReadOnlyList<FileSizeBucket> buckets,
-        IReadOnlyList<string> variants,
-        IReadOnlyList<string> scenarios)
-    {
-        // runs and records are already filtered to converged windows per scenario/variant.
-        static IReadOnlyList<BenchmarkRunRecord> ScenarioVariantRuns(
-            IReadOnlyList<BenchmarkRunRecord> allRuns, string scenario, string variant) =>
-            allRuns.Where(r =>
-                string.Equals(r.ScenarioName, scenario, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase)).ToList();
-
-        static IReadOnlyList<BenchmarkFileCopyRecord> ScenarioVariantRecords(
-            IReadOnlyList<BenchmarkFileCopyRecord> allRecords, string scenario, string variant) =>
-            allRecords.Where(r =>
-                string.Equals(r.ScenarioName, scenario, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(r.VariantName, variant, StringComparison.OrdinalIgnoreCase)).ToList();
-
-        report("## All Scenarios Summary");
-        report(null);
-        report("Cross-scenario summary matrix displaying median execute durations (for entire runs) and run-median aggregate throughput (MiB/s) per bucket.");
-        report(null);
-
-        report("### Run-Level Median Duration");
-        report(null);
-
-        var header = "| Variant | " + string.Join(" | ", scenarios.Select(BenchmarkHelpers.EscapeTable)) + " |";
-        var divider = "|---|" + string.Join("|", scenarios.Select(_ => "---:")) + "|";
-        report(header);
-        report(divider);
-
-        foreach (var variant in variants)
-        {
-            var row = new List<string> { BenchmarkHelpers.EscapeTable(variant) };
-            var variantConfig = config.Variants.FirstOrDefault(v => string.Equals(v.Name, variant, StringComparison.OrdinalIgnoreCase));
-            var matchedControlName = variantConfig?.MatchedControl;
-
-            foreach (var scenario in scenarios)
-            {
-                var evidence = BenchmarkStatistics.BuildRunEvidence(ScenarioVariantRuns(runs, scenario, variant), variant);
-                if (evidence.TotalRuns == 0)
-                {
-                    row.Add("-");
-                }
-                else if (string.IsNullOrEmpty(matchedControlName))
-                {
-                    row.Add(BenchmarkHelpers.FormatDurationHuman(evidence.MedianSeconds));
-                }
-                else
-                {
-                    var controlEvidence = BenchmarkStatistics.BuildRunEvidence(ScenarioVariantRuns(runs, scenario, matchedControlName), matchedControlName);
-                    if (controlEvidence.TotalRuns > 0 && controlEvidence.MedianSeconds > 0)
-                    {
-                        var deltaPercent = (evidence.MedianSeconds - controlEvidence.MedianSeconds) / controlEvidence.MedianSeconds * 100.0;
-                        var sign = deltaPercent > 0 ? "+" : "";
-                        row.Add($"{BenchmarkHelpers.FormatDurationHuman(evidence.MedianSeconds)} ({sign}{deltaPercent:0.0}%)");
-                    }
-                    else
-                    {
-                        row.Add(BenchmarkHelpers.FormatDurationHuman(evidence.MedianSeconds));
-                    }
-                }
-            }
-
-            if (row.Count > 1 && row.Skip(1).Any(c => c != "-"))
-                report("| " + string.Join(" | ", row) + " |");
-        }
-        report(null);
-
-        report("### Scenario-Level Median Throughput (MiB/s)");
-        report(null);
-        report(header);
-        report(divider);
-
-        foreach (var variant in variants)
-        {
-            var row = new List<string> { BenchmarkHelpers.EscapeTable(variant) };
-            var variantConfig = config.Variants.FirstOrDefault(v => string.Equals(v.Name, variant, StringComparison.OrdinalIgnoreCase));
-            var matchedControlName = variantConfig?.MatchedControl;
-
-            foreach (var scenario in scenarios)
-            {
-                var evidence = BenchmarkStatistics.BuildBucketEvidence(ScenarioVariantRecords(records, scenario, variant), null, variant);
-                if (evidence.RecordCount == 0)
-                {
-                    row.Add("-");
-                }
-                else if (string.IsNullOrEmpty(matchedControlName))
-                {
-                    row.Add($"{evidence.AggregateThroughputMiBPerSecond:0.00}");
-                }
-                else
-                {
-                    var controlEvidence = BenchmarkStatistics.BuildBucketEvidence(ScenarioVariantRecords(records, scenario, matchedControlName), null, matchedControlName);
-                    if (controlEvidence.RecordCount > 0 && controlEvidence.AggregateThroughputMiBPerSecond > 0)
-                    {
-                        var deltaPercent = (evidence.AggregateThroughputMiBPerSecond - controlEvidence.AggregateThroughputMiBPerSecond) / controlEvidence.AggregateThroughputMiBPerSecond * 100.0;
-                        var sign = deltaPercent > 0 ? "+" : "";
-                        row.Add($"{evidence.AggregateThroughputMiBPerSecond:0.00} ({sign}{deltaPercent:0.0}%)");
-                    }
-                    else
-                    {
-                        row.Add($"{evidence.AggregateThroughputMiBPerSecond:0.00}");
-                    }
-                }
-            }
-
-            if (row.Count > 1 && row.Skip(1).Any(c => c != "-"))
-                report("| " + string.Join(" | ", row) + " |");
-        }
-        report(null);
-
-        foreach (var bucket in buckets)
-        {
-            var hasAnyDataForBucket = records.Any(r => bucket.Contains(r.FileSizeBytes));
-            if (!hasAnyDataForBucket) continue;
-
-            report($"### Bucket Throughput (MiB/s): {bucket.Label}");
-            report(null);
-            report(header);
-            report(divider);
-
-            foreach (var variant in variants)
-            {
-                var row = new List<string> { BenchmarkHelpers.EscapeTable(variant) };
-                var variantConfig = config.Variants.FirstOrDefault(v => string.Equals(v.Name, variant, StringComparison.OrdinalIgnoreCase));
-                var matchedControlName = variantConfig?.MatchedControl;
-
-                foreach (var scenario in scenarios)
-                {
-                    var evidence = BenchmarkStatistics.BuildBucketEvidence(ScenarioVariantRecords(records, scenario, variant), bucket, variant);
-                    if (evidence.RecordCount == 0)
-                    {
-                        row.Add("-");
-                    }
-                    else if (string.IsNullOrEmpty(matchedControlName))
-                    {
-                        row.Add($"{evidence.AggregateThroughputMiBPerSecond:0.00}");
-                    }
-                    else
-                    {
-                        var controlEvidence = BenchmarkStatistics.BuildBucketEvidence(ScenarioVariantRecords(records, scenario, matchedControlName), bucket, matchedControlName);
-                        if (controlEvidence.RecordCount > 0 && controlEvidence.AggregateThroughputMiBPerSecond > 0)
-                        {
-                            var deltaPercent = (evidence.AggregateThroughputMiBPerSecond - controlEvidence.AggregateThroughputMiBPerSecond) / controlEvidence.AggregateThroughputMiBPerSecond * 100.0;
-                            var sign = deltaPercent > 0 ? "+" : "";
-                            row.Add($"{evidence.AggregateThroughputMiBPerSecond:0.00} ({sign}{deltaPercent:0.0}%)");
-                        }
-                        else
-                        {
-                            row.Add($"{evidence.AggregateThroughputMiBPerSecond:0.00}");
-                        }
-                    }
-                }
-
-                if (row.Count > 1 && row.Skip(1).Any(c => c != "-"))
-                    report("| " + string.Join(" | ", row) + " |");
-            }
-            report(null);
-        }
-    }
 }

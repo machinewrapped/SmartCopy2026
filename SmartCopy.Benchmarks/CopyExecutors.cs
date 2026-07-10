@@ -92,22 +92,13 @@ internal sealed class ProductionCopyExecutor : ICopyExecutor
 {
     private readonly string _destinationPath;
     private readonly OverwriteMode _overwriteMode;
-    private readonly OperationalSettings _settings;
-    private readonly IFileSystemProvider _sourceProvider;
-    private readonly IFileSystemProvider _destinationProvider;
 
     public ProductionCopyExecutor(
         string destinationPath,
-        OverwriteMode overwriteMode,
-        OperationalSettings settings,
-        IFileSystemProvider sourceProvider,
-        IFileSystemProvider destinationProvider)
+        OverwriteMode overwriteMode)
     {
         _destinationPath = destinationPath;
         _overwriteMode = overwriteMode;
-        _settings = settings;
-        _sourceProvider = sourceProvider;
-        _destinationProvider = destinationProvider;
     }
 
     public Task<IReadOnlyList<TransformResult>> ExecuteAsync(PipelineJob job, CancellationToken ct)

@@ -102,7 +102,7 @@ internal static class BenchmarkHtmlReportGenerator
 
         foreach (var item in runItems.OrderBy(x => x.MedianSeconds))
         {
-            runLabelsJs.Add($"'{item.Variant}'");
+            runLabelsJs.Add(JsonString(item.Variant));
             runDataJs.Add(Math.Round(item.MedianSeconds, 2).ToString(System.Globalization.CultureInfo.InvariantCulture));
             runColorsJs.Add(item.Color);
         }
@@ -158,7 +158,7 @@ internal static class BenchmarkHtmlReportGenerator
         sb.AppendLine($"<canvas id=\"{trendCanvasId}\"></canvas>");
         sb.AppendLine("</div>");
 
-        var trendBucketLabelsJs = string.Join(", ", buckets.Select(b => $"'{b.Label}'"));
+        var trendBucketLabelsJs = string.Join(", ", buckets.Select(b => JsonString(b.Label)));
         var trendDatasetsJs = new List<string>();
         int trendColorIndex = 0;
 
@@ -179,7 +179,7 @@ internal static class BenchmarkHtmlReportGenerator
             var dataAvgStr = string.Join(", ", dataAvg.Select(d => d.ToString(System.Globalization.CultureInfo.InvariantCulture)));
             trendDatasetsJs.Add($@"
                 {{
-                    label: '{variant}',
+                    label: {JsonString(variant)},
                     data: [{dataAvgStr}],
                     borderColor: {borderColor},
                     backgroundColor: {backgroundColor},
@@ -287,7 +287,7 @@ internal static class BenchmarkHtmlReportGenerator
 
             diffDatasetsJs.Add($@"
                 {{
-                    label: '{variant} vs {controlVariant}',
+                    label: {JsonString($"{variant} vs {controlVariant}")},
                     data: [{dataDiffStr}],
                     borderColor: {borderColor},
                     backgroundColor: {backgroundColor},
@@ -345,7 +345,7 @@ internal static class BenchmarkHtmlReportGenerator
             .ToList();
 
         // X-axis labels
-        var bucketLabelsJs = string.Join(", ", buckets.Select(b => $"'{b.Label}'"));
+        var bucketLabelsJs = string.Join(", ", buckets.Select(b => JsonString(b.Label)));
 
         foreach (var category in categories)
         {
@@ -386,7 +386,7 @@ internal static class BenchmarkHtmlReportGenerator
                 var dataAvgStr = string.Join(", ", dataAvg);
                 datasetsJs.Add($@"
                     {{
-                        label: '{variant}',
+                        label: {JsonString(variant)},
                         data: [{dataAvgStr}],
                         backgroundColor: {color},
                         borderColor: 'rgba(255, 255, 255, 0.2)',
@@ -801,7 +801,7 @@ internal static class BenchmarkHtmlReportGenerator
         var validVariants = variants
             .Where(v => matchedControlLookup.TryGetValue(v, out var c) && !string.Equals(v, c, StringComparison.OrdinalIgnoreCase))
             .ToList();
-        var validVariantLabelsJs = string.Join(", ", validVariants.Select(v => $"'{v}'"));
+        var validVariantLabelsJs = string.Join(", ", validVariants.Select(JsonString));
 
         sb.AppendLine("<h2>Variant vs Control (%) Across Scenarios</h2>");
         sb.AppendLine("<div style=\"margin-bottom: 1rem;\">");
@@ -875,7 +875,7 @@ internal static class BenchmarkHtmlReportGenerator
                 var dataDiffStr = string.Join(", ", dataDiffs.Select(d => d.ToString(System.Globalization.CultureInfo.InvariantCulture)));
                 sb.AppendLine($@"
                     {{
-                        label: '{scenario}',
+                        label: {JsonString(scenario)},
                         data: [{dataDiffStr}],
                         borderColor: {borderColor},
                         backgroundColor: {backgroundColor},
@@ -924,7 +924,7 @@ internal static class BenchmarkHtmlReportGenerator
         ");
         sb.AppendLine("</script>");
 
-        var variantLabelsJs = string.Join(", ", variants.Select(v => $"'{v}'"));
+        var variantLabelsJs = string.Join(", ", variants.Select(JsonString));
 
         // --- Run-Level Median Throughput Line Chart ---
         sb.AppendLine($"<h2>Run-Level Median Throughput</h2>");
@@ -974,7 +974,7 @@ internal static class BenchmarkHtmlReportGenerator
 
             lineDatasetsJs.Add($@"
                 {{
-                    label: '{scenario}',
+                    label: {JsonString(scenario)},
                     data: [{string.Join(", ", dataList)}],
                     borderColor: {borderColor},
                     backgroundColor: {backgroundColor},
@@ -1044,7 +1044,7 @@ internal static class BenchmarkHtmlReportGenerator
 
             runDatasetsJs.Add($@"
                 {{
-                    label: '{scenario}',
+                    label: {JsonString(scenario)},
                     data: [{string.Join(", ", dataList)}],
                     backgroundColor: {color},
                     borderColor: 'rgba(255, 255, 255, 0.2)',
@@ -1115,7 +1115,7 @@ internal static class BenchmarkHtmlReportGenerator
 
                 bucketDatasetsJs.Add($@"
                     {{
-                        label: '{scenario}',
+                        label: {JsonString(scenario)},
                         data: [{string.Join(", ", dataList)}],
                         backgroundColor: {color},
                         borderColor: 'rgba(255, 255, 255, 0.2)',

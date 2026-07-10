@@ -215,8 +215,10 @@ internal static class BenchmarkCopyRunner
             batch.Clear();
         }
 
-        foreach (var node in sortedFileNodes)
+        try
         {
+            foreach (var node in sortedFileNodes)
+            {
             ct.ThrowIfCancellationRequested();
 
             if (job.PauseToken is not null)
@@ -302,6 +304,25 @@ internal static class BenchmarkCopyRunner
 
                 var readTicksCompleted = Stopwatch.GetTimestamp() - readStartTick;
                 var readDurationCompleted = TimeSpan.FromSeconds((double)readTicksCompleted / Stopwatch.Frequency);
+
+                // The read is capped at the scanned node.Size, so a short read means the file
+                // shrank between the scan and this copy. Byte accounting downstream (completedBytes,
+                // Input/OutputBytes → throughput) uses node.Size, so counting this file at its
+                // scanned size while it took only its actual transfer time would inflate throughput
+                // and could skew the converged-window verdict. Fail the file loudly instead: a
+                // failed file marks the whole run unsuccessful, excluding a dataset that changed
+                // mid-run rather than silently averaging a compromised measurement.
+                if (bytesRead != node.Size)
+                {
+                    results.Add(new TransformResult(
+                        IsSuccess: false,
+                        SourceNode: node,
+                        SourceNodeResult: SourceResult.None,
+                        DestinationPath: destination,
+                        ErrorMessage: $"Read {bytesRead} of {node.Size} scanned bytes; source changed during the run.",
+                        ExecutionDuration: readDurationCompleted));
+                    continue;
+                }
 
                 currentBatch.Add(new BatchedFile
                 {
@@ -458,17 +479,23 @@ internal static class BenchmarkCopyRunner
                         EstimatedRemaining: remaining));
                 }
             }
-        }
+            }
 
-        // Flush any remaining batched files at the end
-        if (currentBatch.Count > 0)
+            // Flush any remaining batched files at the end.
+            if (currentBatch.Count > 0)
+            {
+                await FlushBatchAsync(currentBatch, sharedBatchBuffer!);
+            }
+
+            return results;
+        }
+        finally
         {
-            await FlushBatchAsync(currentBatch, sharedBatchBuffer!);
-            ArrayPool<byte>.Shared.Return(sharedBatchBuffer!);
-            sharedBatchBuffer = null;
+            if (sharedBatchBuffer is not null)
+            {
+                ArrayPool<byte>.Shared.Return(sharedBatchBuffer);
+            }
         }
-
-        return results;
     }
 
     private static TimeSpan EstimateRemaining(TimeSpan elapsed, long completed, long total)

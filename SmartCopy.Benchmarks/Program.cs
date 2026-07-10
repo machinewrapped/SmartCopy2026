@@ -15,6 +15,7 @@ if (selection.Help)
     Console.WriteLine("  --compare-with <dir> Directory containing benchmark-file-results.ndjson to compare against");
     Console.WriteLine("  --scenario <name>    Filter execution to a specific scenario name");
     Console.WriteLine("  --variant <name>     Filter execution to a specific variant name");
+    Console.WriteLine("  --runs <n>           Run a fixed number of rounds (explicit mode; skips convergence)");
     Console.WriteLine("  --remove, --prune    Shorthand for --mode remove-records");
     Console.WriteLine("  --mode remove-records --scenario <name> [--variant <name>]");
     Console.WriteLine("                       Remove matching run-level and file-level result records");
@@ -36,10 +37,9 @@ var configPath = Path.IsPathFullyQualified(configPathArgument)
 
 if (!File.Exists(configPath))
 {
-    var template = BenchmarkConfig.CreateTemplate();
-    await BenchmarkJson.WriteAsync(configPath, template, ct);
-    Console.WriteLine($"Created {Path.GetFileName(configPath)} in {Path.GetDirectoryName(configPath) ?? workingDirectory}.");
-    Console.WriteLine("Edit the scenario file if needed, then run the benchmark app again.");
+    await BenchmarkJson.WriteAsync(configPath, BenchmarkConfig.CreateScaffold(), ct);
+    Console.WriteLine($"Created an empty benchmark configuration scaffold: {configPath}.");
+    Console.WriteLine("Set sourcePath and add one or more scenarios before running the benchmark.");
     return 0;
 }
 
@@ -47,54 +47,46 @@ var config = await BenchmarkJson.ReadAsync<BenchmarkConfig>(configPath, ct)
     ?? throw new InvalidOperationException($"Could not read {configPath}.");
 config.Normalize();
 
-SystemSleepController.PreventSleep();
-try
+if (selection.Mode == BenchmarkRunMode.DatasetPreparation)
 {
-    if (selection.Mode == BenchmarkRunMode.DatasetPreparation)
-    {
-        await DatasetPreparationRunner.RunAsync(workingDirectory, config, selection, ct);
-        return 0;
-    }
+    await DatasetPreparationRunner.RunAsync(workingDirectory, config, selection, ct);
+    return 0;
+}
 
-    if (selection.Mode == BenchmarkRunMode.Analysis)
-    {
-        await AnalysisRunner.RunAsync(workingDirectory, config, selection, ct);
-        return 0;
-    }
+if (selection.Mode == BenchmarkRunMode.Analysis)
+{
+    await AnalysisRunner.RunAsync(workingDirectory, config, selection, ct);
+    return 0;
+}
 
-    if (selection.Mode == BenchmarkRunMode.SizeScaling)
-    {
-        await SizeScalingRunner.RunAsync(workingDirectory, config, selection, ct);
-        return 0;
-    }
+if (selection.Mode == BenchmarkRunMode.SizeScaling)
+{
+    await SizeScalingRunner.RunAsync(workingDirectory, config, selection, ct);
+    return 0;
+}
 
-    if (selection.Mode == BenchmarkRunMode.Validation)
-    {
-        await ValidationModeRunner.RunAsync(workingDirectory, config, selection, ct);
-        await ArchiveLatestRunAsync();
-        return 0;
-    }
-
-    if (selection.Mode == BenchmarkRunMode.Compare)
-    {
-        await CompareRunner.RunAsync(workingDirectory, config, selection, ct);
-        return 0;
-    }
-
-    if (selection.Mode == BenchmarkRunMode.RemoveRecords)
-    {
-        await BenchmarkRecordRemovalRunner.RunAsync(workingDirectory, config, selection, ct);
-        return 0;
-    }
-
-    await BenchmarkModeRunner.RunAsync(workingDirectory, config, selection, ct);
+if (selection.Mode == BenchmarkRunMode.Validation)
+{
+    await ValidationModeRunner.RunAsync(workingDirectory, config, selection, ct);
     await ArchiveLatestRunAsync();
     return 0;
 }
-finally
+
+if (selection.Mode == BenchmarkRunMode.Compare)
 {
-    SystemSleepController.AllowSleep();
+    await CompareRunner.RunAsync(workingDirectory, config, selection, ct);
+    return 0;
 }
+
+if (selection.Mode == BenchmarkRunMode.RemoveRecords)
+{
+    await BenchmarkRecordRemovalRunner.RunAsync(workingDirectory, config, selection, ct);
+    return 0;
+}
+
+await BenchmarkModeRunner.RunAsync(workingDirectory, config, selection, ct);
+await ArchiveLatestRunAsync();
+return 0;
 
 async Task ArchiveLatestRunAsync()
 {
