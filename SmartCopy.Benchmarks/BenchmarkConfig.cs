@@ -17,8 +17,6 @@ internal sealed class BenchmarkConfig
     public List<BenchmarkVariant> Variants { get; set; } = [];
     public DatasetPreparationConfig? DatasetPreparation { get; set; }
     public int CooldownSeconds { get; set; } = 60;
-    public bool ClearCacheBetweenRuns { get; set; } = false;
-    public string? RamMapPath { get; set; }
 
     /// <summary>
     /// Keyed by normalized base source path. Each value is the (shuffled) list of pool

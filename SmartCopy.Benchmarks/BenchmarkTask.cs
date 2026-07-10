@@ -98,18 +98,10 @@ internal sealed class BenchmarkTask
 
         Console.WriteLine();
         Console.WriteLine($"--- Cold cache boundary before {_scenario.Name} ---");
-
-        if (!string.IsNullOrWhiteSpace(_config.RamMapPath) && File.Exists(_config.RamMapPath))
-        {
-            BenchmarkHelpers.ClearOsFileCache(_config.RamMapPath);
-        }
-        else
-        {
-            Console.WriteLine(_scenario.UsePathPool
-                ? "Returning to path-pool runs. Reboot to clear the OS file cache, then run again..."
-                : "Switching to a non-pool run. Reboot to clear the OS file cache, then run again...");
-            Console.ReadKey(intercept: true);
-        }
+        Console.WriteLine(_scenario.UsePathPool
+            ? "Returning to path-pool runs. Reboot to clear the OS file cache, then run again..."
+            : "Switching to a non-pool run. Reboot to clear the OS file cache, then run again...");
+        Console.ReadKey(intercept: true);
         Console.WriteLine();
     }
 

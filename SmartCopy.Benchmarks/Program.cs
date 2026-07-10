@@ -47,54 +47,46 @@ var config = await BenchmarkJson.ReadAsync<BenchmarkConfig>(configPath, ct)
     ?? throw new InvalidOperationException($"Could not read {configPath}.");
 config.Normalize();
 
-SystemSleepController.PreventSleep();
-try
+if (selection.Mode == BenchmarkRunMode.DatasetPreparation)
 {
-    if (selection.Mode == BenchmarkRunMode.DatasetPreparation)
-    {
-        await DatasetPreparationRunner.RunAsync(workingDirectory, config, selection, ct);
-        return 0;
-    }
+    await DatasetPreparationRunner.RunAsync(workingDirectory, config, selection, ct);
+    return 0;
+}
 
-    if (selection.Mode == BenchmarkRunMode.Analysis)
-    {
-        await AnalysisRunner.RunAsync(workingDirectory, config, selection, ct);
-        return 0;
-    }
+if (selection.Mode == BenchmarkRunMode.Analysis)
+{
+    await AnalysisRunner.RunAsync(workingDirectory, config, selection, ct);
+    return 0;
+}
 
-    if (selection.Mode == BenchmarkRunMode.SizeScaling)
-    {
-        await SizeScalingRunner.RunAsync(workingDirectory, config, selection, ct);
-        return 0;
-    }
+if (selection.Mode == BenchmarkRunMode.SizeScaling)
+{
+    await SizeScalingRunner.RunAsync(workingDirectory, config, selection, ct);
+    return 0;
+}
 
-    if (selection.Mode == BenchmarkRunMode.Validation)
-    {
-        await ValidationModeRunner.RunAsync(workingDirectory, config, selection, ct);
-        await ArchiveLatestRunAsync();
-        return 0;
-    }
-
-    if (selection.Mode == BenchmarkRunMode.Compare)
-    {
-        await CompareRunner.RunAsync(workingDirectory, config, selection, ct);
-        return 0;
-    }
-
-    if (selection.Mode == BenchmarkRunMode.RemoveRecords)
-    {
-        await BenchmarkRecordRemovalRunner.RunAsync(workingDirectory, config, selection, ct);
-        return 0;
-    }
-
-    await BenchmarkModeRunner.RunAsync(workingDirectory, config, selection, ct);
+if (selection.Mode == BenchmarkRunMode.Validation)
+{
+    await ValidationModeRunner.RunAsync(workingDirectory, config, selection, ct);
     await ArchiveLatestRunAsync();
     return 0;
 }
-finally
+
+if (selection.Mode == BenchmarkRunMode.Compare)
 {
-    SystemSleepController.AllowSleep();
+    await CompareRunner.RunAsync(workingDirectory, config, selection, ct);
+    return 0;
 }
+
+if (selection.Mode == BenchmarkRunMode.RemoveRecords)
+{
+    await BenchmarkRecordRemovalRunner.RunAsync(workingDirectory, config, selection, ct);
+    return 0;
+}
+
+await BenchmarkModeRunner.RunAsync(workingDirectory, config, selection, ct);
+await ArchiveLatestRunAsync();
+return 0;
 
 async Task ArchiveLatestRunAsync()
 {
