@@ -36,10 +36,9 @@ var configPath = Path.IsPathFullyQualified(configPathArgument)
 
 if (!File.Exists(configPath))
 {
-    var template = BenchmarkConfig.CreateTemplate();
-    await BenchmarkJson.WriteAsync(configPath, template, ct);
-    Console.WriteLine($"Created {Path.GetFileName(configPath)} in {Path.GetDirectoryName(configPath) ?? workingDirectory}.");
-    Console.WriteLine("Edit the scenario file if needed, then run the benchmark app again.");
+    await BenchmarkJson.WriteAsync(configPath, BenchmarkConfig.CreateScaffold(), ct);
+    Console.WriteLine($"Created an empty benchmark configuration scaffold: {configPath}.");
+    Console.WriteLine("Set sourcePath and add one or more scenarios before running the benchmark.");
     return 0;
 }
 
