@@ -39,6 +39,7 @@ public sealed class OperationJournal
 
     public async Task<string> WriteAsync(
         IEnumerable<TransformResult> results,
+        IReadOnlyDictionary<string, string?>? metadata = null,
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -50,6 +51,19 @@ public sealed class OperationJournal
         await using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
         await using var writer = new StreamWriter(stream);
 
+        await writer.WriteLineAsync("# SmartCopy Operation Journal v2");
+        if (metadata is not null)
+        {
+            foreach (var (key, value) in metadata)
+            {
+                ct.ThrowIfCancellationRequested();
+                await writer.WriteLineAsync($"#meta\t{SanitizeField(key)}\t{SanitizeField(value ?? string.Empty)}");
+            }
+        }
+
+        await writer.WriteLineAsync(
+            "#fields\ttimestampUtc\tstatus\taction\tsource\tdestination\toutputSizeDisplay\tinputBytes\toutputBytes\tfilesAffected\tfoldersAffected\tfilesSkipped\tfoldersSkipped\texecutionDurationMilliseconds\tdestinationResult\terrorMessage");
+
         foreach (var result in results)
         {
             ct.ThrowIfCancellationRequested();
@@ -58,9 +72,13 @@ public sealed class OperationJournal
             var destination = SanitizeField(result.DestinationPath ?? string.Empty);
             var status = result.IsSuccess ? "ok" : "failed";
             var outputSize = FileSizeFormatter.FormatBytes(result.OutputBytes);
+            var durationMilliseconds = result.ExecutionDuration?.TotalMilliseconds.ToString("R", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+            var errorMessage = SanitizeField(result.ErrorMessage ?? string.Empty);
 
             await writer.WriteLineAsync(
-                $"{DateTime.UtcNow:O}\t{status}\t{action}\t{source}\t{destination}\t{outputSize}");
+                $"{DateTime.UtcNow:O}\t{status}\t{action}\t{source}\t{destination}\t{outputSize}\t" +
+                $"{result.InputBytes}\t{result.OutputBytes}\t{result.NumberOfFilesAffected}\t{result.NumberOfFoldersAffected}\t" +
+                $"{result.NumberOfFilesSkipped}\t{result.NumberOfFoldersSkipped}\t{durationMilliseconds}\t{result.DestinationResult}\t{errorMessage}");
         }
 
         await writer.FlushAsync(ct);

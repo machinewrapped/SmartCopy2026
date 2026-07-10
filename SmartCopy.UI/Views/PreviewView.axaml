@@ -117,6 +117,34 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
                         </Border>
+                        <!-- Transfer-strategy summary: shows the resolved policy/strategy per copy/move step. -->
+                        <Border IsVisible="{Binding HasStrategyNotes}"
+                                Background="{DynamicResource SurfaceBrush}"
+                                BorderBrush="{DynamicResource PanelBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Padding="8">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="TRANSFER STRATEGY"
+                                           FontWeight="SemiBold"
+                                           FontSize="10"
+                                           Foreground="{DynamicResource MutedForegroundBrush}" />
+                                <TextBlock Text="{Binding StrategyStatus}"
+                                           FontSize="12"
+                                           FontStyle="Italic"
+                                           Foreground="{DynamicResource MutedForegroundBrush}" />
+                                <ItemsControl ItemsSource="{Binding StrategyNotes}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}"
+                                                       Foreground="{DynamicResource DefaultForegroundBrush}"
+                                                       FontSize="12"
+                                                       TextWrapping="Wrap" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
 
                     <ScrollViewer Grid.Row="1"

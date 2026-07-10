@@ -1,4 +1,6 @@
 using System.Text.Json.Serialization;
+using System.Runtime.InteropServices;
+using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 
 namespace SmartCopy.Core.Settings;
@@ -21,8 +23,11 @@ public sealed class AppSettings
     public bool FullPreScan { get; set; }
     public bool FollowSymlinks { get; set; }
     public bool EnableFilesystemWatcher { get; set; } = true;
-    public int CopyChunkSizeKb { get; set; } = 256;
-    
+    public int CopyChunkSizeKb { get; set; } = OperationalSettings.DefaultCopyBufferSizeBytes / 1024;
+
+    // Performance optimisations — tunable in DEBUG builds, always serialised.
+    public CopyOptimisationPlatformPolicy CopyOptimisationPlatformPolicy { get; set; } = new();
+
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public OverwriteMode DefaultOverwriteMode { get; set; } = OverwriteMode.Skip;
 
@@ -73,10 +78,118 @@ public sealed class AppSettings
 
     public bool UseAbsolutePathsForSelectionSave { get; set; }
     public bool AutoOpenLogOnRun { get; set; } = true;
+    public bool WriteOperationJournal { get; set; } = false;
 
-    /// <summary>Show full diagnostic output (exception stack traces, etc.) in the log panel.
+    /// <summary>
+    /// Show full diagnostic output (exception stack traces, etc.) in the log panel.
     /// Useful for capturing details when reporting bugs.
+    /// </summary>
     public bool VerboseLogging { get; set; } = false;
+
+    public OperationalSettings CreateOperationalSettings() => CreateOperationalSettings(GetCurrentPlatform());
+
+    internal OperationalSettings CreateOperationalSettings(OSPlatform platform)
+    {
+        var policy = GetCopyOptimisationPolicy(platform);
+        var settings = new OperationalSettings
+        {
+            CopyBufferSizeBytes = PositiveKbToIntBytesOrDefault(
+                CopyChunkSizeKb,
+                OperationalSettings.DefaultCopyBufferSizeBytes),
+
+            CopyBufferRouting = new CopyBufferRoutingSettings
+            {
+                SsdBytes = PositiveKbToIntBytesOrDefault(
+                    policy.CopyRoutingSsdBufferKb,
+                    CopyBufferRoutingSettings.DefaultSsdBytes),
+                UsbBytes = PositiveKbToIntBytesOrDefault(
+                    policy.CopyRoutingUsbBufferKb,
+                    CopyBufferRoutingSettings.DefaultUsbBytes),
+                HddBytes = PositiveKbToIntBytesOrDefault(
+                    policy.CopyRoutingHddBufferKb,
+                    CopyBufferRoutingSettings.DefaultHddBytes),
+                SameVolumeHddBytes = PositiveKbToIntBytesOrDefault(
+                    policy.CopyRoutingSameVolumeHddBufferKb,
+                    CopyBufferRoutingSettings.DefaultSameVolumeHddBytes),
+                UnknownBytes = PositiveKbToIntBytesOrDefault(
+                    policy.CopyRoutingUnknownBufferKb,
+                    CopyBufferRoutingSettings.DefaultUnknownBytes),
+            },
+        };
+
+        if (!policy.Enabled)
+        {
+            return settings.Normalize();
+        }
+
+        return (settings with
+        {
+            TinyFileFastPathThresholdBytes = NonNegativeKbToLongBytesOrDefault(
+                policy.TinyFileFastPathKb,
+                OperationalSettings.DefaultEnabledTinyFileFastPathThresholdBytes),
+            BatchBufferBytes = NonNegativeKbToIntBoundedBytesOrDefault(
+                policy.BatchBufferKb,
+                OperationalSettings.DefaultEnabledBatchBufferBytes),
+            DestinationRoutingEnabled = true,
+        }).Normalize();
+    }
+
+    public CopyOptimisationPolicy GetCurrentCopyOptimisationPolicy() => GetCopyOptimisationPolicy(GetCurrentPlatform());
+
+    internal CopyOptimisationPolicy GetCopyOptimisationPolicy(OSPlatform platform) =>
+        CopyOptimisationPlatformPolicy?.For(platform) ?? CopyOptimisationPolicy.DisabledDefaults();
+
+    private static OSPlatform GetCurrentPlatform()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return OSPlatform.Windows;
+        }
+
+        if (OperatingSystem.IsMacOS())
+        {
+            return OSPlatform.OSX;
+        }
+
+        if (OperatingSystem.IsLinux())
+        {
+            return OSPlatform.Linux;
+        }
+
+        return OSPlatform.Create("UNKNOWN");
+    }
+
+    private static int PositiveKbToIntBytesOrDefault(int valueKb, int defaultBytes)
+    {
+        if (valueKb <= 0)
+        {
+            return defaultBytes;
+        }
+
+        var bytes = (long)valueKb * 1024;
+        return bytes <= int.MaxValue ? (int)bytes : defaultBytes;
+    }
+
+    private static long NonNegativeKbToLongBytesOrDefault(int valueKb, long defaultBytes)
+    {
+        if (valueKb < 0)
+        {
+            return defaultBytes;
+        }
+
+        return (long)valueKb * 1024;
+    }
+
+    private static long NonNegativeKbToIntBoundedBytesOrDefault(int valueKb, long defaultBytes)
+    {
+        if (valueKb < 0)
+        {
+            return defaultBytes;
+        }
+
+        var bytes = (long)valueKb * 1024;
+        return bytes <= int.MaxValue ? bytes : defaultBytes;
+    }
 
     /// <summary>
     /// Copies all persisted properties from <paramref name="saved"/> into this instance,
@@ -94,4 +207,3 @@ public sealed class AppSettings
         }
     }
 }
-

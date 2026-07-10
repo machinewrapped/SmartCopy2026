@@ -25,54 +25,6 @@ public sealed class DeleteStepTrashTests
         }
     }
 
-    private sealed class TestStepContext : IStepContext
-    {
-        private readonly Dictionary<DirectoryTreeNode, PipelineContext> _contexts = new();
-        private readonly HashSet<DirectoryTreeNode> _failed = new();
-
-        public DirectoryNode RootNode { get; }
-        public IFileSystemProvider SourceProvider { get; }
-        public FileSystemProviderRegistry ProviderRegistry { get; }
-        public bool ShowHiddenFiles { get; }
-        public bool AllowDeleteReadOnly { get; }
-        public ITrashService TrashService { get; }
-
-        public TestStepContext(
-            DirectoryNode root,
-            IFileSystemProvider provider,
-            ITrashService trashService)
-        {
-            RootNode = root;
-            SourceProvider = provider;
-            ProviderRegistry = new FileSystemProviderRegistry();
-            ProviderRegistry.Register(provider);
-            TrashService = trashService;
-        }
-
-        public PipelineContext GetNodeContext(DirectoryTreeNode node)
-        {
-            if (!_contexts.TryGetValue(node, out var ctx))
-            {
-                ctx = new PipelineContext
-                {
-                    SourceNode = node,
-                    SourceProvider = SourceProvider,
-                    ProviderRegistry = ProviderRegistry,
-                    PathSegments = node.RelativePathSegments.Length > 0
-                        ? node.RelativePathSegments
-                        : [node.Name],
-                    CurrentExtension = Path.GetExtension(node.Name).TrimStart('.'),
-                    VirtualCheckState = node.CheckState,
-                };
-                _contexts[node] = ctx;
-            }
-            return ctx;
-        }
-
-        public bool IsNodeFailed(DirectoryTreeNode node) => _failed.Contains(node);
-        public void MarkFailed(DirectoryTreeNode node) => _failed.Add(node);
-    }
-
     private static CapabilityOverrideProvider WithCanTrash(MemoryFileSystemProvider inner, bool canTrash)
         => new(inner, new ProviderCapabilities(
             CanSeek: true,
@@ -107,7 +59,7 @@ public sealed class DeleteStepTrashTests
         var (root, file, memProvider) = await MakeTree();
         var provider = WithCanTrash(memProvider, canTrash: true);
         var trashSpy = new SpyTrashService { IsAvailable = true };
-        var context = new TestStepContext(root, provider, trashSpy);
+        var context = new FakeStepContext(root, provider, trashService:trashSpy);
 
         var step = new DeleteStep(DeleteMode.Trash);
         var results = await step.ApplyAsync(context, CancellationToken.None).ToListAsync(CancellationToken.None);
@@ -127,7 +79,7 @@ public sealed class DeleteStepTrashTests
         var (root, file, memProvider) = await MakeTree();
         var provider = WithCanTrash(memProvider, canTrash: false);
         var trashSpy = new SpyTrashService { IsAvailable = true };
-        var context = new TestStepContext(root, provider, trashSpy);
+        var context = new FakeStepContext(root, provider, trashService:trashSpy);
 
         var step = new DeleteStep(DeleteMode.Trash);
         var results = await step.ApplyAsync(context, CancellationToken.None).ToListAsync(CancellationToken.None);
@@ -147,7 +99,7 @@ public sealed class DeleteStepTrashTests
         var (root, file, memProvider) = await MakeTree();
         var provider = WithCanTrash(memProvider, canTrash: true);
         var trashSpy = new SpyTrashService { IsAvailable = false };
-        var context = new TestStepContext(root, provider, trashSpy);
+        var context = new FakeStepContext(root, provider, trashService:trashSpy);
 
         var step = new DeleteStep(DeleteMode.Trash);
         var results = await step.ApplyAsync(context, CancellationToken.None).ToListAsync(CancellationToken.None);
@@ -167,7 +119,7 @@ public sealed class DeleteStepTrashTests
         var (root, file, memProvider) = await MakeTree();
         var provider = WithCanTrash(memProvider, canTrash: true);
         var trashSpy = new SpyTrashService { IsAvailable = true };
-        var context = new TestStepContext(root, provider, trashSpy);
+        var context = new FakeStepContext(root, provider, trashService:trashSpy);
 
         var step = new DeleteStep(DeleteMode.Permanent);
         var results = await step.ApplyAsync(context, CancellationToken.None).ToListAsync(CancellationToken.None);
@@ -186,7 +138,7 @@ public sealed class DeleteStepTrashTests
     {
         var (root, file, memProvider) = await MakeTree();
         var provider = WithCanTrash(memProvider, canTrash: true);
-        var context = new TestStepContext(root, provider, new NullTrashService());
+        var context = new FakeStepContext(root, provider, trashService:new NullTrashService());
 
         var step = new DeleteStep(DeleteMode.Trash);
         var results = await step.PreviewAsync(context, CancellationToken.None).ToListAsync(CancellationToken.None);
@@ -203,7 +155,7 @@ public sealed class DeleteStepTrashTests
     {
         var (root, file, memProvider) = await MakeTree();
         var provider = WithCanTrash(memProvider, canTrash: false);
-        var context = new TestStepContext(root, provider, new NullTrashService());
+        var context = new FakeStepContext(root, provider, trashService:new NullTrashService());
 
         var step = new DeleteStep(DeleteMode.Trash);
         var results = await step.PreviewAsync(context, CancellationToken.None).ToListAsync(CancellationToken.None);

@@ -91,6 +91,15 @@ public partial class PreviewViewModel : ViewModelBase
     public bool HasInfoMessages => InfoMessages.Count > 0;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasStrategyNotes))]
+    private IReadOnlyList<string> _strategyNotes = [];
+
+    public bool HasStrategyNotes => StrategyNotes.Count > 0;
+
+    [ObservableProperty]
+    private string _strategyStatus = "";
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsReady))]
     private bool _isPreparingPlan;
 
@@ -161,6 +170,8 @@ public partial class PreviewViewModel : ViewModelBase
         TotalEstimatedOutputBytes = 0;
         Warnings = [];
         InfoMessages = [];
+        StrategyNotes = [];
+        StrategyStatus = "";
         Errors = [];
         Groups.Clear();
         OnPropertyChanged(nameof(ConfirmButtonText));
@@ -183,6 +194,8 @@ public partial class PreviewViewModel : ViewModelBase
         TotalEstimatedOutputBytes = plan.TotalEstimatedOutputBytes;
         Warnings = plan.Warnings;
         InfoMessages = plan.InfoMessages;
+        StrategyNotes = plan.StrategyNotes;
+        StrategyStatus = plan.StrategyStatus;
         Errors = plan.Errors;
 
         Groups.Clear();
@@ -276,6 +289,20 @@ public partial class PreviewViewModel : ViewModelBase
         sb.AppendLine($"**Total Input Size:** { FileSizeFormatter.FormatBytes(TotalEstimatedInputBytes)}");
         sb.AppendLine($"**Estimated Output Size:** {FileSizeFormatter.FormatBytes(TotalEstimatedOutputBytes)}");
         sb.AppendLine();
+
+        if (StrategyNotes.Count > 0)
+        {
+            sb.AppendLine("## Transfer Strategy");
+            sb.AppendLine();
+            if (!string.IsNullOrEmpty(StrategyStatus))
+            {
+                sb.AppendLine($"**{StrategyStatus}**");
+                sb.AppendLine();
+            }
+            foreach (var note in StrategyNotes)
+                sb.AppendLine($"- {note}");
+            sb.AppendLine();
+        }
 
         var deleteActions = new List<PlannedAction>();
         var overwriteActions = new List<PlannedAction>();

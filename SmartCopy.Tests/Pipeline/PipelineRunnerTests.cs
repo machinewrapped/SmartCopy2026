@@ -222,7 +222,7 @@ public sealed class PipelineRunnerTests
         // Source must not have been deleted.
         Assert.True(await provider.ExistsAsync("/source/song.mp3", CancellationToken.None));
         // Destination must remain unchanged.
-        await using var stream = await provider.OpenReadAsync("/dest/source/song.mp3", CancellationToken.None);
+        await using var stream = await provider.OpenReadAsync("/dest/source/song.mp3", ct: CancellationToken.None);
         var bytes = new byte[stream.Length];
         _ = await stream.ReadAsync(bytes, CancellationToken.None);
         Assert.Equal("existing"u8.ToArray(), bytes);

@@ -195,6 +195,10 @@ public sealed class PipelineIntegrationTests
                 SourceProvider = provider,
                 ProviderRegistry = provider.CreateRegistry(),
                 Progress = new SyncProgress<OperationProgress>(progressUpdates.Add),
+                // Drop the small-file threshold below the file size so the transfer takes the
+                // chunked manual-loop path that emits per-chunk in-flight progress (the production
+                // behaviour for files larger than the threshold).
+                OperationalSettings = new OperationalSettings { SmallFileProgressThresholdBytes = 256 * 1024 },
             });
 
         Assert.NotEmpty(progressUpdates);
@@ -231,6 +235,8 @@ public sealed class PipelineIntegrationTests
                 SourceProvider = sourceProvider,
                 ProviderRegistry = registry,
                 Progress = new SyncProgress<OperationProgress>(progressUpdates.Add),
+                // See the copy variant above: a sub-threshold size forces the chunked in-flight path.
+                OperationalSettings = new OperationalSettings { SmallFileProgressThresholdBytes = 256 * 1024 },
             });
 
         Assert.NotEmpty(progressUpdates);
@@ -267,13 +273,21 @@ public sealed class PipelineIntegrationTests
 
         Assert.True(File.Exists(path));
         var lines = await File.ReadAllLinesAsync(path);
-        var line = Assert.Single(lines);
-        var columns = line.Split('\t');
-        Assert.Equal(6, columns.Length);
+        Assert.Equal(3, lines.Length);
+        Assert.Equal("# SmartCopy Operation Journal v2", lines[0]);
+        Assert.StartsWith("#fields\t", lines[1]);
+
+        var columns = lines[2].Split('\t');
+        Assert.Equal(15, columns.Length);
         Assert.Equal("ok", columns[1]);
         Assert.Equal("copy", columns[2]);
         Assert.Equal("src/song.mp3", columns[3]);
         Assert.Equal("mem://dest/src/song.mp3", columns[4]);
         Assert.Equal("256.0KB", columns[5]);
+        Assert.Equal((256 * 1024).ToString(), columns[6]);
+        Assert.Equal((256 * 1024).ToString(), columns[7]);
+        Assert.Equal("1", columns[8]);
+        Assert.NotEmpty(columns[12]);
+        Assert.Equal("Created", columns[13]);
     }
 }

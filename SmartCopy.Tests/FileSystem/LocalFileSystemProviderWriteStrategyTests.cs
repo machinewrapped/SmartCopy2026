@@ -7,50 +7,23 @@ namespace SmartCopy.Tests.FileSystem;
 public sealed class LocalFileSystemProviderWriteStrategyTests
 {
     [Fact]
-    public async Task WriteAsync_CopyToAsyncMode_ReportsProgressAndWritesContent()
+    public async Task WriteAsync_WritesContentAndReportsProgress()
     {
         using var temp = new TempDirectory();
-        var provider = new LocalFileSystemProvider(
-            temp.Path,
-            options: new LocalFileSystemProviderOptions
-            {
-                CopyBufferSizeBytes = 4,
-                WriteMode = LocalFileSystemWriteMode.CopyToAsync,
-            });
+        var provider = new LocalFileSystemProvider(temp.Path);
 
-        var destination = Path.Combine(temp.Path, "copytoasync.txt");
-        var payload = Encoding.UTF8.GetBytes("progress-check");
-        var reportedBytes = 0L;
-        IProgress<long> progress = new SyncProgress<long>(bytes => reportedBytes += bytes);
-
-        await using var source = new MemoryStream(payload);
-        await provider.WriteAsync(destination, source, progress, CancellationToken.None);
-
-        Assert.Equal(payload.LongLength, reportedBytes);
-        Assert.Equal("progress-check", await File.ReadAllTextAsync(destination));
-    }
-
-    [Fact]
-    public async Task WriteAsync_ManualLoopWithArrayPool_WritesContentAndReportsProgress()
-    {
-        using var temp = new TempDirectory();
-        var provider = new LocalFileSystemProvider(
-            temp.Path,
-            options: new LocalFileSystemProviderOptions
-            {
-                CopyBufferSizeBytes = 3,
-                WriteMode = LocalFileSystemWriteMode.ManualLoop,
-                UseArrayPoolForManualLoop = true,
-                PreallocateDestinationFile = true,
-            });
-
-        var destination = Path.Combine(temp.Path, "manualloop.txt");
+        var destination = Path.Combine(temp.Path, "copy.txt");
         var payload = Encoding.UTF8.GetBytes("arraypool-check");
         var reportedBytes = 0L;
         IProgress<long> progress = new SyncProgress<long>(bytes => reportedBytes += bytes);
 
+        var settings = new OperationalSettings
+        {
+            CopyBufferSizeBytes = 3,
+        };
+
         await using var source = new MemoryStream(payload);
-        await provider.WriteAsync(destination, source, progress, CancellationToken.None);
+        await provider.WriteAsync(destination, source, progress, settings, CancellationToken.None);
 
         Assert.Equal(payload.LongLength, reportedBytes);
         Assert.Equal(payload.LongLength, new FileInfo(destination).Length);
@@ -67,7 +40,7 @@ public sealed class LocalFileSystemProviderWriteStrategyTests
         await Assert.ThrowsAsync<OperationCanceledException>(async () =>
         {
             await using var source = new InterruptingReadStream(totalBytes: 1024, throwAfterBytes: 256);
-            await provider.WriteAsync(destination, source, progress: null, CancellationToken.None);
+            await provider.WriteAsync(destination, source, progress: null, settings: null, CancellationToken.None);
         });
 
         Assert.False(File.Exists(destination));
@@ -85,7 +58,7 @@ public sealed class LocalFileSystemProviderWriteStrategyTests
         await Assert.ThrowsAsync<OperationCanceledException>(async () =>
         {
             await using var source = new InterruptingReadStream(totalBytes: 4096, throwAfterBytes: 512);
-            await provider.WriteAsync(destination, source, progress: null, CancellationToken.None);
+            await provider.WriteAsync(destination, source, progress: null, settings: null, CancellationToken.None);
         });
 
         Assert.Equal("original", await File.ReadAllTextAsync(destination));
@@ -101,11 +74,87 @@ public sealed class LocalFileSystemProviderWriteStrategyTests
         var destination = Path.Combine(temp.Path, longFileName);
 
         await using var source = new MemoryStream("long-name-check"u8.ToArray());
-        await provider.WriteAsync(destination, source, progress: null, CancellationToken.None);
+        await provider.WriteAsync(destination, source, progress: null, settings: null, CancellationToken.None);
 
         Assert.True(File.Exists(destination));
         Assert.Equal("long-name-check", await File.ReadAllTextAsync(destination));
         Assert.Empty(Directory.GetFiles(temp.Path, "*.smartcopy.tmp.*", SearchOption.TopDirectoryOnly));
+    }
+
+    [Fact]
+    public async Task WriteAsync_DirectDurability_WritesContentDirectlyAndSucceeds()
+    {
+        using var temp = new TempDirectory();
+        var provider = new LocalFileSystemProvider(temp.Path);
+
+        var destination = Path.Combine(temp.Path, "directtiny.txt");
+        var payload = Encoding.UTF8.GetBytes("tiny-direct-write");
+        var reportedBytes = 0L;
+        IProgress<long> progress = new SyncProgress<long>(bytes => reportedBytes += bytes);
+
+        var settings = new OperationalSettings
+        {
+            CopyBufferSizeBytes = 4,
+            WriteDurability = WriteDurability.Direct,
+        };
+
+        await using var source = new MemoryStream(payload);
+        await provider.WriteAsync(destination, source, progress, settings, CancellationToken.None);
+
+        Assert.Equal(payload.LongLength, reportedBytes);
+        Assert.True(File.Exists(destination));
+        Assert.Equal("tiny-direct-write", await File.ReadAllTextAsync(destination));
+        Assert.Empty(Directory.GetFiles(temp.Path, "*.smartcopy.tmp.*", SearchOption.TopDirectoryOnly));
+    }
+
+    [Fact]
+    public async Task WriteAsync_DirectDurability_WhenInterrupted_DoesNotLeaveCorruptedFile()
+    {
+        using var temp = new TempDirectory();
+        var provider = new LocalFileSystemProvider(temp.Path);
+        var destination = Path.Combine(temp.Path, "direct-interrupted.txt");
+
+        var settings = new OperationalSettings
+        {
+            CopyBufferSizeBytes = 4,
+            WriteDurability = WriteDurability.Direct,
+        };
+
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+        {
+            await using var source = new InterruptingReadStream(totalBytes: 512, throwAfterBytes: 128);
+            await provider.WriteAsync(destination, source, progress: null, settings, CancellationToken.None);
+        });
+
+        Assert.False(File.Exists(destination));
+        Assert.Empty(Directory.GetFiles(temp.Path, "*.smartcopy.tmp.*", SearchOption.TopDirectoryOnly));
+    }
+
+    [Fact]
+    public async Task WriteAsync_DirectDurability_WhenOpenFails_DoesNotDeletePreExistingFile()
+    {
+        using var temp = new TempDirectory();
+        var provider = new LocalFileSystemProvider(temp.Path);
+        var destination = Path.Combine(temp.Path, "pre-existing.txt");
+        await File.WriteAllTextAsync(destination, "do-not-delete-me");
+
+        var invalidDestination = Path.Combine(destination, "invalid-subdir", "file.txt");
+
+        var settings = new OperationalSettings
+        {
+            CopyBufferSizeBytes = 4,
+            WriteDurability = WriteDurability.Direct,
+        };
+
+        await Assert.ThrowsAnyAsync<IOException>(async () =>
+        {
+            await using var source = new MemoryStream("payload"u8.ToArray());
+            await provider.WriteAsync(invalidDestination, source, progress: null, settings, CancellationToken.None);
+        });
+
+        // Ensure the actual pre-existing file was completely untouched
+        Assert.True(File.Exists(destination));
+        Assert.Equal("do-not-delete-me", await File.ReadAllTextAsync(destination));
     }
 
     private sealed class InterruptingReadStream(int totalBytes, int throwAfterBytes) : Stream

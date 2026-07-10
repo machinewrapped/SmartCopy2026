@@ -1,8 +1,6 @@
 using SmartCopy.Core.DirectoryTree;
-using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Pipeline.Steps;
-using SmartCopy.Core.Trash;
 using SmartCopy.Tests.TestInfrastructure;
 
 namespace SmartCopy.Tests.Pipeline;
@@ -14,54 +12,6 @@ namespace SmartCopy.Tests.Pipeline;
 /// </summary>
 public sealed class ErrorHandlingTests
 {
-    // ─────────────────────────────────────────────────────────────────────────
-    // Shared test context
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private sealed class TestContext(DirectoryNode root, IFileSystemProvider source, IFileSystemProvider? target = null) : IStepContext
-    {
-        private readonly Dictionary<DirectoryTreeNode, PipelineContext> _ctxCache = new();
-        private readonly HashSet<DirectoryTreeNode> _failed = new();
-
-        public DirectoryNode RootNode { get; } = root;
-        public IFileSystemProvider SourceProvider { get; } = source;
-        public bool ShowHiddenFiles { get; }
-        public bool AllowDeleteReadOnly { get; }
-        public ITrashService TrashService { get; } = new NullTrashService();
-
-        public FileSystemProviderRegistry ProviderRegistry { get; } = BuildRegistry(source, target);
-
-        private static FileSystemProviderRegistry BuildRegistry(IFileSystemProvider source, IFileSystemProvider? target)
-        {
-            var reg = new FileSystemProviderRegistry();
-            reg.Register(source);
-            if (target != null && target != source)
-                reg.Register(target);
-            return reg;
-        }
-
-        public PipelineContext GetNodeContext(DirectoryTreeNode node)
-        {
-            if (!_ctxCache.TryGetValue(node, out var ctx))
-            {
-                ctx = new PipelineContext
-                {
-                    SourceNode = node,
-                    SourceProvider = SourceProvider,
-                    ProviderRegistry = ProviderRegistry,
-                    PathSegments = node.RelativePathSegments.Length > 0 ? node.RelativePathSegments : [node.Name],
-                    CurrentExtension = Path.GetExtension(node.Name).TrimStart('.'),
-                    VirtualCheckState = node.CheckState,
-                };
-                _ctxCache[node] = ctx;
-            }
-            return ctx;
-        }
-
-        public bool IsNodeFailed(DirectoryTreeNode node) => _failed.Contains(node);
-        public void MarkFailed(DirectoryTreeNode node) => _failed.Add(node);
-    }
-
     // ─────────────────────────────────────────────────────────────────────────
     // CopyStep
     // ─────────────────────────────────────────────────────────────────────────
@@ -83,7 +33,7 @@ public sealed class ErrorHandlingTests
         var root = await inner.BuildDirectoryTree("/src");
         foreach (var f in root.Files) f.CheckState = CheckState.Checked;
 
-        var ctx = new TestContext(root, source);
+        var ctx = new FakeStepContext(root, source);
         var step = new CopyStep("mem://dest");
 
         var results = new List<TransformResult>();
@@ -126,7 +76,7 @@ public sealed class ErrorHandlingTests
         var root = await inner.BuildDirectoryTree("/src");
         foreach (var f in root.Files) f.CheckState = CheckState.Checked;
 
-        var ctx = new TestContext(root, source);
+        var ctx = new FakeStepContext(root, source);
         var step = new MoveStep("mem://dest");
 
         var results = new List<TransformResult>();
@@ -173,7 +123,7 @@ public sealed class ErrorHandlingTests
         var root = await innerSource.BuildDirectoryTree("/src");
         root.Files[0].CheckState = CheckState.Checked;
 
-        var ctx = new TestContext(root, faultingSource, target);
+        var ctx = new FakeStepContext(root, faultingSource, target);
         var step = new MoveStep("mem://target/dest");
 
         var results = new List<TransformResult>();
@@ -215,7 +165,7 @@ public sealed class ErrorHandlingTests
         root.Files.Single(f => f.Name == "a.txt").CheckState = CheckState.Checked;
         root.Files.Single(f => f.Name == "b.txt").CheckState = CheckState.Checked;
 
-        var ctx = new TestContext(root, source);
+        var ctx = new FakeStepContext(root, source);
         var step = new DeleteStep(DeleteMode.Permanent);
 
         // DeleteStep requires preview first.
@@ -266,7 +216,7 @@ public sealed class ErrorHandlingTests
         // Fault only the directory-level atomic move, not individual file moves.
         var source = new FaultingProvider(inner) { FaultOnMove = path => path == subdir.FullPath };
 
-        var ctx = new TestContext(root, source);
+        var ctx = new FakeStepContext(root, source);
         var step = new MoveStep("mem://dest");
 
         var results = new List<TransformResult>();
@@ -305,7 +255,7 @@ public sealed class ErrorHandlingTests
 
         // Fault only the root directory delete, not individual file deletes.
         var source = new FaultingProvider(inner) { FaultOnDelete = path => path == root.FullPath };
-        var ctx = new TestContext(root, source);
+        var ctx = new FakeStepContext(root, source);
         var step = new DeleteStep(DeleteMode.Permanent);
 
         var previewResults = new List<TransformResult>();
