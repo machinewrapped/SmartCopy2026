@@ -5,7 +5,7 @@ This file provides guidance to AI agents when working with code in this reposito
 SmartCopy2026 is a cross-platform file manager (Windows/Linux/macOS) rewritten from SmartCopy 2015 (WinForms/.NET 4.8). It intelligently copies large directories via composable filters and transform pipelines. Stack: C#/.NET 10, Avalonia UI 11, CommunityToolkit.Mvvm.
 
 ## Project Status
-Implementation according to `Docs/SmartCopy2026-Plan.md` is complete. The app is launched and live on multiple sites.
+Implementation according to the archived `Docs/archive/SmartCopy2026-Plan.md` is complete. The app is launched and live on multiple sites.
 
 ## System Architecture
 Architectural overview and design principles are detailed in `Docs/Architecture.md`. Consult the architecture when designing a solution to ensure that it follows established principles, and update the document after refactoring or redesign changes the architecture.
