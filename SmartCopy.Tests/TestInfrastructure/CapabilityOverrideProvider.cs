@@ -47,8 +47,8 @@ internal sealed class CapabilityOverrideProvider(
     public Task<bool> ExistsAsync(string path, CancellationToken ct) =>
         inner.ExistsAsync(path, ct);
 
-    public IBulkWriteSession BeginBulkWriteAsync() =>
-        inner.BeginBulkWriteAsync();
+    public IBulkWriteSession BeginBulkWrite() =>
+        inner.BeginBulkWrite();
         
     public string GetRelativePath(string basePath, string fullPath) =>
         inner.GetRelativePath(basePath, fullPath);

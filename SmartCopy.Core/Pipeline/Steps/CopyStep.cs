@@ -183,7 +183,7 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
             ?? throw new InvalidOperationException("TargetProvider must be set for CopyStep.");
 
         // Bulk-write scope lets providers establish protocol-level transfer sessions (e.g. MTP).
-        await using var targetSession = targetProvider.BeginBulkWriteAsync();
+        await using var targetSession = targetProvider.BeginBulkWrite();
 
         // The policy resolves buffer size + batching from the source/destination drive pair and
         // returns the strategy that performs the byte transfer. Copy keeps no transfer logic of

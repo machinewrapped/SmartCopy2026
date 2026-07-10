@@ -481,7 +481,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         }, ct);
     }
 
-    public IBulkWriteSession BeginBulkWriteAsync() => new BulkWriteSession(this);
+    public IBulkWriteSession BeginBulkWrite() => new BulkWriteSession(this);
 
     private sealed class BulkWriteSession(LocalFileSystemProvider owner) : IBulkWriteSession
     {

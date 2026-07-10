@@ -221,7 +221,7 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
         var canAtomicMove = sameVolume && targetProvider.Capabilities.CanAtomicMove;
 
         // Bulk-write scope lets providers establish protocol-level transfer sessions (e.g. MTP).
-        await using var targetSession = targetProvider.BeginBulkWriteAsync();
+        await using var targetSession = targetProvider.BeginBulkWrite();
 
         // Non-atomic moves degrade to copy+delete; the copy reuses the shared strategy.
         var strategy = await context.ResolveCopyStrategyAsync(targetProvider, ct);

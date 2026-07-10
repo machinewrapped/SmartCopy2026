@@ -165,7 +165,7 @@ public sealed class LocalFileSystemProviderWriteStrategyTests
         var directory = Path.Combine(temp.Path, "created");
         var external = Path.Combine(directory, "external.txt");
 
-        await using var session = provider.BeginBulkWriteAsync();
+        await using var session = provider.BeginBulkWrite();
         var destination = Path.Combine(directory, "written.txt");
         await using var source = new MemoryStream("payload"u8.ToArray());
         await session.WriteAsync(destination, source, progress: null, settings: null, CancellationToken.None);
@@ -175,7 +175,7 @@ public sealed class LocalFileSystemProviderWriteStrategyTests
         Assert.False(await session.ExistsAsync(external, CancellationToken.None));
         Assert.True(await provider.ExistsAsync(external, CancellationToken.None));
 
-        await using var secondSession = provider.BeginBulkWriteAsync();
+        await using var secondSession = provider.BeginBulkWrite();
         Assert.True(await secondSession.ExistsAsync(external, CancellationToken.None));
     }
 
