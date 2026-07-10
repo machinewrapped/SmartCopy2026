@@ -73,7 +73,13 @@ internal static class StreamCopyEngine
         var rentedBuffer = System.Buffers.ArrayPool<byte>.Shared.Rent(opts.CopyBufferSizeBytes);
         try
         {
-            await CopyWithManualLoopCoreAsync(data, output, rentedBuffer, progress, ct);
+            await CopyWithManualLoopCoreAsync(
+                data,
+                output,
+                rentedBuffer,
+                opts.CopyBufferSizeBytes,
+                progress,
+                ct);
         }
         finally
         {
@@ -85,13 +91,14 @@ internal static class StreamCopyEngine
         Stream data,
         Stream output,
         byte[] buffer,
+        int bufferSize,
         IProgress<long>? progress,
         CancellationToken ct)
     {
         while (true)
         {
             ct.ThrowIfCancellationRequested();
-            var read = await data.ReadAsync(buffer.AsMemory(0, buffer.Length), ct);
+            var read = await data.ReadAsync(buffer.AsMemory(0, bufferSize), ct);
             if (read == 0)
             {
                 break;

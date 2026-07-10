@@ -97,6 +97,7 @@ public abstract class CopyStrategyBase : ICopyStrategy
     public abstract IAsyncEnumerable<TransformResult> CopySelectionAsync(
         IStepContext context,
         IFileSystemProvider targetProvider,
+        IBulkWriteSession targetSession,
         string destPath,
         OverwriteMode mode,
         SourceResult successResult,
@@ -105,7 +106,7 @@ public abstract class CopyStrategyBase : ICopyStrategy
     public async Task TransferFileAsync(
         IStepContext context,
         DirectoryTreeNode file,
-        IFileSystemProvider targetProvider,
+        IBulkWriteSession targetSession,
         string destination,
         CancellationToken ct)
     {
@@ -122,7 +123,7 @@ public abstract class CopyStrategyBase : ICopyStrategy
         // per file via SettingsFor and the provider honours it.
         var settings = SettingsFor(file.Size);
         await using var sourceStream = await context.SourceProvider.OpenReadAsync(file.FullPath, settings.CopyBufferSizeBytes, ct);
-        await targetProvider.WriteAsync(destination, sourceStream, writeProgress, settings, ct);
+        await targetSession.WriteAsync(destination, sourceStream, writeProgress, settings, ct);
     }
 
     /// <summary>
@@ -134,14 +135,14 @@ public abstract class CopyStrategyBase : ICopyStrategy
         DirectoryTreeNode node,
         string destination,
         DestinationResult destResult,
-        IFileSystemProvider targetProvider,
+        IBulkWriteSession targetSession,
         SourceResult successResult,
         CancellationToken ct)
     {
         string? copyError = null;
         try
         {
-            await TransferFileAsync(context, node, targetProvider, destination, ct);
+            await TransferFileAsync(context, node, targetSession, destination, ct);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -166,12 +167,12 @@ public abstract class CopyStrategyBase : ICopyStrategy
     /// (OverwriteMode.Skip and destination exists).
     /// </summary>
     protected static async Task<DestinationResult?> ResolveDestResultAsync(
-        IFileSystemProvider targetProvider,
+        IBulkWriteSession targetSession,
         string destination,
         OverwriteMode mode,
         CancellationToken ct)
     {
-        var exists = await targetProvider.ExistsAsync(destination, ct);
+        var exists = await targetSession.ExistsAsync(destination, ct);
         if (exists && mode == OverwriteMode.Skip)
             return null;
 

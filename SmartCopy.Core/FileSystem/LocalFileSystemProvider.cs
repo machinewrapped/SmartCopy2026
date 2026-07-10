@@ -16,8 +16,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 
     private readonly bool _isNetworkPath;
     private readonly ProviderCapabilities _capabilities;
-    // Ordinal matches the historical behaviour of the inline directory cache this replaced.
-    private readonly FreshDirectoryTracker _directoryTracker = new(StringComparison.Ordinal);
+
     public LocalFileSystemProvider(
         string rootPath,
         Func<string>? readLinuxMountInfo = null)
@@ -144,21 +143,40 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         Stream data,
         IProgress<long>? progress,
         OperationalSettings? settings,
+        CancellationToken ct) =>
+        await WriteAsync(path, data, progress, settings, directoryTracker: null, ct);
+
+    private async Task WriteAsync(
+        string path,
+        Stream data,
+        IProgress<long>? progress,
+        OperationalSettings? settings,
+        FreshDirectoryTracker? directoryTracker,
         CancellationToken ct)
     {
         var opts = settings ?? new OperationalSettings();
         var fullPath = Resolve(path);
         var directory = Path.GetDirectoryName(fullPath);
-        if (!string.IsNullOrEmpty(directory) && !_directoryTracker.IsKnown(directory))
+        if (!string.IsNullOrEmpty(directory))
         {
-            if (!Directory.Exists(directory))
+            if (directoryTracker is null)
             {
-                Directory.CreateDirectory(directory);
-                _directoryTracker.MarkCreated(directory);
+                if (!Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
             }
-            else
+            else if (!directoryTracker.IsKnown(directory))
             {
-                _directoryTracker.MarkKnown(directory);
+                if (!Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                    directoryTracker.MarkCreated(directory);
+                }
+                else
+                {
+                    directoryTracker.MarkKnown(directory);
+                }
             }
         }
 
@@ -443,32 +461,45 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         }, ct);
     }
 
-    public Task<bool> ExistsAsync(string path, CancellationToken ct)
+    public Task<bool> ExistsAsync(string path, CancellationToken ct) =>
+        ExistsAsync(path, directoryTracker: null, ct);
+
+    private Task<bool> ExistsAsync(string path, FreshDirectoryTracker? directoryTracker, CancellationToken ct)
     {
         return Task.Run(() =>
         {
             ct.ThrowIfCancellationRequested();
             var fullPath = Resolve(path);
             // A directory we just created is empty by definition, so nothing inside it exists yet.
-            if (_directoryTracker.IsFreshlyCreated(Path.GetDirectoryName(fullPath)))
+            if (directoryTracker is not null &&
+                directoryTracker.IsFreshlyCreated(Path.GetDirectoryName(fullPath)))
+            {
                 return false;
+            }
+
             return File.Exists(fullPath) || Directory.Exists(fullPath);
         }, ct);
     }
 
-    public IAsyncDisposable BeginBulkWriteAsync()
-    {
-        _directoryTracker.Reset();
-        return new BulkWriteScope(this);
-    }
+    public IBulkWriteSession BeginBulkWriteAsync() => new BulkWriteSession(this);
 
-    private sealed class BulkWriteScope(LocalFileSystemProvider owner) : IAsyncDisposable
+    private sealed class BulkWriteSession(LocalFileSystemProvider owner) : IBulkWriteSession
     {
-        public ValueTask DisposeAsync()
-        {
-            owner._directoryTracker.Reset();
-            return ValueTask.CompletedTask;
-        }
+        // Ordinal matches the historical behaviour of the inline directory cache this replaced.
+        private readonly FreshDirectoryTracker _directoryTracker = new(StringComparison.Ordinal);
+
+        public Task WriteAsync(
+            string path,
+            Stream data,
+            IProgress<long>? progress,
+            OperationalSettings? settings,
+            CancellationToken ct) =>
+            owner.WriteAsync(path, data, progress, settings, _directoryTracker, ct);
+
+        public Task<bool> ExistsAsync(string path, CancellationToken ct) =>
+            owner.ExistsAsync(path, _directoryTracker, ct);
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     public Task<long?> GetAvailableFreeSpaceAsync(CancellationToken ct)

@@ -34,6 +34,35 @@ public sealed class StreamCopyEngineTests
         Assert.Equal(payload, destination.ToArray());
     }
 
+    [Fact]
+    public async Task CopyAsync_ManualLoop_RespectsConfiguredBufferSize()
+    {
+        var payload = "arraypool-rent-may-be-larger"u8.ToArray();
+        var reported = new List<long>();
+        IProgress<long> progress = new SyncProgress<long>(reported.Add);
+
+        var settings = new OperationalSettings
+        {
+            CopyBufferSizeBytes = 3,
+            SmallFileProgressThresholdBytes = 0,
+        };
+
+        await using var source = new MaxReadTrackingStream(payload);
+        await using var destination = new MemoryStream();
+
+        await StreamCopyEngine.CopyAsync(
+            source,
+            destination,
+            remainingBytes: null,
+            progress,
+            settings,
+            CancellationToken.None);
+
+        Assert.True(source.MaxRequestedReadBytes <= settings.CopyBufferSizeBytes);
+        Assert.Equal(payload.LongLength, reported.Sum());
+        Assert.Equal(payload, destination.ToArray());
+    }
+
     private sealed class CopyToAsyncFailingMemoryStream(byte[] payload) : MemoryStream(payload, writable: false)
     {
         public bool CopyToAsyncCalled { get; private set; }
@@ -43,6 +72,17 @@ public sealed class StreamCopyEngineTests
             CopyToAsyncCalled = true;
             throw new InvalidOperationException(
                 "Auto small-file path should not call CopyToAsync when ArrayPool is enabled.");
+        }
+    }
+
+    private sealed class MaxReadTrackingStream(byte[] payload) : MemoryStream(payload, writable: false)
+    {
+        public int MaxRequestedReadBytes { get; private set; }
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            MaxRequestedReadBytes = Math.Max(MaxRequestedReadBytes, buffer.Length);
+            return base.ReadAsync(buffer, cancellationToken);
         }
     }
 }

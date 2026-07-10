@@ -168,6 +168,24 @@ public sealed class AppSettingsOperationalSettingsTests
         Assert.Equal(320 * 1024, operational.CopyBufferRouting.UnknownBytes);
     }
 
+    [Fact]
+    public void GetCopyOptimisationPolicy_WhenPersistedPlatformPolicyIsNull_MaterializesFallback()
+    {
+        var settings = new AppSettings
+        {
+            CopyOptimisationPlatformPolicy = new CopyOptimisationPlatformPolicy
+            {
+                Windows = null!,
+            },
+        };
+
+        var policy = settings.GetCopyOptimisationPolicy(OSPlatform.Windows);
+        policy.Enabled = true;
+
+        Assert.Same(policy, settings.CopyOptimisationPlatformPolicy.Windows);
+        Assert.True(settings.CopyOptimisationPlatformPolicy.Windows.Enabled);
+    }
+
     private static CopyOptimisationPolicy TestPolicy(bool enabled) => new()
     {
         Enabled = enabled,

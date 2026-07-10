@@ -14,6 +14,7 @@ public sealed class StreamingCopyStrategy(OperationalSettings settings, bool tar
     public override async IAsyncEnumerable<TransformResult> CopySelectionAsync(
         IStepContext context,
         IFileSystemProvider targetProvider,
+        IBulkWriteSession targetSession,
         string destPath,
         OverwriteMode mode,
         SourceResult successResult,
@@ -37,14 +38,21 @@ public sealed class StreamingCopyStrategy(OperationalSettings settings, bool tar
             var destination = targetProvider.JoinPath(destPath, nodeCtx.PathSegments);
 
             // null => the file already exists and OverwriteMode is Skip; report it skipped.
-            var destResult = await ResolveDestResultAsync(targetProvider, destination, mode, ct);
+            var destResult = await ResolveDestResultAsync(targetSession, destination, mode, ct);
             if (destResult is null)
             {
                 yield return SkippedResult(node, destination);
                 continue;
             }
 
-            yield return await CopyOneFileAsync(context, node, destination, destResult.Value, targetProvider, successResult, ct);
+            yield return await CopyOneFileAsync(
+                context,
+                node,
+                destination,
+                destResult.Value,
+                targetSession,
+                successResult,
+                ct);
         }
     }
 }

@@ -35,6 +35,7 @@ public interface ICopyStrategy
     IAsyncEnumerable<TransformResult> CopySelectionAsync(
         IStepContext context,
         IFileSystemProvider targetProvider,
+        IBulkWriteSession targetSession,
         string destPath,
         OverwriteMode mode,
         SourceResult successResult,
@@ -50,7 +51,7 @@ public interface ICopyStrategy
     Task TransferFileAsync(
         IStepContext context,
         DirectoryTreeNode file,
-        IFileSystemProvider targetProvider,
+        IBulkWriteSession targetSession,
         string destination,
         CancellationToken ct);
 }

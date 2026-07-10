@@ -112,13 +112,7 @@ public interface IFileSystemProvider
     /// Providers may use this to reset write-optimisation caches or establish
     /// protocol-level bulk-transfer sessions (e.g. MTP). Default: no-op.
     /// </summary>
-    IAsyncDisposable BeginBulkWriteAsync() => NullScope.Instance;
-
-    private sealed class NullScope : IAsyncDisposable
-    {
-        internal static readonly NullScope Instance = new();
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-    }
+    IBulkWriteSession BeginBulkWriteAsync() => new ProviderBulkWriteSession(this);
 
     /// <summary>
     /// Returns the available free bytes on the volume hosting this provider,

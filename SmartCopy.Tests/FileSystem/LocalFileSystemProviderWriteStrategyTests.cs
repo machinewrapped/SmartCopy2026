@@ -157,6 +157,28 @@ public sealed class LocalFileSystemProviderWriteStrategyTests
         Assert.Equal("do-not-delete-me", await File.ReadAllTextAsync(destination));
     }
 
+    [Fact]
+    public async Task BulkWriteSession_FreshDirectoryCache_DoesNotLeakToProviderOrNewSession()
+    {
+        using var temp = new TempDirectory();
+        var provider = new LocalFileSystemProvider(temp.Path);
+        var directory = Path.Combine(temp.Path, "created");
+        var external = Path.Combine(directory, "external.txt");
+
+        await using var session = provider.BeginBulkWriteAsync();
+        var destination = Path.Combine(directory, "written.txt");
+        await using var source = new MemoryStream("payload"u8.ToArray());
+        await session.WriteAsync(destination, source, progress: null, settings: null, CancellationToken.None);
+
+        await File.WriteAllTextAsync(external, "exists");
+
+        Assert.False(await session.ExistsAsync(external, CancellationToken.None));
+        Assert.True(await provider.ExistsAsync(external, CancellationToken.None));
+
+        await using var secondSession = provider.BeginBulkWriteAsync();
+        Assert.True(await secondSession.ExistsAsync(external, CancellationToken.None));
+    }
+
     private sealed class InterruptingReadStream(int totalBytes, int throwAfterBytes) : Stream
     {
         private readonly int _totalBytes = totalBytes;

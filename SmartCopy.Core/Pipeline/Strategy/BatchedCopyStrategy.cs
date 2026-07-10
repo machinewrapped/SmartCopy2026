@@ -19,6 +19,7 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
     public override async IAsyncEnumerable<TransformResult> CopySelectionAsync(
         IStepContext context,
         IFileSystemProvider targetProvider,
+        IBulkWriteSession targetSession,
         string destPath,
         OverwriteMode mode,
         SourceResult successResult,
@@ -52,7 +53,7 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
             // ceremony, so batched timing must bank it too — otherwise bucket comparisons charge the
             // streaming control for a stat the batched variants hide. Banked with the read at flush.
             var ceremonyStart = Stopwatch.GetTimestamp();
-            var destResult = await ResolveDestResultAsync(targetProvider, destination, mode, ct);
+            var destResult = await ResolveDestResultAsync(targetSession, destination, mode, ct);
             var ceremonyElapsed = Stopwatch.GetElapsedTime(ceremonyStart);
 
             // null => already exists and OverwriteMode is Skip; report skipped without reading.
@@ -70,7 +71,12 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
                 // No room left for this file — drain what we have, then start filling again.
                 if (!buffer.HasCapacityFor(fileSize))
                 {
-                    await foreach (var r in FlushBatchAsync(buffer, targetProvider, context, successResult, ct))
+                    await foreach (var r in FlushBatchAsync(
+                        buffer,
+                        targetSession,
+                        context,
+                        successResult,
+                        ct))
                         yield return r;
                 }
 
@@ -106,15 +112,27 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
             {
                 // File above the eligibility ceiling — flush pending entries (to preserve order), then
                 // stream it directly via the ManualLoop fallback.
-                await foreach (var r in FlushBatchAsync(buffer, targetProvider, context, successResult, ct))
+                await foreach (var r in FlushBatchAsync(
+                    buffer,
+                    targetSession,
+                    context,
+                    successResult,
+                    ct))
                     yield return r;
 
-                yield return await CopyOneFileAsync(context, node, destination, destResult.Value, targetProvider, successResult, ct);
+                yield return await CopyOneFileAsync(
+                    context,
+                    node,
+                    destination,
+                    destResult.Value,
+                    targetSession,
+                    successResult,
+                    ct);
             }
         }
 
         // Drain whatever remains after the last file.
-        await foreach (var r in FlushBatchAsync(buffer, targetProvider, context, successResult, ct))
+        await foreach (var r in FlushBatchAsync(buffer, targetSession, context, successResult, ct))
             yield return r;
     }
 
@@ -158,7 +176,7 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
     /// </summary>
     private async IAsyncEnumerable<TransformResult> FlushBatchAsync(
         BatchCopyBuffer buffer,
-        IFileSystemProvider targetProvider,
+        IBulkWriteSession targetSession,
         IStepContext context,
         SourceResult successResult,
         [EnumeratorCancellation] CancellationToken ct)
@@ -178,7 +196,7 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
             try
             {
                 using var ms = buffer.OpenSegmentStream(entry);
-                await targetProvider.WriteAsync(entry.Destination, ms, progress, SettingsFor(entry.Length), ct);
+                await targetSession.WriteAsync(entry.Destination, ms, progress, SettingsFor(entry.Length), ct);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {

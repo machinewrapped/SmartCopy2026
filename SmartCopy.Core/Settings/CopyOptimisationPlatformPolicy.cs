@@ -32,19 +32,19 @@ public sealed class CopyOptimisationPlatformPolicy
     {
         if (platform.Equals(OSPlatform.Windows))
         {
-            return Windows ?? CopyOptimisationPolicy.DisabledDefaults();
+            return Windows ??= CopyOptimisationPolicy.DisabledDefaults();
         }
 
         if (platform.Equals(OSPlatform.OSX))
         {
-            return MacOS ?? CopyOptimisationPolicy.DisabledDefaults();
+            return MacOS ??= CopyOptimisationPolicy.DisabledDefaults();
         }
 
         if (platform.Equals(OSPlatform.Linux))
         {
-            return Linux ?? CopyOptimisationPolicy.DisabledDefaults();
+            return Linux ??= CopyOptimisationPolicy.DisabledDefaults();
         }
 
-        return Other ?? CopyOptimisationPolicy.DisabledDefaults();
+        return Other ??= CopyOptimisationPolicy.DisabledDefaults();
     }
 }

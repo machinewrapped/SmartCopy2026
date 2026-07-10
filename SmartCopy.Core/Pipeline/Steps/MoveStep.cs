@@ -221,13 +221,108 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
         var canAtomicMove = sameVolume && targetProvider.Capabilities.CanAtomicMove;
 
         // Bulk-write scope lets providers establish protocol-level transfer sessions (e.g. MTP).
-        await using var _ = targetProvider.BeginBulkWriteAsync();
+        await using var targetSession = targetProvider.BeginBulkWriteAsync();
 
         // Non-atomic moves degrade to copy+delete; the copy reuses the shared strategy.
         var strategy = await context.ResolveCopyStrategyAsync(targetProvider, ct);
+        var execution = new MoveExecutor(
+            context,
+            DestinationPath,
+            targetProvider,
+            targetSession,
+            strategy,
+            canAtomicMove,
+            OverwriteMode);
 
-        await foreach (var result in WalkAndMoveAsync(context.RootNode, context, DestinationPath, targetProvider, strategy, canAtomicMove, OverwriteMode, ct))
+        await foreach (var result in WalkAndMoveAsync(context.RootNode, execution, ct))
             yield return result;
+    }
+
+    private sealed class MoveExecutor(
+        IStepContext stepContext,
+        string destinationPath,
+        IFileSystemProvider targetProvider,
+        IBulkWriteSession targetSession,
+        ICopyStrategy strategy,
+        bool canAtomicMove,
+        OverwriteMode overwriteMode)
+    {
+        public bool CanAtomicMove => canAtomicMove;
+
+        public OverwriteMode OverwriteMode => overwriteMode;
+
+        public bool IsNodeFailed(DirectoryTreeNode node) => stepContext.IsNodeFailed(node);
+
+        public void MarkFailed(DirectoryTreeNode node) => stepContext.MarkFailed(node);
+
+        public string GetDestination(DirectoryTreeNode node)
+        {
+            var nodeCtx = stepContext.GetNodeContext(node);
+            return targetProvider.JoinPath(destinationPath, nodeCtx.PathSegments);
+        }
+
+        public Task<bool> DestinationExistsAsync(string destination, CancellationToken ct) =>
+            targetSession.ExistsAsync(destination, ct);
+
+        public async Task<bool> TryAtomicMoveAsync(DirectoryTreeNode node, string destination, CancellationToken ct)
+        {
+            try
+            {
+                await stepContext.SourceProvider.MoveAsync(node.FullPath, destination, ct);
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return false;
+            }
+        }
+
+        public async Task<string?> DeleteSourceDirectoryAsync(DirectoryTreeNode node, CancellationToken ct)
+        {
+            try
+            {
+                await stepContext.SourceProvider.DeleteAsync(node.FullPath, ct);
+                return null;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return ex.Message;
+            }
+        }
+
+        public async Task<string?> MoveFileAsync(DirectoryTreeNode file, string destination, CancellationToken ct)
+        {
+            if (canAtomicMove)
+            {
+                try
+                {
+                    await stepContext.SourceProvider.MoveAsync(file.FullPath, destination, ct);
+                    return null;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    return ex.Message;
+                }
+            }
+
+            // Cross-volume / non-atomic: copy via the shared strategy, then delete the source.
+            // `copied` distinguishes a transfer failure from a source-cleanup failure so the
+            // message is accurate (a copied-but-not-deleted file is not data loss).
+            bool copied = false;
+            try
+            {
+                await strategy.TransferFileAsync(stepContext, file, targetSession, destination, ct);
+                copied = true;
+                await stepContext.SourceProvider.DeleteAsync(file.FullPath, ct);
+                return null;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return copied
+                    ? $"Copied but source could not be deleted: {ex.Message}"
+                    : ex.Message;
+            }
+        }
     }
 
     /// <summary>
@@ -235,40 +330,27 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
     /// Atomically moves entire subtrees where possible; falls back to piecewise otherwise.
     /// </summary>
     private static async IAsyncEnumerable<TransformResult> WalkAndMoveAsync(
-        DirectoryNode node, IStepContext context,
-        string destinationPath,
-        IFileSystemProvider targetProvider, ICopyStrategy strategy, bool canAtomicMove,
-        OverwriteMode overwriteMode,
+        DirectoryNode node,
+        MoveExecutor execution,
         [EnumeratorCancellation] CancellationToken ct)
     {
         // --- Directories: try to move each fully-selected subtree as a unit, else recurse. -------
         foreach (var child in node.Children)
         {
             ct.ThrowIfCancellationRequested();
-            if (context.IsNodeFailed(child)) continue;
+            if (execution.IsNodeFailed(child)) continue;
             if (child.CheckState == CheckState.Unchecked) continue;
 
-            var childCtx = context.GetNodeContext(child);
-            var dest = targetProvider.JoinPath(destinationPath, childCtx.PathSegments);
-            var destExists = await targetProvider.ExistsAsync(dest, ct);
+            var dest = execution.GetDestination(child);
+            var destExists = await execution.DestinationExistsAsync(dest, ct);
 
             // The atomic fast-path requires three things: a free destination (an existing one must be
             // merged content-by-content), an atomic-capable same-volume pair, and a fully-selected
             // subtree (a partial selection must leave the unselected files behind).
-            bool atomicMoved = false;
-            if (!destExists && canAtomicMove && CanMoveEntireSubtree(child))
-            {
-                try
-                {
-                    await context.SourceProvider.MoveAsync(child.FullPath, dest, ct);
-                    atomicMoved = true;
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    // Atomic move failed; fall back to piecewise walk below.
-                    _ = ex;
-                }
-            }
+            var atomicMoved = !destExists &&
+                execution.CanAtomicMove &&
+                CanMoveEntireSubtree(child) &&
+                await execution.TryAtomicMoveAsync(child, dest, ct);
 
             if (atomicMoved)
             {
@@ -292,7 +374,7 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
                 // Destination exists (merge needed), cross-provider, or partial selection: recurse piecewise.
                 // Track whether every descendant moved so we know if the source directory can be removed.
                 var allMoved = true;
-                await foreach (var result in WalkAndMoveAsync(child, context, destinationPath, targetProvider, strategy, canAtomicMove, overwriteMode, ct))
+                await foreach (var result in WalkAndMoveAsync(child, execution, ct))
                 {
                     if (!result.IsSuccess || result.SourceNodeResult == SourceResult.Skipped)
                         allMoved = false;
@@ -301,23 +383,15 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
 
                 // Delete the now-empty source directory when the subtree was fully selected and nothing was skipped.
                 // (A partial selection or a skip leaves files behind, so the directory must remain.)
-                if (allMoved && !context.IsNodeFailed(child) && CanMoveEntireSubtree(child))
+                if (allMoved && !execution.IsNodeFailed(child) && CanMoveEntireSubtree(child))
                 {
-                    string? dirCleanupError = null;
-                    try
-                    {
-                        await context.SourceProvider.DeleteAsync(child.FullPath, ct);
-                    }
-                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                    {
-                        dirCleanupError = ex.Message;
-                    }
+                    var dirCleanupError = await execution.DeleteSourceDirectoryAsync(child, ct);
 
                     // The files moved but the empty directory lingered — surface it as a failure on the
                     // directory without invalidating the file moves that already succeeded.
                     if (dirCleanupError is not null)
                     {
-                        context.MarkFailed(child);
+                        execution.MarkFailed(child);
                         yield return new TransformResult(
                             IsSuccess: false,
                             SourceNode: child,
@@ -332,14 +406,13 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
         foreach (var file in node.Files)
         {
             ct.ThrowIfCancellationRequested();
-            if (!file.IsSelected || context.IsNodeFailed(file)) continue;
+            if (!file.IsSelected || execution.IsNodeFailed(file)) continue;
 
-            var fileCtx = context.GetNodeContext(file);
-            var fileDest = targetProvider.JoinPath(destinationPath, fileCtx.PathSegments);
-            var fileDestExists = await targetProvider.ExistsAsync(fileDest, ct);
+            var fileDest = execution.GetDestination(file);
+            var fileDestExists = await execution.DestinationExistsAsync(fileDest, ct);
 
             // Pre-existing destination under Skip: leave the source in place.
-            if (fileDestExists && overwriteMode == OverwriteMode.Skip)
+            if (fileDestExists && execution.OverwriteMode == OverwriteMode.Skip)
             {
                 yield return new TransformResult(
                     IsSuccess: true,
@@ -351,42 +424,11 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
                 continue;
             }
 
-            string? fileError = null;
-            if (canAtomicMove)
-            {
-                // Same-volume, capable provider: a rename is the whole operation.
-                try
-                {
-                    await context.SourceProvider.MoveAsync(file.FullPath, fileDest, ct);
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    fileError = ex.Message;
-                }
-            }
-            else
-            {
-                // Cross-volume / non-atomic: copy via the shared strategy, then delete the source.
-                // `copied` distinguishes a transfer failure from a source-cleanup failure so the
-                // message is accurate (a copied-but-not-deleted file is not data loss).
-                bool copied = false;
-                try
-                {
-                    await strategy.TransferFileAsync(context, file, targetProvider, fileDest, ct);
-                    copied = true;
-                    await context.SourceProvider.DeleteAsync(file.FullPath, ct);
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    fileError = copied
-                        ? $"Copied but source could not be deleted: {ex.Message}"
-                        : ex.Message;
-                }
-            }
+            var fileError = await execution.MoveFileAsync(file, fileDest, ct);
 
             if (fileError is not null)
             {
-                context.MarkFailed(file);
+                execution.MarkFailed(file);
                 yield return new TransformResult(
                     IsSuccess: false,
                     SourceNode: file,
