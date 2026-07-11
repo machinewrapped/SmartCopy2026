@@ -12,6 +12,8 @@ internal sealed class BenchmarkConfig
     public int MaxConvergenceRuns { get; set; } = 5;
     public bool Converge { get; set; } = true;
     public bool FailFast { get; set; } = true;
+    public bool ClearDestinationBeforeRun { get; set; } = true;
+    public bool ClearDestinationAfterRun { get; set; } = true;
     public List<BenchmarkScenario> Scenarios { get; set; } = [];
     public List<string> ScenarioExecutionOrder { get; set; } = [];
     public List<BenchmarkVariant> Variants { get; set; } = [];

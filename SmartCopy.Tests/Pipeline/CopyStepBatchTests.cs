@@ -71,6 +71,71 @@ public sealed class CopyStepBatchTests
     }
 
     [Fact]
+    public async Task BatchCopy_NaturalOrder_StreamsIneligibleFilesWithoutDrainingPendingBatch()
+    {
+        var small = "tiny"u8.ToArray();
+        var large = new byte[20];
+        Random.Shared.NextBytes(large);
+
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithFile("/src/a-small.txt", small)
+            .WithFile("/src/z-large.txt", large)
+            .WithDirectory("/dest"));
+
+        var root = await provider.BuildDirectoryTree("/src");
+        SelectAllFiles(root);
+
+        var results = await RunCopyAsync(root, provider, batchBufferBytes: 10, batchOrderByFileSize: false);
+
+        var copiedOrder = results
+            .Where(r => r.SourceNodeResult == SourceResult.Copied && r.IsSuccess)
+            .Select(r => r.SourceNode.Name)
+            .ToList();
+
+        Assert.Equal(new[] { "z-large.txt", "a-small.txt" }, copiedOrder);
+        Assert.Equal(small, await ReadAllBytesAsync(provider, "/dest/a-small.txt"));
+        Assert.Equal(large, await ReadAllBytesAsync(provider, "/dest/z-large.txt"));
+    }
+
+    [Fact]
+    public async Task BatchCopy_PromotedNaturalOrder_DrainsBeforeIneligibleFile()
+    {
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithFile("/src/a-small.txt", "tiny"u8)
+            .WithFile("/src/z-large.txt", new byte[20])
+            .WithDirectory("/dest"));
+
+        var root = await provider.BuildDirectoryTree("/src");
+        SelectAllFiles(root);
+
+        var results = await RunCopyAsync(root, provider, batchBufferBytes: 10, batchFlushWhenFull: false);
+
+        var copiedOrder = results
+            .Where(r => r.SourceNodeResult == SourceResult.Copied && r.IsSuccess)
+            .Select(r => r.SourceNode.Name)
+            .ToList();
+
+        Assert.Equal(new[] { "a-small.txt", "z-large.txt" }, copiedOrder);
+    }
+
+    [Fact]
+    public async Task BatchCopy_DirectoryExitFlushesBeforeEnteringNextSibling()
+    {
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithFile("/src/A/small.txt", "tiny"u8)
+            .WithFile("/src/B/large.txt", new byte[20])
+            .WithDirectory("/dest"));
+
+        var root = await provider.BuildDirectoryTree("/src");
+        SelectAllFiles(root);
+
+        var results = await RunCopyAsync(root, provider, batchBufferBytes: 10);
+
+        var traversalOrder = results.Select(r => r.SourceNode.Name).ToList();
+        Assert.Equal(new[] { "A", "small.txt", "B", "large.txt" }, traversalOrder);
+    }
+
+    [Fact]
     public async Task BatchCopy_FlushOnOverflow_AllFilesCorrect()
     {
         // Buffer fits exactly 2 × 4-byte files; the third forces a mid-iteration flush.
@@ -130,7 +195,7 @@ public sealed class CopyStepBatchTests
         var root = await provider.BuildDirectoryTree("/src");
         SelectAllFiles(root);
 
-        var results = await RunCopyAsync(root, provider, batchBufferBytes: 512 * 1024);
+        var results = await RunCopyAsync(root, provider, batchBufferBytes: 512 * 1024, batchOrderByFileSize: true);
 
         var copiedOrder = results
             .Where(r => r.SourceNodeResult == SourceResult.Copied && r.IsSuccess)
@@ -248,7 +313,8 @@ public sealed class CopyStepBatchTests
         DirectoryNode root,
         MemoryFileSystemProvider provider,
         long batchBufferBytes = 0,
-        bool batchOrderByFileSize = true)
+        bool batchOrderByFileSize = false,
+        bool batchFlushWhenFull = true)
     {
         var step = new CopyStep("mem://dest");
         var runner = new PipelineRunner(new TransformPipeline([step]));
@@ -260,7 +326,12 @@ public sealed class CopyStepBatchTests
             OperationalSettings = new OperationalSettings
             {
                 BatchBufferBytes = batchBufferBytes,
-                BatchOrderByFileSize = batchOrderByFileSize,
+                BatchTraversalOrder = batchOrderByFileSize
+                    ? BatchTraversalOrder.AscendingFileSize
+                    : BatchTraversalOrder.Natural,
+                BatchFlushPolicy = batchFlushWhenFull
+                    ? BatchFlushPolicy.FlushOnCapacityOrDirectoryExit
+                    : BatchFlushPolicy.FlushBeforeIneligibleFile,
             },
         };
         return await runner.ExecuteAsync(job);

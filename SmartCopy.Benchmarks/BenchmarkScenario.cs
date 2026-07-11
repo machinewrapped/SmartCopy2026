@@ -9,15 +9,14 @@ internal sealed class BenchmarkScenario
     public string DestinationPath { get; set; } = string.Empty;
     public string? SourcePath { get; set; }
     public bool Enabled { get; set; } = true;
-    public bool ClearDestinationBeforeRun { get; set; } = true;
-    public bool ClearDestinationAfterRun { get; set; } = true;
     public OverwriteMode OverwriteMode { get; set; } = OverwriteMode.Always;
     public int? ProviderCopyBufferSizeBytes { get; set; }
     public long? ProviderSmallFileProgressThresholdBytes { get; set; }
     public long? DirectWriteThresholdBytes { get; set; }
     public long? BufferBatchBytes { get; set; }
     public long? BatchEligibilityThresholdBytes { get; set; }
-    public bool? BatchOrderByFileSize { get; set; }
+    public BatchTraversalOrder? BatchTraversalOrder { get; set; }
+    public BatchFlushPolicy? BatchFlushPolicy { get; set; }
     public bool? ProviderWriteSequentialScan { get; set; }
     public bool UsePathPool { get; set; }
     public List<string>? Variants { get; set; }
@@ -41,7 +40,8 @@ internal sealed class BenchmarkScenario
             CopyBufferSizeBytes = ProviderCopyBufferSizeBytes ?? defaults.CopyBufferSizeBytes,
             SmallFileProgressThresholdBytes = ProviderSmallFileProgressThresholdBytes
                 ?? defaults.SmallFileProgressThresholdBytes,
-            BatchOrderByFileSize = BatchOrderByFileSize ?? defaults.BatchOrderByFileSize,
+            BatchTraversalOrder = BatchTraversalOrder ?? defaults.BatchTraversalOrder,
+            BatchFlushPolicy = BatchFlushPolicy ?? defaults.BatchFlushPolicy,
         }.Normalize();
     }
 }

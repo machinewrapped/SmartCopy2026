@@ -11,6 +11,20 @@ public enum WriteDurability
     Direct,
 }
 
+/// <summary>Order in which files are read for batch routing.</summary>
+public enum BatchTraversalOrder
+{
+    Natural,
+    AscendingFileSize,
+}
+
+/// <summary>When pending eligible data is written in addition to the unconditional full-buffer flush.</summary>
+public enum BatchFlushPolicy
+{
+    FlushBeforeIneligibleFile,
+    FlushOnCapacityOrDirectoryExit,
+}
+
 public sealed record OperationalSettings
 {
     public const int DefaultCopyBufferSizeBytes = 256 * 1024;
@@ -36,9 +50,14 @@ public sealed record OperationalSettings
     /// buffer capacity, so the default 512 KiB keeps ≥2 files per flush of a 1 MiB+ buffer — which is
     /// what makes phase separation happen. <c>0</c> disables the ceiling (use buffer capacity).</summary>
     public long BatchEligibilityCeilingBytes { get; init; } = DefaultBatchEligibilityCeilingBytes;
-    /// <summary>When true, batch traversal copies each directory's selected files in ascending size
-    /// order for better buffer packing. When false, preserves the directory tree's natural file order.</summary>
-    public bool BatchOrderByFileSize { get; init; } = true;
+    /// <summary>Order in which files are read for batch routing.</summary>
+    public BatchTraversalOrder BatchTraversalOrder { get; init; } = BatchTraversalOrder.AscendingFileSize;
+    /// <summary>Traversal order selected by the routing policy when the source is HDD.</summary>
+    public BatchTraversalOrder HddSourceBatchTraversalOrder { get; init; } = BatchTraversalOrder.Natural;
+    /// <summary>Traversal order selected by the routing policy for non-HDD sources.</summary>
+    public BatchTraversalOrder OtherSourceBatchTraversalOrder { get; init; } = BatchTraversalOrder.AscendingFileSize;
+    /// <summary>Additional batch flush points. A full buffer always flushes before another eligible file is read.</summary>
+    public BatchFlushPolicy BatchFlushPolicy { get; init; } = BatchFlushPolicy.FlushBeforeIneligibleFile;
     /// <summary>Per-file durability intent (set by the strategy). Default <see cref="WriteDurability.Staged"/>
     /// keeps direct <c>WriteAsync</c> callers crash-safe.</summary>
     public WriteDurability WriteDurability { get; init; } = WriteDurability.Staged;

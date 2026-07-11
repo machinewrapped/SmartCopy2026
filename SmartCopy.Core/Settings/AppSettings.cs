@@ -130,6 +130,9 @@ public sealed class AppSettings
             BatchBufferBytes = NonNegativeKbToIntBoundedBytesOrDefault(
                 policy.BatchBufferKb,
                 OperationalSettings.DefaultEnabledBatchBufferBytes),
+            HddSourceBatchTraversalOrder = policy.HddSourceBatchTraversalOrder,
+            OtherSourceBatchTraversalOrder = policy.OtherSourceBatchTraversalOrder,
+            BatchFlushPolicy = policy.BatchFlushPolicy,
             DestinationRoutingEnabled = true,
         }).Normalize();
     }

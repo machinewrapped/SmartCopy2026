@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Settings;
 
 namespace SmartCopy.Tests.Settings;
@@ -166,6 +167,30 @@ public sealed class AppSettingsOperationalSettingsTests
         Assert.Equal(640 * 1024, operational.CopyBufferRouting.HddBytes);
         Assert.Equal(256 * 1024, operational.CopyBufferRouting.SameVolumeHddBytes);
         Assert.Equal(320 * 1024, operational.CopyBufferRouting.UnknownBytes);
+    }
+
+    [Fact]
+    public void CreateOperationalSettings_MapsBatchFlushProductionPolicy()
+    {
+        var settings = new AppSettings
+        {
+            CopyOptimisationPlatformPolicy = new CopyOptimisationPlatformPolicy
+            {
+                Windows = new CopyOptimisationPolicy
+                {
+                    Enabled = true,
+                    HddSourceBatchTraversalOrder = BatchTraversalOrder.Natural,
+                    OtherSourceBatchTraversalOrder = BatchTraversalOrder.Natural,
+                    BatchFlushPolicy = BatchFlushPolicy.FlushOnCapacityOrDirectoryExit,
+                },
+            },
+        };
+
+        var operational = settings.CreateOperationalSettings(OSPlatform.Windows);
+
+        Assert.Equal(BatchTraversalOrder.Natural, operational.HddSourceBatchTraversalOrder);
+        Assert.Equal(BatchTraversalOrder.Natural, operational.OtherSourceBatchTraversalOrder);
+        Assert.Equal(BatchFlushPolicy.FlushOnCapacityOrDirectoryExit, operational.BatchFlushPolicy);
     }
 
     [Fact]

@@ -94,13 +94,13 @@ public sealed class DefaultCopyStrategyPolicyTests
             new OperationalSettings
             {
                 DestinationRoutingEnabled = true,
-                BatchOrderByFileSize = true,
+                HddSourceBatchTraversalOrder = BatchTraversalOrder.Natural,
             },
             new DriveClassification(DriveMediaType.HDD, DriveInterfaceType.SATA),
             new DriveClassification(DriveMediaType.HDD, DriveInterfaceType.SATA),
             sameVolume: true);
 
-        Assert.False(strategy.Settings.BatchOrderByFileSize);
+        Assert.Equal(BatchTraversalOrder.Natural, strategy.Settings.BatchTraversalOrder);
     }
 
     [Fact]
@@ -110,13 +110,13 @@ public sealed class DefaultCopyStrategyPolicyTests
             new OperationalSettings
             {
                 DestinationRoutingEnabled = true,
-                BatchOrderByFileSize = true,
+                HddSourceBatchTraversalOrder = BatchTraversalOrder.Natural,
             },
             new DriveClassification(DriveMediaType.HDD, DriveInterfaceType.SATA),
             new DriveClassification(DriveMediaType.SSD, DriveInterfaceType.NVMe),
             sameVolume: false);
 
-        Assert.False(strategy.Settings.BatchOrderByFileSize);
+        Assert.Equal(BatchTraversalOrder.Natural, strategy.Settings.BatchTraversalOrder);
     }
 
     [Fact]
@@ -126,13 +126,13 @@ public sealed class DefaultCopyStrategyPolicyTests
             new OperationalSettings
             {
                 DestinationRoutingEnabled = true,
-                BatchOrderByFileSize = true,
+                BatchTraversalOrder = BatchTraversalOrder.AscendingFileSize,
             },
             new DriveClassification(DriveMediaType.SSD, DriveInterfaceType.NVMe),
             new DriveClassification(DriveMediaType.HDD, DriveInterfaceType.SATA),
             sameVolume: false);
 
-        Assert.True(strategy.Settings.BatchOrderByFileSize);
+        Assert.Equal(BatchTraversalOrder.AscendingFileSize, strategy.Settings.BatchTraversalOrder);
     }
 
     [Fact]
@@ -142,13 +142,40 @@ public sealed class DefaultCopyStrategyPolicyTests
             new OperationalSettings
             {
                 DestinationRoutingEnabled = false,
-                BatchOrderByFileSize = true,
+                BatchTraversalOrder = BatchTraversalOrder.AscendingFileSize,
             },
             new DriveClassification(DriveMediaType.HDD, DriveInterfaceType.SATA),
             new DriveClassification(DriveMediaType.HDD, DriveInterfaceType.SATA),
             sameVolume: true);
 
-        Assert.True(strategy.Settings.BatchOrderByFileSize);
+        Assert.Equal(BatchTraversalOrder.AscendingFileSize, strategy.Settings.BatchTraversalOrder);
+    }
+
+    [Fact]
+    public void RoutingEnabled_SsdSource_DefaultsToSizeOrderedBatchTraversal()
+    {
+        var strategy = Resolve(
+            RoutedSettings(),
+            new DriveClassification(DriveMediaType.SSD, DriveInterfaceType.NVMe),
+            new DriveClassification(DriveMediaType.SSD, DriveInterfaceType.NVMe));
+
+        Assert.Equal(BatchTraversalOrder.AscendingFileSize, strategy.Settings.BatchTraversalOrder);
+    }
+
+    [Fact]
+    public void RoutingEnabled_FlushWhenFullCandidate_UsesNaturalBatchOrder()
+    {
+        var strategy = Resolve(
+            RoutedSettings() with
+            {
+                OtherSourceBatchTraversalOrder = BatchTraversalOrder.Natural,
+                BatchFlushPolicy = BatchFlushPolicy.FlushOnCapacityOrDirectoryExit,
+            },
+            new DriveClassification(DriveMediaType.SSD, DriveInterfaceType.NVMe),
+            new DriveClassification(DriveMediaType.SSD, DriveInterfaceType.NVMe));
+
+        Assert.Equal(BatchTraversalOrder.Natural, strategy.Settings.BatchTraversalOrder);
+        Assert.Equal(BatchFlushPolicy.FlushOnCapacityOrDirectoryExit, strategy.Settings.BatchFlushPolicy);
     }
 
     private static OperationalSettings RoutedSettings() => new()

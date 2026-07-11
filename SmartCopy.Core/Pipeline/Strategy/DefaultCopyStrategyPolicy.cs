@@ -10,8 +10,9 @@ namespace SmartCopy.Core.Pipeline.Strategy;
 /// <see cref="OperationalSettings.DestinationRoutingEnabled"/> is set, also selects the copy
 /// buffer size from the configurable routing table on <see cref="OperationalSettings"/>. The
 /// baseline table keeps same-volume HDD at 256 KiB, routes cross-volume HDD and unknown media to
-/// 512 KiB, and routes SSD/USB pairs to 1 MiB. Source-HDD pairs preserve natural batch traversal
-/// order to avoid seek-heavy size sorting. This is the seam future per-device learned profiles replace.
+/// 512 KiB, and routes SSD/USB pairs to 1 MiB. Batch traversal preserves natural source order;
+/// size ordering remains available only as an explicit benchmark control. This is the seam future
+/// per-device learned profiles replace.
 /// </summary>
 public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
 {
@@ -32,11 +33,10 @@ public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
                     inputs.Target,
                     inputs.SameVolume,
                     resolved),
-                BatchOrderByFileSize = SelectBatchOrderByFileSize(
+                BatchTraversalOrder = ResolveBatchTraversalOrder(
                     inputs.Source,
-                    inputs.Target,
-                    inputs.SameVolume,
-                    resolved.BatchOrderByFileSize),
+                    resolved.HddSourceBatchTraversalOrder,
+                    resolved.OtherSourceBatchTraversalOrder),
             };
         }
 
@@ -95,18 +95,14 @@ public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
         return settings.CopyBufferRouting.UnknownBytes;
     }
 
-    internal static bool SelectBatchOrderByFileSize(
-        DriveClassification source,
-        DriveClassification target,
-        bool sameVolume,
-        bool requested)
-    {
-        if (!requested)
-            return false;
-
-        return source.MediaType != DriveMediaType.HDD;
-    }
-
     private static bool IsHddPair(DriveClassification source, DriveClassification target) =>
         source.MediaType == DriveMediaType.HDD || target.MediaType == DriveMediaType.HDD;
+
+    private static BatchTraversalOrder ResolveBatchTraversalOrder(
+        DriveClassification source,
+        BatchTraversalOrder hddSourceOrder,
+        BatchTraversalOrder otherSourceOrder)
+    {
+        return source.MediaType == DriveMediaType.HDD ? hddSourceOrder : otherSourceOrder;
+    }
 }
