@@ -236,6 +236,8 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
 
         await foreach (var result in WalkAndMoveAsync(context.RootNode, execution, ct))
             yield return result;
+
+        await targetSession.CompleteAsync(ct);
     }
 
     private sealed class MoveExecutor(
