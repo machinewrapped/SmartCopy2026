@@ -62,6 +62,10 @@ public partial class MtpDevicePickerViewModel : ObservableObject
         {
             if (IsMtpDevice(protocol: null, d.DeviceId)) return true;
         }
+        // MediaDevices returns disconnected descriptors from GetDevices(). Some WPD drivers
+        // throw while their metadata is read until Connect() is called. Keep those descriptors
+        // selectable; the connection and folder-load paths report any real access failure.
+        catch (NotConnectedException) { return true; }
         catch { }
 
         try { return IsMtpDevice(d.Protocol, deviceId: null); }
@@ -80,6 +84,17 @@ public partial class MtpDevicePickerViewModel : ObservableObject
         protocol?.StartsWith("MTP:", StringComparison.OrdinalIgnoreCase) == true ||
         deviceId?.StartsWith(@"\\?\usb#", StringComparison.OrdinalIgnoreCase) == true;
 
+    private static string GetDisplayName(MediaDevice device)
+    {
+        try { return GetDisplayName(device.FriendlyName, device.Model); }
+        catch { return "Connected portable device"; }
+    }
+
+    internal static string GetDisplayName(string? friendlyName, string? model) =>
+        !string.IsNullOrWhiteSpace(friendlyName) ? friendlyName :
+        !string.IsNullOrWhiteSpace(model) ? model :
+        "Connected portable device";
+
     public MtpDevicePickerViewModel()
     {
         _allDevices = [.. MediaDevice.GetDevices().Where(IsMtpDevice)];
@@ -90,7 +105,7 @@ public partial class MtpDevicePickerViewModel : ObservableObject
     {
         Items.Clear();
         foreach (var dev in _allDevices)
-            Items.Add(new MtpPickerItem { Kind = MtpPickerItem.ItemKind.Device, DisplayName = dev.FriendlyName ?? dev.Model ?? "Unknown Device", Device = dev });
+            Items.Add(new MtpPickerItem { Kind = MtpPickerItem.ItemKind.Device, DisplayName = GetDisplayName(dev), Device = dev });
         LocationHeader = "Connected Devices";
         ConfirmCommand.NotifyCanExecuteChanged();
     }
@@ -114,8 +129,9 @@ public partial class MtpDevicePickerViewModel : ObservableObject
 
             case MtpPickerItem.ItemKind.Device:
                 _currentDevice = item.Device!;
-                var name = string.IsNullOrEmpty(item.Device!.FriendlyName) ? item.Device.Model : item.Device.FriendlyName;
-                _browsingProvider = new MtpFileSystemProvider(item.Device!, $"mtp://{name}/");
+                // Device names are not consistently available until MediaDevices.Connect().
+                // Let the provider establish the session and derive its canonical root path.
+                _browsingProvider = new MtpFileSystemProvider(item.Device!, "");
                 _currentPath = _browsingProvider.RootPath;
                 await LoadFolderAsync();
                 break;

@@ -15,4 +15,14 @@ public sealed class MtpDevicePickerViewModelTests
     {
         Assert.Equal(expected, MtpDevicePickerViewModel.IsMtpDevice(protocol, deviceId));
     }
+
+    [Theory]
+    [InlineData("motorola edge 60 fusion", null, "motorola edge 60 fusion")]
+    [InlineData("", "Moto", "Moto")]
+    [InlineData(null, null, "Connected portable device")]
+    public void GetDisplayName_UsesVisibleFallbackForUnconnectedDescriptors(
+        string? friendlyName, string? model, string expected)
+    {
+        Assert.Equal(expected, MtpDevicePickerViewModel.GetDisplayName(friendlyName, model));
+    }
 }
