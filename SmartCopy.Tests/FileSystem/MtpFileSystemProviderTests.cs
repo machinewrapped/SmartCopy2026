@@ -21,4 +21,21 @@ public sealed class MtpFileSystemProviderTests
             ["__Just Ripped", "Alternative", "World & New Age", "alpha.mp3", "zebra.mp3"],
             sorted.Select(node => node.Name));
     }
+
+    [Fact]
+    public void GetDeviceName_PrefersConnectedMetadataAndCreatesDistinctFallbacks()
+    {
+        Assert.Equal(
+            "motorola edge 60 fusion",
+            MtpFileSystemProvider.GetDeviceName("motorola edge 60 fusion", "Motorola", "device-a"));
+        Assert.Equal(
+            "Motorola",
+            MtpFileSystemProvider.GetDeviceName("", "Motorola", "device-a"));
+
+        var firstFallback = MtpFileSystemProvider.GetDeviceName(null, null, "device-a");
+        var secondFallback = MtpFileSystemProvider.GetDeviceName(null, null, "device-b");
+
+        Assert.StartsWith("Connected portable device ", firstFallback);
+        Assert.NotEqual(firstFallback, secondFallback);
+    }
 }

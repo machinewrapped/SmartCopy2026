@@ -17,7 +17,7 @@ public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
     public MtpFileSystemProvider(MediaDevice device, string rootPath)
     {
         _device = MtpConnectionManager.Acquire(device, this);
-        var name = string.IsNullOrEmpty(_device.FriendlyName) ? _device.Model : _device.FriendlyName;
+        var name = GetDeviceName(_device.FriendlyName, _device.Model, _device.DeviceId);
         VolumeId = $"mtp://{name}";
         RootPath = string.IsNullOrWhiteSpace(rootPath) ? $"{VolumeId}/" : rootPath;
     }
@@ -79,6 +79,21 @@ public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
         [.. children
             .OrderBy(node => node.IsDirectory ? 0 : 1)
             .ThenBy(node => node.Name, StringComparer.CurrentCultureIgnoreCase)];
+
+    /// <summary>
+    /// Uses the device metadata that becomes available after connecting. For devices that remain
+    /// nameless, creates a stable, non-identifying display name from their connection identifier.
+    /// </summary>
+    internal static string GetDeviceName(string? friendlyName, string? model, string? deviceId)
+    {
+        if (!string.IsNullOrWhiteSpace(friendlyName)) return friendlyName;
+        if (!string.IsNullOrWhiteSpace(model)) return model;
+        if (string.IsNullOrWhiteSpace(deviceId)) return "Connected portable device";
+
+        var hash = System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(deviceId));
+        return $"Connected portable device {Convert.ToHexString(hash[..4])}";
+    }
 
     public Task<FileSystemNode> GetNodeAsync(string path, CancellationToken ct)
     {

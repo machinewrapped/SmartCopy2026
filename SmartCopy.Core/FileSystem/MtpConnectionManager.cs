@@ -27,12 +27,13 @@ public static class MtpConnectionManager
     /// </summary>
     public static MediaDevice Acquire(MediaDevice device, MtpFileSystemProvider provider)
     {
+        // Some WPD drivers do not expose DeviceId until their MediaDevices session is open.
+        // Connect before taking the global lock to avoid serialising slow hardware I/O.
+        if (!device.IsConnected)
+            device.Connect();
+
         lock (Sync)
         {
-            // Some WPD drivers do not expose DeviceId until their MediaDevices session is open.
-            // Connect before using it as the reference-counting key.
-            if (!device.IsConnected)
-                device.Connect();
             var id = device.DeviceId;
             if (Connections.TryGetValue(id, out var conn))
             {
