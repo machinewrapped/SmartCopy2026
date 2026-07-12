@@ -53,9 +53,30 @@ public partial class MtpDevicePickerViewModel : ObservableObject
 
     private static bool IsMtpDevice(MediaDevice d)
     {
-        try { return d.Protocol?.StartsWith("MTP:", StringComparison.OrdinalIgnoreCase) == true; }
+        // Protocol can throw for some Windows WPD descriptors before the device is
+        // connected.  Check the physical USB identity first so that an unavailable
+        // optional label cannot hide an otherwise usable device.
+        try
+        {
+            if (IsMtpDevice(protocol: null, d.DeviceId)) return true;
+        }
+        catch { }
+
+        try { return IsMtpDevice(d.Protocol, deviceId: null); }
         catch { return false; }
     }
+
+    /// <summary>
+    /// Identifies physical MTP/WPD devices returned by MediaDevices.
+    /// Some Windows MTP drivers, including the Motorola edge 60 fusion driver, do not
+    /// populate <see cref="MediaDevice.Protocol"/> during discovery.  Their physical
+    /// device id is nevertheless exposed as a USB WPD device.  Do not include
+    /// <c>swd#wpdbusenum</c> entries here: those are shell storage endpoints beneath a
+    /// device, not independently connectable devices for the picker.
+    /// </summary>
+    internal static bool IsMtpDevice(string? protocol, string? deviceId) =>
+        protocol?.StartsWith("MTP:", StringComparison.OrdinalIgnoreCase) == true ||
+        deviceId?.StartsWith(@"\\?\usb#", StringComparison.OrdinalIgnoreCase) == true;
 
     public MtpDevicePickerViewModel()
     {
