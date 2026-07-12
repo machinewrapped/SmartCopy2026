@@ -178,6 +178,28 @@ public sealed class DefaultCopyStrategyPolicyTests
         Assert.Equal(BatchFlushPolicy.FlushOnCapacityOrDirectoryExit, strategy.Settings.BatchFlushPolicy);
     }
 
+    [Theory]
+    [InlineData(DriveMediaType.SSD, DriveInterfaceType.NVMe, DriveMediaType.MTP, DriveInterfaceType.USB)]
+    [InlineData(DriveMediaType.MTP, DriveInterfaceType.USB, DriveMediaType.SSD, DriveInterfaceType.NVMe)]
+    public void MtpEndpoint_DisablesBatchingAndSizeOrdering(
+        DriveMediaType srcMedia, DriveInterfaceType srcIface,
+        DriveMediaType dstMedia, DriveInterfaceType dstIface)
+    {
+        var strategy = Resolve(
+            new OperationalSettings
+            {
+                BatchBufferBytes = 1024 * 1024,
+                BatchTraversalOrder = BatchTraversalOrder.AscendingFileSize,
+                DestinationRoutingEnabled = true,
+            },
+            new DriveClassification(srcMedia, srcIface),
+            new DriveClassification(dstMedia, dstIface));
+
+        Assert.IsType<StreamingCopyStrategy>(strategy);
+        Assert.Equal(0, strategy.Settings.BatchBufferBytes);
+        Assert.Equal(BatchTraversalOrder.Natural, strategy.Settings.BatchTraversalOrder);
+    }
+
     private static OperationalSettings RoutedSettings() => new()
     {
         CopyBufferSizeBytes = BaseBuffer,

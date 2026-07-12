@@ -24,6 +24,12 @@ public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
     {
         var resolved = inputs.Base.WithProviderConstraints(inputs.SourceCaps, inputs.TargetCaps);
 
+        // MTP protocol transfers are serialized and do not benefit from read-side batching or
+        // reordering. Preserve the user's natural traversal order in either direction.
+        var isMtpTransfer = IsMtpTransfer(inputs.Source, inputs.Target);
+        if (isMtpTransfer)
+            resolved = resolved with { BatchBufferBytes = 0, BatchTraversalOrder = BatchTraversalOrder.Natural };
+
         if (resolved.DestinationRoutingEnabled)
         {
             resolved = resolved with
@@ -33,10 +39,12 @@ public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
                     inputs.Target,
                     inputs.SameVolume,
                     resolved),
-                BatchTraversalOrder = ResolveBatchTraversalOrder(
-                    inputs.Source,
-                    resolved.HddSourceBatchTraversalOrder,
-                    resolved.OtherSourceBatchTraversalOrder),
+                BatchTraversalOrder = isMtpTransfer
+                    ? BatchTraversalOrder.Natural
+                    : ResolveBatchTraversalOrder(
+                        inputs.Source,
+                        resolved.HddSourceBatchTraversalOrder,
+                        resolved.OtherSourceBatchTraversalOrder),
             };
         }
 
@@ -94,6 +102,9 @@ public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
         // Unknown / Memory / MTP / ambiguous: do not assume fast media.
         return settings.CopyBufferRouting.UnknownBytes;
     }
+
+    private static bool IsMtpTransfer(DriveClassification source, DriveClassification target) =>
+        source.MediaType == DriveMediaType.MTP || target.MediaType == DriveMediaType.MTP;
 
     private static bool IsHddPair(DriveClassification source, DriveClassification target) =>
         source.MediaType == DriveMediaType.HDD || target.MediaType == DriveMediaType.HDD;
