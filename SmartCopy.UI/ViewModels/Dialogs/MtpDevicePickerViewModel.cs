@@ -53,6 +53,8 @@ public partial class MtpDevicePickerViewModel : ObservableObject
 
     private static bool IsMtpDevice(MediaDevice d)
     {
+        if (d is null) return false;
+
         // Protocol can throw for some Windows WPD descriptors before the device is
         // connected.  Check the physical USB identity first so that an unavailable
         // optional label cannot hide an otherwise usable device.
