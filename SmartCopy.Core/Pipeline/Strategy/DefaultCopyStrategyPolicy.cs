@@ -23,6 +23,13 @@ public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
     {
         var resolved = inputs.Base.WithProviderConstraints(inputs.SourceCaps, inputs.TargetCaps);
 
+        // MTP protocol transfers are serialized and do not benefit from read-side batching or
+        // size reordering.  Preserve the user's natural traversal order in either direction.
+        if (IsMtpTransfer(inputs.Source, inputs.Target))
+        {
+            resolved = resolved with { BatchBufferBytes = 0, BatchOrderByFileSize = false };
+        }
+
         if (resolved.DestinationRoutingEnabled)
         {
             resolved = resolved with
@@ -106,6 +113,9 @@ public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
 
         return source.MediaType != DriveMediaType.HDD;
     }
+
+    private static bool IsMtpTransfer(DriveClassification source, DriveClassification target) =>
+        source.MediaType == DriveMediaType.MTP || target.MediaType == DriveMediaType.MTP;
 
     private static bool IsHddPair(DriveClassification source, DriveClassification target) =>
         source.MediaType == DriveMediaType.HDD || target.MediaType == DriveMediaType.HDD;
