@@ -12,7 +12,9 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     private const string StagedFileSuffix = ".smartcopy.tmp.";
     private const string CompactStagedFilePrefix = ".smartcopy.staging.";
     private const int GuidNLength = 32;
-    private const int DefaultBufferSize = 256 * 1024;
+
+    /// <summary>A <c>FileStreamOptions.BufferSize</c> of 1 disables FileStream's internal buffer.</summary>
+    private const int NoFileStreamBuffer = 1;
 
     private readonly bool _isNetworkPath;
     private readonly ProviderCapabilities _capabilities;
@@ -132,7 +134,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                     Mode = FileMode.Open,
                     Access = FileAccess.Read,
                     Share = FileShare.Read,
-                    BufferSize = bufferSize ?? DefaultBufferSize,
+                    BufferSize = bufferSize ?? NoFileStreamBuffer,
                     Options = FileOptions.Asynchronous | FileOptions.SequentialScan
                 });
         }, ct);
@@ -199,7 +201,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                         Mode = FileMode.Create,
                         Access = FileAccess.Write,
                         Share = FileShare.None,
-                        BufferSize = opts.CopyBufferSizeBytes,
+                        BufferSize = NoFileStreamBuffer,
                         Options = FileOptions.Asynchronous
                     }))
                 {
@@ -227,7 +229,6 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         {
             await using (var output = CreateStagedWriteStream(
                 fullPath,
-                opts.CopyBufferSizeBytes,
                 out tempPath,
                 out stagedOutsideDestinationDirectory))
             {
@@ -278,14 +279,13 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 
     private static FileStream CreateStagedWriteStream(
         string destinationPath,
-        int bufferSizeBytes,
         out string stagedPath,
         out bool stagedOutsideDestinationDirectory)
     {
         Exception? lastException = null;
 
         var candidate = BuildStagedWritePath(destinationPath);
-        if (TryCreateStagedWriteStream(candidate, bufferSizeBytes, out var stream, out lastException))
+        if (TryCreateStagedWriteStream(candidate, out var stream, out lastException))
         {
             stagedPath = candidate;
             stagedOutsideDestinationDirectory = false;
@@ -293,7 +293,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         }
 
         candidate = BuildCompactStagedWritePath(destinationPath);
-        if (TryCreateStagedWriteStream(candidate, bufferSizeBytes, out stream, out var compactException))
+        if (TryCreateStagedWriteStream(candidate, out stream, out var compactException))
         {
             stagedPath = candidate;
             stagedOutsideDestinationDirectory = false;
@@ -303,7 +303,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         lastException = compactException ?? lastException;
 
         candidate = BuildSystemTempStagedWritePath();
-        if (TryCreateStagedWriteStream(candidate, bufferSizeBytes, out stream, out var tempException))
+        if (TryCreateStagedWriteStream(candidate, out stream, out var tempException))
         {
             stagedPath = candidate;
             stagedOutsideDestinationDirectory = true;
@@ -318,7 +318,6 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 
     private static bool TryCreateStagedWriteStream(
         string candidate,
-        int bufferSizeBytes,
         out FileStream stream,
         out Exception? exception)
     {
@@ -331,7 +330,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                     Mode = FileMode.CreateNew,
                     Access = FileAccess.Write,
                     Share = FileShare.None,
-                    BufferSize = bufferSizeBytes,
+                    BufferSize = NoFileStreamBuffer,
                     Options = FileOptions.Asynchronous
                 });
 
