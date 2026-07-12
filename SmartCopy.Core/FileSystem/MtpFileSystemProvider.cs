@@ -19,7 +19,7 @@ public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
         _device = MtpConnectionManager.Acquire(device, this);
         var name = string.IsNullOrEmpty(_device.FriendlyName) ? _device.Model : _device.FriendlyName;
         VolumeId = $"mtp://{name}";
-        RootPath = rootPath;
+        RootPath = string.IsNullOrWhiteSpace(rootPath) ? $"{VolumeId}/" : rootPath;
     }
 
     public MediaDevice Device => _device;
@@ -67,9 +67,18 @@ public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
                 });
             }
 
-            return result;
+            return SortChildren(result);
         }, ct);
     }
+
+    /// <summary>
+    /// WPD does not guarantee a stable enumeration order. Return a directory-first,
+    /// culture-aware presentation order consistent with Windows folder views.
+    /// </summary>
+    internal static IReadOnlyList<FileSystemNode> SortChildren(IEnumerable<FileSystemNode> children) =>
+        [.. children
+            .OrderBy(node => node.IsDirectory ? 0 : 1)
+            .ThenBy(node => node.Name, StringComparer.CurrentCultureIgnoreCase)];
 
     public Task<FileSystemNode> GetNodeAsync(string path, CancellationToken ct)
     {

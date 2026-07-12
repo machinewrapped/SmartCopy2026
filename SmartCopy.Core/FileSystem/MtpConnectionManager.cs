@@ -29,14 +29,19 @@ public static class MtpConnectionManager
     {
         lock (Sync)
         {
+            // Some WPD drivers do not expose DeviceId until their MediaDevices session is open.
+            // Connect before using it as the reference-counting key.
+            if (!device.IsConnected)
+                device.Connect();
             var id = device.DeviceId;
             if (Connections.TryGetValue(id, out var conn))
             {
+                if (!ReferenceEquals(conn.Device, device))
+                    device.Disconnect();
                 conn.Providers.Add(provider);
                 return conn.Device;
             }
 
-            device.Connect();
             Connections[id] = new Connection { Device = device, Providers = { provider } };
             return device;
         }
