@@ -85,7 +85,9 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
                 var readStart = Stopwatch.GetTimestamp();
                 try
                 {
-                    await using var src = await context.SourceProvider.OpenReadAsync(node.FullPath, Settings.CopyBufferSizeBytes, ct);
+                    // No bufferSize: the batch reader buffers into its own pooled buffer, so the
+                    // source stream is opened unbuffered (avoids a redundant per-file FileStream buffer).
+                    await using var src = await context.SourceProvider.OpenReadAsync(node.FullPath, ct: ct);
                     await buffer.AccumulateAsync(
                         src,
                         fileSize,

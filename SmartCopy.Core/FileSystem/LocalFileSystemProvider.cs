@@ -14,12 +14,13 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     private const int GuidNLength = 32;
 
     /// <summary>
-    /// FileStream <c>BufferSize</c> for the copy path. 1 disables FileStream's internal buffer: the
-    /// copy path does its own buffering — <see cref="StreamCopyEngine"/> pumps through a pooled buffer,
-    /// and the batch reader reads whole small files straight into the batch buffer — so FileStream's
-    /// buffer would be a redundant allocation, sized to the copy buffer and paid once per stream. With
-    /// ~73% of a real dataset under 64 KiB and two streams per file, that per-file buffer was the
-    /// dominant copy-path allocation (tens of GiB per run). See Docs/archive/optimisation.
+    /// Default FileStream <c>BufferSize</c> for the copy path. 1 disables FileStream's internal buffer:
+    /// the copy path does its own buffering — <see cref="StreamCopyEngine"/> pumps through a pooled
+    /// buffer, and the batch reader reads whole small files straight into the batch buffer — so
+    /// FileStream's buffer would be a redundant allocation, sized to the copy buffer and paid once per
+    /// stream. With ~73% of a real dataset under 64 KiB and two streams per file, that per-file buffer
+    /// was the dominant copy-path allocation (tens of GiB per run). See Docs/archive/optimisation.
+    /// Writes always use it; reads use it unless a caller explicitly requests FileStream buffering.
     /// </summary>
     private const int NoFileStreamBuffer = 1;
 
@@ -141,7 +142,9 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                     Mode = FileMode.Open,
                     Access = FileAccess.Read,
                     Share = FileShare.Read,
-                    BufferSize = NoFileStreamBuffer,
+                    // Honour an explicit caller request; default to unbuffered. Copy callers pass
+                    // nothing because they own their buffering (see NoFileStreamBuffer).
+                    BufferSize = bufferSize ?? NoFileStreamBuffer,
                     Options = FileOptions.Asynchronous | FileOptions.SequentialScan
                 });
         }, ct);
