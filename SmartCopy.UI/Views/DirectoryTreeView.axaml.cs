@@ -25,6 +25,12 @@ public partial class DirectoryTreeView : UserControl
             return;
         }
 
+        if (e.Source is Visual visualSource
+            && (visualSource is CheckBox || visualSource.GetVisualAncestors().OfType<CheckBox>().Any()))
+        {
+            return;
+        }
+
         var treeViewItem = e.Source as TreeViewItem
             ?? (e.Source as Visual)?.GetVisualAncestors().OfType<TreeViewItem>().FirstOrDefault();
         if (treeViewItem is null)
