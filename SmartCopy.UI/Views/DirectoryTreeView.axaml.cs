@@ -32,9 +32,7 @@ public partial class DirectoryTreeView : UserControl
             return;
         }
 
-        var expander = treeViewItem.GetVisualDescendants()
-            .OfType<ToggleButton>()
-            .FirstOrDefault(button => button.Name == "PART_ExpandCollapseChevron");
+        var expander = FindExpander(treeViewItem);
 
         if (expander?.IsVisible != true || expander.TranslatePoint(default, DirectoryTree) is not { } position)
         {
@@ -43,6 +41,15 @@ public partial class DirectoryTreeView : UserControl
 
         const double hitTargetPadding = 6;
         var pointer = e.GetPosition(DirectoryTree);
+        var isDirectClick = pointer.X >= position.X
+            && pointer.X <= position.X + expander.Bounds.Width
+            && pointer.Y >= position.Y
+            && pointer.Y <= position.Y + expander.Bounds.Height;
+        if (isDirectClick)
+        {
+            return;
+        }
+
         if (pointer.X < position.X - hitTargetPadding
             || pointer.X > position.X + expander.Bounds.Width + hitTargetPadding
             || pointer.Y < position.Y - hitTargetPadding
@@ -53,6 +60,30 @@ public partial class DirectoryTreeView : UserControl
 
         treeViewItem.IsExpanded = !treeViewItem.IsExpanded;
         e.Handled = true;
+    }
+
+    private static ToggleButton? FindExpander(Visual visual)
+    {
+        if (visual is ToggleButton { Name: "PART_ExpandCollapseChevron" } button)
+        {
+            return button;
+        }
+
+        foreach (var child in visual.GetVisualChildren())
+        {
+            if (child is TreeViewItem)
+            {
+                continue;
+            }
+
+            var expander = FindExpander(child);
+            if (expander is not null)
+            {
+                return expander;
+            }
+        }
+
+        return null;
     }
 
     private void OnSetAsSourcePathClick(object? sender, RoutedEventArgs e)
