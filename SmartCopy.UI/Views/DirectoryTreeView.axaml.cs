@@ -1,6 +1,9 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.VisualTree;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.UI.ViewModels;
 
@@ -12,6 +15,44 @@ public partial class DirectoryTreeView : UserControl
     {
         InitializeComponent();
         DirectoryTree.AddHandler(KeyDownEvent, OnTreeKeyDown, RoutingStrategies.Tunnel);
+        DirectoryTree.AddHandler(PointerPressedEvent, OnTreePointerPressed, RoutingStrategies.Tunnel);
+    }
+
+    private void OnTreePointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (e.GetCurrentPoint(DirectoryTree).Properties.IsLeftButtonPressed == false)
+        {
+            return;
+        }
+
+        var treeViewItem = e.Source as TreeViewItem
+            ?? (e.Source as Visual)?.GetVisualAncestors().OfType<TreeViewItem>().FirstOrDefault();
+        if (treeViewItem is null)
+        {
+            return;
+        }
+
+        var expander = treeViewItem.GetVisualDescendants()
+            .OfType<ToggleButton>()
+            .FirstOrDefault(button => button.Name == "PART_ExpandCollapseChevron");
+
+        if (expander?.IsVisible != true || expander.TranslatePoint(default, DirectoryTree) is not { } position)
+        {
+            return;
+        }
+
+        const double hitTargetPadding = 6;
+        var pointer = e.GetPosition(DirectoryTree);
+        if (pointer.X < position.X - hitTargetPadding
+            || pointer.X > position.X + expander.Bounds.Width + hitTargetPadding
+            || pointer.Y < position.Y - hitTargetPadding
+            || pointer.Y > position.Y + expander.Bounds.Height + hitTargetPadding)
+        {
+            return;
+        }
+
+        treeViewItem.IsExpanded = !treeViewItem.IsExpanded;
+        e.Handled = true;
     }
 
     private void OnSetAsSourcePathClick(object? sender, RoutedEventArgs e)
