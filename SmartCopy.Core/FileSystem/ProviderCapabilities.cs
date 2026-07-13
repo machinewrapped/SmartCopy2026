@@ -10,7 +10,8 @@ public readonly record struct ProviderCapabilities(
     bool AllowBatchRead = true,
     bool AllowBatchWrite = true,
     long MaxBatchBufferBytes = 0,
-    bool AllowStagedWrite = true)
+    bool AllowStagedWrite = true,
+    bool CanAtomicDirectoryDelete = true)
 {
     /// <summary>Full capabilities; used as a safe default before a source path is configured.</summary>
     public static ProviderCapabilities Full { get; } =

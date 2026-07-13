@@ -1391,7 +1391,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         IReadOnlyList<TransformResult>? results = null;
         try
         {
-            results = await runner.ExecuteAsync(executionJob);
+            // Pipeline preparation and traversal can be substantial (especially for MTP trees).
+            // Keep all execution work away from Avalonia's dispatcher; progress and log updates are
+            // already marshalled back through the queue and dispatcher timer above.
+            results = await Task.Run(
+                () => runner.ExecuteAsync(executionJob, executionJob.CancellationToken),
+                executionJob.CancellationToken);
             StatusBar.Progress.Complete();
         }
         catch (OperationCanceledException)

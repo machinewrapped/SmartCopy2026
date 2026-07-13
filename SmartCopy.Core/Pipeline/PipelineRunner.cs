@@ -191,6 +191,9 @@ public sealed partial class PipelineRunner
     {
         await PrepareExecutionAsync(job, ct);
 
+        if (job.SourceProvider is IDeleteOperationProvider deleteOperationProvider)
+            deleteOperationProvider.BeginDeleteOperation();
+
         var results = new List<TransformResult>();
         var progress = new ExecutionProgressReporter(job);
         int stepIndex = 0;

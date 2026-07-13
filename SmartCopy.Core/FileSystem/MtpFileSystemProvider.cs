@@ -4,10 +4,12 @@ using System.Runtime.Versioning;
 namespace SmartCopy.Core.FileSystem;
 
 [SupportedOSPlatform("windows")]
-public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
+public sealed class MtpFileSystemProvider : IFileSystemProvider, IDeleteOperationProvider, IDisposable
 {
     private readonly MediaDevice _device;
+    private readonly IMtpDeleteDevice _deleteDevice;
     private static readonly char[] Separators = ['/', '\\'];
+    private int _verifyNextSuccessfulDelete;
 
     /// <param name="rootPath">
     /// The scan root for this provider instance — typically the folder the user selected
@@ -17,9 +19,18 @@ public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
     public MtpFileSystemProvider(MediaDevice device, string rootPath)
     {
         _device = MtpConnectionManager.Acquire(device, this);
+        _deleteDevice = new MediaDeviceDeleteAdapter(_device);
         var name = GetDeviceName(_device.FriendlyName, _device.Model, _device.DeviceId);
         VolumeId = $"mtp://{name}";
         RootPath = string.IsNullOrWhiteSpace(rootPath) ? $"{VolumeId}/" : rootPath;
+    }
+
+    private MtpFileSystemProvider(IMtpDeleteDevice deleteDevice, string volumeId, string rootPath)
+    {
+        _device = null!;
+        _deleteDevice = deleteDevice;
+        VolumeId = volumeId;
+        RootPath = rootPath;
     }
 
     public MediaDevice Device => _device;
@@ -29,7 +40,8 @@ public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
     public ProviderCapabilities Capabilities => new(
         CanSeek: false, CanAtomicMove: false, CanWatch: false,
         MaxPathLength: 260, CanTrash: false,
-        AllowStagedWrite: false); // UploadFile writes directly; there is no temp+rename on MTP.
+        AllowStagedWrite: false,
+        CanAtomicDirectoryDelete: false); // UploadFile writes directly; there is no temp+rename on MTP.
 
     public ValueTask<Hardware.DriveClassification> GetClassificationAsync(CancellationToken ct = default) => 
         ValueTask.FromResult(new Hardware.DriveClassification(Hardware.DriveMediaType.MTP, Hardware.DriveInterfaceType.USB));
@@ -140,12 +152,35 @@ public sealed class MtpFileSystemProvider : IFileSystemProvider, IDisposable
         return Task.Run(() =>
         {
             var devicePath = DevicePath(path);
-            if (_device.DirectoryExists(devicePath))
-                _device.DeleteDirectory(devicePath);
+            if (_deleteDevice.DirectoryExists(devicePath))
+            {
+                // The pipeline empties MTP folders before this cleanup. Do not recursively
+                // remove anything that may have appeared on the device after the selection was made.
+                _deleteDevice.DeleteDirectory(devicePath, recursive: false);
+            }
             else
-                _device.DeleteFile(devicePath);
+                _deleteDevice.DeleteFile(devicePath);
+
+            // Some WPD drivers acknowledge a delete request without removing the object. One
+            // round-trip per pipeline execution catches that failure mode without doubling the
+            // cost of a large delete set.
+            if (Interlocked.CompareExchange(ref _verifyNextSuccessfulDelete, 0, 1) == 1
+                && (_deleteDevice.FileExists(devicePath) || _deleteDevice.DirectoryExists(devicePath)))
+            {
+                throw new IOException($"The MTP device did not remove '{path}'.");
+            }
         }, ct);
     }
+
+    /// <summary>Starts a new delete operation and enables its one-time MTP postcondition check.</summary>
+    internal void BeginDeleteOperation() => Interlocked.Exchange(ref _verifyNextSuccessfulDelete, 1);
+
+    void IDeleteOperationProvider.BeginDeleteOperation() => BeginDeleteOperation();
+
+    internal static MtpFileSystemProvider CreateForDeleteTesting(
+        IMtpDeleteDevice deleteDevice,
+        string volumeId = "mtp://test") =>
+        new(deleteDevice, volumeId, volumeId + "/");
 
     public Task MoveAsync(string sourcePath, string destPath, CancellationToken ct)
         => throw new NotSupportedException("MTP does not support atomic moves.");
