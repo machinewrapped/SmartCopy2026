@@ -85,9 +85,10 @@ public sealed class DeleteStep : IPipelineStep
         bool useTrash = Mode == DeleteMode.Trash
             && context.SourceProvider.Capabilities.CanTrash
             && context.TrashService.IsAvailable;
+        bool canAtomicallyDeleteDirectories = context.SourceProvider.Capabilities.CanAtomicDirectoryDelete;
 
         // If the root node itself is fully selected, delete it atomically.
-        if (context.RootNode.IsSelected)
+        if (context.RootNode.IsSelected && canAtomicallyDeleteDirectories)
         {
             if (!context.AllowDeleteReadOnly && (context.RootNode.Attributes & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
             {
@@ -130,13 +131,30 @@ public sealed class DeleteStep : IPipelineStep
             // Atomic delete failed — fall through to per-node loop below.
         }
 
-        foreach (var node in context.RootNode.GetSelectedDescendants())
+        IEnumerable<DirectoryTreeNode> nodesToDelete = context.RootNode.GetSelectedDescendants();
+        if (!canAtomicallyDeleteDirectories)
+        {
+            // MTP recursive directory deletion is an opaque, potentially very long WPD call.
+            // Delete files first, then empty directories from the leaves up, so each device call
+            // produces a result and the UI remains responsive throughout the operation.
+            var granularNodes = context.RootNode.GetSelectedDescendants().ToList();
+            if (context.RootNode.IsSelected)
+                granularNodes.Add(context.RootNode);
+
+            nodesToDelete = granularNodes
+                .OrderBy(node => node.IsDirectory)
+                .ThenByDescending(node => node.RelativePathSegments.Length);
+        }
+
+        foreach (var node in nodesToDelete)
         {
             ct.ThrowIfCancellationRequested();
             if (context.IsNodeFailed(node)) continue;
             // Skip nodes whose parent is also selected — the parent delete covers them.
             // Exception: if the parent's atomic delete already failed, process children individually.
-            if (node.Parent?.IsSelected == true && !context.IsNodeFailed(node.Parent)) continue;
+            if (canAtomicallyDeleteDirectories
+                && node.Parent?.IsSelected == true
+                && !context.IsNodeFailed(node.Parent)) continue;
 
             if (!context.AllowDeleteReadOnly && (node.Attributes & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
             {

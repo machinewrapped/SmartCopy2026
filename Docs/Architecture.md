@@ -15,6 +15,8 @@ SmartCopy2026 follows a strict separation of concerns, heavily utilizing Depende
 ### 2.1 File System Abstraction (`IFileSystemProvider`)
 *   **Principle**: The pipeline and all algorithms are completely decoupled from physical file systems.
 *   **Details**: Target file systems are abstracted behind `IFileSystemProvider`. Implementations exist for Local (NTFS/POSIX), Windows MTP (phones/cameras), and in-memory instances (for fast, isolated unit testing).
+    * MTP sources opt out of atomic directory deletion: deletes are executed file-first then folder-last, so a slow WPD recursive-directory request cannot leave the UI without progress. Final folder cleanup is non-recursive, so new device content cannot be removed after selection. The provider verifies the first successful delete in each pipeline execution; a small delete-device adapter lets this behaviour be unit-tested without connected hardware.
+    * The UI schedules pipeline execution off Avalonia's dispatcher. Results are queued and drained on the UI thread, keeping the window responsive during provider I/O and large tree traversal.
 *   **Signpost**: Search for `IFileSystemProvider.cs` and `ProviderCapabilities` to understand constraints (e.g., missing atomic move on MTP, or unseekable streams).
 
 ### 2.2 Directory Tree and Selection State (`DirectoryTreeNode`)

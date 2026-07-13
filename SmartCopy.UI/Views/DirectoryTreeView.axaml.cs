@@ -1,6 +1,9 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.VisualTree;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.UI.ViewModels;
 
@@ -12,6 +15,81 @@ public partial class DirectoryTreeView : UserControl
     {
         InitializeComponent();
         DirectoryTree.AddHandler(KeyDownEvent, OnTreeKeyDown, RoutingStrategies.Tunnel);
+        DirectoryTree.AddHandler(PointerPressedEvent, OnTreePointerPressed, RoutingStrategies.Tunnel);
+    }
+
+    private void OnTreePointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (e.GetCurrentPoint(DirectoryTree).Properties.IsLeftButtonPressed == false)
+        {
+            return;
+        }
+
+        if (e.Source is Visual visualSource
+            && (visualSource is CheckBox || visualSource.GetVisualAncestors().OfType<CheckBox>().Any()))
+        {
+            return;
+        }
+
+        var treeViewItem = e.Source as TreeViewItem
+            ?? (e.Source as Visual)?.GetVisualAncestors().OfType<TreeViewItem>().FirstOrDefault();
+        if (treeViewItem is null)
+        {
+            return;
+        }
+
+        var expander = FindExpander(treeViewItem);
+
+        if (expander?.IsVisible != true || expander.TranslatePoint(default, DirectoryTree) is not { } position)
+        {
+            return;
+        }
+
+        const double hitTargetPadding = 6;
+        var pointer = e.GetPosition(DirectoryTree);
+        var isDirectClick = pointer.X >= position.X
+            && pointer.X <= position.X + expander.Bounds.Width
+            && pointer.Y >= position.Y
+            && pointer.Y <= position.Y + expander.Bounds.Height;
+        if (isDirectClick)
+        {
+            return;
+        }
+
+        if (pointer.X < position.X - hitTargetPadding
+            || pointer.X > position.X + expander.Bounds.Width + hitTargetPadding
+            || pointer.Y < position.Y - hitTargetPadding
+            || pointer.Y > position.Y + expander.Bounds.Height + hitTargetPadding)
+        {
+            return;
+        }
+
+        treeViewItem.IsExpanded = !treeViewItem.IsExpanded;
+        e.Handled = true;
+    }
+
+    private static ToggleButton? FindExpander(Visual visual)
+    {
+        if (visual is ToggleButton { Name: "PART_ExpandCollapseChevron" } button)
+        {
+            return button;
+        }
+
+        foreach (var child in visual.GetVisualChildren())
+        {
+            if (child is TreeViewItem)
+            {
+                continue;
+            }
+
+            var expander = FindExpander(child);
+            if (expander is not null)
+            {
+                return expander;
+            }
+        }
+
+        return null;
     }
 
     private void OnSetAsSourcePathClick(object? sender, RoutedEventArgs e)

@@ -139,6 +139,34 @@ public sealed class PipelineDirectoryTests
         Assert.False(await provider.ExistsAsync("/src/music/a.flac", CancellationToken.None));
     }
 
+    [Fact]
+    public async Task Delete_NonAtomicDirectoryProvider_DeletesFilesBeforeDirectories()
+    {
+        var inner = MemoryFileSystemFixtures.Create(f => f
+            .WithSimulatedFile("/src/music/rock/a.flac", 500)
+            .WithSimulatedFile("/src/music/rock/b.flac", 800));
+        var root = await inner.BuildDirectoryTree("/src/music");
+        root.CheckState = CheckState.Checked;
+
+        var source = new CapabilityOverrideProvider(
+            inner,
+            inner.Capabilities with { CanAtomicDirectoryDelete = false });
+        var runner = new PipelineRunner(new TransformPipeline([new DeleteStep()]));
+        var job = new PipelineJob
+        {
+            RootNode       = root,
+            SourceProvider = source,
+            ProviderRegistry = inner.CreateRegistry(),
+        };
+
+        await runner.PreviewAsync(job);
+        var results = await runner.ExecuteAsync(job);
+
+        Assert.Equal(["a.flac", "b.flac", "rock", "music"], results.Select(result => result.SourceNode.Name));
+        Assert.All(results, result => Assert.True(result.IsSuccess));
+        Assert.False(await inner.ExistsAsync("/src/music", CancellationToken.None));
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Move: partial coverage — processes individual files, parent stays
     // ─────────────────────────────────────────────────────────────────────────
