@@ -308,7 +308,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         DefaultDeleteMode = _settings.DefaultDeleteMode;
         ShowHiddenFiles = _settings.ShowHiddenFiles;
         AllowDeleteReadOnly = _settings.AllowDeleteReadOnly;
-        AllowCopyOptimisations = _settings.GetCurrentCopyOptimisationPolicy().Enabled;
+        AllowCopyOptimisations = _settings.GetOptimisedCopyEnabled();
 #if DEBUG
         EnableMemoryFileSystem = _settings.EnableMemoryFileSystem;
         AddArtificialDelay = _settings.AddArtificialDelay;
@@ -498,7 +498,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     partial void OnAllowCopyOptimisationsChanged(bool value)
     {
-        _settings.GetCurrentCopyOptimisationPolicy().Enabled = value;
+        _settings.OptimisedCopyEnabled = value;
         _ = SaveSettingsAsync();
     }
 
@@ -873,7 +873,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         DefaultDeleteMode = _settings.DefaultDeleteMode;
         ShowHiddenFiles = _settings.ShowHiddenFiles;
         AllowDeleteReadOnly = _settings.AllowDeleteReadOnly;
-        AllowCopyOptimisations = _settings.GetCurrentCopyOptimisationPolicy().Enabled;
+        AllowCopyOptimisations = _settings.GetOptimisedCopyEnabled();
 #if DEBUG
         EnableMemoryFileSystem = _settings.EnableMemoryFileSystem;
         AddArtificialDelay = _settings.AddArtificialDelay;

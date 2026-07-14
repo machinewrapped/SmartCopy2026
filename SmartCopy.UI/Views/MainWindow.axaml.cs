@@ -282,6 +282,12 @@ public partial class MainWindow : Window
         OptionsMenu.Items.Add(new Separator());
         OptionsMenu.Items.Add(SectionHeader("Pipeline"));
 
+        _allowCopyOptimisationsMenuItem = Toggle(
+            "Optimised _Copy",
+            _mainVm?.AllowCopyOptimisations ?? false,
+            () => { if (_mainVm is not null) _mainVm.AllowCopyOptimisations = !_mainVm.AllowCopyOptimisations; });
+        OptionsMenu.Items.Add(_allowCopyOptimisationsMenuItem);
+
         _allowDeleteWithoutPreviewMenuItem = Toggle(
             "Skip Preview for _Deletes",
             _mainVm?.AllowDeleteWithoutPreview ?? false,
@@ -311,12 +317,6 @@ public partial class MainWindow : Window
             _mainVm?.DefaultDeleteMode ?? DeleteMode.Trash,
             mode => { if (_mainVm is not null) _mainVm.DefaultDeleteMode = mode; });
         OptionsMenu.Items.Add(_defaultDeleteModeMenu);
-
-        _allowCopyOptimisationsMenuItem = Toggle(
-            "Optimised _Copy",
-            _mainVm?.AllowCopyOptimisations ?? false,
-            () => { if (_mainVm is not null) _mainVm.AllowCopyOptimisations = !_mainVm.AllowCopyOptimisations; });
-        OptionsMenu.Items.Add(_allowCopyOptimisationsMenuItem);
 
         // ── Section: Scan ─────────────────────────────────────────────────────
         OptionsMenu.Items.Add(new Separator());

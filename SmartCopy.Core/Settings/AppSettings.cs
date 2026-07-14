@@ -25,8 +25,11 @@ public sealed class AppSettings
     public bool EnableFilesystemWatcher { get; set; } = true;
     public int CopyChunkSizeKb { get; set; } = OperationalSettings.DefaultCopyBufferSizeBytes / 1024;
 
-    // Performance optimisations — users choose whether the canonical policy is enabled per platform.
-    public CopyOptimisationPlatformPolicy CopyOptimisationPlatformPolicy { get; set; } = new();
+    /// <summary>
+    /// Explicit optimised-copy choice. Null keeps the platform default (Windows on, other platforms off).
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? OptimisedCopyEnabled { get; set; }
 
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public OverwriteMode DefaultOverwriteMode { get; set; } = OverwriteMode.Skip;
@@ -90,7 +93,6 @@ public sealed class AppSettings
 
     internal OperationalSettings CreateOperationalSettings(OSPlatform platform)
     {
-        var policy = GetCopyOptimisationPolicy(platform);
         var settings = new OperationalSettings
         {
             CopyBufferSizeBytes = PositiveKbToIntBytesOrDefault(
@@ -100,7 +102,7 @@ public sealed class AppSettings
             CopyBufferRouting = new CopyBufferRoutingSettings(),
         };
 
-        if (!policy.Enabled)
+        if (!GetOptimisedCopyEnabled(platform))
         {
             return settings.Normalize();
         }
@@ -113,10 +115,10 @@ public sealed class AppSettings
         }).Normalize();
     }
 
-    public CopyOptimisationPolicy GetCurrentCopyOptimisationPolicy() => GetCopyOptimisationPolicy(GetCurrentPlatform());
+    public bool GetOptimisedCopyEnabled() => GetOptimisedCopyEnabled(GetCurrentPlatform());
 
-    internal CopyOptimisationPolicy GetCopyOptimisationPolicy(OSPlatform platform) =>
-        CopyOptimisationPlatformPolicy?.For(platform) ?? CopyOptimisationPolicy.DisabledDefaults();
+    internal bool GetOptimisedCopyEnabled(OSPlatform platform) =>
+        OptimisedCopyEnabled ?? platform.Equals(OSPlatform.Windows);
 
     private static OSPlatform GetCurrentPlatform()
     {

@@ -19,13 +19,7 @@ public sealed class AppSettingsStoreTests
             LastSourcePath = "/music",
             ShowHiddenFiles = true,
             CopyChunkSizeKb = 1024,
-            CopyOptimisationPlatformPolicy = new CopyOptimisationPlatformPolicy
-            {
-                Windows = new CopyOptimisationPolicy
-                {
-                    Enabled = true,
-                },
-            },
+            OptimisedCopyEnabled = true,
             RecentSources = ["/one", "/two"],
         };
 
@@ -35,7 +29,7 @@ public sealed class AppSettingsStoreTests
         Assert.Equal("/music", loaded.LastSourcePath);
         Assert.True(loaded.ShowHiddenFiles);
         Assert.Equal(1024, loaded.CopyChunkSizeKb);
-        Assert.True(loaded.CopyOptimisationPlatformPolicy.Windows.Enabled);
+        Assert.True(loaded.OptimisedCopyEnabled);
         Assert.Equal(2, loaded.RecentSources.Count);
     }
 
@@ -64,8 +58,8 @@ public sealed class AppSettingsStoreTests
 
         var loaded = await store.LoadAsync(filePath, CancellationToken.None);
 
-        Assert.False(loaded.CopyOptimisationPlatformPolicy.Windows.Enabled);
-        loaded.CopyOptimisationPlatformPolicy.Windows.Enabled = true;
+        Assert.Null(loaded.OptimisedCopyEnabled);
+        loaded.OptimisedCopyEnabled = true;
         var operational = loaded.CreateOperationalSettings(System.Runtime.InteropServices.OSPlatform.Windows);
         Assert.Equal(256 * 1024, operational.TinyFileFastPathThresholdBytes);
         Assert.Equal(1024 * 1024, operational.BatchBufferBytes);
@@ -73,7 +67,8 @@ public sealed class AppSettingsStoreTests
         await store.SaveAsync(loaded, CancellationToken.None);
         var savedJson = await File.ReadAllTextAsync(filePath);
 
-        Assert.Contains("\"Enabled\": true", savedJson);
+        Assert.Contains("\"OptimisedCopyEnabled\": true", savedJson);
+        Assert.DoesNotContain("CopyOptimisationPlatformPolicy", savedJson);
         Assert.DoesNotContain("TinyFileFastPathKb", savedJson);
         Assert.DoesNotContain("BatchBufferKb", savedJson);
         Assert.DoesNotContain("CopyRoutingSsdBufferKb", savedJson);
