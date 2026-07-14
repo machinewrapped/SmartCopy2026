@@ -24,11 +24,14 @@ public sealed record OperationalSettings
 
     /// <summary>Size of the per-file copy buffer and ArrayPool rent size.</summary>
     public int CopyBufferSizeBytes { get; init; } = DefaultCopyBufferSizeBytes;
+
     /// <summary>Files at or below this size report progress once on completion rather than per chunk.</summary>
     public long SmallFileProgressThresholdBytes { get; init; } = DefaultSmallFileProgressThresholdBytes;
+
     /// <summary>Files at or below this size are written <see cref="WriteDurability.Direct"/> (no staging).
     /// <c>0</c> disables the fast path (always stage).</summary>
     public long TinyFileFastPathThresholdBytes { get; init; }
+
     /// <summary>When &gt; 0, selects <c>BatchedCopyStrategy</c> and sets its accumulation-buffer capacity;
     /// <c>0</c> uses <c>StreamingCopyStrategy</c>.</summary>
     public long BatchBufferBytes { get; init; }
@@ -36,14 +39,18 @@ public sealed record OperationalSettings
     /// buffer capacity, so the default 512 KiB keeps ≥2 files per flush of a 1 MiB+ buffer — which is
     /// what makes phase separation happen. <c>0</c> disables the ceiling (use buffer capacity).</summary>
     public long BatchEligibilityCeilingBytes { get; init; } = DefaultBatchEligibilityCeilingBytes;
+
     /// <summary>Per-file durability intent (set by the strategy). Default <see cref="WriteDurability.Staged"/>
     /// keeps direct <c>WriteAsync</c> callers crash-safe.</summary>
     public WriteDurability WriteDurability { get; init; } = WriteDurability.Staged;
+
     /// <summary>When true, the copy strategy policy selects the copy buffer from the
     /// source→destination drive pair. Default false preserves the fixed-buffer behaviour.</summary>
     public bool DestinationRoutingEnabled { get; init; }
+
     /// <summary>Settings-backed copy-buffer routing profile used when destination routing is enabled.</summary>
     public CopyBufferRoutingSettings CopyBufferRouting { get; init; } = new();
+
     /// <summary>Minimum interval between completion-progress reports, in milliseconds. 0 disables the time gate.</summary>
     public int CompletionProgressIntervalMs { get; init; } = DefaultCompletionProgressIntervalMs;
     /// <summary>Minimum number of files between completion-progress reports. 0 disables the file-count gate.</summary>
