@@ -166,8 +166,6 @@ internal sealed class BenchmarkTask
         Console.WriteLine("Provider Settings:");
         Console.WriteLine($"  Buffer:                  {BenchmarkHelpers.FormatSize(providerOptions.CopyBufferSizeBytes)}");
         Console.WriteLine($"  Small file threshold:    {BenchmarkHelpers.FormatSize(providerOptions.SmallFileProgressThresholdBytes)}");
-        Console.WriteLine($"  Batch traversal order:  {providerOptions.BatchTraversalOrder}");
-        Console.WriteLine($"  Batch flush policy:     {providerOptions.BatchFlushPolicy}");
     }
 
     private async Task WriteInProgressRecordAsync(DateTime runStartedUtc)
@@ -240,8 +238,6 @@ internal sealed class BenchmarkTask
         PrintSetting("Buffer:", BenchmarkHelpers.FormatSize(_recordedSettings.CopyBufferSizeBytes), BenchmarkHelpers.FormatSize(_executionSettings.CopyBufferSizeBytes));
         PrintSetting("Batch buffer:", BenchmarkHelpers.FormatSize(_recordedSettings.BatchBufferBytes), BenchmarkHelpers.FormatSize(_executionSettings.BatchBufferBytes));
         PrintSetting("Batch elig. ceiling:", BenchmarkHelpers.FormatSize(_recordedSettings.BatchEligibilityCeilingBytes), BenchmarkHelpers.FormatSize(_executionSettings.BatchEligibilityCeilingBytes));
-        PrintSetting("Batch traversal order:", _recordedSettings.BatchTraversalOrder.ToString(), _executionSettings.BatchTraversalOrder.ToString());
-        PrintSetting("Batch flush policy:", _recordedSettings.BatchFlushPolicy.ToString(), _executionSettings.BatchFlushPolicy.ToString());
         PrintSetting("Tiny file threshold:", BenchmarkHelpers.FormatSize(_recordedSettings.TinyFileFastPathThresholdBytes), BenchmarkHelpers.FormatSize(_executionSettings.TinyFileFastPathThresholdBytes));
         PrintSetting("Destination routing:", _recordedSettings.DestinationRoutingEnabled.ToString(), _executionSettings.DestinationRoutingEnabled.ToString());
 
@@ -280,8 +276,6 @@ internal sealed class BenchmarkTask
         CheckExpected(_variant.ExpectedEffectiveCopyBufferSizeBytes, effectiveSettings.CopyBufferSizeBytes, "copyBufferSizeBytes");
         CheckExpected(_variant.ExpectedEffectiveBatchBufferBytes, effectiveSettings.BatchBufferBytes, "batchBufferBytes");
         CheckExpected(_variant.ExpectedEffectiveBatchEligibilityCeilingBytes, effectiveSettings.BatchEligibilityCeilingBytes, "batchEligibilityCeilingBytes");
-        CheckExpected(_variant.ExpectedEffectiveBatchTraversalOrder, effectiveSettings.BatchTraversalOrder, "batchTraversalOrder");
-        CheckExpected(_variant.ExpectedEffectiveBatchFlushPolicy, effectiveSettings.BatchFlushPolicy, "batchFlushPolicy");
         CheckExpected(_variant.ExpectedEffectiveTinyFileFastPathThresholdBytes, effectiveSettings.TinyFileFastPathThresholdBytes, "tinyFileFastPathThresholdBytes");
         CheckExpected(_variant.ExpectedEffectiveDestinationRoutingEnabled, effectiveSettings.DestinationRoutingEnabled, "destinationRoutingEnabled");
 
@@ -338,7 +332,6 @@ internal sealed class BenchmarkTask
         var directWriteThresholdBytes = _variant.DirectWriteThresholdBytes ?? _scenario.DirectWriteThresholdBytes ?? 0L;
         var bufferBatchBytes = _variant.BufferBatchBytes ?? _scenario.BufferBatchBytes ?? 0L;
         var batchEligibilityThresholdBytes = _variant.BatchEligibilityThresholdBytes ?? _scenario.BatchEligibilityThresholdBytes ?? 0L;
-        var batchOrderByFileSize = providerOptions.BatchTraversalOrder == BatchTraversalOrder.AscendingFileSize;
         var writeSequentialScan = _variant.ProviderWriteSequentialScan ?? _scenario.ProviderWriteSequentialScan ?? false;
 
         ICopyExecutor executor = useProductionExecutor
@@ -346,7 +339,7 @@ internal sealed class BenchmarkTask
             : new PrototypeCopyExecutor(
                 _destinationPath, overwriteMode,
                 directWriteThresholdBytes, bufferBatchBytes, batchEligibilityThresholdBytes,
-                batchOrderByFileSize, writeSequentialScan);
+                writeSequentialScan);
 
         BenchmarkHelpers.UpdateProgress("Preparing copy...");
         using (var executeProgress = new ThrottledConsoleProgress<OperationProgress>(p =>
@@ -507,8 +500,6 @@ internal sealed class BenchmarkTask
             ["providerWriteSequentialScan"] = (_variant.ProviderWriteSequentialScan ?? _scenario.ProviderWriteSequentialScan ?? false).ToString(),
             ["bufferBatchBytes"] = (_variant.BufferBatchBytes ?? _scenario.BufferBatchBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["batchEligibilityThresholdBytes"] = (_variant.BatchEligibilityThresholdBytes ?? _scenario.BatchEligibilityThresholdBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["batchTraversalOrder"] = providerOptions.BatchTraversalOrder.ToString(),
-            ["batchFlushPolicy"] = providerOptions.BatchFlushPolicy.ToString(),
             ["directWriteThresholdBytes"] = (_variant.DirectWriteThresholdBytes ?? _scenario.DirectWriteThresholdBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["destinationRoutingEnabled"] = (_variant.DestinationRoutingEnabled ?? false).ToString(),
             ["productionBatchBufferBytes"] = providerOptions.BatchBufferBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),

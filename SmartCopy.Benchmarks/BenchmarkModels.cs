@@ -96,8 +96,6 @@ internal sealed class BenchmarkRunRecord
     public long? DirectWriteThresholdBytes { get; init; }
     public long? BufferBatchBytes { get; init; }
     public long? BatchEligibilityThresholdBytes { get; init; }
-    public BatchTraversalOrder? BatchTraversalOrder { get; init; }
-    public BatchFlushPolicy? BatchFlushPolicy { get; init; }
     public bool? DestinationRoutingEnabled { get; init; }
     public long? ProductionBatchBufferBytes { get; init; }
     public long? ProductionBatchEligibilityCeilingBytes { get; init; }
@@ -157,8 +155,6 @@ internal sealed class BenchmarkRunRecord
             DirectWriteThresholdBytes = variant.DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes,
             BufferBatchBytes = variant.BufferBatchBytes ?? scenario.BufferBatchBytes,
             BatchEligibilityThresholdBytes = variant.BatchEligibilityThresholdBytes ?? scenario.BatchEligibilityThresholdBytes,
-            BatchTraversalOrder = providerOptions.BatchTraversalOrder,
-            BatchFlushPolicy = providerOptions.BatchFlushPolicy,
             DestinationRoutingEnabled = providerOptions.DestinationRoutingEnabled,
             ProductionBatchBufferBytes = providerOptions.BatchBufferBytes,
             ProductionBatchEligibilityCeilingBytes = providerOptions.BatchEligibilityCeilingBytes,
@@ -248,8 +244,6 @@ internal sealed class BenchmarkRunRecord
             DirectWriteThresholdBytes = variant.DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes,
             BufferBatchBytes = variant.BufferBatchBytes ?? scenario.BufferBatchBytes,
             BatchEligibilityThresholdBytes = variant.BatchEligibilityThresholdBytes ?? scenario.BatchEligibilityThresholdBytes,
-            BatchTraversalOrder = providerOptions.BatchTraversalOrder,
-            BatchFlushPolicy = providerOptions.BatchFlushPolicy,
             DestinationRoutingEnabled = providerOptions.DestinationRoutingEnabled,
             ProductionBatchBufferBytes = providerOptions.BatchBufferBytes,
             ProductionBatchEligibilityCeilingBytes = providerOptions.BatchEligibilityCeilingBytes,

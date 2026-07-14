@@ -17,10 +17,6 @@ internal sealed class BenchmarkVariant
     public long? DirectWriteThresholdBytes { get; set; }
     public long? BufferBatchBytes { get; set; }
     public long? BatchEligibilityThresholdBytes { get; set; }
-    public BatchTraversalOrder? BatchTraversalOrder { get; set; }
-    /// <summary>Optional per-scenario traversal-order overrides, keyed by scenario name.</summary>
-    public Dictionary<string, BatchTraversalOrder>? ScenarioTraversalOrderOverrides { get; set; }
-    public BatchFlushPolicy? BatchFlushPolicy { get; set; }
     public bool? DestinationRoutingEnabled { get; set; }
     public bool? ProviderWriteSequentialScan { get; set; }
     /// <summary>
@@ -32,8 +28,6 @@ internal sealed class BenchmarkVariant
     public int? ExpectedEffectiveCopyBufferSizeBytes { get; set; }
     public long? ExpectedEffectiveBatchBufferBytes { get; set; }
     public long? ExpectedEffectiveBatchEligibilityCeilingBytes { get; set; }
-    public BatchTraversalOrder? ExpectedEffectiveBatchTraversalOrder { get; set; }
-    public BatchFlushPolicy? ExpectedEffectiveBatchFlushPolicy { get; set; }
     public long? ExpectedEffectiveTinyFileFastPathThresholdBytes { get; set; }
     public bool? ExpectedEffectiveDestinationRoutingEnabled { get; set; }
 
@@ -70,13 +64,6 @@ internal sealed class BenchmarkVariant
             SmallFileProgressThresholdBytes = ProviderSmallFileProgressThresholdBytes
                 ?? scenario.ProviderSmallFileProgressThresholdBytes
                 ?? defaults.SmallFileProgressThresholdBytes,
-            BatchTraversalOrder = GetTraversalOrderOverride(scenario)
-                ?? BatchTraversalOrder
-                ?? scenario.BatchTraversalOrder
-                ?? defaults.BatchTraversalOrder,
-            BatchFlushPolicy = BatchFlushPolicy
-                ?? scenario.BatchFlushPolicy
-                ?? defaults.BatchFlushPolicy,
         }.Normalize();
     }
 
@@ -93,12 +80,6 @@ internal sealed class BenchmarkVariant
         var defaults = new AppSettings().CreateOperationalSettings();
         var batchBufferBytes = BufferBatchBytes ?? scenario.BufferBatchBytes ?? defaults.BatchBufferBytes;
         var batchEligibilityCeilingBytes = BatchEligibilityThresholdBytes ?? scenario.BatchEligibilityThresholdBytes ?? defaults.BatchEligibilityCeilingBytes;
-        var batchTraversalOrder = GetTraversalOrderOverride(scenario)
-            ?? BatchTraversalOrder
-            ?? scenario.BatchTraversalOrder;
-        var hddSourceBatchTraversalOrder = batchTraversalOrder ?? defaults.HddSourceBatchTraversalOrder;
-        var otherSourceBatchTraversalOrder = batchTraversalOrder ?? defaults.OtherSourceBatchTraversalOrder;
-        var batchFlushPolicy = BatchFlushPolicy ?? scenario.BatchFlushPolicy ?? defaults.BatchFlushPolicy;
         var tinyFileFastPathThresholdBytes = DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes ?? defaults.TinyFileFastPathThresholdBytes;
         var destinationRoutingEnabled = DestinationRoutingEnabled ?? defaults.DestinationRoutingEnabled;
 
@@ -112,18 +93,9 @@ internal sealed class BenchmarkVariant
                 ?? defaults.SmallFileProgressThresholdBytes,
             BatchBufferBytes = batchBufferBytes,
             BatchEligibilityCeilingBytes = batchEligibilityCeilingBytes,
-            BatchTraversalOrder = batchTraversalOrder ?? defaults.BatchTraversalOrder,
-            HddSourceBatchTraversalOrder = hddSourceBatchTraversalOrder,
-            OtherSourceBatchTraversalOrder = otherSourceBatchTraversalOrder,
-            BatchFlushPolicy = batchFlushPolicy,
             TinyFileFastPathThresholdBytes = tinyFileFastPathThresholdBytes,
             DestinationRoutingEnabled = destinationRoutingEnabled,
         }.Normalize();
     }
 
-    private BatchTraversalOrder? GetTraversalOrderOverride(BenchmarkScenario scenario) =>
-        ScenarioTraversalOrderOverrides is not null &&
-        ScenarioTraversalOrderOverrides.TryGetValue(scenario.Name, out var order)
-            ? order
-            : null;
 }

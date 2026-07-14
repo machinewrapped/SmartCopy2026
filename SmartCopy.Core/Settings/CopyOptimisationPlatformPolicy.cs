@@ -10,9 +10,6 @@ public sealed class CopyOptimisationPolicy
         (int)(OperationalSettings.DefaultEnabledTinyFileFastPathThresholdBytes / 1024);
     public int BatchBufferKb { get; set; } =
         (int)(OperationalSettings.DefaultEnabledBatchBufferBytes / 1024);
-    public BatchTraversalOrder HddSourceBatchTraversalOrder { get; set; } = BatchTraversalOrder.Natural;
-    public BatchTraversalOrder OtherSourceBatchTraversalOrder { get; set; } = BatchTraversalOrder.AscendingFileSize;
-    public BatchFlushPolicy BatchFlushPolicy { get; set; } = BatchFlushPolicy.FlushBeforeIneligibleFile;
     public int CopyRoutingSsdBufferKb { get; set; } = CopyBufferRoutingSettings.DefaultSsdBytes / 1024;
     public int CopyRoutingUsbBufferKb { get; set; } = CopyBufferRoutingSettings.DefaultUsbBytes / 1024;
     public int CopyRoutingHddBufferKb { get; set; } = CopyBufferRoutingSettings.DefaultHddBytes / 1024;

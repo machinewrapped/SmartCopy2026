@@ -26,7 +26,6 @@ internal static class BenchmarkCopyRunner
         long bufferBatchBytes,
         long batchEligibilityThresholdBytes,
         int copyBufferSizeBytes,
-        bool batchOrderByFileSize,
         bool enableWriteSequentialScan,
         CancellationToken ct)
     {
@@ -51,9 +50,9 @@ internal static class BenchmarkCopyRunner
                 SourceNodeResult: SourceResult.None));
         }
 
-        // 2. Match the production batch traversal: each directory's files smallest-first,
-        // then each child subtree depth-first, preserving directory-cohesive interruption semantics.
-        var sortedFileNodes = EnumerateForBatching(job.RootNode, batchOrderByFileSize)
+        // 2. Match the production batch traversal: natural file order, then each child subtree
+        // depth-first, preserving directory-cohesive interruption semantics.
+        var sortedFileNodes = EnumerateForBatching(job.RootNode)
             .Where(n => !n.IsDirectory)
             .ToList();
 
@@ -514,11 +513,9 @@ internal static class BenchmarkCopyRunner
         return TimeSpan.FromSeconds(remainingSeconds);
     }
 
-    private static IEnumerable<DirectoryTreeNode> EnumerateForBatching(DirectoryNode dir, bool orderFilesBySize)
+    private static IEnumerable<DirectoryTreeNode> EnumerateForBatching(DirectoryNode dir)
     {
         var files = dir.Files.Where(f => f.IsSelected);
-        if (orderFilesBySize)
-            files = files.OrderBy(f => f.Size);
 
         foreach (var file in files)
             yield return file;
@@ -533,7 +530,7 @@ internal static class BenchmarkCopyRunner
             if (child.IsSelected)
                 yield return child;
 
-            foreach (var node in EnumerateForBatching(child, orderFilesBySize))
+            foreach (var node in EnumerateForBatching(child))
                 yield return node;
         }
     }

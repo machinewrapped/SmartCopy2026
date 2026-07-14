@@ -10,9 +10,9 @@ namespace SmartCopy.Core.Pipeline.Strategy;
 /// <see cref="OperationalSettings.DestinationRoutingEnabled"/> is set, also selects the copy
 /// buffer size from the configurable routing table on <see cref="OperationalSettings"/>. The
 /// baseline table keeps same-volume HDD at 256 KiB, routes cross-volume HDD and unknown media to
-/// 512 KiB, and routes SSD/USB pairs to 1 MiB. Batch traversal preserves natural source order;
-/// size ordering remains available only as an explicit benchmark control. This is the seam future
-/// per-device learned profiles replace.
+/// 512 KiB, and routes SSD/USB pairs to 1 MiB. Batching always preserves natural source order and
+/// flushes at capacity, directory exit, and selection end. This is the seam future per-device
+/// learned profiles replace.
 /// </summary>
 public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
 {
@@ -24,11 +24,10 @@ public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
     {
         var resolved = inputs.Base.WithProviderConstraints(inputs.SourceCaps, inputs.TargetCaps);
 
-        // MTP protocol transfers are serialized and do not benefit from read-side batching or
-        // reordering. Preserve the user's natural traversal order in either direction.
+        // MTP protocol transfers are serialized and do not benefit from read-side batching.
         var isMtpTransfer = IsMtpTransfer(inputs.Source, inputs.Target);
         if (isMtpTransfer)
-            resolved = resolved with { BatchBufferBytes = 0, BatchTraversalOrder = BatchTraversalOrder.Natural };
+            resolved = resolved with { BatchBufferBytes = 0 };
 
         if (resolved.DestinationRoutingEnabled)
         {
@@ -39,12 +38,6 @@ public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
                     inputs.Target,
                     inputs.SameVolume,
                     resolved),
-                BatchTraversalOrder = isMtpTransfer
-                    ? BatchTraversalOrder.Natural
-                    : ResolveBatchTraversalOrder(
-                        inputs.Source,
-                        resolved.HddSourceBatchTraversalOrder,
-                        resolved.OtherSourceBatchTraversalOrder),
             };
         }
 
@@ -109,11 +102,4 @@ public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
     private static bool IsHddPair(DriveClassification source, DriveClassification target) =>
         source.MediaType == DriveMediaType.HDD || target.MediaType == DriveMediaType.HDD;
 
-    private static BatchTraversalOrder ResolveBatchTraversalOrder(
-        DriveClassification source,
-        BatchTraversalOrder hddSourceOrder,
-        BatchTraversalOrder otherSourceOrder)
-    {
-        return source.MediaType == DriveMediaType.HDD ? hddSourceOrder : otherSourceOrder;
-    }
 }

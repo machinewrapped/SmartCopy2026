@@ -48,8 +48,6 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
         DirectoryNode dir, BatchCopyOperation operation, [EnumeratorCancellation] CancellationToken ct)
     {
         var files = dir.Files.Where(f => f.IsSelected);
-        if (Settings.BatchTraversalOrder == BatchTraversalOrder.AscendingFileSize)
-            files = files.OrderBy(f => f.Size);
 
         foreach (var file in files)
         {
@@ -68,11 +66,8 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
             await foreach (var result in CopyDirectoryAsync(child, operation, ct))
                 yield return result;
 
-            if (Settings.BatchFlushPolicy == BatchFlushPolicy.FlushOnCapacityOrDirectoryExit)
-            {
-                await foreach (var result in FlushBatchAsync(operation, ct))
-                    yield return result;
-            }
+            await foreach (var result in FlushBatchAsync(operation, ct))
+                yield return result;
         }
     }
 
@@ -95,12 +90,6 @@ public sealed class BatchedCopyStrategy(OperationalSettings settings, bool targe
 
         if (node.Size > operation.EffectiveCeiling)
         {
-            if (Settings.BatchFlushPolicy == BatchFlushPolicy.FlushBeforeIneligibleFile)
-            {
-                await foreach (var result in FlushBatchAsync(operation, ct))
-                    yield return result;
-            }
-
             yield return await CopyOneFileAsync(operation.Context, node, destination, destResult.Value,
                 operation.TargetSession, operation.SuccessResult, ct);
             yield break;

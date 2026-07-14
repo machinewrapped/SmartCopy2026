@@ -170,30 +170,6 @@ public sealed class AppSettingsOperationalSettingsTests
     }
 
     [Fact]
-    public void CreateOperationalSettings_MapsBatchFlushProductionPolicy()
-    {
-        var settings = new AppSettings
-        {
-            CopyOptimisationPlatformPolicy = new CopyOptimisationPlatformPolicy
-            {
-                Windows = new CopyOptimisationPolicy
-                {
-                    Enabled = true,
-                    HddSourceBatchTraversalOrder = BatchTraversalOrder.Natural,
-                    OtherSourceBatchTraversalOrder = BatchTraversalOrder.Natural,
-                    BatchFlushPolicy = BatchFlushPolicy.FlushOnCapacityOrDirectoryExit,
-                },
-            },
-        };
-
-        var operational = settings.CreateOperationalSettings(OSPlatform.Windows);
-
-        Assert.Equal(BatchTraversalOrder.Natural, operational.HddSourceBatchTraversalOrder);
-        Assert.Equal(BatchTraversalOrder.Natural, operational.OtherSourceBatchTraversalOrder);
-        Assert.Equal(BatchFlushPolicy.FlushOnCapacityOrDirectoryExit, operational.BatchFlushPolicy);
-    }
-
-    [Fact]
     public void GetCopyOptimisationPolicy_WhenPersistedPlatformPolicyIsNull_MaterializesFallback()
     {
         var settings = new AppSettings
