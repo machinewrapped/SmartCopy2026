@@ -18,6 +18,8 @@ internal static class BenchmarkCopyRunner
         public required TimeSpan ReadDuration { get; init; }
     }
 
+    private readonly record struct BatchTraversalItem(DirectoryTreeNode? Node, bool IsDirectoryExit);
+
     public static async Task<IReadOnlyList<TransformResult>> RunAsync(
         PipelineJob job,
         string destinationPath,
@@ -26,7 +28,6 @@ internal static class BenchmarkCopyRunner
         long bufferBatchBytes,
         long batchEligibilityThresholdBytes,
         int copyBufferSizeBytes,
-        bool batchOrderByFileSize,
         bool enableWriteSequentialScan,
         CancellationToken ct)
     {
@@ -51,12 +52,8 @@ internal static class BenchmarkCopyRunner
                 SourceNodeResult: SourceResult.None));
         }
 
-        // 2. Match the production batch traversal: each directory's files smallest-first,
-        // then each child subtree depth-first, preserving directory-cohesive interruption semantics.
-        var sortedFileNodes = EnumerateForBatching(job.RootNode, batchOrderByFileSize)
-            .Where(n => !n.IsDirectory)
-            .ToList();
-
+        // 2. Match the production batch traversal: natural file order, then each child subtree
+        // depth-first, preserving directory-cohesive interruption semantics.
         var currentBatch = new List<BatchedFile>();
         long currentBatchBytes = 0;
         byte[]? sharedBatchBuffer = null;
@@ -215,10 +212,32 @@ internal static class BenchmarkCopyRunner
             batch.Clear();
         }
 
+        async Task FlushAndResetBatchAsync()
+        {
+            if (currentBatch.Count == 0)
+                return;
+
+            await FlushBatchAsync(currentBatch, sharedBatchBuffer!);
+            ArrayPool<byte>.Shared.Return(sharedBatchBuffer!);
+            sharedBatchBuffer = null;
+            currentBatchBytes = 0;
+            currentBatchOffset = 0;
+        }
+
         try
         {
-            foreach (var node in sortedFileNodes)
+            foreach (var item in EnumerateForBatching(job.RootNode))
             {
+            if (item.IsDirectoryExit)
+            {
+                await FlushAndResetBatchAsync();
+                continue;
+            }
+
+            var node = item.Node!;
+            if (node.IsDirectory)
+                continue;
+
             ct.ThrowIfCancellationRequested();
 
             if (job.PauseToken is not null)
@@ -256,11 +275,7 @@ internal static class BenchmarkCopyRunner
             {
                 if (currentBatch.Count > 0 && currentBatchBytes + node.Size > bufferBatchBytes)
                 {
-                    await FlushBatchAsync(currentBatch, sharedBatchBuffer!);
-                    ArrayPool<byte>.Shared.Return(sharedBatchBuffer!);
-                    sharedBatchBuffer = null;
-                    currentBatchBytes = 0;
-                    currentBatchOffset = 0;
+                    await FlushAndResetBatchAsync();
                 }
 
                 sharedBatchBuffer ??= ArrayPool<byte>.Shared.Rent((int)bufferBatchBytes);
@@ -338,16 +353,6 @@ internal static class BenchmarkCopyRunner
             }
             else
             {
-                // Not batchable: flush any pending batch first
-                if (currentBatch.Count > 0)
-                {
-                    await FlushBatchAsync(currentBatch, sharedBatchBuffer!);
-                    ArrayPool<byte>.Shared.Return(sharedBatchBuffer!);
-                    sharedBatchBuffer = null;
-                    currentBatchBytes = 0;
-                    currentBatchOffset = 0;
-                }
-
                 // Ensure parent directory exists
                 var directory = Path.GetDirectoryName(destination);
                 if (!string.IsNullOrEmpty(directory) && directory != lastCreatedDir)
@@ -482,10 +487,7 @@ internal static class BenchmarkCopyRunner
             }
 
             // Flush any remaining batched files at the end.
-            if (currentBatch.Count > 0)
-            {
-                await FlushBatchAsync(currentBatch, sharedBatchBuffer!);
-            }
+            await FlushAndResetBatchAsync();
 
             return results;
         }
@@ -514,14 +516,12 @@ internal static class BenchmarkCopyRunner
         return TimeSpan.FromSeconds(remainingSeconds);
     }
 
-    private static IEnumerable<DirectoryTreeNode> EnumerateForBatching(DirectoryNode dir, bool orderFilesBySize)
+    private static IEnumerable<BatchTraversalItem> EnumerateForBatching(DirectoryNode dir)
     {
         var files = dir.Files.Where(f => f.IsSelected);
-        if (orderFilesBySize)
-            files = files.OrderBy(f => f.Size);
 
         foreach (var file in files)
-            yield return file;
+            yield return new BatchTraversalItem(file, IsDirectoryExit: false);
 
         foreach (var child in dir.Children)
         {
@@ -531,10 +531,12 @@ internal static class BenchmarkCopyRunner
                 continue;
 
             if (child.IsSelected)
-                yield return child;
+                yield return new BatchTraversalItem(child, IsDirectoryExit: false);
 
-            foreach (var node in EnumerateForBatching(child, orderFilesBySize))
+            foreach (var node in EnumerateForBatching(child))
                 yield return node;
+
+            yield return new BatchTraversalItem(null, IsDirectoryExit: true);
         }
     }
 }

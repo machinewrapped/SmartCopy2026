@@ -195,5 +195,7 @@ public sealed class CopyStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
         {
             yield return result;
         }
+
+        await targetSession.CompleteAsync(ct);
     }
 }

@@ -62,7 +62,7 @@ internal sealed class BenchmarkTask
 
         try
         {
-            if (_scenario.ClearDestinationBeforeRun)
+            if (_config.ClearDestinationBeforeRun)
                 ClearDestination("Clearing destination contents before benchmark...");
 
             SetupProviders();
@@ -75,7 +75,7 @@ internal sealed class BenchmarkTask
 
             Console.WriteLine();
 
-            if (_scenario.ClearDestinationAfterRun)
+            if (_config.ClearDestinationAfterRun)
                 ClearDestination("Clearing destination contents after benchmark (post-clear)...");
         }
         catch (Exception ex)
@@ -84,7 +84,7 @@ internal sealed class BenchmarkTask
             Console.Error.WriteLine($"Error during benchmark run: {ex.Message}");
             await WriteFailureRecordAsync(runStartedUtc, ex);
 
-            if (_scenario.ClearDestinationAfterRun)
+            if (_config.ClearDestinationAfterRun)
                 TryClearDestination();
 
             throw;
@@ -166,7 +166,6 @@ internal sealed class BenchmarkTask
         Console.WriteLine("Provider Settings:");
         Console.WriteLine($"  Buffer:                  {BenchmarkHelpers.FormatSize(providerOptions.CopyBufferSizeBytes)}");
         Console.WriteLine($"  Small file threshold:    {BenchmarkHelpers.FormatSize(providerOptions.SmallFileProgressThresholdBytes)}");
-        Console.WriteLine($"  Batch order by size:     {providerOptions.BatchOrderByFileSize}");
     }
 
     private async Task WriteInProgressRecordAsync(DateTime runStartedUtc)
@@ -239,7 +238,6 @@ internal sealed class BenchmarkTask
         PrintSetting("Buffer:", BenchmarkHelpers.FormatSize(_recordedSettings.CopyBufferSizeBytes), BenchmarkHelpers.FormatSize(_executionSettings.CopyBufferSizeBytes));
         PrintSetting("Batch buffer:", BenchmarkHelpers.FormatSize(_recordedSettings.BatchBufferBytes), BenchmarkHelpers.FormatSize(_executionSettings.BatchBufferBytes));
         PrintSetting("Batch elig. ceiling:", BenchmarkHelpers.FormatSize(_recordedSettings.BatchEligibilityCeilingBytes), BenchmarkHelpers.FormatSize(_executionSettings.BatchEligibilityCeilingBytes));
-        PrintSetting("Batch order by size:", _recordedSettings.BatchOrderByFileSize.ToString(), _executionSettings.BatchOrderByFileSize.ToString());
         PrintSetting("Tiny file threshold:", BenchmarkHelpers.FormatSize(_recordedSettings.TinyFileFastPathThresholdBytes), BenchmarkHelpers.FormatSize(_executionSettings.TinyFileFastPathThresholdBytes));
         PrintSetting("Destination routing:", _recordedSettings.DestinationRoutingEnabled.ToString(), _executionSettings.DestinationRoutingEnabled.ToString());
 
@@ -278,7 +276,6 @@ internal sealed class BenchmarkTask
         CheckExpected(_variant.ExpectedEffectiveCopyBufferSizeBytes, effectiveSettings.CopyBufferSizeBytes, "copyBufferSizeBytes");
         CheckExpected(_variant.ExpectedEffectiveBatchBufferBytes, effectiveSettings.BatchBufferBytes, "batchBufferBytes");
         CheckExpected(_variant.ExpectedEffectiveBatchEligibilityCeilingBytes, effectiveSettings.BatchEligibilityCeilingBytes, "batchEligibilityCeilingBytes");
-        CheckExpected(_variant.ExpectedEffectiveBatchOrderByFileSize, effectiveSettings.BatchOrderByFileSize, "batchOrderByFileSize");
         CheckExpected(_variant.ExpectedEffectiveTinyFileFastPathThresholdBytes, effectiveSettings.TinyFileFastPathThresholdBytes, "tinyFileFastPathThresholdBytes");
         CheckExpected(_variant.ExpectedEffectiveDestinationRoutingEnabled, effectiveSettings.DestinationRoutingEnabled, "destinationRoutingEnabled");
 
@@ -289,9 +286,9 @@ internal sealed class BenchmarkTask
         }
 
         void CheckExpected<T>(T? expected, T actual, string name)
-            where T : struct, IEquatable<T>
+            where T : struct
         {
-            if (expected is { } value && !value.Equals(actual))
+            if (expected is { } value && !EqualityComparer<T>.Default.Equals(value, actual))
             {
                 failures.Add($"{name} expected {value} but resolved {actual}");
             }
@@ -335,7 +332,6 @@ internal sealed class BenchmarkTask
         var directWriteThresholdBytes = _variant.DirectWriteThresholdBytes ?? _scenario.DirectWriteThresholdBytes ?? 0L;
         var bufferBatchBytes = _variant.BufferBatchBytes ?? _scenario.BufferBatchBytes ?? 0L;
         var batchEligibilityThresholdBytes = _variant.BatchEligibilityThresholdBytes ?? _scenario.BatchEligibilityThresholdBytes ?? 0L;
-        var batchOrderByFileSize = providerOptions.BatchOrderByFileSize;
         var writeSequentialScan = _variant.ProviderWriteSequentialScan ?? _scenario.ProviderWriteSequentialScan ?? false;
 
         ICopyExecutor executor = useProductionExecutor
@@ -343,7 +339,7 @@ internal sealed class BenchmarkTask
             : new PrototypeCopyExecutor(
                 _destinationPath, overwriteMode,
                 directWriteThresholdBytes, bufferBatchBytes, batchEligibilityThresholdBytes,
-                batchOrderByFileSize, writeSequentialScan);
+                writeSequentialScan);
 
         BenchmarkHelpers.UpdateProgress("Preparing copy...");
         using (var executeProgress = new ThrottledConsoleProgress<OperationProgress>(p =>
@@ -504,7 +500,6 @@ internal sealed class BenchmarkTask
             ["providerWriteSequentialScan"] = (_variant.ProviderWriteSequentialScan ?? _scenario.ProviderWriteSequentialScan ?? false).ToString(),
             ["bufferBatchBytes"] = (_variant.BufferBatchBytes ?? _scenario.BufferBatchBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["batchEligibilityThresholdBytes"] = (_variant.BatchEligibilityThresholdBytes ?? _scenario.BatchEligibilityThresholdBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["batchOrderByFileSize"] = providerOptions.BatchOrderByFileSize.ToString(),
             ["directWriteThresholdBytes"] = (_variant.DirectWriteThresholdBytes ?? _scenario.DirectWriteThresholdBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["destinationRoutingEnabled"] = (_variant.DestinationRoutingEnabled ?? false).ToString(),
             ["productionBatchBufferBytes"] = providerOptions.BatchBufferBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),

@@ -1,0 +1,83 @@
+{
+  "sourcePath": "D:\\TestData\\MixedDataset",
+  "artifactPath": "C:\\benchmark-artifacts",
+  "includeHidden": false,
+  "convergenceSpreadPercent": 4.5,
+  "gatePercent": 3,
+  "maxConvergenceRuns": 5,
+  "converge": true,
+  "failFast": false,
+  "clearDestinationBeforeRun": true,
+  "clearDestinationAfterRun": true,
+  "scenarios": [
+    {
+      "name": "SSDtoSSD",
+      "destinationPath": "D:\\TestData\\NaturalFlush_SSDtoSSD",
+      "enabled": true,
+      "overwriteMode": 1,
+      "usePathPool": true
+    },
+    {
+      "name": "SSDtoHDD",
+      "destinationPath": "M:\\TestData\\NaturalFlush_SSDtoHDD",
+      "enabled": true,
+      "overwriteMode": 1,
+      "usePathPool": true
+    },
+    {
+      "name": "HDDtoSSD",
+      "destinationPath": "D:\\TestData\\NaturalFlush_HDDtoSSD",
+      "sourcePath": "E:\\TestData\\MixedDataset",
+      "enabled": true,
+      "overwriteMode": 1,
+      "usePathPool": true
+    },
+    {
+      "name": "HDDtoHDD",
+      "destinationPath": "M:\\TestData\\NaturalFlush_HDDtoHDD",
+      "sourcePath": "E:\\TestData\\MixedDataset",
+      "enabled": true,
+      "overwriteMode": 1,
+      "usePathPool": true
+    }
+  ],
+  "scenarioExecutionOrder": [
+    "SSDtoSSD",
+    "SSDtoHDD",
+    "HDDtoSSD",
+    "HDDtoHDD"
+  ],
+  "variants": [
+    {
+      "name": "Production_Promoted",
+      "notes": "The selected production platform policy and source-to-target routing determine every operational copy setting.",
+      "enabled": true,
+      "desiredRunCount": 3,
+      "writeJournal": true,
+      "usePrototypeExecutor": false
+    }
+  ],
+  "cooldownSeconds": 120,
+  "sourcePools": {
+    "D:\\TestData\\MixedDataset": [
+      "D:\\TestData\\MixedDataset_1",
+      "D:\\TestData\\MixedDataset_2",
+      "D:\\TestData\\MixedDataset_8",
+      "D:\\TestData\\MixedDataset_5",
+      "D:\\TestData\\MixedDataset_6",
+      "D:\\TestData\\MixedDataset_4",
+      "D:\\TestData\\MixedDataset_3",
+      "D:\\TestData\\MixedDataset_7"
+    ],
+    "E:\\TestData\\MixedDataset": [
+      "E:\\TestData\\MixedDataset_5",
+      "E:\\TestData\\MixedDataset_1",
+      "E:\\TestData\\MixedDataset_4",
+      "E:\\TestData\\MixedDataset_3",
+      "E:\\TestData\\MixedDataset_2",
+      "E:\\TestData\\MixedDataset_6",
+      "E:\\TestData\\MixedDataset_8",
+      "E:\\TestData\\MixedDataset_7"
+    ]
+  }
+}

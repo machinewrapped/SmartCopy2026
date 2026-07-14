@@ -498,6 +498,8 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         public Task<bool> ExistsAsync(string path, CancellationToken ct) =>
             owner.ExistsAsync(path, _directoryTracker, ct);
 
+        public Task CompleteAsync(CancellationToken ct) => Task.CompletedTask;
+
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 

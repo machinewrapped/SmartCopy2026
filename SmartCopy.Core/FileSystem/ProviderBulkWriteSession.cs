@@ -13,5 +13,7 @@ internal sealed class ProviderBulkWriteSession(IFileSystemProvider provider) : I
     public Task<bool> ExistsAsync(string path, CancellationToken ct) =>
         provider.ExistsAsync(path, ct);
 
+    public Task CompleteAsync(CancellationToken ct) => Task.CompletedTask;
+
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

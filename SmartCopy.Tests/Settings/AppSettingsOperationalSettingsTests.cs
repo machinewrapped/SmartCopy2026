@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Settings;
 
 namespace SmartCopy.Tests.Settings;

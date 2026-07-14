@@ -10,8 +10,9 @@ namespace SmartCopy.Core.Pipeline.Strategy;
 /// <see cref="OperationalSettings.DestinationRoutingEnabled"/> is set, also selects the copy
 /// buffer size from the configurable routing table on <see cref="OperationalSettings"/>. The
 /// baseline table keeps same-volume HDD at 256 KiB, routes cross-volume HDD and unknown media to
-/// 512 KiB, and routes SSD/USB pairs to 1 MiB. Source-HDD pairs preserve natural batch traversal
-/// order to avoid seek-heavy size sorting. This is the seam future per-device learned profiles replace.
+/// 512 KiB, and routes SSD/USB pairs to 1 MiB. Batching always preserves natural source order and
+/// flushes at capacity, directory exit, and selection end. This is the seam future per-device
+/// learned profiles replace.
 /// </summary>
 public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
 {
@@ -23,12 +24,10 @@ public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
     {
         var resolved = inputs.Base.WithProviderConstraints(inputs.SourceCaps, inputs.TargetCaps);
 
-        // MTP protocol transfers are serialized and do not benefit from read-side batching or
-        // size reordering.  Preserve the user's natural traversal order in either direction.
-        if (IsMtpTransfer(inputs.Source, inputs.Target))
-        {
-            resolved = resolved with { BatchBufferBytes = 0, BatchOrderByFileSize = false };
-        }
+        // MTP protocol transfers are serialized and do not benefit from read-side batching.
+        var isMtpTransfer = IsMtpTransfer(inputs.Source, inputs.Target);
+        if (isMtpTransfer)
+            resolved = resolved with { BatchBufferBytes = 0 };
 
         if (resolved.DestinationRoutingEnabled)
         {
@@ -39,11 +38,6 @@ public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
                     inputs.Target,
                     inputs.SameVolume,
                     resolved),
-                BatchOrderByFileSize = SelectBatchOrderByFileSize(
-                    inputs.Source,
-                    inputs.Target,
-                    inputs.SameVolume,
-                    resolved.BatchOrderByFileSize),
             };
         }
 
@@ -102,21 +96,10 @@ public sealed class DefaultCopyStrategyPolicy : ICopyStrategyPolicy
         return settings.CopyBufferRouting.UnknownBytes;
     }
 
-    internal static bool SelectBatchOrderByFileSize(
-        DriveClassification source,
-        DriveClassification target,
-        bool sameVolume,
-        bool requested)
-    {
-        if (!requested)
-            return false;
-
-        return source.MediaType != DriveMediaType.HDD;
-    }
-
     private static bool IsMtpTransfer(DriveClassification source, DriveClassification target) =>
         source.MediaType == DriveMediaType.MTP || target.MediaType == DriveMediaType.MTP;
 
     private static bool IsHddPair(DriveClassification source, DriveClassification target) =>
         source.MediaType == DriveMediaType.HDD || target.MediaType == DriveMediaType.HDD;
+
 }

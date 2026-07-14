@@ -1,5 +1,6 @@
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
+using SmartCopy.Core.Settings;
 
 namespace SmartCopy.Benchmarks;
 
@@ -16,7 +17,6 @@ internal sealed class BenchmarkVariant
     public long? DirectWriteThresholdBytes { get; set; }
     public long? BufferBatchBytes { get; set; }
     public long? BatchEligibilityThresholdBytes { get; set; }
-    public bool? BatchOrderByFileSize { get; set; }
     public bool? DestinationRoutingEnabled { get; set; }
     public bool? ProviderWriteSequentialScan { get; set; }
     /// <summary>
@@ -28,7 +28,6 @@ internal sealed class BenchmarkVariant
     public int? ExpectedEffectiveCopyBufferSizeBytes { get; set; }
     public long? ExpectedEffectiveBatchBufferBytes { get; set; }
     public long? ExpectedEffectiveBatchEligibilityCeilingBytes { get; set; }
-    public bool? ExpectedEffectiveBatchOrderByFileSize { get; set; }
     public long? ExpectedEffectiveTinyFileFastPathThresholdBytes { get; set; }
     public bool? ExpectedEffectiveDestinationRoutingEnabled { get; set; }
 
@@ -65,9 +64,6 @@ internal sealed class BenchmarkVariant
             SmallFileProgressThresholdBytes = ProviderSmallFileProgressThresholdBytes
                 ?? scenario.ProviderSmallFileProgressThresholdBytes
                 ?? defaults.SmallFileProgressThresholdBytes,
-            BatchOrderByFileSize = BatchOrderByFileSize
-                ?? scenario.BatchOrderByFileSize
-                ?? defaults.BatchOrderByFileSize,
         }.Normalize();
     }
 
@@ -81,10 +77,9 @@ internal sealed class BenchmarkVariant
     /// </summary>
     public OperationalSettings CreateProductionOperationalSettings(BenchmarkScenario scenario)
     {
-        var defaults = new OperationalSettings();
+        var defaults = new AppSettings().CreateOperationalSettings();
         var batchBufferBytes = BufferBatchBytes ?? scenario.BufferBatchBytes ?? defaults.BatchBufferBytes;
         var batchEligibilityCeilingBytes = BatchEligibilityThresholdBytes ?? scenario.BatchEligibilityThresholdBytes ?? defaults.BatchEligibilityCeilingBytes;
-        var batchOrderByFileSize = BatchOrderByFileSize ?? scenario.BatchOrderByFileSize ?? defaults.BatchOrderByFileSize;
         var tinyFileFastPathThresholdBytes = DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes ?? defaults.TinyFileFastPathThresholdBytes;
         var destinationRoutingEnabled = DestinationRoutingEnabled ?? defaults.DestinationRoutingEnabled;
 
@@ -98,9 +93,9 @@ internal sealed class BenchmarkVariant
                 ?? defaults.SmallFileProgressThresholdBytes,
             BatchBufferBytes = batchBufferBytes,
             BatchEligibilityCeilingBytes = batchEligibilityCeilingBytes,
-            BatchOrderByFileSize = batchOrderByFileSize,
             TinyFileFastPathThresholdBytes = tinyFileFastPathThresholdBytes,
             DestinationRoutingEnabled = destinationRoutingEnabled,
         }.Normalize();
     }
+
 }

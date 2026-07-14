@@ -19,4 +19,7 @@ public interface IBulkWriteSession : IAsyncDisposable
     /// Returns whether a file or directory exists at <paramref name="path"/> within this bulk operation.
     /// </summary>
     Task<bool> ExistsAsync(string path, CancellationToken ct);
+
+    /// <summary>Commits all writes accepted by this session.</summary>
+    Task CompleteAsync(CancellationToken ct);
 }
