@@ -180,8 +180,8 @@ public sealed partial class PipelineRunner
         return sameVolume ? $"{pair}, same volume" : pair;
     }
 
-    /// <summary>Plan-wide copy-optimisations status. Destination routing is the proxy the UI toggles
-    /// with "Allow Copy Optimisations": on ⇒ buffer chosen per drive pair; off ⇒ the fixed default.</summary>
+    /// <summary>Plan-wide copy-optimisations status. Destination routing is the proxy the user setting toggles:
+    /// on ⇒ buffer chosen per drive pair; off ⇒ the fixed default.</summary>
     private static string DescribeOptimisations(OperationalSettings settings) =>
         settings.DestinationRoutingEnabled
             ? "Copy optimisations: on — buffer routed by drive pair"

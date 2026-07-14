@@ -1,20 +1,9 @@
 using System.Runtime.InteropServices;
-using SmartCopy.Core.FileSystem;
-
 namespace SmartCopy.Core.Settings;
 
 public sealed class CopyOptimisationPolicy
 {
     public bool Enabled { get; set; }
-    public int TinyFileFastPathKb { get; set; } =
-        (int)(OperationalSettings.DefaultEnabledTinyFileFastPathThresholdBytes / 1024);
-    public int BatchBufferKb { get; set; } =
-        (int)(OperationalSettings.DefaultEnabledBatchBufferBytes / 1024);
-    public int CopyRoutingSsdBufferKb { get; set; } = CopyBufferRoutingSettings.DefaultSsdBytes / 1024;
-    public int CopyRoutingUsbBufferKb { get; set; } = CopyBufferRoutingSettings.DefaultUsbBytes / 1024;
-    public int CopyRoutingHddBufferKb { get; set; } = CopyBufferRoutingSettings.DefaultHddBytes / 1024;
-    public int CopyRoutingSameVolumeHddBufferKb { get; set; } = CopyBufferRoutingSettings.DefaultSameVolumeHddBytes / 1024;
-    public int CopyRoutingUnknownBufferKb { get; set; } = CopyBufferRoutingSettings.DefaultUnknownBytes / 1024;
 
     public static CopyOptimisationPolicy EnabledDefaults() => new() { Enabled = true };
 

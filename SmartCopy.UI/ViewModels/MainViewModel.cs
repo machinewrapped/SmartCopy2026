@@ -91,6 +91,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private bool _allowDeleteReadOnly;
 
+    [ObservableProperty]
+    private bool _allowCopyOptimisations;
+
 #if DEBUG
     [ObservableProperty]
     private bool _enableMemoryFileSystem = false;
@@ -101,14 +104,6 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private bool _limitMemoryFileSystemCapacity = false;
 
-    [ObservableProperty]
-    private bool _allowCopyOptimisations = false;
-
-    [ObservableProperty]
-    private int _tinyFileFastPathKb = 64;
-
-    [ObservableProperty]
-    private int _batchBufferKb = 1024;
 #endif
 
     public string SourcePath
@@ -313,14 +308,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         DefaultDeleteMode = _settings.DefaultDeleteMode;
         ShowHiddenFiles = _settings.ShowHiddenFiles;
         AllowDeleteReadOnly = _settings.AllowDeleteReadOnly;
+        AllowCopyOptimisations = _settings.GetCurrentCopyOptimisationPolicy().Enabled;
 #if DEBUG
-        var copyOptimisationPolicy = _settings.GetCurrentCopyOptimisationPolicy();
         EnableMemoryFileSystem = _settings.EnableMemoryFileSystem;
         AddArtificialDelay = _settings.AddArtificialDelay;
         LimitMemoryFileSystemCapacity = _settings.LimitMemoryFileSystemCapacity;
-        AllowCopyOptimisations = copyOptimisationPolicy.Enabled;
-        TinyFileFastPathKb = copyOptimisationPolicy.TinyFileFastPathKb;
-        BatchBufferKb = copyOptimisationPolicy.BatchBufferKb;
 #endif
 
         SourcePathPicker.RefreshSettings();
@@ -504,6 +496,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _ = SaveSettingsAsync();
     }
 
+    partial void OnAllowCopyOptimisationsChanged(bool value)
+    {
+        _settings.GetCurrentCopyOptimisationPolicy().Enabled = value;
+        _ = SaveSettingsAsync();
+    }
+
 #if DEBUG
     partial void OnEnableMemoryFileSystemChanged(bool value)
     {
@@ -541,23 +539,6 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _ = SaveSettingsAsync();
     }
 
-    partial void OnAllowCopyOptimisationsChanged(bool value)
-    {
-        _settings.GetCurrentCopyOptimisationPolicy().Enabled = value;
-        _ = SaveSettingsAsync();
-    }
-
-    partial void OnTinyFileFastPathKbChanged(int value)
-    {
-        _settings.GetCurrentCopyOptimisationPolicy().TinyFileFastPathKb = value;
-        _ = SaveSettingsAsync();
-    }
-
-    partial void OnBatchBufferKbChanged(int value)
-    {
-        _settings.GetCurrentCopyOptimisationPolicy().BatchBufferKb = value;
-        _ = SaveSettingsAsync();
-    }
 #endif
 
     private async Task SaveSettingsAsync()
@@ -892,14 +873,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         DefaultDeleteMode = _settings.DefaultDeleteMode;
         ShowHiddenFiles = _settings.ShowHiddenFiles;
         AllowDeleteReadOnly = _settings.AllowDeleteReadOnly;
+        AllowCopyOptimisations = _settings.GetCurrentCopyOptimisationPolicy().Enabled;
 #if DEBUG
-        var copyOptimisationPolicy = _settings.GetCurrentCopyOptimisationPolicy();
         EnableMemoryFileSystem = _settings.EnableMemoryFileSystem;
         AddArtificialDelay = _settings.AddArtificialDelay;
         LimitMemoryFileSystemCapacity = _settings.LimitMemoryFileSystemCapacity;
-        AllowCopyOptimisations = copyOptimisationPolicy.Enabled;
-        TinyFileFastPathKb = copyOptimisationPolicy.TinyFileFastPathKb;
-        BatchBufferKb = copyOptimisationPolicy.BatchBufferKb;
 #endif
 
         SourcePathPicker.RefreshSettings();

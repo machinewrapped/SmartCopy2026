@@ -36,8 +36,6 @@
 
 The main content area uses a **3-column layout** — Filters | Folders | Files — all at the same height and separated by draggable `GridSplitter`s. This places the filter controls in visual proximity to the tree and file list they affect, making the data-flow readable left-to-right.
 
-The Options menu includes log-related toggles for auto-opening the in-app log, verbose diagnostics, and writing operation journal files. Operation journals are off by default; the in-app log remains the primary user-facing operation record.
-
 ```text
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │ File  Options  Selection  Workflows Help                                     │

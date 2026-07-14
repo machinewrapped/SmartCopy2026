@@ -25,7 +25,7 @@ public sealed class AppSettings
     public bool EnableFilesystemWatcher { get; set; } = true;
     public int CopyChunkSizeKb { get; set; } = OperationalSettings.DefaultCopyBufferSizeBytes / 1024;
 
-    // Performance optimisations — tunable in DEBUG builds, always serialised.
+    // Performance optimisations — users choose whether the canonical policy is enabled per platform.
     public CopyOptimisationPlatformPolicy CopyOptimisationPlatformPolicy { get; set; } = new();
 
     [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -97,24 +97,7 @@ public sealed class AppSettings
                 CopyChunkSizeKb,
                 OperationalSettings.DefaultCopyBufferSizeBytes),
 
-            CopyBufferRouting = new CopyBufferRoutingSettings
-            {
-                SsdBytes = PositiveKbToIntBytesOrDefault(
-                    policy.CopyRoutingSsdBufferKb,
-                    CopyBufferRoutingSettings.DefaultSsdBytes),
-                UsbBytes = PositiveKbToIntBytesOrDefault(
-                    policy.CopyRoutingUsbBufferKb,
-                    CopyBufferRoutingSettings.DefaultUsbBytes),
-                HddBytes = PositiveKbToIntBytesOrDefault(
-                    policy.CopyRoutingHddBufferKb,
-                    CopyBufferRoutingSettings.DefaultHddBytes),
-                SameVolumeHddBytes = PositiveKbToIntBytesOrDefault(
-                    policy.CopyRoutingSameVolumeHddBufferKb,
-                    CopyBufferRoutingSettings.DefaultSameVolumeHddBytes),
-                UnknownBytes = PositiveKbToIntBytesOrDefault(
-                    policy.CopyRoutingUnknownBufferKb,
-                    CopyBufferRoutingSettings.DefaultUnknownBytes),
-            },
+            CopyBufferRouting = new CopyBufferRoutingSettings(),
         };
 
         if (!policy.Enabled)
@@ -124,12 +107,8 @@ public sealed class AppSettings
 
         return (settings with
         {
-            TinyFileFastPathThresholdBytes = NonNegativeKbToLongBytesOrDefault(
-                policy.TinyFileFastPathKb,
-                OperationalSettings.DefaultEnabledTinyFileFastPathThresholdBytes),
-            BatchBufferBytes = NonNegativeKbToIntBoundedBytesOrDefault(
-                policy.BatchBufferKb,
-                OperationalSettings.DefaultEnabledBatchBufferBytes),
+            TinyFileFastPathThresholdBytes = OperationalSettings.DefaultEnabledTinyFileFastPathThresholdBytes,
+            BatchBufferBytes = OperationalSettings.DefaultEnabledBatchBufferBytes,
             DestinationRoutingEnabled = true,
         }).Normalize();
     }
@@ -168,27 +147,6 @@ public sealed class AppSettings
 
         var bytes = (long)valueKb * 1024;
         return bytes <= int.MaxValue ? (int)bytes : defaultBytes;
-    }
-
-    private static long NonNegativeKbToLongBytesOrDefault(int valueKb, long defaultBytes)
-    {
-        if (valueKb < 0)
-        {
-            return defaultBytes;
-        }
-
-        return (long)valueKb * 1024;
-    }
-
-    private static long NonNegativeKbToIntBoundedBytesOrDefault(int valueKb, long defaultBytes)
-    {
-        if (valueKb < 0)
-        {
-            return defaultBytes;
-        }
-
-        var bytes = (long)valueKb * 1024;
-        return bytes <= int.MaxValue ? bytes : defaultBytes;
     }
 
     /// <summary>
