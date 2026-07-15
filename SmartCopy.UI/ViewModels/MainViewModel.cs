@@ -251,6 +251,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     {
                         await FileList.LoadFilesForNodeAsync(dirNode, FilterChain.BuildLiveChain(), _appContext);
                     }
+                    catch (OperationCanceledException)
+                    {
+                        // Expected when selection changes rapidly or a new load cancels the previous one
+                    }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Failed to load files for directory");
