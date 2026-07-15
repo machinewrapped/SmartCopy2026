@@ -6,7 +6,7 @@ namespace SmartCopy.Tests.Settings;
 
 public sealed class AppSettingsOperationalSettingsTests
 {
-    public static TheoryData<OSPlatform, bool> CleanInstallPlatformCases => new()
+    public static TheoryData<OSPlatform, bool> PlatformDefaultCases => new()
     {
         { OSPlatform.Windows, true },
         { OSPlatform.OSX, false },
@@ -14,64 +14,13 @@ public sealed class AppSettingsOperationalSettingsTests
         { OSPlatform.Create("OTHER"), false },
     };
 
-    public static TheoryData<OSPlatform, CopyOptimisationPlatformPolicy, bool> PlatformPolicyCases => new()
-    {
-        {
-            OSPlatform.Windows,
-            new CopyOptimisationPlatformPolicy
-            {
-                Windows = TestPolicy(enabled: false),
-            },
-            false
-        },
-        {
-            OSPlatform.Windows,
-            new CopyOptimisationPlatformPolicy
-            {
-                Windows = TestPolicy(enabled: true),
-            },
-            true
-        },
-        {
-            OSPlatform.OSX,
-            new CopyOptimisationPlatformPolicy
-            {
-                Windows = TestPolicy(enabled: true),
-                MacOS = TestPolicy(enabled: false),
-            },
-            false
-        },
-        {
-            OSPlatform.OSX,
-            new CopyOptimisationPlatformPolicy
-            {
-                Windows = TestPolicy(enabled: true),
-                MacOS = TestPolicy(enabled: true),
-                Linux = TestPolicy(enabled: false),
-            },
-            true
-        },
-        {
-            OSPlatform.Linux,
-            new CopyOptimisationPlatformPolicy
-            {
-                Windows = TestPolicy(enabled: false),
-                MacOS = TestPolicy(enabled: true),
-                Linux = TestPolicy(enabled: false),
-            },
-            false
-        },
-    };
-
     [Theory]
-    [MemberData(nameof(CleanInstallPlatformCases))]
-    public void CreateOperationalSettings_CleanInstall_UsesWindowsPolicyOnly(
+    [MemberData(nameof(PlatformDefaultCases))]
+    public void CreateOperationalSettings_UsesPlatformDefault(
         OSPlatform platform,
         bool expectOptimised)
     {
-        var settings = new AppSettings();
-
-        var operational = settings.CreateOperationalSettings(platform);
+        var operational = new AppSettings().CreateOperationalSettings(platform);
 
         Assert.Equal(expectOptimised, operational.DestinationRoutingEnabled);
         Assert.Equal(expectOptimised ? 256 * 1024 : 0, operational.TinyFileFastPathThresholdBytes);
@@ -79,24 +28,35 @@ public sealed class AppSettingsOperationalSettingsTests
     }
 
     [Theory]
-    [MemberData(nameof(PlatformPolicyCases))]
-    public void CreateOperationalSettings_UsesSelectedPlatformPolicy(
-        OSPlatform platform,
-        CopyOptimisationPlatformPolicy platformPolicy,
-        bool expectOptimised)
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CreateOperationalSettings_UsesExplicitChoiceRegardlessOfPlatform(bool enabled)
     {
-        var settings = new AppSettings
-        {
-            CopyChunkSizeKb = 384,
-            CopyOptimisationPlatformPolicy = platformPolicy,
-        };
+        var settings = new AppSettings { OptimisedCopyEnabled = enabled };
 
-        var operational = settings.CreateOperationalSettings(platform);
+        var windows = settings.CreateOperationalSettings(OSPlatform.Windows);
+        var mac = settings.CreateOperationalSettings(OSPlatform.OSX);
 
-        Assert.Equal(384 * 1024, operational.CopyBufferSizeBytes);
-        Assert.Equal(expectOptimised, operational.DestinationRoutingEnabled);
-        Assert.Equal(expectOptimised ? 256 * 1024 : 0, operational.TinyFileFastPathThresholdBytes);
-        Assert.Equal(expectOptimised ? 1024 * 1024 : 0, operational.BatchBufferBytes);
+        Assert.Equal(enabled, windows.DestinationRoutingEnabled);
+        Assert.Equal(enabled, mac.DestinationRoutingEnabled);
+    }
+
+    [Theory]
+    [InlineData("Windows", true, null)]
+    [InlineData("Windows", false, false)]
+    [InlineData("OSX", false, null)]
+    [InlineData("OSX", true, true)]
+    public void SetOptimisedCopyEnabled_StoresOnlyNonDefaultChoices(
+        string platformName,
+        bool value,
+        bool? expectedPersistedValue)
+    {
+        var platform = platformName == "Windows" ? OSPlatform.Windows : OSPlatform.OSX;
+        var settings = new AppSettings();
+
+        settings.SetOptimisedCopyEnabled(platform, value);
+
+        Assert.Equal(expectedPersistedValue, settings.OptimisedCopyEnabled);
     }
 
     [Fact]
@@ -105,10 +65,7 @@ public sealed class AppSettingsOperationalSettingsTests
         var settings = new AppSettings
         {
             CopyChunkSizeKb = -1,
-            CopyOptimisationPlatformPolicy = new CopyOptimisationPlatformPolicy
-            {
-                Windows = CopyOptimisationPolicy.EnabledDefaults(),
-            },
+            OptimisedCopyEnabled = true,
         };
 
         var operational = settings.CreateOperationalSettings(OSPlatform.Windows);
@@ -123,24 +80,4 @@ public sealed class AppSettingsOperationalSettingsTests
         Assert.Equal(256 * 1024, operational.CopyBufferRouting.SameVolumeHddBytes);
         Assert.Equal(512 * 1024, operational.CopyBufferRouting.UnknownBytes);
     }
-
-    [Fact]
-    public void GetCopyOptimisationPolicy_WhenPersistedPlatformPolicyIsNull_MaterializesFallback()
-    {
-        var settings = new AppSettings
-        {
-            CopyOptimisationPlatformPolicy = new CopyOptimisationPlatformPolicy
-            {
-                Windows = null!,
-            },
-        };
-
-        var policy = settings.GetCopyOptimisationPolicy(OSPlatform.Windows);
-        policy.Enabled = true;
-
-        Assert.Same(policy, settings.CopyOptimisationPlatformPolicy.Windows);
-        Assert.True(settings.CopyOptimisationPlatformPolicy.Windows.Enabled);
-    }
-
-    private static CopyOptimisationPolicy TestPolicy(bool enabled) => new() { Enabled = enabled };
 }

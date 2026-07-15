@@ -91,8 +91,19 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private bool _allowDeleteReadOnly;
 
-    [ObservableProperty]
     private bool _allowCopyOptimisations;
+
+    public bool AllowCopyOptimisations
+    {
+        get => _allowCopyOptimisations;
+        set
+        {
+            if (SetProperty(ref _allowCopyOptimisations, value))
+            {
+                PersistAllowCopyOptimisations(value);
+            }
+        }
+    }
 
 #if DEBUG
     [ObservableProperty]
@@ -308,7 +319,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         DefaultDeleteMode = _settings.DefaultDeleteMode;
         ShowHiddenFiles = _settings.ShowHiddenFiles;
         AllowDeleteReadOnly = _settings.AllowDeleteReadOnly;
-        AllowCopyOptimisations = _settings.GetCurrentCopyOptimisationPolicy().Enabled;
+        ApplyOptimisedCopySetting();
 #if DEBUG
         EnableMemoryFileSystem = _settings.EnableMemoryFileSystem;
         AddArtificialDelay = _settings.AddArtificialDelay;
@@ -496,9 +507,15 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _ = SaveSettingsAsync();
     }
 
-    partial void OnAllowCopyOptimisationsChanged(bool value)
+    private void PersistAllowCopyOptimisations(bool value)
     {
-        _settings.GetCurrentCopyOptimisationPolicy().Enabled = value;
+        var previousValue = _settings.OptimisedCopyEnabled;
+        _settings.SetOptimisedCopyEnabled(value);
+        if (_settings.OptimisedCopyEnabled == previousValue)
+        {
+            return;
+        }
+
         _ = SaveSettingsAsync();
     }
 
@@ -540,6 +557,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     }
 
 #endif
+
+    private void ApplyOptimisedCopySetting()
+        => SetProperty(ref _allowCopyOptimisations, _settings.GetOptimisedCopyEnabled(), nameof(AllowCopyOptimisations));
 
     private async Task SaveSettingsAsync()
     {
@@ -873,7 +893,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         DefaultDeleteMode = _settings.DefaultDeleteMode;
         ShowHiddenFiles = _settings.ShowHiddenFiles;
         AllowDeleteReadOnly = _settings.AllowDeleteReadOnly;
-        AllowCopyOptimisations = _settings.GetCurrentCopyOptimisationPolicy().Enabled;
+        ApplyOptimisedCopySetting();
 #if DEBUG
         EnableMemoryFileSystem = _settings.EnableMemoryFileSystem;
         AddArtificialDelay = _settings.AddArtificialDelay;
