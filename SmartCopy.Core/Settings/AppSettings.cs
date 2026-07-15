@@ -25,8 +25,10 @@ public sealed class AppSettings
     public bool EnableFilesystemWatcher { get; set; } = true;
     public int CopyChunkSizeKb { get; set; } = OperationalSettings.DefaultCopyBufferSizeBytes / 1024;
 
-    // Performance optimisations — tunable in DEBUG builds, always serialised.
-    public CopyOptimisationPlatformPolicy CopyOptimisationPlatformPolicy { get; set; } = new();
+    /// <summary>
+    /// Explicit optimised-copy choice. Null keeps the platform default (Windows on, other platforms off).
+    /// </summary>
+    public bool? OptimisedCopyEnabled { get; set; }
 
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public OverwriteMode DefaultOverwriteMode { get; set; } = OverwriteMode.Skip;
@@ -90,54 +92,45 @@ public sealed class AppSettings
 
     internal OperationalSettings CreateOperationalSettings(OSPlatform platform)
     {
-        var policy = GetCopyOptimisationPolicy(platform);
         var settings = new OperationalSettings
         {
             CopyBufferSizeBytes = PositiveKbToIntBytesOrDefault(
                 CopyChunkSizeKb,
                 OperationalSettings.DefaultCopyBufferSizeBytes),
 
-            CopyBufferRouting = new CopyBufferRoutingSettings
-            {
-                SsdBytes = PositiveKbToIntBytesOrDefault(
-                    policy.CopyRoutingSsdBufferKb,
-                    CopyBufferRoutingSettings.DefaultSsdBytes),
-                UsbBytes = PositiveKbToIntBytesOrDefault(
-                    policy.CopyRoutingUsbBufferKb,
-                    CopyBufferRoutingSettings.DefaultUsbBytes),
-                HddBytes = PositiveKbToIntBytesOrDefault(
-                    policy.CopyRoutingHddBufferKb,
-                    CopyBufferRoutingSettings.DefaultHddBytes),
-                SameVolumeHddBytes = PositiveKbToIntBytesOrDefault(
-                    policy.CopyRoutingSameVolumeHddBufferKb,
-                    CopyBufferRoutingSettings.DefaultSameVolumeHddBytes),
-                UnknownBytes = PositiveKbToIntBytesOrDefault(
-                    policy.CopyRoutingUnknownBufferKb,
-                    CopyBufferRoutingSettings.DefaultUnknownBytes),
-            },
+            CopyBufferRouting = new CopyBufferRoutingSettings(),
         };
 
-        if (!policy.Enabled)
+        if (!GetOptimisedCopyEnabled(platform))
         {
             return settings.Normalize();
         }
 
         return (settings with
         {
-            TinyFileFastPathThresholdBytes = NonNegativeKbToLongBytesOrDefault(
-                policy.TinyFileFastPathKb,
-                OperationalSettings.DefaultEnabledTinyFileFastPathThresholdBytes),
-            BatchBufferBytes = NonNegativeKbToIntBoundedBytesOrDefault(
-                policy.BatchBufferKb,
-                OperationalSettings.DefaultEnabledBatchBufferBytes),
+            TinyFileFastPathThresholdBytes = OperationalSettings.DefaultEnabledTinyFileFastPathThresholdBytes,
+            BatchBufferBytes = OperationalSettings.DefaultEnabledBatchBufferBytes,
             DestinationRoutingEnabled = true,
         }).Normalize();
     }
 
-    public CopyOptimisationPolicy GetCurrentCopyOptimisationPolicy() => GetCopyOptimisationPolicy(GetCurrentPlatform());
+    public bool GetOptimisedCopyEnabled() => GetOptimisedCopyEnabled(GetCurrentPlatform());
 
-    internal CopyOptimisationPolicy GetCopyOptimisationPolicy(OSPlatform platform) =>
-        CopyOptimisationPlatformPolicy?.For(platform) ?? CopyOptimisationPolicy.DisabledDefaults();
+    public void SetOptimisedCopyEnabled(bool value) =>
+        SetOptimisedCopyEnabled(GetCurrentPlatform(), value);
+
+    internal void SetOptimisedCopyEnabled(OSPlatform platform, bool value)
+    {
+        OptimisedCopyEnabled = value == GetPlatformDefaultOptimisedCopyEnabled(platform)
+            ? null
+            : value;
+    }
+
+    internal bool GetOptimisedCopyEnabled(OSPlatform platform) =>
+        OptimisedCopyEnabled ?? GetPlatformDefaultOptimisedCopyEnabled(platform);
+
+    private static bool GetPlatformDefaultOptimisedCopyEnabled(OSPlatform platform) =>
+        platform.Equals(OSPlatform.Windows);
 
     private static OSPlatform GetCurrentPlatform()
     {
@@ -168,27 +161,6 @@ public sealed class AppSettings
 
         var bytes = (long)valueKb * 1024;
         return bytes <= int.MaxValue ? (int)bytes : defaultBytes;
-    }
-
-    private static long NonNegativeKbToLongBytesOrDefault(int valueKb, long defaultBytes)
-    {
-        if (valueKb < 0)
-        {
-            return defaultBytes;
-        }
-
-        return (long)valueKb * 1024;
-    }
-
-    private static long NonNegativeKbToIntBoundedBytesOrDefault(int valueKb, long defaultBytes)
-    {
-        if (valueKb < 0)
-        {
-            return defaultBytes;
-        }
-
-        var bytes = (long)valueKb * 1024;
-        return bytes <= int.MaxValue ? bytes : defaultBytes;
     }
 
     /// <summary>

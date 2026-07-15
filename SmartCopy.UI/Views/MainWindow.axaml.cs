@@ -64,6 +64,7 @@ public partial class MainWindow : Window
     private MenuItem? _lazyExpandScanMenuItem;
     private MenuItem? _followSymlinksMenuItem;
     private MenuItem? _showHiddenFilesMenuItem;
+    private MenuItem? _allowCopyOptimisationsMenuItem;
 
 #if DEBUG
     // Options menu — Debug
@@ -71,10 +72,6 @@ public partial class MainWindow : Window
     private MenuItem? _artificialDelayMenuItem;
     private MenuItem? _limitMemoryFileSystemCapacityMenuItem;
 
-    // Options menu — Performance
-    private MenuItem? _allowCopyOptimisationsMenuItem;
-    private MenuItem? _tinyFileThresholdMenu;
-    private MenuItem? _batchBufferMenu;
 #endif
 
     public MainWindow()
@@ -285,6 +282,12 @@ public partial class MainWindow : Window
         OptionsMenu.Items.Add(new Separator());
         OptionsMenu.Items.Add(SectionHeader("Pipeline"));
 
+        _allowCopyOptimisationsMenuItem = Toggle(
+            "Optimised _Copy",
+            _mainVm?.AllowCopyOptimisations ?? false,
+            () => { if (_mainVm is not null) _mainVm.AllowCopyOptimisations = !_mainVm.AllowCopyOptimisations; });
+        OptionsMenu.Items.Add(_allowCopyOptimisationsMenuItem);
+
         _allowDeleteWithoutPreviewMenuItem = Toggle(
             "Skip Preview for _Deletes",
             _mainVm?.AllowDeleteWithoutPreview ?? false,
@@ -371,30 +374,6 @@ public partial class MainWindow : Window
             );
         debugMenu.Items.Add(_limitMemoryFileSystemCapacityMenuItem);
 
-        // ── Submenu: Performance ───────────────────────────────────────────
-        OptionsMenu.Items.Add(new Separator());
-        var performanceMenu = new MenuItem { Header = "Performance" };
-        OptionsMenu.Items.Add(performanceMenu);
-
-        _allowCopyOptimisationsMenuItem = Toggle(
-            "Allow Copy Optimisations",
-            _mainVm?.AllowCopyOptimisations ?? false,
-            () => { if (_mainVm is not null) _mainVm.AllowCopyOptimisations = !_mainVm.AllowCopyOptimisations; });
-        performanceMenu.Items.Add(_allowCopyOptimisationsMenuItem);
-
-        _tinyFileThresholdMenu = new MenuItem { Header = "Tiny File Threshold" };
-        PopulateByteSizeRadioMenu(_tinyFileThresholdMenu,
-            _mainVm?.TinyFileFastPathKb ?? 64,
-            [(0, "Disabled"), (16, "16 KiB"), (32, "32 KiB"), (64, "64 KiB"), (128, "128 KiB")],
-            kb => { if (_mainVm is not null) _mainVm.TinyFileFastPathKb = kb; });
-        performanceMenu.Items.Add(_tinyFileThresholdMenu);
-
-        _batchBufferMenu = new MenuItem { Header = "Batch Buffer Size" };
-        PopulateByteSizeRadioMenu(_batchBufferMenu,
-            _mainVm?.BatchBufferKb ?? 1024,
-            [(0, "Disabled"), (256, "256 KiB"), (512, "512 KiB"), (1024, "1 MiB"), (2048, "2 MiB"), (4096, "4 MiB")],
-            kb => { if (_mainVm is not null) _mainVm.BatchBufferKb = kb; });
-        performanceMenu.Items.Add(_batchBufferMenu);
 #endif
 
         return;
@@ -452,31 +431,6 @@ public partial class MainWindow : Window
             }
         }
 
-        static void PopulateByteSizeRadioMenu(
-            MenuItem parent, int currentKb,
-            (int Kb, string Label)[] options,
-            Action<int> onSelect)
-        {
-            parent.Items.Clear();
-            foreach (var (kb, label) in options)
-            {
-                var item = new MenuItem
-                {
-                    Header = label,
-                    Tag = kb,
-                    ToggleType = MenuItemToggleType.Radio,
-                    IsChecked = kb == currentKb,
-                };
-                item.Click += (_, _) =>
-                {
-                    onSelect(kb);
-                    foreach (var child in parent.Items.OfType<MenuItem>())
-                        if (child.Tag is int t)
-                            child.IsChecked = t == kb;
-                };
-                parent.Items.Add(item);
-            }
-        }
     }
 
     private void OnMainViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -586,6 +540,11 @@ public partial class MainWindow : Window
                 }
                 break;
 
+            case nameof(MainViewModel.AllowCopyOptimisations):
+                if (_allowCopyOptimisationsMenuItem is not null)
+                    _allowCopyOptimisationsMenuItem.IsChecked = _mainVm?.AllowCopyOptimisations ?? false;
+                break;
+
 #if DEBUG
             case nameof(MainViewModel.EnableMemoryFileSystem):
                 if (_enableMemoryFileSystemMenuItem is not null)
@@ -611,28 +570,6 @@ public partial class MainWindow : Window
 
                 break;
 
-            case nameof(MainViewModel.AllowCopyOptimisations):
-                if (_allowCopyOptimisationsMenuItem is not null)
-                    _allowCopyOptimisationsMenuItem.IsChecked = _mainVm?.AllowCopyOptimisations ?? false;
-                break;
-
-            case nameof(MainViewModel.TinyFileFastPathKb):
-                if (_tinyFileThresholdMenu is not null && _mainVm is not null)
-                {
-                    foreach (var child in _tinyFileThresholdMenu.Items.OfType<MenuItem>())
-                        if (child.Tag is int t)
-                            child.IsChecked = t == _mainVm.TinyFileFastPathKb;
-                }
-                break;
-
-            case nameof(MainViewModel.BatchBufferKb):
-                if (_batchBufferMenu is not null && _mainVm is not null)
-                {
-                    foreach (var child in _batchBufferMenu.Items.OfType<MenuItem>())
-                        if (child.Tag is int t)
-                            child.IsChecked = t == _mainVm.BatchBufferKb;
-                }
-                break;
 #endif
 
         }
