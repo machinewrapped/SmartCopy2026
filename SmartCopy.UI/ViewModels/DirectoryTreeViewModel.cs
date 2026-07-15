@@ -110,7 +110,7 @@ public class DirectoryTreeViewModel : ViewModelBase
     }
 
     /// <summary> Avalonia TreeView requires an enumerable root</summary>
-    private ObservableCollection<DirectoryNode> ItemsSource { get; } = [];
+    public ObservableCollection<DirectoryNode> ItemsSource { get; } = [];
 
     /// <summary>
     /// Set the root path for the directory tree (may be underneath the filesystem root)

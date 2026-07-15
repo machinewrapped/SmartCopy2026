@@ -10,7 +10,7 @@
         CanResize="True"
         ShowInTaskbar="False"
         ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaChromeHints="NoChrome"
+        WindowDecorations="BorderOnly"
         WindowStartupLocation="CenterOwner"
         Background="Transparent"
         TransparencyLevelHint="Transparent">

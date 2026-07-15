@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
+             xmlns:core="clr-namespace:SmartCopy.Core.DirectoryTree;assembly=SmartCopy.Core"
              xmlns:conv="clr-namespace:SmartCopy.UI.Converters"
              x:Class="SmartCopy.UI.Views.DirectoryTreeView"
              x:DataType="vm:DirectoryTreeViewModel">
@@ -20,13 +21,13 @@
               BorderThickness="0"
 >
         <TreeView.Styles>
-            <Style Selector="TreeViewItem">
+            <Style Selector="TreeViewItem" x:DataType="core:DirectoryNode">
                 <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
                 <Setter Property="IsVisible">
                     <Setter.Value>
                         <MultiBinding Converter="{StaticResource NodeVisibilityConverter}">
                             <Binding Path="IsFilterIncluded" />
-                            <Binding Path="DataContext.ShowFilteredNodesInTree" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                            <Binding Path="((vm:DirectoryTreeViewModel)DataContext).ShowFilteredNodesInTree" RelativeSource="{RelativeSource AncestorType=UserControl}" />
                         </MultiBinding>
                     </Setter.Value>
                 </Setter>
@@ -37,7 +38,7 @@
             </Style>
         </TreeView.Styles>
         <TreeView.ItemTemplate>
-            <TreeDataTemplate ItemsSource="{Binding Children}">
+            <TreeDataTemplate ItemsSource="{Binding Children}" x:DataType="core:DirectoryNode">
                 <StackPanel Orientation="Horizontal" Spacing="4"
                             Opacity="{Binding FilterResult, Converter={StaticResource FilterResultOpacityConverter}}"
                             ToolTip.Tip="{Binding Notes, Converter={StaticResource NullIfEmptyStringConverter}}">

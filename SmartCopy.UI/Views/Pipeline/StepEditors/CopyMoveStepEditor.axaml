@@ -1,7 +1,9 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:views="clr-namespace:SmartCopy.UI.Views"
-             x:Class="SmartCopy.UI.Views.Pipeline.StepEditors.CopyMoveStepEditor">
+             xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels.Pipeline"
+             x:Class="SmartCopy.UI.Views.Pipeline.StepEditors.CopyMoveStepEditor"
+             x:DataType="vm:CopyMoveStepEditorViewModelBase">
    <StackPanel Spacing="8">
        <TextBlock Text="Destination Path" FontSize="12" Opacity="0.7" />
        <views:PathPickerControl DataContext="{Binding DestinationPathPicker}"

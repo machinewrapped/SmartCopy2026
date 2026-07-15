@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
+             xmlns:local="clr-namespace:SmartCopy.UI.Views"
              x:Class="SmartCopy.UI.Views.PathPickerControl"
              x:DataType="vm:PathPickerViewModel">
 
@@ -52,8 +53,8 @@
                 Content="📁"
                 Click="OnBrowseClick"
                 CornerRadius="4"
-                ToolTip.Tip="{Binding $parent[UserControl].BrowseButtonToolTip}"
-                AutomationProperties.Name="{Binding $parent[UserControl].BrowseButtonToolTip}"/>
+                ToolTip.Tip="{Binding $parent[local:PathPickerControl].BrowseButtonToolTip}"
+                AutomationProperties.Name="{Binding $parent[local:PathPickerControl].BrowseButtonToolTip}"/>
 
         <Button Grid.Row="0"
                 Grid.Column="3"

@@ -1,10 +1,13 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels.Dialogs"
         x:Class="SmartCopy.UI.Views.Dialogs.MtpDevicePickerDialog"
+        x:DataType="vm:MtpDevicePickerViewModel"
         Title="Browse MTP Device"
         Width="400" Height="450"
         CanResize="False"
         ExtendClientAreaToDecorationsHint="True"
+        WindowDecorations="BorderOnly"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
         Background="#1e1e1e">
@@ -18,7 +21,7 @@
                  SelectionChanged="OnItemSelectionChanged"
                  Height="300">
             <ListBox.ItemTemplate>
-                <DataTemplate>
+                <DataTemplate x:DataType="vm:MtpPickerItem">
                     <TextBlock Text="{Binding DisplayName}" />
                 </DataTemplate>
             </ListBox.ItemTemplate>
