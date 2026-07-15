@@ -34,6 +34,24 @@ public sealed class AppSettingsStoreTests
     }
 
     [Fact]
+    public async Task LoadInto_RoundTripsConditionallyIgnoredOptimisedCopySetting()
+    {
+        using var temp = new TempDirectory();
+        var filePath = Path.Combine(temp.Path, "settings.json");
+        var store = new AppSettingsStore();
+        await store.SaveAsync(new AppSettings
+        {
+            SettingsFilePath = filePath,
+            OptimisedCopyEnabled = true,
+        }, CancellationToken.None);
+
+        var settings = new AppSettings { SettingsFilePath = filePath };
+        await store.LoadIntoAsync(settings, CancellationToken.None);
+
+        Assert.True(settings.OptimisedCopyEnabled);
+    }
+
+    [Fact]
     public async Task LoadAndSave_LegacyCopyTuning_IgnoresAndRemovesNumericFields()
     {
         using var temp = new TempDirectory();

@@ -28,7 +28,6 @@ public sealed class AppSettings
     /// <summary>
     /// Explicit optimised-copy choice. Null keeps the platform default (Windows on, other platforms off).
     /// </summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? OptimisedCopyEnabled { get; set; }
 
     [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -117,8 +116,21 @@ public sealed class AppSettings
 
     public bool GetOptimisedCopyEnabled() => GetOptimisedCopyEnabled(GetCurrentPlatform());
 
+    public void SetOptimisedCopyEnabled(bool value) =>
+        SetOptimisedCopyEnabled(GetCurrentPlatform(), value);
+
+    internal void SetOptimisedCopyEnabled(OSPlatform platform, bool value)
+    {
+        OptimisedCopyEnabled = value == GetPlatformDefaultOptimisedCopyEnabled(platform)
+            ? null
+            : value;
+    }
+
     internal bool GetOptimisedCopyEnabled(OSPlatform platform) =>
-        OptimisedCopyEnabled ?? platform.Equals(OSPlatform.Windows);
+        OptimisedCopyEnabled ?? GetPlatformDefaultOptimisedCopyEnabled(platform);
+
+    private static bool GetPlatformDefaultOptimisedCopyEnabled(OSPlatform platform) =>
+        platform.Equals(OSPlatform.Windows);
 
     private static OSPlatform GetCurrentPlatform()
     {

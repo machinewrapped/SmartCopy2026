@@ -41,6 +41,24 @@ public sealed class AppSettingsOperationalSettingsTests
         Assert.Equal(enabled, mac.DestinationRoutingEnabled);
     }
 
+    [Theory]
+    [InlineData("Windows", true, null)]
+    [InlineData("Windows", false, false)]
+    [InlineData("OSX", false, null)]
+    [InlineData("OSX", true, true)]
+    public void SetOptimisedCopyEnabled_StoresOnlyNonDefaultChoices(
+        string platformName,
+        bool value,
+        bool? expectedPersistedValue)
+    {
+        var platform = platformName == "Windows" ? OSPlatform.Windows : OSPlatform.OSX;
+        var settings = new AppSettings();
+
+        settings.SetOptimisedCopyEnabled(platform, value);
+
+        Assert.Equal(expectedPersistedValue, settings.OptimisedCopyEnabled);
+    }
+
     [Fact]
     public void CreateOperationalSettings_EnabledPolicy_UsesCanonicalValues()
     {
