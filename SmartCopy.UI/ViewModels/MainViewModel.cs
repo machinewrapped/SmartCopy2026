@@ -1458,19 +1458,19 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         switch (result.SourceNodeResult)
         {
             case SourceResult.Copied:
-                LogPanel.AddEntry($"Copied {result.SourceNode.Name} → {result.DestinationPath} ({FileSizeFormatter.FormatBytes(result.OutputBytes)})");
+                LogPanel.AddEntry($"Copied {result.SourceNode.Name} → {result.DestinationPath} ({FileSizeFormatter.FormatBytes(result.OutputBytes)}){OverwriteTag(result.DestinationResult)}");
                 break;
             case SourceResult.Moved:
-                LogPanel.AddEntry($"Moved {result.SourceNode.Name} → {result.DestinationPath} ({FileSizeFormatter.FormatBytes(result.OutputBytes)})");
+                LogPanel.AddEntry($"Moved {result.SourceNode.Name} → {result.DestinationPath} ({FileSizeFormatter.FormatBytes(result.OutputBytes)}){OverwriteTag(result.DestinationResult)}");
                 break;
             case SourceResult.Trashed or SourceResult.Deleted:
                 LogPanel.AddEntry($"Deleted {result.SourceNode.Name} ({FileSizeFormatter.FormatBytes(result.InputBytes)})");
                 break;
         }
-
-        if (result.DestinationResult == DestinationResult.Overwritten)
-            LogPanel.AddEntry($"Overwrote {result.DestinationPath ?? "(unknown)"}");
     }
+
+    private static string OverwriteTag(DestinationResult destinationResult) =>
+        destinationResult == DestinationResult.Overwritten ? " [overwritten]" : string.Empty;
 
     private async Task SaveWorkflowAsync()
     {
