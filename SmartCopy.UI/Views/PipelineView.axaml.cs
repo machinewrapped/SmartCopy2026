@@ -336,19 +336,23 @@ public partial class PipelineView : UserControl
 
     private void OnEditStepClick(object? sender, RoutedEventArgs e)
     {
-        if (sender is Button { DataContext: PipelineStepViewModel step })
-        {
-            (DataContext as PipelineViewModel)?.RequestEditStepCommand.Execute(step);
-            e.Handled = true;
-        }
+        if (sender is not Button { DataContext: PipelineStepViewModel step } ||
+            DataContext is not PipelineViewModel vm)
+            return;
+
+        e.Handled = true;
+        if (vm.RequestEditStepCommand.CanExecute(step))
+            vm.RequestEditStepCommand.Execute(step);
     }
 
     private void OnRemoveStepClick(object? sender, RoutedEventArgs e)
     {
-        if (sender is Button { DataContext: PipelineStepViewModel step })
-        {
-            (DataContext as PipelineViewModel)?.RemoveStepCommand.Execute(step);
-            e.Handled = true;
-        }
+        if (sender is not Button { DataContext: PipelineStepViewModel step } ||
+            DataContext is not PipelineViewModel vm)
+            return;
+
+        e.Handled = true;
+        if (vm.RemoveStepCommand.CanExecute(step))
+            vm.RemoveStepCommand.Execute(step);
     }
 }

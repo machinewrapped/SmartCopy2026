@@ -334,19 +334,23 @@ public partial class FilterChainView : UserControl
 
     private void OnEditFilterClick(object? sender, RoutedEventArgs e)
     {
-        if (sender is Button { DataContext: FilterViewModel filterVm })
-        {
-            (DataContext as FilterChainViewModel)?.RequestEditFilterCommand.Execute(filterVm);
-            e.Handled = true;
-        }
+        if (sender is not Button { DataContext: FilterViewModel filterVm } ||
+            DataContext is not FilterChainViewModel vm)
+            return;
+
+        e.Handled = true;
+        if (vm.RequestEditFilterCommand.CanExecute(filterVm))
+            vm.RequestEditFilterCommand.Execute(filterVm);
     }
 
     private void OnRemoveFilterClick(object? sender, RoutedEventArgs e)
     {
-        if (sender is Button { DataContext: FilterViewModel filterVm })
-        {
-            (DataContext as FilterChainViewModel)?.RemoveFilterCommand.Execute(filterVm);
-            e.Handled = true;
-        }
+        if (sender is not Button { DataContext: FilterViewModel filterVm } ||
+            DataContext is not FilterChainViewModel vm)
+            return;
+
+        e.Handled = true;
+        if (vm.RemoveFilterCommand.CanExecute(filterVm))
+            vm.RemoveFilterCommand.Execute(filterVm);
     }
 }

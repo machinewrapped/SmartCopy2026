@@ -7,12 +7,14 @@ namespace SmartCopy.UI.ViewModels.Pipeline;
 
 public abstract partial class CopyMoveStepEditorViewModelBase : StepEditorViewModelBase, IDestinationProvider
 {
+    private static readonly OverwriteMode[] CachedOverwriteModes = Enum.GetValues<OverwriteMode>();
+
     public PathPickerViewModel DestinationPathPicker { get; }
 
     [ObservableProperty]
     private OverwriteMode _selectedOverwriteMode;
 
-    public OverwriteMode[] OverwriteModes => Enum.GetValues<OverwriteMode>();
+    public OverwriteMode[] OverwriteModes => CachedOverwriteModes;
 
     public string DestinationPath
     {
