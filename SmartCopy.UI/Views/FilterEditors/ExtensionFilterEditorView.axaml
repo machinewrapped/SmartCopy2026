@@ -25,8 +25,7 @@
                                     Background="Transparent" Foreground="{DynamicResource MutedForegroundBrush}"
                                     HorizontalContentAlignment="Center"
                                     VerticalContentAlignment="Center"
-                                    Command="{Binding $parent[UserControl].((vm:ExtensionFilterEditorViewModel)DataContext).RemoveExtensionCommand}"
-                                    CommandParameter="{Binding}" />
+                                    Click="OnRemoveExtensionClick" />
                         </StackPanel>
                     </Border>
                 </DataTemplate>

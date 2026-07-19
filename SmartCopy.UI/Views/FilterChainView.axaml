@@ -127,11 +127,9 @@
                                                      Foreground="{DynamicResource MutedForegroundBrush}"
                                                     FontSize="13"
                                                     AutomationProperties.Name="Edit filter"
-                                                    Command="{Binding $parent[UserControl].((vm:FilterChainViewModel)DataContext).RequestEditFilterCommand}"
-                                                    CommandParameter="{Binding}" />
+                                                    Click="OnEditFilterClick" />
                                             <Button Content="✕"
-                                                    Command="{Binding $parent[UserControl].((vm:FilterChainViewModel)DataContext).RemoveFilterCommand}"
-                                                    CommandParameter="{Binding}"
+                                                    Click="OnRemoveFilterClick"
                                                     Width="26" Height="26" CornerRadius="4"
                                                     Padding="0"
                                                     HorizontalContentAlignment="Center"

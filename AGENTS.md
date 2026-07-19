@@ -15,6 +15,8 @@ Canonical UI and interaction designs can be found in `Docs/UIUX.md`. Refer to th
 
 ## Commands
 
+Build and test commands must be run sequentially, never in parallel. The projects share the `artifacts` output and intermediate directories, so concurrent `dotnet build`/`dotnet test` processes can lock generated files and produce misleading failures.
+
 ```bash
 # Build
 dotnet build | Out-String

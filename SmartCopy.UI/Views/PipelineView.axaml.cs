@@ -32,30 +32,37 @@ public partial class PipelineView : UserControl
         StepsItemsControl.AddHandler(DragDrop.DropEvent, OnStepsDrop);
         StepsItemsControl.ContainerPrepared += OnStepContainerPrepared;
 
-        DataContextChanged += (s, e) =>
+        DataContextChanged += OnDataContextChanged;
+
+        if (DataContext != null)
         {
-            if (_currentViewModel != null)
-            {
-                _currentViewModel.Steps.CollectionChanged -= Steps_CollectionChanged;
-                _currentViewModel.EditStepRequested -= OnEditStepRequested;
-                _currentViewModel.AddStep.StepTypeSelected -= OnAddStepTypeSelected;
-                _currentViewModel.AddStep.StepPresetPicked -= OnStepPresetPickedClosePopup;
-                _currentViewModel.AddStep.CloseRequested -= OnCloseRequestedClosePopup;
-                _currentViewModel.SavePipelineRequested -= OnSavePipelineRequested;
-            }
+            OnDataContextChanged(this, EventArgs.Empty);
+        }
+    }
 
-            _currentViewModel = DataContext as PipelineViewModel;
+    private void OnDataContextChanged(object? sender, EventArgs e)
+    {
+        if (_currentViewModel != null)
+        {
+            _currentViewModel.Steps.CollectionChanged -= Steps_CollectionChanged;
+            _currentViewModel.EditStepRequested -= OnEditStepRequested;
+            _currentViewModel.AddStep.StepTypeSelected -= OnAddStepTypeSelected;
+            _currentViewModel.AddStep.StepPresetPicked -= OnStepPresetPickedClosePopup;
+            _currentViewModel.AddStep.CloseRequested -= OnCloseRequestedClosePopup;
+            _currentViewModel.SavePipelineRequested -= OnSavePipelineRequested;
+        }
 
-            if (_currentViewModel != null)
-            {
-                _currentViewModel.Steps.CollectionChanged += Steps_CollectionChanged;
-                _currentViewModel.EditStepRequested += OnEditStepRequested;
-                _currentViewModel.AddStep.StepTypeSelected += OnAddStepTypeSelected;
-                _currentViewModel.AddStep.StepPresetPicked += OnStepPresetPickedClosePopup;
-                _currentViewModel.AddStep.CloseRequested += OnCloseRequestedClosePopup;
-                _currentViewModel.SavePipelineRequested += OnSavePipelineRequested;
-            }
-        };
+        _currentViewModel = DataContext as PipelineViewModel;
+
+        if (_currentViewModel != null)
+        {
+            _currentViewModel.Steps.CollectionChanged += Steps_CollectionChanged;
+            _currentViewModel.EditStepRequested += OnEditStepRequested;
+            _currentViewModel.AddStep.StepTypeSelected += OnAddStepTypeSelected;
+            _currentViewModel.AddStep.StepPresetPicked += OnStepPresetPickedClosePopup;
+            _currentViewModel.AddStep.CloseRequested += OnCloseRequestedClosePopup;
+            _currentViewModel.SavePipelineRequested += OnSavePipelineRequested;
+        }
     }
 
     private void OnAddStepButtonClick(object? sender, RoutedEventArgs e)
@@ -81,7 +88,7 @@ public partial class PipelineView : UserControl
         if (await _currentViewModel.TryAddStepWithoutConfiguration(kind))
             return;
 
-        if (this.VisualRoot is not Window parentWindow)
+        if (TopLevel.GetTopLevel(this) is not Window parentWindow)
             return;
 
         var vm = EditStepDialogViewModel.ForNew(kind, _currentViewModel.AppContext, _currentViewModel.SourceCapabilities);
@@ -107,7 +114,7 @@ public partial class PipelineView : UserControl
 
     private async void OnEditStepRequested(object? sender, PipelineStepViewModel step)
     {
-        if (_currentViewModel is null || this.VisualRoot is not Window parentWindow)
+        if (_currentViewModel is null || TopLevel.GetTopLevel(this) is not Window parentWindow)
             return;
 
         if (!step.Step.IsEditable)
@@ -325,5 +332,27 @@ public partial class PipelineView : UserControl
                 e.Handled = true;
                 break;
         }
+    }
+
+    private void OnEditStepClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { DataContext: PipelineStepViewModel step } ||
+            DataContext is not PipelineViewModel vm)
+            return;
+
+        e.Handled = true;
+        if (vm.RequestEditStepCommand.CanExecute(step))
+            vm.RequestEditStepCommand.Execute(step);
+    }
+
+    private void OnRemoveStepClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { DataContext: PipelineStepViewModel step } ||
+            DataContext is not PipelineViewModel vm)
+            return;
+
+        e.Handled = true;
+        if (vm.RemoveStepCommand.CanExecute(step))
+            vm.RemoveStepCommand.Execute(step);
     }
 }

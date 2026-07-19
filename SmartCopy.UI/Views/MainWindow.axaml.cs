@@ -318,12 +318,6 @@ public partial class MainWindow : Window
             mode => { if (_mainVm is not null) _mainVm.DefaultDeleteMode = mode; });
         OptionsMenu.Items.Add(_defaultDeleteModeMenu);
 
-        _allowCopyOptimisationsMenuItem = Toggle(
-            "Optimised _Copy",
-            _mainVm?.AllowCopyOptimisations ?? false,
-            () => { if (_mainVm is not null) _mainVm.AllowCopyOptimisations = !_mainVm.AllowCopyOptimisations; });
-        OptionsMenu.Items.Add(_allowCopyOptimisationsMenuItem);
-
         // ── Section: Scan ─────────────────────────────────────────────────────
         OptionsMenu.Items.Add(new Separator());
         OptionsMenu.Items.Add(SectionHeader("Scan"));

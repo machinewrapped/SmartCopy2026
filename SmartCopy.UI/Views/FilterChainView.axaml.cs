@@ -27,36 +27,43 @@ public partial class FilterChainView : UserControl
     {
         InitializeComponent();
 
-        DataContextChanged += (s, e) =>
-        {
-            if (_currentViewModel != null)
-            {
-                _currentViewModel.Filters.CollectionChanged -= Filters_CollectionChanged;
-                _currentViewModel.NewFilterDialogRequested -= OnNewFilterDialogRequested;
-                _currentViewModel.EditFilterRequested -= OnEditFilterRequested;
-                _currentViewModel.SaveChainRequested -= OnSaveChainRequested;
-                _currentViewModel.AddFilter.PresetPicked -= OnPresetPickedClosePopup;
-                _currentViewModel.AddFilter.CloseRequested -= OnCloseRequestedClosePopup;
-            }
-
-            _currentViewModel = DataContext as FilterChainViewModel;
-
-            if (_currentViewModel != null)
-            {
-                _currentViewModel.Filters.CollectionChanged += Filters_CollectionChanged;
-                _currentViewModel.NewFilterDialogRequested += OnNewFilterDialogRequested;
-                _currentViewModel.EditFilterRequested += OnEditFilterRequested;
-                _currentViewModel.SaveChainRequested += OnSaveChainRequested;
-                _currentViewModel.AddFilter.PresetPicked += OnPresetPickedClosePopup;
-                _currentViewModel.AddFilter.CloseRequested += OnCloseRequestedClosePopup;
-            }
-        };
+        DataContextChanged += OnDataContextChanged;
 
         // Wire DragDrop on the filter cards ItemsControl.
         DragDrop.SetAllowDrop(FiltersItemsControl, true);
         FiltersItemsControl.AddHandler(DragDrop.DragOverEvent, OnFiltersDragOver);
         FiltersItemsControl.AddHandler(DragDrop.DropEvent, OnFiltersDrop);
         FiltersItemsControl.ContainerPrepared += OnFilterContainerPrepared;
+
+        if (DataContext != null)
+        {
+            OnDataContextChanged(this, EventArgs.Empty);
+        }
+    }
+
+    private void OnDataContextChanged(object? sender, EventArgs e)
+    {
+        if (_currentViewModel != null)
+        {
+            _currentViewModel.Filters.CollectionChanged -= Filters_CollectionChanged;
+            _currentViewModel.NewFilterDialogRequested -= OnNewFilterDialogRequested;
+            _currentViewModel.EditFilterRequested -= OnEditFilterRequested;
+            _currentViewModel.SaveChainRequested -= OnSaveChainRequested;
+            _currentViewModel.AddFilter.PresetPicked -= OnPresetPickedClosePopup;
+            _currentViewModel.AddFilter.CloseRequested -= OnCloseRequestedClosePopup;
+        }
+
+        _currentViewModel = DataContext as FilterChainViewModel;
+
+        if (_currentViewModel != null)
+        {
+            _currentViewModel.Filters.CollectionChanged += Filters_CollectionChanged;
+            _currentViewModel.NewFilterDialogRequested += OnNewFilterDialogRequested;
+            _currentViewModel.EditFilterRequested += OnEditFilterRequested;
+            _currentViewModel.SaveChainRequested += OnSaveChainRequested;
+            _currentViewModel.AddFilter.PresetPicked += OnPresetPickedClosePopup;
+            _currentViewModel.AddFilter.CloseRequested += OnCloseRequestedClosePopup;
+        }
     }
 
     // ---- Add-filter popup ----
@@ -89,7 +96,7 @@ public partial class FilterChainView : UserControl
     private async Task OpenNewFilterDialogAsync(string filterType)
     {
         if (_currentViewModel is null) return;
-        if (this.VisualRoot is not Window parentWindow) return;
+        if (TopLevel.GetTopLevel(this) is not Window parentWindow) return;
 
         var vm = EditFilterDialogViewModel.ForNew(
             filterType,
@@ -111,7 +118,7 @@ public partial class FilterChainView : UserControl
     private async Task OpenEditFilterDialogAsync(FilterViewModel filterVm)
     {
         if (_currentViewModel is null) return;
-        if (this.VisualRoot is not Window parentWindow) return;
+        if (TopLevel.GetTopLevel(this) is not Window parentWindow) return;
 
         var vm = EditFilterDialogViewModel.ForEdit(
             filterVm.BackingFilter,
@@ -323,5 +330,27 @@ public partial class FilterChainView : UserControl
                 e.Handled = true;
                 break;
         }
+    }
+
+    private void OnEditFilterClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { DataContext: FilterViewModel filterVm } ||
+            DataContext is not FilterChainViewModel vm)
+            return;
+
+        e.Handled = true;
+        if (vm.RequestEditFilterCommand.CanExecute(filterVm))
+            vm.RequestEditFilterCommand.Execute(filterVm);
+    }
+
+    private void OnRemoveFilterClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { DataContext: FilterViewModel filterVm } ||
+            DataContext is not FilterChainViewModel vm)
+            return;
+
+        e.Handled = true;
+        if (vm.RemoveFilterCommand.CanExecute(filterVm))
+            vm.RemoveFilterCommand.Execute(filterVm);
     }
 }

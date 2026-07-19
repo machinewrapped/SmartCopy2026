@@ -5,38 +5,11 @@ using SmartCopy.Core.Settings;
 
 namespace SmartCopy.UI.ViewModels.Pipeline;
 
-public partial class MoveStepEditorViewModel : StepEditorViewModelBase, IDestinationProvider
+public partial class MoveStepEditorViewModel : CopyMoveStepEditorViewModelBase
 {
-    public PathPickerViewModel DestinationPathPicker { get; }
-
-    [ObservableProperty]
-    private OverwriteMode _selectedOverwriteMode;
-
-    public static OverwriteMode[] OverwriteModes => Enum.GetValues<OverwriteMode>();
-
-    public string DestinationPath
+    public MoveStepEditorViewModel(IAppContext ctx) : base(ctx)
     {
-        get => DestinationPathPicker.Path;
-        set => DestinationPathPicker.Path = value;
     }
-
-    public MoveStepEditorViewModel(IAppContext ctx)
-    {
-        DestinationPathPicker = new PathPickerViewModel(ctx.Settings, PathPickerMode.Target);
-        DestinationPathPicker.RegisterProvider = ctx.Register;
-        DestinationPathPicker.PropertyChanged += (s, e) =>
-        {
-            if (e.PropertyName == nameof(PathPickerViewModel.Path))
-            {
-                OnPropertyChanged(nameof(DestinationPath));
-                OnPropertyChanged(nameof(IsValid));
-            }
-        };
-
-        SelectedOverwriteMode = ctx.Settings.DefaultOverwriteMode;
-    }
-
-    public override bool IsValid => !string.IsNullOrWhiteSpace(DestinationPath);
 
     public override IPipelineStep BuildStep() => new MoveStep(DestinationPath.Trim(), SelectedOverwriteMode);
 

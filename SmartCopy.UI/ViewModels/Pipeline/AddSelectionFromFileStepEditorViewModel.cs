@@ -5,38 +5,11 @@ using SmartCopy.Core.Settings;
 
 namespace SmartCopy.UI.ViewModels.Pipeline;
 
-public partial class AddSelectionFromFileStepEditorViewModel : StepEditorViewModelBase
+public partial class AddSelectionFromFileStepEditorViewModel : SelectionFromFileStepEditorViewModelBase
 {
-    public PathPickerViewModel FilePathPicker { get; }
-
-    public string FilePath
+    public AddSelectionFromFileStepEditorViewModel(IAppContext ctx) : base(ctx)
     {
-        get => FilePathPicker.Path;
-        set => FilePathPicker.Path = value;
     }
-
-    public AddSelectionFromFileStepEditorViewModel(IAppContext ctx)
-    {
-        FilePathPicker = new PathPickerViewModel(ctx.Settings, PathPickerMode.SelectionFile);
-        FilePathPicker.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(PathPickerViewModel.Path))
-            {
-                OnPropertyChanged(nameof(FilePath));
-                OnPropertyChanged(nameof(IsValid));
-            }
-        };
-
-        var lastSourcePath = ctx.Settings.LastSourcePath;
-        if (!string.IsNullOrWhiteSpace(lastSourcePath))
-        {
-            var provider = ctx.ResolveProvider(lastSourcePath);
-            if (provider is not null)
-                FilePath = provider.JoinPath(lastSourcePath, ["selection.sc2sel"]);
-        }
-    }
-
-    public override bool IsValid => !string.IsNullOrWhiteSpace(FilePath);
 
     public override IPipelineStep BuildStep() =>
         new AddSelectionFromFileStep(FilePath.Trim());

@@ -10,6 +10,7 @@
         SizeToContent="Height"
         CanResize="False"
         ExtendClientAreaToDecorationsHint="True"
+        WindowDecorations="BorderOnly"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource AppBackgroundBrush}">
