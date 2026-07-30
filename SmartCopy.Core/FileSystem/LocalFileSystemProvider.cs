@@ -1,3 +1,5 @@
+using System.IO.Enumeration;
+
 namespace SmartCopy.Core.FileSystem;
 
 /// <summary>
@@ -16,12 +18,30 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     /// <summary>A <c>FileStreamOptions.BufferSize</c> of 1 disables FileStream's internal buffer.</summary>
     private const int NoFileStreamBuffer = 1;
 
+    /// <summary>
+    /// Mirrors <c>EnumerationOptions.Compatible</c>, the (internal) options the parameterless
+    /// <see cref="Directory.EnumerateDirectories(string)"/> / <see cref="Directory.EnumerateFiles(string)"/>
+    /// overloads use. Do NOT replace this with <c>new EnumerationOptions()</c>: the default constructor
+    /// sets <c>AttributesToSkip = Hidden | System</c> and <c>IgnoreInaccessible = true</c>, which would
+    /// silently drop hidden and system entries from every scan and swallow access errors.
+    /// </summary>
+    private static readonly EnumerationOptions ChildEnumerationOptions = new()
+    {
+        MatchType = MatchType.Win32,
+        AttributesToSkip = 0,
+        IgnoreInaccessible = false,
+        RecurseSubdirectories = false,
+        ReturnSpecialDirectories = false,
+    };
+
     private readonly bool _isNetworkPath;
     private readonly ProviderCapabilities _capabilities;
+    private readonly Func<IEnumerable<string>>? _readMountPoints;
 
     public LocalFileSystemProvider(
         string rootPath,
-        Func<string>? readLinuxMountInfo = null)
+        Func<string>? readLinuxMountInfo = null,
+        Func<IEnumerable<string>>? readMountPoints = null)
     {
         RootPath = NormalizePath(rootPath);
         _isNetworkPath = LocalPathNetworkClassifier.IsNetworkPath(RootPath, readLinuxMountInfo);
@@ -32,23 +52,47 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
             MaxPathLength: int.MaxValue,
             CanTrash: !_isNetworkPath,
             CanQueryFreeSpace: !_isNetworkPath);
-            
+
+        _readMountPoints = readMountPoints;
     }
 
     public string RootPath { get; }
 
-    public string? VolumeId => _isNetworkPath
-        ? null
-        : GetVolumeIdSafe(RootPath);
+    /// <summary>
+    /// Identity of the volume holding <see cref="RootPath"/>: the drive root on Windows, the deepest
+    /// containing mount point on Unix, and null for network paths (which have no local volume).
+    /// <para>
+    /// Two providers rooted anywhere on one volume must return the same ID — the same-volume move
+    /// fast path and the volume-keyed caches (<see cref="Hardware.DriveClassificationRegistry"/>,
+    /// <c>FreeSpaceCache</c>) all depend on it.
+    /// </para>
+    /// <para>
+    /// Deliberately resolved on each access rather than cached. Providers live in a process-wide
+    /// registry, so a cached ID would outlive the mount topology it was derived from: a device
+    /// mounted at a path that was inspected while unmounted would keep reporting the parent volume,
+    /// which is the dangerous direction (a false same-volume claim skips the free-space warning).
+    /// This is read a handful of times per pipeline run, not per file, so re-reading the mount table
+    /// is not worth caching around.
+    /// </para>
+    /// </summary>
+    public string? VolumeId => _isNetworkPath ? null : GetVolumeIdSafe(RootPath, _readMountPoints);
 
-    private static string? GetVolumeIdSafe(string path)
+    private static string? GetVolumeIdSafe(string path, Func<IEnumerable<string>>? readMountPoints)
     {
         try
         {
-            string drivePath = OperatingSystem.IsWindows() 
-                ? (Path.GetPathRoot(path) ?? path) 
-                : path;
-            return new DriveInfo(drivePath).Name;
+            if (OperatingSystem.IsWindows())
+            {
+                return new DriveInfo(Path.GetPathRoot(path) ?? path).Name;
+            }
+
+            // On Unix `new DriveInfo(path).Name` echoes the path back rather than resolving the
+            // containing mount point, so it must be matched against the mount table instead —
+            // otherwise every folder looks like its own volume and no two paths ever compare equal.
+            var mountPoints = readMountPoints?.Invoke();
+            return mountPoints is null
+                ? MountPointResolver.Resolve(path)
+                : MountPointResolver.Resolve(path, mountPoints);
         }
         catch
         {
@@ -81,21 +125,38 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                 throw new DirectoryNotFoundException(fullPath);
             }
 
-            var nodes = new List<FileSystemNode>();
+            // A single enumeration pass. Every field is read straight off the FileSystemEntry that
+            // the OS already returned for the directory read, so no child costs a second stat the
+            // way a per-child DirectoryInfo/FileInfo does.
+            var enumerable = new FileSystemEnumerable<FileSystemNode>(
+                fullPath,
+                static (ref FileSystemEntry entry) => new FileSystemNode
+                {
+                    Name = entry.FileName.ToString(),
+                    FullPath = entry.ToFullPath(),
+                    IsDirectory = entry.IsDirectory,
+                    // Directories report Size 0; entry.Length is only meaningful for files.
+                    Size = entry.IsDirectory ? 0L : entry.Length,
+                    CreatedAt = entry.CreationTimeUtc.UtcDateTime,
+                    ModifiedAt = entry.LastWriteTimeUtc.UtcDateTime,
+                    Attributes = entry.Attributes,
+                },
+                ChildEnumerationOptions);
 
-            foreach (var childDirectory in Directory.EnumerateDirectories(fullPath))
+            // Callers see directories before files, as they did when this walked the directory
+            // twice. Partitioning into two lists preserves that at the cost of one concat, with
+            // no second enumeration and no extra stat.
+            var directories = new List<FileSystemNode>();
+            var files = new List<FileSystemNode>();
+
+            foreach (var node in enumerable)
             {
                 ct.ThrowIfCancellationRequested();
-                nodes.Add(CreateDirectoryNode(childDirectory));
+                (node.IsDirectory ? directories : files).Add(node);
             }
 
-            foreach (var childFile in Directory.EnumerateFiles(fullPath))
-            {
-                ct.ThrowIfCancellationRequested();
-                nodes.Add(CreateFileNode(childFile));
-            }
-
-            return nodes;
+            directories.AddRange(files);
+            return directories;
         }, ct);
     }
 

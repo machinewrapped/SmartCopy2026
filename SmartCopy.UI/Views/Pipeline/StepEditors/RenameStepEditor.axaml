@@ -6,7 +6,7 @@
     <StackPanel Spacing="8">
         <TextBlock Text="Pattern" FontSize="12" Opacity="0.7" />
         <TextBox Text="{Binding Pattern, Mode=TwoWay}"
-                 Watermark="{}{name}_{ext}" />
+                 PlaceholderText="{}{name}_{ext}" />
 
         <StackPanel Orientation="Horizontal" Spacing="6">
             <Border BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="6,2">

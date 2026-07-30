@@ -19,7 +19,7 @@
         <StackPanel Spacing="4">
             <TextBlock Text="Name" FontSize="12" Opacity="0.7" />
             <TextBox Text="{Binding StepName}"
-                     Watermark="Auto-generated from parameters" />
+                     PlaceholderText="Auto-generated from parameters" />
         </StackPanel>
 
         <Border BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="10">

@@ -16,7 +16,7 @@
 
         <StackPanel Spacing="4">
             <TextBlock Text="Filter Chain Name" FontSize="12" Opacity="0.7" />
-            <TextBox Text="{Binding ChainName}" Watermark="Enter filter chain name" />
+            <TextBox Text="{Binding ChainName}" PlaceholderText="Enter filter chain name" />
         </StackPanel>
 
         <StackPanel Spacing="4">
