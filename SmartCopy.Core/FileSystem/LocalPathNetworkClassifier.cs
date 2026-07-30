@@ -93,7 +93,7 @@ internal static class LocalPathNetworkClassifier
                 continue;
             }
 
-            if (!IsSamePathOrChild(normalizedPath, mountPoint))
+            if (!MountPointResolver.Contains(mountPoint, normalizedPath))
             {
                 continue;
             }
@@ -156,23 +156,6 @@ internal static class LocalPathNetworkClassifier
         }
 
         return normalized;
-    }
-
-    private static bool IsSamePathOrChild(string path, string mountPoint)
-    {
-        if (string.Equals(path, mountPoint, StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        if (mountPoint == "/")
-        {
-            return path.StartsWith("/", StringComparison.Ordinal);
-        }
-
-        return path.Length > mountPoint.Length
-            && path.StartsWith(mountPoint, StringComparison.Ordinal)
-            && path[mountPoint.Length] == '/';
     }
 
     private static string UnescapeMountInfoField(string value)
