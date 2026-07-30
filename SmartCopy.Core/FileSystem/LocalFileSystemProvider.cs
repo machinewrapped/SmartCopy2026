@@ -125,15 +125,9 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                 throw new DirectoryNotFoundException(fullPath);
             }
 
-            // A single enumeration pass, replacing two traversals plus a DirectoryInfo/FileInfo
-            // allocated and stat'ed per child.
-            //
-            // This does not make the children free of stat on Unix: FileSystemEntry is populated
-            // from the directory entry, but Length and the timestamps are not in it, so reading
-            // them lazily triggers one stat per child regardless. Only Windows carries those
-            // fields in the directory read itself. What is saved here is the second traversal and
-            // the per-child allocation - worth having, but do not build later work on the
-            // assumption that these children are stat-free.
+            // A single enumeration pass, replacing two traversals and a FileInfo per child. On Unix
+            // each child still costs one stat: Length and the timestamps are not in the directory
+            // entry, so FileSystemEntry fetches them lazily. Windows carries them in the entry.
             var enumerable = new FileSystemEnumerable<FileSystemNode>(
                 fullPath,
                 static (ref FileSystemEntry entry) => new FileSystemNode
