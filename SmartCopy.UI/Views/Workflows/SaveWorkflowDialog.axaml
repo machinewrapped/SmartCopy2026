@@ -20,7 +20,7 @@
 
         <StackPanel Spacing="4">
             <TextBlock Text="Workflow Name" FontSize="12" Opacity="0.7" />
-            <TextBox Text="{Binding WorkflowName}" Watermark="Enter workflow name" />
+            <TextBox Text="{Binding WorkflowName}" PlaceholderText="Enter workflow name" />
         </StackPanel>
 
         <StackPanel Spacing="4">
