@@ -124,4 +124,49 @@ public class MediaTypeProbeTests
             empty.Delete(recursive: true);
         }
     }
+
+    [Fact]
+    public async Task RunWithTimeoutAsync_ReturnsUnknownWhenProbeDoesNotComplete()
+    {
+        using var releaseProbe = new ManualResetEventSlim();
+        try
+        {
+            var result = await MediaTypeProbe.RunWithTimeoutAsync(
+                _ =>
+                {
+                    releaseProbe.Wait();
+                    return DriveMediaType.SSD;
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.Equal(DriveMediaType.Unknown, result);
+        }
+        finally
+        {
+            releaseProbe.Set();
+        }
+    }
+
+    [Fact]
+    public async Task RunWithTimeoutAsync_PropagatesCallerCancellation()
+    {
+        using var releaseProbe = new ManualResetEventSlim();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+        try
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                MediaTypeProbe.RunWithTimeoutAsync(
+                    _ =>
+                    {
+                        releaseProbe.Wait();
+                        return DriveMediaType.SSD;
+                    },
+                    TimeSpan.FromSeconds(10),
+                    cancellation.Token));
+        }
+        finally
+        {
+            releaseProbe.Set();
+        }
+    }
 }

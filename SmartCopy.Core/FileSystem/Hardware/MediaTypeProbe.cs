@@ -61,6 +61,13 @@ internal static class MediaTypeProbe
     /// <summary>Bounds the search for sample files so an unreadable or vast tree cannot stall a scan.</summary>
     private const int MaxDirectoriesVisited = 64;
 
+    /// <summary>
+    /// Bounds the entire latency probe. Individual filesystem calls are synchronous and cannot be
+    /// interrupted reliably, so the caller stops waiting when this expires while the worker observes
+    /// the canceled token at its next safe boundary.
+    /// </summary>
+    private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(10);
+
     /// <summary>Spreads samples across the tree; files in one directory tend to be allocated together,
     /// which would let a rotational drive answer without seeking.</summary>
     private const int MaxFilesPerDirectory = 4;
@@ -124,16 +131,45 @@ internal static class MediaTypeProbe
         if (!string.IsNullOrEmpty(volumeKey) && _cache.TryGetValue(volumeKey, out var cached))
             return cached;
 
-        var mediaType = await Task.Run(() =>
+        var mediaType = await RunWithTimeoutAsync(timeoutCt =>
         {
-            var files = CollectSampleFiles(searchRoots, ct);
-            return ClassifyLatencies(SampleLatencies(files, ct));
-        }, ct).ConfigureAwait(false);
+            var files = CollectSampleFiles(searchRoots, timeoutCt);
+            return ClassifyLatencies(SampleLatencies(files, timeoutCt));
+        }, ProbeTimeout, ct).ConfigureAwait(false);
 
         if (mediaType != DriveMediaType.Unknown && !string.IsNullOrEmpty(volumeKey))
             _cache[volumeKey] = mediaType;
 
         return mediaType;
+    }
+
+    /// <summary>
+    /// Runs synchronous probe work without allowing an uninterruptible filesystem call to hold the
+    /// caller indefinitely. Caller cancellation still propagates; expiration degrades to Unknown.
+    /// </summary>
+    internal static async Task<DriveMediaType> RunWithTimeoutAsync(
+        Func<CancellationToken, DriveMediaType> probe,
+        TimeSpan timeout,
+        CancellationToken ct = default)
+    {
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeoutCts.CancelAfter(timeout);
+
+        var probeTask = Task.Run(() => probe(timeoutCts.Token), timeoutCts.Token);
+        try
+        {
+            return await probeTask.WaitAsync(timeoutCts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // Observe a late failure after the timed-out worker returns from its synchronous I/O.
+            _ = probeTask.ContinueWith(
+                task => _ = task.Exception,
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+            return DriveMediaType.Unknown;
+        }
     }
 
     /// <summary>
