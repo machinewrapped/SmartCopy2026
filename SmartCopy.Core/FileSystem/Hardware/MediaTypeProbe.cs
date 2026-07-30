@@ -16,10 +16,33 @@ namespace SmartCopy.Core.FileSystem.Hardware;
 /// </summary>
 internal static class MediaTypeProbe
 {
-    /// <summary>Median at or below this is solid state; at or above <see cref="HddMedianFloorMs"/> is
-    /// rotational. The gap between them stays Unknown rather than forcing a call.</summary>
+    /// <summary>
+    /// A read at or above this took a mechanical seek. Solid state does not produce them: an
+    /// SSD behind a USB bridge measured a 2.0ms worst case over five rounds, against 30-55ms
+    /// maxima on a rotational drive on the same bus.
+    /// </summary>
+    internal const double SeekLatencyFloorMs = 3.0;
+
+    /// <summary>Ceiling on the median for a solid-state verdict, once seeks have been ruled out.</summary>
     internal const double SsdMedianCeilingMs = 1.5;
-    internal const double HddMedianFloorMs = 3.0;
+
+    /// <summary>
+    /// Proportion of samples showing a seek that condemns the drive as rotational.
+    /// <para>
+    /// The median cannot be the primary signal. The OS caches blocks read by anything else — a
+    /// previous probe, Spotlight, a file manager — and on a userspace (fskit) volume a cached read
+    /// costs about 1ms, indistinguishable from a genuine USB SSD read. Measured on a rotational USB
+    /// drive whose cache had been warmed, the median fell to 0.48ms while 42% of samples still took
+    /// 30ms+. Counting seeks survives that; averaging them away does not.
+    /// </para>
+    /// </summary>
+    private const double RotationalSeekFraction = 0.25;
+
+    /// <summary>
+    /// Seek-latency samples tolerated before a solid-state verdict is withheld. One allows for a
+    /// bus or scheduler hiccup without letting a rotational drive through on a lucky sample.
+    /// </summary>
+    private const int MaxSolidStateOutliers = 1;
 
     internal const int SampleBlockBytes = 4096;
     internal const int TargetSampleCount = 24;
@@ -113,13 +136,26 @@ internal static class MediaTypeProbe
         return mediaType;
     }
 
+    /// <summary>
+    /// Classifies on how many samples show a seek, not on the average latency — see
+    /// <see cref="RotationalSeekFraction"/> for why the median is not trustworthy here.
+    /// </summary>
     internal static DriveMediaType ClassifyLatencies(IReadOnlyList<double> latenciesMs)
     {
         if (latenciesMs.Count < MinimumSampleCount) return DriveMediaType.Unknown;
 
-        double median = Median(latenciesMs);
-        if (median <= SsdMedianCeilingMs) return DriveMediaType.SSD;
-        if (median >= HddMedianFloorMs) return DriveMediaType.HDD;
+        int seekSamples = 0;
+        foreach (var latency in latenciesMs)
+        {
+            if (latency >= SeekLatencyFloorMs) seekSamples++;
+        }
+
+        if (seekSamples >= latenciesMs.Count * RotationalSeekFraction) return DriveMediaType.HDD;
+
+        if (seekSamples <= MaxSolidStateOutliers && Median(latenciesMs) <= SsdMedianCeilingMs)
+            return DriveMediaType.SSD;
+
+        // Too few seeks to condemn it, too slow to clear it: say nothing.
         return DriveMediaType.Unknown;
     }
 
@@ -246,14 +282,20 @@ internal static class MediaTypeProbe
         return latencies;
     }
 
+    private const int F_RDAHEAD = 45;
     private const int F_NOCACHE = 48;
 
     [DllImport("libc", SetLastError = true)]
     private static extern int fcntl(int fd, int cmd, int arg);
 
     /// <summary>
-    /// Bypasses the unified buffer cache so a sample measures the device, not RAM. Best-effort: if it
-    /// fails the reads still run, they just risk reading cached data and looking artificially fast.
+    /// Asks the kernel not to cache or read ahead for this handle, so a sample measures the device
+    /// rather than RAM and the probe pollutes the cache as little as possible for the next run.
+    /// <para>
+    /// Best-effort, and not sufficient on its own: neither flag evicts pages another reader already
+    /// cached, and a userspace filesystem need not honour them at all. Classification therefore does
+    /// not rely on this working — see <see cref="RotationalSeekFraction"/>.
+    /// </para>
     /// </summary>
     private static void DisableFileCache(SafeFileHandle handle)
     {
@@ -261,7 +303,9 @@ internal static class MediaTypeProbe
 
         try
         {
-            fcntl((int)handle.DangerousGetHandle(), F_NOCACHE, 1);
+            int fd = (int)handle.DangerousGetHandle();
+            fcntl(fd, F_NOCACHE, 1);
+            fcntl(fd, F_RDAHEAD, 0);
         }
         catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
         {

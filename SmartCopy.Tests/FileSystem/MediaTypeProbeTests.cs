@@ -65,13 +65,48 @@ public class MediaTypeProbeTests
         Assert.Equal(DriveMediaType.Unknown, MediaTypeProbe.ClassifyLatencies(samples));
     }
 
-    /// <summary>A rotational drive's outliers run to hundreds of ms; the median must ignore them.</summary>
+    /// <summary>One slow sample is a bus or scheduler hiccup, not a seek pattern.</summary>
     [Fact]
-    public void ClassifyLatencies_UsesMedianSoOutliersDoNotDecide()
+    public void ClassifyLatencies_ToleratesASingleOutlier()
     {
         double[] samples = [0.9, 1.0, 1.0, 1.1, 0.8, 1.2, 0.9, 304.0];
 
         Assert.Equal(DriveMediaType.SSD, MediaTypeProbe.ClassifyLatencies(samples));
+    }
+
+    /// <summary>
+    /// Verbatim samples from a USB rotational drive whose cache had been warmed by an earlier probe.
+    /// The median is 0.48ms — well inside solid-state range, and what previously made this drive
+    /// report SSD — but 5 of 12 reads still took a seek. Counting seeks is what survives caching.
+    /// </summary>
+    [Fact]
+    public void ClassifyLatencies_ReportsRotationalWhenCachingFlattensTheMedian()
+    {
+        double[] samples = [0.48, 0.47, 37.2, 0.49, 0.46, 30.1, 0.48, 0.51, 34.8, 0.47, 36.5, 0.49];
+
+        Assert.InRange(samples.Order().ElementAt(samples.Length / 2), 0, MediaTypeProbe.SsdMedianCeilingMs);
+        Assert.Equal(DriveMediaType.HDD, MediaTypeProbe.ClassifyLatencies(samples));
+    }
+
+    /// <summary>
+    /// Verbatim samples from a USB SSD on the same bus. Its worst read is 2.0ms, so no tightening of
+    /// the seek floor is needed to separate it from the rotational case above.
+    /// </summary>
+    [Fact]
+    public void ClassifyLatencies_ReportsSolidStateForATightDistribution()
+    {
+        double[] samples = [0.89, 0.97, 1.00, 0.95, 0.94, 2.03, 0.88, 0.91, 1.10, 0.93, 0.90, 1.70];
+
+        Assert.Equal(DriveMediaType.SSD, MediaTypeProbe.ClassifyLatencies(samples));
+    }
+
+    /// <summary>A drive whose every sampled block was already cached cannot be judged.</summary>
+    [Fact]
+    public void ClassifyLatencies_ReturnsUnknownWhenNothingIsFastAndNothingSeeks()
+    {
+        double[] samples = [2.0, 2.1, 2.2, 2.0, 2.3, 2.1, 2.0, 2.2, 2.1, 2.0, 2.4, 2.1];
+
+        Assert.Equal(DriveMediaType.Unknown, MediaTypeProbe.ClassifyLatencies(samples));
     }
 
     [Fact]
