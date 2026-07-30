@@ -76,6 +76,46 @@ public sealed class LocalFileSystemProviderVolumeIdTests
         Assert.Null(provider.VolumeId);
     }
 
+    /// <summary>
+    /// Providers are held in a process-wide registry, so one created while a path was unmounted outlives
+    /// that state. A device mounted underneath it afterwards must be picked up: a stale ID would keep
+    /// naming the parent volume and could claim same-volume against it, skipping the free-space warning.
+    /// </summary>
+    [Fact]
+    public void Unix_DeviceMountedAfterProviderCreation_IsPickedUp()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        var mounted = false;
+        var provider = new LocalFileSystemProvider(
+            "/mnt/archive/2026",
+            readMountPoints: () => mounted ? ["/", "/mnt/archive"] : ["/"]);
+
+        Assert.Equal("/", provider.VolumeId);
+
+        mounted = true;
+
+        Assert.Equal("/mnt/archive", provider.VolumeId);
+    }
+
+    /// <summary>And the reverse, so an unmounted device stops being reported as its own volume.</summary>
+    [Fact]
+    public void Unix_DeviceUnmountedAfterProviderCreation_IsPickedUp()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        var mounted = true;
+        var provider = new LocalFileSystemProvider(
+            "/mnt/archive/2026",
+            readMountPoints: () => mounted ? ["/", "/mnt/archive"] : ["/"]);
+
+        Assert.Equal("/mnt/archive", provider.VolumeId);
+
+        mounted = false;
+
+        Assert.Equal("/", provider.VolumeId);
+    }
+
     /// <summary>End-to-end against the host's real mount table, with no injection.</summary>
     [Fact]
     public void RealFileSystem_SiblingTempFolders_ShareAVolumeId()

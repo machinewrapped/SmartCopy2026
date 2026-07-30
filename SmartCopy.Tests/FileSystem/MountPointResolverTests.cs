@@ -92,6 +92,28 @@ public sealed class MountPointResolverTests
             MountPointResolver.Resolve("/Volumes//PortableSSD/Source/", mountPoints));
     }
 
+    /// <summary>
+    /// Whitespace is legal in a Unix path component, including at the end of a volume name. Trimming it
+    /// would leave the mount unable to match its own contents, attributing an external volume's files to
+    /// the parent — a false same-volume claim, which is the dangerous direction.
+    /// </summary>
+    [Fact]
+    public void Resolve_MountNameWithTrailingSpace_MatchesItsOwnContents()
+    {
+        string[] mountPoints = ["/", "/Volumes/Archive "];
+
+        Assert.Equal("/Volumes/Archive ", MountPointResolver.Resolve("/Volumes/Archive /files", mountPoints));
+    }
+
+    /// <summary>The converse: a spaced mount name must not swallow its unspaced sibling's paths.</summary>
+    [Fact]
+    public void Resolve_MountNameWithTrailingSpace_DoesNotClaimTheUnspacedPath()
+    {
+        string[] mountPoints = ["/", "/Volumes/Archive "];
+
+        Assert.Equal("/", MountPointResolver.Resolve("/Volumes/Archive/files", mountPoints));
+    }
+
     [Fact]
     public void Resolve_NoMountPointContainsThePath_ReturnsNull()
     {

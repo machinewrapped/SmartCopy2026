@@ -18,7 +18,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 
     private readonly bool _isNetworkPath;
     private readonly ProviderCapabilities _capabilities;
-    private readonly Lazy<string?> _volumeId;
+    private readonly Func<IEnumerable<string>>? _readMountPoints;
 
     public LocalFileSystemProvider(
         string rootPath,
@@ -35,8 +35,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
             CanTrash: !_isNetworkPath,
             CanQueryFreeSpace: !_isNetworkPath);
 
-        _volumeId = new Lazy<string?>(
-            () => _isNetworkPath ? null : GetVolumeIdSafe(RootPath, readMountPoints));
+        _readMountPoints = readMountPoints;
     }
 
     public string RootPath { get; }
@@ -47,11 +46,18 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     /// <para>
     /// Two providers rooted anywhere on one volume must return the same ID — the same-volume move
     /// fast path and the volume-keyed caches (<see cref="Hardware.DriveClassificationRegistry"/>,
-    /// <c>FreeSpaceCache</c>) all depend on it. Computed once per provider, since the containing
-    /// mount point of a fixed root path does not change.
+    /// <c>FreeSpaceCache</c>) all depend on it.
+    /// </para>
+    /// <para>
+    /// Deliberately resolved on each access rather than cached. Providers live in a process-wide
+    /// registry, so a cached ID would outlive the mount topology it was derived from: a device
+    /// mounted at a path that was inspected while unmounted would keep reporting the parent volume,
+    /// which is the dangerous direction (a false same-volume claim skips the free-space warning).
+    /// This is read a handful of times per pipeline run, not per file, so re-reading the mount table
+    /// is not worth caching around.
     /// </para>
     /// </summary>
-    public string? VolumeId => _volumeId.Value;
+    public string? VolumeId => _isNetworkPath ? null : GetVolumeIdSafe(RootPath, _readMountPoints);
 
     private static string? GetVolumeIdSafe(string path, Func<IEnumerable<string>>? readMountPoints)
     {

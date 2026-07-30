@@ -95,10 +95,15 @@ internal static class MountPointResolver
 
     /// <summary>
     /// Collapses duplicate separators and strips trailing separators, preserving the "/" root.
+    /// <para>
+    /// Whitespace is significant and is never trimmed: it is legal anywhere in a Unix path component,
+    /// including at the end of a volume name. Trimming it would leave a mount at "/Volumes/Archive "
+    /// unable to match its own contents, silently attributing them to the parent volume.
+    /// </para>
     /// </summary>
     private static string NormalizePosixPath(string path)
     {
-        var normalized = path.Trim();
+        var normalized = path;
 
         while (normalized.Contains("//", StringComparison.Ordinal))
         {
