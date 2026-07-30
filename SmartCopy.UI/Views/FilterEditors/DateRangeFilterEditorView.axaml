@@ -20,11 +20,11 @@
             <TextBlock Grid.Column="0" Text="From" VerticalAlignment="Center" />
             <CalendarDatePicker Grid.Column="1"
                                 SelectedDate="{Binding MinDate}"
-                                Watermark="any" />
+                                PlaceholderText="any" />
             <TextBlock Grid.Column="2" Text="To" VerticalAlignment="Center" />
             <CalendarDatePicker Grid.Column="3"
                                 SelectedDate="{Binding MaxDate}"
-                                Watermark="any" />
+                                PlaceholderText="any" />
         </Grid>
 
     </StackPanel>

@@ -16,7 +16,7 @@
 
         <StackPanel Spacing="4">
             <TextBlock Text="New Name" FontSize="12" Opacity="0.7" />
-            <TextBox Text="{Binding NewName}" Watermark="Enter new name" />
+            <TextBox Text="{Binding NewName}" PlaceholderText="Enter new name" />
         </StackPanel>
 
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
