@@ -177,9 +177,12 @@ internal static class MediaTypeProbe
     /// directory, and entries read per directory. Files smaller than one block cannot be sampled.
     /// </summary>
     /// <remarks>
-    /// Enumerated in a single pass reading sizes straight off <see cref="FileSystemEntry"/>. Walking
-    /// with <c>DirectoryInfo.EnumerateFiles</c> instead costs a <c>stat</c> per <c>FileInfo</c> plus a
-    /// second pass for subdirectories: on a cold rotational drive that measured 4.0s against 0.35s.
+    /// Enumerated in a single pass, taking files and subdirectories from one traversal instead of the
+    /// two that <c>DirectoryInfo.EnumerateFiles</c> plus <c>EnumerateDirectories</c> would cost, and
+    /// without allocating a <c>FileInfo</c> per child. Note this does <em>not</em> avoid a per-child
+    /// <c>stat</c> on Unix: <see cref="FileSystemEntry"/> is populated from the directory entry, and
+    /// reading <see cref="FileSystemEntry.Length"/> lazily triggers one anyway (measured ~1.5x the
+    /// cost of touching only dirent-backed fields, warm). Only Windows gets the size for free.
     /// </remarks>
     private static List<string> CollectSampleFiles(IReadOnlyList<string> searchRoots, CancellationToken ct)
     {
