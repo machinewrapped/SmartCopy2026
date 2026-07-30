@@ -1,3 +1,5 @@
+using System.IO.Enumeration;
+
 namespace SmartCopy.Core.FileSystem;
 
 /// <summary>
@@ -15,6 +17,22 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 
     /// <summary>A <c>FileStreamOptions.BufferSize</c> of 1 disables FileStream's internal buffer.</summary>
     private const int NoFileStreamBuffer = 1;
+
+    /// <summary>
+    /// Mirrors <c>EnumerationOptions.Compatible</c>, the (internal) options the parameterless
+    /// <see cref="Directory.EnumerateDirectories(string)"/> / <see cref="Directory.EnumerateFiles(string)"/>
+    /// overloads use. Do NOT replace this with <c>new EnumerationOptions()</c>: the default constructor
+    /// sets <c>AttributesToSkip = Hidden | System</c> and <c>IgnoreInaccessible = true</c>, which would
+    /// silently drop hidden and system entries from every scan and swallow access errors.
+    /// </summary>
+    private static readonly EnumerationOptions ChildEnumerationOptions = new()
+    {
+        MatchType = MatchType.Win32,
+        AttributesToSkip = 0,
+        IgnoreInaccessible = false,
+        RecurseSubdirectories = false,
+        ReturnSpecialDirectories = false,
+    };
 
     private readonly bool _isNetworkPath;
     private readonly ProviderCapabilities _capabilities;
@@ -107,21 +125,38 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                 throw new DirectoryNotFoundException(fullPath);
             }
 
-            var nodes = new List<FileSystemNode>();
+            // A single enumeration pass. Every field is read straight off the FileSystemEntry that
+            // the OS already returned for the directory read, so no child costs a second stat the
+            // way a per-child DirectoryInfo/FileInfo does.
+            var enumerable = new FileSystemEnumerable<FileSystemNode>(
+                fullPath,
+                static (ref FileSystemEntry entry) => new FileSystemNode
+                {
+                    Name = entry.FileName.ToString(),
+                    FullPath = entry.ToFullPath(),
+                    IsDirectory = entry.IsDirectory,
+                    // Directories report Size 0; entry.Length is only meaningful for files.
+                    Size = entry.IsDirectory ? 0L : entry.Length,
+                    CreatedAt = entry.CreationTimeUtc.UtcDateTime,
+                    ModifiedAt = entry.LastWriteTimeUtc.UtcDateTime,
+                    Attributes = entry.Attributes,
+                },
+                ChildEnumerationOptions);
 
-            foreach (var childDirectory in Directory.EnumerateDirectories(fullPath))
+            // Callers see directories before files, as they did when this walked the directory
+            // twice. Partitioning into two lists preserves that at the cost of one concat, with
+            // no second enumeration and no extra stat.
+            var directories = new List<FileSystemNode>();
+            var files = new List<FileSystemNode>();
+
+            foreach (var node in enumerable)
             {
                 ct.ThrowIfCancellationRequested();
-                nodes.Add(CreateDirectoryNode(childDirectory));
+                (node.IsDirectory ? directories : files).Add(node);
             }
 
-            foreach (var childFile in Directory.EnumerateFiles(fullPath))
-            {
-                ct.ThrowIfCancellationRequested();
-                nodes.Add(CreateFileNode(childFile));
-            }
-
-            return nodes;
+            directories.AddRange(files);
+            return directories;
         }, ct);
     }
 
