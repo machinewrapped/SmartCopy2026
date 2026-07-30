@@ -18,10 +18,12 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 
     private readonly bool _isNetworkPath;
     private readonly ProviderCapabilities _capabilities;
+    private readonly Lazy<string?> _volumeId;
 
     public LocalFileSystemProvider(
         string rootPath,
-        Func<string>? readLinuxMountInfo = null)
+        Func<string>? readLinuxMountInfo = null,
+        Func<IEnumerable<string>>? readMountPoints = null)
     {
         RootPath = NormalizePath(rootPath);
         _isNetworkPath = LocalPathNetworkClassifier.IsNetworkPath(RootPath, readLinuxMountInfo);
@@ -32,23 +34,41 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
             MaxPathLength: int.MaxValue,
             CanTrash: !_isNetworkPath,
             CanQueryFreeSpace: !_isNetworkPath);
-            
+
+        _volumeId = new Lazy<string?>(
+            () => _isNetworkPath ? null : GetVolumeIdSafe(RootPath, readMountPoints));
     }
 
     public string RootPath { get; }
 
-    public string? VolumeId => _isNetworkPath
-        ? null
-        : GetVolumeIdSafe(RootPath);
+    /// <summary>
+    /// Identity of the volume holding <see cref="RootPath"/>: the drive root on Windows, the deepest
+    /// containing mount point on Unix, and null for network paths (which have no local volume).
+    /// <para>
+    /// Two providers rooted anywhere on one volume must return the same ID — the same-volume move
+    /// fast path and the volume-keyed caches (<see cref="Hardware.DriveClassificationRegistry"/>,
+    /// <c>FreeSpaceCache</c>) all depend on it. Computed once per provider, since the containing
+    /// mount point of a fixed root path does not change.
+    /// </para>
+    /// </summary>
+    public string? VolumeId => _volumeId.Value;
 
-    private static string? GetVolumeIdSafe(string path)
+    private static string? GetVolumeIdSafe(string path, Func<IEnumerable<string>>? readMountPoints)
     {
         try
         {
-            string drivePath = OperatingSystem.IsWindows() 
-                ? (Path.GetPathRoot(path) ?? path) 
-                : path;
-            return new DriveInfo(drivePath).Name;
+            if (OperatingSystem.IsWindows())
+            {
+                return new DriveInfo(Path.GetPathRoot(path) ?? path).Name;
+            }
+
+            // On Unix `new DriveInfo(path).Name` echoes the path back rather than resolving the
+            // containing mount point, so it must be matched against the mount table instead —
+            // otherwise every folder looks like its own volume and no two paths ever compare equal.
+            var mountPoints = readMountPoints?.Invoke();
+            return mountPoints is null
+                ? MountPointResolver.Resolve(path)
+                : MountPointResolver.Resolve(path, mountPoints);
         }
         catch
         {
