@@ -126,20 +126,19 @@ public class MediaTypeProbeTests
     }
 
     [Fact]
-    public async Task RunWithTimeoutAsync_ReturnsUnknownWhenProbeDoesNotComplete()
+    public async Task RunWithTimeoutAsync_ReportsTransientTimeoutWhenProbeDoesNotComplete()
     {
         using var releaseProbe = new ManualResetEventSlim();
         try
         {
-            var result = await MediaTypeProbe.RunWithTimeoutAsync(
-                _ =>
-                {
-                    releaseProbe.Wait();
-                    return DriveMediaType.SSD;
-                },
-                TimeSpan.FromMilliseconds(50));
-
-            Assert.Equal(DriveMediaType.Unknown, result);
+            await Assert.ThrowsAsync<DriveClassificationTimeoutException>(() =>
+                MediaTypeProbe.RunWithTimeoutAsync(
+                    _ =>
+                    {
+                        releaseProbe.Wait();
+                        return DriveMediaType.SSD;
+                    },
+                    TimeSpan.FromMilliseconds(50)));
         }
         finally
         {

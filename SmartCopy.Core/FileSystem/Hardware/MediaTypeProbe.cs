@@ -145,7 +145,8 @@ internal static class MediaTypeProbe
 
     /// <summary>
     /// Runs synchronous probe work without allowing an uninterruptible filesystem call to hold the
-    /// caller indefinitely. Caller cancellation still propagates; expiration degrades to Unknown.
+    /// caller indefinitely. Caller cancellation still propagates; expiration is reported as transient
+    /// so the classification registry can return Unknown without caching the failed attempt.
     /// </summary>
     internal static async Task<DriveMediaType> RunWithTimeoutAsync(
         Func<CancellationToken, DriveMediaType> probe,
@@ -168,7 +169,7 @@ internal static class MediaTypeProbe
                 CancellationToken.None,
                 TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
                 TaskScheduler.Default);
-            return DriveMediaType.Unknown;
+            throw new DriveClassificationTimeoutException();
         }
     }
 

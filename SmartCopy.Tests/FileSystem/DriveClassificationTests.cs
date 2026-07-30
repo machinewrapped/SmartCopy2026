@@ -55,4 +55,28 @@ public class DriveClassificationTests
         // Assert
         Assert.Equal(c1, c2);
     }
+
+    [Fact]
+    public async Task DriveClassificationRegistry_DoesNotCacheTimedOutAttempt()
+    {
+        var attempts = 0;
+        var volumeId = $"TRANSIENT_TIMEOUT_{Guid.NewGuid():N}";
+
+        Task<DriveClassification> ClassifyAsync(string _, CancellationToken __)
+        {
+            attempts++;
+            return attempts == 1
+                ? Task.FromException<DriveClassification>(new DriveClassificationTimeoutException())
+                : Task.FromResult(new DriveClassification(DriveMediaType.SSD, DriveInterfaceType.USB));
+        }
+
+        var first = await DriveClassificationRegistry.GetOrClassifyAsync(
+            "/first", volumeId, ClassifyAsync);
+        var second = await DriveClassificationRegistry.GetOrClassifyAsync(
+            "/second", volumeId, ClassifyAsync);
+
+        Assert.Equal(DriveClassification.Unknown, first);
+        Assert.Equal(DriveMediaType.SSD, second.MediaType);
+        Assert.Equal(2, attempts);
+    }
 }
