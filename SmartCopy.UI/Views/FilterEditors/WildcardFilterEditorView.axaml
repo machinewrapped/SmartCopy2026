@@ -5,7 +5,7 @@
              x:DataType="vm:WildcardFilterEditorViewModel">
     <StackPanel Spacing="8">
         <TextBox Text="{Binding Pattern, UpdateSourceTrigger=PropertyChanged}"
-                 Watermark="e.g. *.tmp;*.bak;~*" />
+                 PlaceholderText="e.g. *.tmp;*.bak;~*" />
         <TextBlock Text="Separate multiple patterns with ;"
                    FontSize="11" Opacity="0.5" />
     </StackPanel>

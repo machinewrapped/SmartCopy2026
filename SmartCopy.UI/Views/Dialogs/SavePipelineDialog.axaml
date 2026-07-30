@@ -16,7 +16,7 @@
 
         <StackPanel Spacing="4">
             <TextBlock Text="Pipeline Name" FontSize="12" Opacity="0.7" />
-            <TextBox Text="{Binding PipelineName}" Watermark="Enter pipeline name" />
+            <TextBox Text="{Binding PipelineName}" PlaceholderText="Enter pipeline name" />
         </StackPanel>
 
         <StackPanel Spacing="4">

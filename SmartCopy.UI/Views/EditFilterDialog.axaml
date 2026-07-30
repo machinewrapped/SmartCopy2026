@@ -38,7 +38,7 @@
         <!-- Filter name field -->
         <StackPanel Spacing="4">
             <TextBlock Text="Name" FontSize="12" Opacity="0.7" />
-            <TextBox Text="{Binding FilterName}" Watermark="Auto-generated from parameters" />
+            <TextBox Text="{Binding FilterName}" PlaceholderText="Auto-generated from parameters" />
         </StackPanel>
 
         <!-- Type-specific editor (dispatched by DataTemplate) -->

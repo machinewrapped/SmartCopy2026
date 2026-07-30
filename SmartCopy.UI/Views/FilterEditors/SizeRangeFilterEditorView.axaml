@@ -12,7 +12,7 @@
                            Value="{Binding MinValue}"
                            Minimum="0"
                            FormatString="0.##"
-                           Watermark="any" />
+                           PlaceholderText="any" />
             <ComboBox Grid.Column="2" SelectedItem="{Binding MinUnit}">
                 <ComboBox.Items>
                     <vm:SizeUnit>Bytes</vm:SizeUnit>
@@ -31,7 +31,7 @@
                            Value="{Binding MaxValue}"
                            Minimum="0"
                            FormatString="0.##"
-                           Watermark="any" />
+                           PlaceholderText="any" />
             <ComboBox Grid.Column="2" SelectedItem="{Binding MaxUnit}">
                 <ComboBox.Items>
                     <vm:SizeUnit>Bytes</vm:SizeUnit>
