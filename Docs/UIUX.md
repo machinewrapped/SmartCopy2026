@@ -67,7 +67,7 @@ The main content area uses a **3-column layout** — Filters | Folders | Files �
 ```text
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │ [SelectionView: always visible]          [OperationProgressView: when active] │
-│ 142 files selected · 2.3 GB · 17 filt…  12/142 ████░░ 34%  0:34  [‖][✕]    │
+│ 142 files selected · 2.3 GB · 17 filt…  12/142 ████░░ 34% 18.4 MB/s  0:34 [‖][✕] │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
