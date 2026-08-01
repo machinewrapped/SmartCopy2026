@@ -11,5 +11,6 @@ public readonly record struct OperationProgress(
     long TotalBytesCompleted,
     long TotalBytes,
     TimeSpan Elapsed,
-    TimeSpan EstimatedRemaining);
+    TimeSpan EstimatedRemaining,
+    bool TransfersData = false);
 
