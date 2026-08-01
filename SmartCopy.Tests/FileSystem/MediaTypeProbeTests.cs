@@ -69,10 +69,18 @@ public class MediaTypeProbeTests
     [Fact]
     public void ClassifyLatencies_ToleratesASingleOutlier()
     {
-        double[] samples = [0.9, 1.0, 1.0, 1.1, 0.8, 1.2, 0.9, 304.0];
+        double[] samples = [.. Enumerable.Repeat(1.0, MediaTypeProbe.MinimumSampleCount - 1), 304.0];
 
         Assert.Equal(DriveMediaType.SSD, MediaTypeProbe.ClassifyLatencies(samples));
     }
+
+    /// <summary>
+    /// Repeats a measured set up to the minimum a verdict requires. The recorded runs stopped at 12
+    /// samples, which the probe no longer treats as enough; repeating preserves the seek ratio and the
+    /// median that the thresholds actually read, without inventing readings the hardware never produced.
+    /// </summary>
+    private static double[] Repeated(double[] measured) =>
+        [.. Enumerable.Range(0, MediaTypeProbe.MinimumSampleCount).Select(i => measured[i % measured.Length])];
 
     /// <summary>
     /// Verbatim samples from a USB rotational drive whose cache had been warmed by an earlier probe.
@@ -85,7 +93,27 @@ public class MediaTypeProbeTests
         double[] samples = [0.48, 0.47, 37.2, 0.49, 0.46, 30.1, 0.48, 0.51, 34.8, 0.47, 36.5, 0.49];
 
         Assert.InRange(samples.Order().ElementAt(samples.Length / 2), 0, MediaTypeProbe.SsdMedianCeilingMs);
-        Assert.Equal(DriveMediaType.HDD, MediaTypeProbe.ClassifyLatencies(samples));
+        Assert.Equal(DriveMediaType.HDD, MediaTypeProbe.ClassifyLatencies(Repeated(samples)));
+    }
+
+    /// <summary>
+    /// A rotational drive whose opening reads all landed in cache. The first
+    /// <see cref="MediaTypeProbe.MinimumSampleCount"/> samples clear it as solid state; the full run
+    /// convicts it. This is why sampling stops early only on a rotational verdict — an early
+    /// solid-state exit would end the run before the reads carrying the evidence were ever taken.
+    /// </summary>
+    [Fact]
+    public void ClassifyLatencies_ReportsRotationalWhenSeeksAppearLateInTheRun()
+    {
+        double[] cached = [.. Enumerable.Repeat(0.5, MediaTypeProbe.MinimumSampleCount)];
+        double[] full =
+        [
+            .. cached,
+            .. Enumerable.Repeat(35.0, MediaTypeProbe.TargetSampleCount - MediaTypeProbe.MinimumSampleCount)
+        ];
+
+        Assert.Equal(DriveMediaType.SSD, MediaTypeProbe.ClassifyLatencies(cached));
+        Assert.Equal(DriveMediaType.HDD, MediaTypeProbe.ClassifyLatencies(full));
     }
 
     /// <summary>
@@ -97,7 +125,7 @@ public class MediaTypeProbeTests
     {
         double[] samples = [0.89, 0.97, 1.00, 0.95, 0.94, 2.03, 0.88, 0.91, 1.10, 0.93, 0.90, 1.70];
 
-        Assert.Equal(DriveMediaType.SSD, MediaTypeProbe.ClassifyLatencies(samples));
+        Assert.Equal(DriveMediaType.SSD, MediaTypeProbe.ClassifyLatencies(Repeated(samples)));
     }
 
     /// <summary>A drive whose every sampled block was already cached cannot be judged.</summary>
@@ -106,7 +134,7 @@ public class MediaTypeProbeTests
     {
         double[] samples = [2.0, 2.1, 2.2, 2.0, 2.3, 2.1, 2.0, 2.2, 2.1, 2.0, 2.4, 2.1];
 
-        Assert.Equal(DriveMediaType.Unknown, MediaTypeProbe.ClassifyLatencies(samples));
+        Assert.Equal(DriveMediaType.Unknown, MediaTypeProbe.ClassifyLatencies(Repeated(samples)));
     }
 
     [Fact]

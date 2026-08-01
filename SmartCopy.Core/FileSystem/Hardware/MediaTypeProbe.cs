@@ -5,56 +5,41 @@ using System.IO.Enumeration;
 namespace SmartCopy.Core.FileSystem.Hardware;
 
 /// <summary>
-/// Determines rotational versus solid-state media when the OS will not say. USB mass-storage bridges
-/// do not pass a device's rotation rate to the host, so for an external drive on macOS neither
-/// <c>diskutil</c> nor IOKit reports it — only the bus is known. Two fallbacks, cheapest first: the
-/// device's own product name, then a random-read latency measurement. Seek time separates the two
-/// classes by an order of magnitude; measured medians over 24 samples were 0.04 ms (internal NVMe),
-/// 1.0 ms (USB-attached SSD) and 10.0 ms (USB-attached HDD).
+/// Determines rotational versus solid-state media when the OS will not say — USB mass-storage bridges
+/// do not pass a device's rotation rate to the host, so on macOS neither <c>diskutil</c> nor IOKit
+/// reports it for an external drive. Two fallbacks, cheapest first: the device's own product name,
+/// then a random-read latency measurement. The measurements behind the thresholds below are recorded
+/// in <c>MediaTypeProbeTests</c>.
 /// </summary>
 internal static class MediaTypeProbe
 {
-    /// <summary>
-    /// A read at or above this took a mechanical seek. Solid state does not produce them: an
-    /// SSD behind a USB bridge measured a 2.0ms worst case over five rounds, against 30-55ms
-    /// maxima on a rotational drive on the same bus.
-    /// </summary>
+    /// <summary>A read at or above this took a mechanical seek. Solid state does not produce them:
+    /// a USB-attached SSD's worst sample was 2.0ms, against 30-55ms maxima on a rotational drive.</summary>
     internal const double SeekLatencyFloorMs = 3.0;
 
     /// <summary>Ceiling on the median for a solid-state verdict, once seeks have been ruled out.</summary>
     internal const double SsdMedianCeilingMs = 1.5;
 
-    /// <summary>
-    /// Proportion of samples showing a seek that condemns the drive as rotational.
-    /// <para>
-    /// The median cannot be the primary signal. The OS caches blocks read by anything else — a
-    /// previous probe, Spotlight, a file manager — and on a userspace (fskit) volume a cached read
-    /// costs about 1ms, indistinguishable from a genuine USB SSD read. Measured on a rotational USB
-    /// drive whose cache had been warmed, the median fell to 0.48ms while 42% of samples still took
-    /// 30ms+. Counting seeks survives that; averaging them away does not.
-    /// </para>
-    /// </summary>
+    /// <summary>Proportion of samples showing a seek that condemns the drive as rotational. Seeks are
+    /// counted rather than averaged because the OS caches blocks read by anything else, which can pull
+    /// a rotational drive's median down into solid-state range; caching hides reads but cannot invent
+    /// a 30ms seek.</summary>
     private const double RotationalSeekFraction = 0.25;
 
-    /// <summary>
-    /// Seek-latency samples tolerated before a solid-state verdict is withheld. One allows for a
-    /// bus or scheduler hiccup without letting a rotational drive through on a lucky sample.
-    /// </summary>
+    /// <summary>Allows a bus or scheduler hiccup without clearing a drive on a lucky sample.</summary>
     private const int MaxSolidStateOutliers = 1;
 
     internal const int SampleBlockBytes = 4096;
     internal const int TargetSampleCount = 24;
 
-    /// <summary>Below this the median is too noisy to classify on.</summary>
-    internal const int MinimumSampleCount = 8;
+    /// <summary>Below this no verdict is given: the rotational threshold is proportional, so a small
+    /// sample lets ordinary I/O contention supply enough slow reads to convict a solid-state drive.</summary>
+    internal const int MinimumSampleCount = 16;
 
-    /// <summary>
-    /// Once this many samples agree on a verdict the rest are skipped. Rotational media is both the
-    /// slow case and the one that reaches a verdict early, so this bounds the worst case: a full
-    /// 24-sample run on a spinning drive costs seconds, most of it spent confirming what the first
-    /// dozen seeks already showed.
-    /// </summary>
-    private const int DecisiveSampleCount = 12;
+    /// <summary>Sampling stops here on a rotational verdict, the slow case. A solid-state verdict reads
+    /// the full <see cref="TargetSampleCount"/> — stopping early would clear a drive whose opening
+    /// samples happened to come from cache, and the reads saved are the fast ones.</summary>
+    private const int DecisiveSampleCount = 16;
 
     /// <summary>Bounds the search for sample files so an unreadable or vast tree cannot stall a scan.</summary>
     private const int MaxDirectoriesVisited = 64;
@@ -65,7 +50,7 @@ internal static class MediaTypeProbe
 
     /// <summary>Keyed by mount point, so the measurement is paid once per volume rather than once per
     /// scanned folder. Only definitive results are cached; an inconclusive probe may have run against
-    /// an empty folder, so it is left to be retried.</summary>
+    /// an empty folder.</summary>
     private static readonly ConcurrentDictionary<string, DriveMediaType> _cache = new(StringComparer.Ordinal);
 
     /// <summary>
@@ -89,10 +74,8 @@ internal static class MediaTypeProbe
         return DriveMediaType.Unknown;
     }
 
-    /// <summary>
-    /// Matches an acronym that is not embedded in a lowercase word, so "Portable SSD" and "PSSD" both
-    /// match while "CrossDrive" does not.
-    /// </summary>
+    /// <summary>Matches an acronym that is not embedded in a lowercase word, so "Portable SSD" and
+    /// "PSSD" both match while "CrossDrive" does not.</summary>
     private static bool ContainsAcronym(string value, string acronym)
     {
         int index = value.IndexOf(acronym, StringComparison.OrdinalIgnoreCase);
@@ -110,10 +93,8 @@ internal static class MediaTypeProbe
         return false;
     }
 
-    /// <summary>
-    /// Measures random-read latency under <paramref name="searchRoots"/> and classifies the result.
-    /// Read-only, and bounded: at most <see cref="TargetSampleCount"/> single-block reads.
-    /// </summary>
+    /// <summary>Measures random-read latency under <paramref name="searchRoots"/> and classifies the
+    /// result. Read-only, and bounded to <see cref="TargetSampleCount"/> single-block reads.</summary>
     internal static async Task<DriveMediaType> MeasureAsync(
         string volumeKey,
         IReadOnlyList<string> searchRoots,
@@ -134,10 +115,8 @@ internal static class MediaTypeProbe
         return mediaType;
     }
 
-    /// <summary>
-    /// Classifies on how many samples show a seek, not on the average latency — see
-    /// <see cref="RotationalSeekFraction"/> for why the median is not trustworthy here.
-    /// </summary>
+    /// <summary>Classifies on how many samples show a seek, not on the average latency — see
+    /// <see cref="RotationalSeekFraction"/>.</summary>
     internal static DriveMediaType ClassifyLatencies(IReadOnlyList<double> latenciesMs)
     {
         if (latenciesMs.Count < MinimumSampleCount) return DriveMediaType.Unknown;
@@ -170,31 +149,33 @@ internal static class MediaTypeProbe
     /// <summary>Bounds the cost of a directory holding thousands of entries.</summary>
     private const int MaxEntriesPerDirectory = 512;
 
+    /// <summary>Caps elapsed time as well as work: each entry costs a lazy stat on Unix, so the count
+    /// limits alone permit tens of thousands of them on a cold drive.</summary>
+    private static readonly TimeSpan SearchBudget = TimeSpan.FromSeconds(2);
+
     /// <summary>
     /// Breadth-first so samples spread across the tree, capped on directories visited, files taken per
-    /// directory, and entries read per directory. Files smaller than one block cannot be sampled.
+    /// directory, entries read per directory, and elapsed time. Files smaller than one block cannot be
+    /// sampled. Search roots overlap — the scanned folder lies under the mount point — so visited paths
+    /// are tracked to stop the second root re-walking the first.
     /// </summary>
-    /// <remarks>
-    /// Enumerated in a single pass, taking files and subdirectories from one traversal instead of the
-    /// two that <c>DirectoryInfo.EnumerateFiles</c> plus <c>EnumerateDirectories</c> would cost, and
-    /// without allocating a <c>FileInfo</c> per child. Note this does <em>not</em> avoid a per-child
-    /// <c>stat</c> on Unix: <see cref="FileSystemEntry"/> is populated from the directory entry, and
-    /// reading <see cref="FileSystemEntry.Length"/> lazily triggers one anyway (measured ~1.5x the
-    /// cost of touching only dirent-backed fields, warm). Only Windows gets the size for free.
-    /// </remarks>
     private static List<string> CollectSampleFiles(IReadOnlyList<string> searchRoots, CancellationToken ct)
     {
         var files = new List<string>(TargetSampleCount);
+        var seen = new HashSet<string>(PathHelper.LocalPathComparer);
         var queue = new Queue<string>();
         foreach (var root in searchRoots)
         {
-            if (!string.IsNullOrWhiteSpace(root)) queue.Enqueue(root);
+            if (!string.IsNullOrWhiteSpace(root) && seen.Add(root)) queue.Enqueue(root);
         }
 
         var options = new EnumerationOptions { IgnoreInaccessible = true };
         int directoriesVisited = 0;
+        long searchStarted = Stopwatch.GetTimestamp();
 
-        while (queue.Count > 0 && files.Count < TargetSampleCount && directoriesVisited < MaxDirectoriesVisited)
+        while (queue.Count > 0 && files.Count < TargetSampleCount &&
+               directoriesVisited < MaxDirectoriesVisited &&
+               Stopwatch.GetElapsedTime(searchStarted) < SearchBudget)
         {
             ct.ThrowIfCancellationRequested();
             var directory = queue.Dequeue();
@@ -217,11 +198,12 @@ internal static class MediaTypeProbe
 
                     if (entry.IsDirectory)
                     {
-                        queue.Enqueue(entry.Path);
+                        if (seen.Add(entry.Path)) queue.Enqueue(entry.Path);
                         continue;
                     }
 
                     if (takenHere >= MaxFilesPerDirectory || entry.Length < SampleBlockBytes) continue;
+                    if (!seen.Add(entry.Path)) continue;
 
                     files.Add(entry.Path);
                     takenHere++;
@@ -269,7 +251,7 @@ internal static class MediaTypeProbe
                 latencies.Add(elapsed.TotalMilliseconds);
 
                 if (latencies.Count >= DecisiveSampleCount &&
-                    ClassifyLatencies(latencies) != DriveMediaType.Unknown)
+                    ClassifyLatencies(latencies) == DriveMediaType.HDD)
                     break;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
