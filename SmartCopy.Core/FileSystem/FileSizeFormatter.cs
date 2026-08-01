@@ -15,7 +15,7 @@ public static class FileSizeFormatter
     public static string FormatRate(double bytesPerSecond)
     {
         if (!double.IsFinite(bytesPerSecond) || bytesPerSecond <= 0)
-            return "0 B/s";
+            return "0B/s";
 
         return bytesPerSecond switch
         {

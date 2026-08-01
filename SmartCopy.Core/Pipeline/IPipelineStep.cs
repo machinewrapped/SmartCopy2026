@@ -13,6 +13,9 @@ public interface IPipelineStep
     /// <summary>Whether this step can be executed.</summary>
     bool IsExecutable { get; }
 
+    /// <summary>Whether this step moves file content, and so has a meaningful transfer rate.</summary>
+    bool TransfersData => false;
+
     /// <summary>Whether this step has any configurable parameters.</summary>
     bool IsConfigurable => true;
 

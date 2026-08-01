@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using SmartCopy.Core.Progress;
 using SmartCopy.UI.ViewModels;
 
@@ -37,7 +38,7 @@ public sealed class OperationProgressViewModelTests
     }
 
     [Fact]
-    public void Update_WithNoMeasuredTransfer_ClearsTransferSpeed()
+    public void Update_WithNoMeasuredTransfer_ReportsZero()
     {
         var vm = new OperationProgressViewModel();
 
@@ -47,10 +48,88 @@ public sealed class OperationProgressViewModelTests
 
         Report(vm, completedBytes: 1024 * 1024, elapsedSeconds: 12);
 
-        Assert.Equal("0 B/s", vm.TransferSpeed);
+        Assert.Equal("0B/s", vm.TransferSpeed);
     }
 
-    private static void Report(OperationProgressViewModel vm, long completedBytes, int elapsedSeconds)
+    [Fact]
+    public void TickStaleness_WhenReportsStop_DecaysRateTowardsZero()
+    {
+        var clock = new FakeClock();
+        var vm = ActiveViewModel(clock);
+
+        Report(vm, completedBytes: 0, elapsedSeconds: 0);
+        Report(vm, completedBytes: 10 * 1024 * 1024, elapsedSeconds: 1);
+        Assert.Equal("10.0MB/s", vm.TransferSpeed);
+
+        // The 10MB measured over 1s of reports now spans 4s of wall clock.
+        clock.Advance(TimeSpan.FromSeconds(3));
+        vm.TickStaleness();
+        Assert.Equal("2.5MB/s", vm.TransferSpeed);
+
+        // Every sample has now aged out of the 10s window.
+        clock.Advance(TimeSpan.FromSeconds(30));
+        vm.TickStaleness();
+        Assert.Equal("0B/s", vm.TransferSpeed);
+    }
+
+    [Fact]
+    public void TickStaleness_WhenStepDoesNotTransferData_LeavesSpeedBlank()
+    {
+        var clock = new FakeClock();
+        var vm = ActiveViewModel(clock);
+
+        Report(vm, completedBytes: 0, elapsedSeconds: 0, transfersData: false);
+        Report(vm, completedBytes: 10 * 1024 * 1024, elapsedSeconds: 1, transfersData: false);
+        clock.Advance(TimeSpan.FromSeconds(3));
+        vm.TickStaleness();
+
+        Assert.Equal(string.Empty, vm.TransferSpeed);
+    }
+
+    [Fact]
+    public void Update_WhenStepStopsTransferringData_ClearsSpeed()
+    {
+        var vm = new OperationProgressViewModel();
+
+        Report(vm, completedBytes: 0, elapsedSeconds: 0);
+        Report(vm, completedBytes: 10 * 1024 * 1024, elapsedSeconds: 1);
+        Assert.Equal("10.0MB/s", vm.TransferSpeed);
+
+        // A following delete step reports no transfer.
+        Report(vm, completedBytes: 1024, elapsedSeconds: 0, transfersData: false);
+
+        Assert.Equal(string.Empty, vm.TransferSpeed);
+    }
+
+    [Fact]
+    public void Update_WhenNextStepRestartsTheClock_StartsANewWindow()
+    {
+        var vm = new OperationProgressViewModel();
+
+        Report(vm, completedBytes: 0, elapsedSeconds: 0);
+        Report(vm, completedBytes: 10 * 1024 * 1024, elapsedSeconds: 5);
+        Assert.Equal("2.0MB/s", vm.TransferSpeed);
+
+        // A second executable step restarts the reporter's stopwatch and zeroes its byte count.
+        // Without a reset the window would span the discontinuity and report nonsense.
+        Report(vm, completedBytes: 0, elapsedSeconds: 0);
+        Report(vm, completedBytes: 4 * 1024 * 1024, elapsedSeconds: 1);
+
+        Assert.Equal("4.0MB/s", vm.TransferSpeed);
+    }
+
+    private static OperationProgressViewModel ActiveViewModel(FakeClock clock)
+    {
+        // TickStaleness only runs for a live operation. Begin() needs a real PipelineJob, so set
+        // the flag directly rather than standing up a whole pipeline.
+        return new OperationProgressViewModel(clock) { IsActive = true };
+    }
+
+    private static void Report(
+        OperationProgressViewModel vm,
+        long completedBytes,
+        int elapsedSeconds,
+        bool transfersData = true)
     {
         vm.Update(new OperationProgress(
             CurrentFile: "video.mp4",
@@ -61,6 +140,17 @@ public sealed class OperationProgressViewModelTests
             TotalBytesCompleted: completedBytes,
             TotalBytes: completedBytes * 2,
             Elapsed: TimeSpan.FromSeconds(elapsedSeconds),
-            EstimatedRemaining: TimeSpan.FromSeconds(2)));
+            EstimatedRemaining: TimeSpan.FromSeconds(2),
+            TransfersData: transfersData));
+    }
+
+    /// <summary>Manually advanced clock; only <see cref="GetTimestamp"/> needs overriding.</summary>
+    private sealed class FakeClock : TimeProvider
+    {
+        private long _timestamp = Stopwatch.GetTimestamp();
+
+        public override long GetTimestamp() => _timestamp;
+
+        public void Advance(TimeSpan by) => _timestamp += (long)(by.TotalSeconds * TimestampFrequency);
     }
 }

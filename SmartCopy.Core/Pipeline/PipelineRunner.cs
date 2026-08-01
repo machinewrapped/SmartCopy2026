@@ -206,7 +206,7 @@ public sealed partial class PipelineRunner
 
             if (step.IsExecutable)
             {
-                progress.BeginExecutableStep();
+                progress.BeginExecutableStep(step.TransfersData);
             }
 
             var lastResultElapsed = progress.Elapsed;
