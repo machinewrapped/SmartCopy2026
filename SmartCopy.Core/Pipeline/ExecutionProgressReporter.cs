@@ -24,6 +24,7 @@ public sealed partial class PipelineRunner
         private long _lastInFlightProgressReportTick;
         private long _lastCompletionProgressReportTick;
         private int _filesSinceLastCompletionProgressReport;
+        private bool _transfersData;
 
         public ExecutionProgressReporter(PipelineJob job)
         {
@@ -39,8 +40,9 @@ public sealed partial class PipelineRunner
 
         public TimeSpan Elapsed => _stopwatch.Elapsed;
 
-        public void BeginExecutableStep()
+        public void BeginExecutableStep(bool transfersData)
         {
+            _transfersData = transfersData;
             _totalBytes = _job.RootNode.TotalSelectedBytes;
             _totalFiles = _job.RootNode.NumSelectedFiles;
             _completedBytes = 0;
@@ -107,7 +109,8 @@ public sealed partial class PipelineRunner
                 TotalBytesCompleted: completedWithTransfer,
                 TotalBytes: _totalBytes,
                 Elapsed: elapsed,
-                EstimatedRemaining: EstimateRemaining(elapsed, completedWithTransfer, _totalBytes)));
+                EstimatedRemaining: EstimateRemaining(elapsed, completedWithTransfer, _totalBytes),
+                TransfersData: _transfersData));
         }
 
         public void CompleteResult(TransformResult result, bool isExecutableStep, TimeSpan currentElapsed)
@@ -144,7 +147,8 @@ public sealed partial class PipelineRunner
                 TotalBytesCompleted: _completedBytes,
                 TotalBytes: _totalBytes,
                 Elapsed: currentElapsed,
-                EstimatedRemaining: EstimateRemaining(currentElapsed, _completedBytes, _totalBytes)));
+                EstimatedRemaining: EstimateRemaining(currentElapsed, _completedBytes, _totalBytes),
+                TransfersData: _transfersData));
             _lastCompletionProgressReportTick = nowTick;
             _filesSinceLastCompletionProgressReport = 0;
         }

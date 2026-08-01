@@ -39,6 +39,20 @@ dotnet test --filter "FullyQualifiedName~TestClassName"
 
 Tests mostly use `MemoryFileSystemProvider` for fast, hermetic file system operations — no real I/O.
 
+### Real-filesystem tests
+
+A few tests (currently `DirectoryWatcherTests`) drive a real directory and depend on OS file-change
+notification timing, which makes them too flaky to gate CI. They are marked `[RealFilesystemFact]`
+and skip by default. To run them:
+
+```bash
+SMARTCOPY_REALFS_TESTS=1 dotnet test --filter "Category=RealFilesystem"
+```
+
+In PowerShell, set the variable first with `$env:SMARTCOPY_REALFS_TESTS = "1"`. Note that the CLI
+`--filter` is ANDed with any filter from a `.runsettings` file rather than overriding it, which is
+why the opt-in is an environment variable rather than a runsettings exclusion.
+
 ---
 
 ## Publishing Locally
