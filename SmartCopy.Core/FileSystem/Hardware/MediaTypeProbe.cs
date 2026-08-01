@@ -1,8 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO.Enumeration;
-using System.Runtime.InteropServices;
-using Microsoft.Win32.SafeHandles;
 
 namespace SmartCopy.Core.FileSystem.Hardware;
 
@@ -256,8 +254,6 @@ internal static class MediaTypeProbe
                 using var handle = File.OpenHandle(
                     file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
 
-                DisableFileCache(handle);
-
                 long length = RandomAccess.GetLength(handle);
                 if (length < SampleBlockBytes) continue;
 
@@ -283,35 +279,5 @@ internal static class MediaTypeProbe
         }
 
         return latencies;
-    }
-
-    private const int F_RDAHEAD = 45;
-    private const int F_NOCACHE = 48;
-
-    [DllImport("libc", SetLastError = true)]
-    private static extern int fcntl(int fd, int cmd, int arg);
-
-    /// <summary>
-    /// Asks the kernel not to cache or read ahead for this handle, so a sample measures the device
-    /// rather than RAM and the probe pollutes the cache as little as possible for the next run.
-    /// <para>
-    /// Best-effort, and not sufficient on its own: neither flag evicts pages another reader already
-    /// cached, and a userspace filesystem need not honour them at all. Classification therefore does
-    /// not rely on this working — see <see cref="RotationalSeekFraction"/>.
-    /// </para>
-    /// </summary>
-    private static void DisableFileCache(SafeFileHandle handle)
-    {
-        if (!OperatingSystem.IsMacOS()) return;
-
-        try
-        {
-            int fd = (int)handle.DangerousGetHandle();
-            fcntl(fd, F_NOCACHE, 1);
-            fcntl(fd, F_RDAHEAD, 0);
-        }
-        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
-        {
-        }
     }
 }
