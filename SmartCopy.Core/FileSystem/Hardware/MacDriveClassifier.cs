@@ -291,7 +291,7 @@ internal sealed class MacDriveClassifier : IDriveClassifier
     {
         if (string.IsNullOrWhiteSpace(path)) return null;
 
-        string normalizedPath = MountPointResolver.NormalizePosixPath(path);
+        string normalizedPath = MountPointResolver.NormalizePosixPath(MountPointResolver.ResolveSymlinks(path));
         MountEntry? best = null;
 
         foreach (var entry in entries)
