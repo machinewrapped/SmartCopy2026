@@ -22,6 +22,7 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
 {
     public StepKind StepType => StepKind.Move;
     public bool IsExecutable => true;
+    public bool TransfersData => true;
 
     public MoveStep(string destinationPath, OverwriteMode overwriteMode = OverwriteMode.Skip)
     {
@@ -217,6 +218,10 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
 
         // An atomic move (single rename) is only valid within one volume and only if the provider
         // supports it; cross-volume or incapable pairs go through copy-then-delete instead.
+        // VolumeId is a best-effort identity (see MountPointResolver's macOS firmlink caveat), so this
+        // may claim same-volume for a pair the OS then rejects. That costs speed, not correctness: a
+        // rejected directory rename falls back to the piecewise walk, and a file rename never sees the
+        // rejection at all (File.Move resolves EXDEV itself).
         var sameVolume = context.SourceProvider.VolumeId is { } vid && targetProvider.VolumeId == vid;
         var canAtomicMove = sameVolume && targetProvider.Capabilities.CanAtomicMove;
 
@@ -294,6 +299,9 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
 
         public async Task<string?> MoveFileAsync(DirectoryTreeNode file, string destination, CancellationToken ct)
         {
+            // A rename that turns out to cross a device boundary needs no fallback here: the local
+            // provider's File.Move handles EXDEV by copying then deleting, so only genuine failures
+            // (locks, permissions) reach the catch.
             if (canAtomicMove)
             {
                 try

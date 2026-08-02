@@ -36,7 +36,7 @@
         <Grid ColumnDefinitions="*, Auto" ColumnSpacing="6">
             <TextBox Grid.Column="0"
                      Text="{Binding InputText}"
-                     Watermark="mp3; flac; jpg  (separate with ;)"
+                     PlaceholderText="mp3; flac; jpg  (separate with ;)"
                      AcceptsReturn="False">
                 <TextBox.KeyBindings>
                     <KeyBinding Gesture="Return"

@@ -15,7 +15,7 @@
         <NumericUpDown Value="{Binding Levels, Mode=TwoWay}"
                        Minimum="1"
                        Increment="1"
-                       Watermark="—" />
+                       PlaceholderText="—" />
 
         <TextBlock Text="Conflict strategy" FontSize="12" Opacity="0.7" />
         <ComboBox ItemsSource="{Binding ConflictStrategies}"

@@ -55,4 +55,82 @@ public class DriveClassificationTests
         // Assert
         Assert.Equal(c1, c2);
     }
+
+    [Fact]
+    public async Task DriveClassificationRegistry_DoesNotCacheTimedOutAttempt()
+    {
+        var attempts = 0;
+        var volumeId = $"TRANSIENT_TIMEOUT_{Guid.NewGuid():N}";
+
+        Task<DriveClassification> ClassifyAsync(string _, CancellationToken __)
+        {
+            attempts++;
+            return attempts == 1
+                ? Task.FromException<DriveClassification>(new DriveClassificationTimeoutException())
+                : Task.FromResult(new DriveClassification(DriveMediaType.SSD, DriveInterfaceType.USB));
+        }
+
+        var first = await DriveClassificationRegistry.GetOrClassifyAsync(
+            "/first", volumeId, ClassifyAsync);
+        var second = await DriveClassificationRegistry.GetOrClassifyAsync(
+            "/second", volumeId, ClassifyAsync);
+
+        Assert.Equal(DriveClassification.Unknown, first);
+        Assert.Equal(DriveMediaType.SSD, second.MediaType);
+        Assert.Equal(2, attempts);
+    }
+
+    [Fact]
+    public async Task DriveClassificationRegistry_DoesNotCacheFailedAttempt()
+    {
+        var attempts = 0;
+        var volumeId = $"TRANSIENT_FAULT_{Guid.NewGuid():N}";
+
+        Task<DriveClassification> ClassifyAsync(string _, CancellationToken __)
+        {
+            attempts++;
+            return attempts == 1
+                ? Task.FromException<DriveClassification>(new IOException("device not ready"))
+                : Task.FromResult(new DriveClassification(DriveMediaType.HDD, DriveInterfaceType.USB));
+        }
+
+        await Assert.ThrowsAsync<IOException>(async () =>
+            await DriveClassificationRegistry.GetOrClassifyAsync("/first", volumeId, ClassifyAsync));
+
+        var second = await DriveClassificationRegistry.GetOrClassifyAsync(
+            "/second", volumeId, ClassifyAsync);
+
+        Assert.Equal(DriveMediaType.HDD, second.MediaType);
+        Assert.Equal(2, attempts);
+    }
+
+    /// <summary>A caller giving up does not invalidate a probe that is still running for others.</summary>
+    [Fact]
+    public async Task DriveClassificationRegistry_KeepsInFlightAttemptWhenOneCallerCancels()
+    {
+        var attempts = 0;
+        var volumeId = $"INFLIGHT_{Guid.NewGuid():N}";
+        var release = new TaskCompletionSource<DriveClassification>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        Task<DriveClassification> ClassifyAsync(string _, CancellationToken __)
+        {
+            attempts++;
+            return release.Task;
+        }
+
+        using var cancellation = new CancellationTokenSource();
+        var abandoned = DriveClassificationRegistry
+            .GetOrClassifyAsync("/first", volumeId, ClassifyAsync, cancellation.Token).AsTask();
+
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => abandoned);
+
+        release.SetResult(new DriveClassification(DriveMediaType.SSD, DriveInterfaceType.NVMe));
+        var second = await DriveClassificationRegistry.GetOrClassifyAsync(
+            "/second", volumeId, ClassifyAsync);
+
+        Assert.Equal(DriveMediaType.SSD, second.MediaType);
+        Assert.Equal(1, attempts);
+    }
 }
