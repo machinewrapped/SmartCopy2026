@@ -101,7 +101,7 @@ internal static class MountPointResolver
     /// unable to match its own contents, silently attributing them to the parent volume.
     /// </para>
     /// </summary>
-    private static string NormalizePosixPath(string path)
+    public static string NormalizePosixPath(string path)
     {
         var normalized = path;
 

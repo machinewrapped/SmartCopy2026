@@ -125,9 +125,9 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                 throw new DirectoryNotFoundException(fullPath);
             }
 
-            // A single enumeration pass. Every field is read straight off the FileSystemEntry that
-            // the OS already returned for the directory read, so no child costs a second stat the
-            // way a per-child DirectoryInfo/FileInfo does.
+            // A single enumeration pass, replacing two traversals and a FileInfo per child. On Unix
+            // each child still costs one stat: Length and the timestamps are not in the directory
+            // entry, so FileSystemEntry fetches them lazily. Windows carries them in the entry.
             var enumerable = new FileSystemEnumerable<FileSystemNode>(
                 fullPath,
                 static (ref FileSystemEntry entry) => new FileSystemNode
@@ -144,8 +144,8 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                 ChildEnumerationOptions);
 
             // Callers see directories before files, as they did when this walked the directory
-            // twice. Partitioning into two lists preserves that at the cost of one concat, with
-            // no second enumeration and no extra stat.
+            // twice. Partitioning into two lists preserves that at the cost of one concat, without
+            // reintroducing a second traversal.
             var directories = new List<FileSystemNode>();
             var files = new List<FileSystemNode>();
 

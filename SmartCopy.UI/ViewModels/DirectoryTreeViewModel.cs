@@ -31,14 +31,18 @@ public class DirectoryTreeViewModel : ViewModelBase
     private CancellationTokenSource? _classificationCts;
     
     /// <summary>The filesystem that contains the root node</summary>
+    /// <remarks>
+    /// Adopted as soon as the scan yields a root so the rest of the UI can use it, but its
+    /// classification is deliberately not loaded here — see <see cref="LoadClassificationAsync"/>.
+    /// </remarks>
     public IFileSystemProvider? SourceProvider
     {
         get => _sourceProvider;
         private set
         {
-            if (SetProperty(ref _sourceProvider, value))
+            if (SetProperty(ref _sourceProvider, value) && value is null)
             {
-                _ = LoadClassificationAsync(value);
+                _ = LoadClassificationAsync(null);
             }
         }
     }
@@ -50,6 +54,17 @@ public class DirectoryTreeViewModel : ViewModelBase
         private set => SetProperty(ref _classification, value);
     }
 
+    /// <summary>
+    /// Loads the drive classification for <paramref name="provider"/>, or clears it when null.
+    /// <para>
+    /// Called once the scan is idle rather than when <see cref="SourceProvider"/> is assigned. On a
+    /// drive whose media type the OS will not report — anything behind a USB bridge on macOS — the
+    /// classifier falls back to timing random reads, and reads issued while the recursive scan is
+    /// still working the same drive measure queueing rather than seek time. A handful of contended
+    /// samples is enough to report a solid-state drive as rotational, and the verdict is then cached
+    /// for the session.
+    /// </para>
+    /// </summary>
     private async Task LoadClassificationAsync(IFileSystemProvider? provider)
     {
         _classificationCts?.Cancel();
@@ -203,6 +218,9 @@ public class DirectoryTreeViewModel : ViewModelBase
 
             // Default to root node, if user hasn't selected one during the scan
             SelectedNode ??= RootNode;
+
+            // Now the drive is idle, so a latency-based media-type probe measures the device.
+            _ = LoadClassificationAsync(SourceProvider);
         }
     }
 
