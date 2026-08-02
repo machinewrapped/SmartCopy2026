@@ -1,4 +1,5 @@
 using SmartCopy.Core.FileSystem.Hardware;
+using SmartCopy.Tests.TestInfrastructure;
 
 namespace SmartCopy.Tests.FileSystem;
 
@@ -207,6 +208,33 @@ public class MacDriveClassifierTests
 
         Assert.Null(info.DeviceName);
     }
+
+    [UnixFact]
+    public async Task RunAsync_ReportsTransientTimeoutWhenToolDoesNotAnswer()
+    {
+        await Assert.ThrowsAsync<DriveClassificationTimeoutException>(() =>
+            MacDriveClassifier.RunAsync(SleepPath, ["30"], TimeSpan.FromMilliseconds(100)));
+    }
+
+    [UnixFact]
+    public async Task RunAsync_ReturnsNullWhenToolExitsNonZero()
+    {
+        Assert.Null(await MacDriveClassifier.RunAsync(
+            SleepPath, ["not-a-duration"], TimeSpan.FromSeconds(30)));
+    }
+
+    [UnixFact]
+    public async Task RunAsync_PropagatesCallerCancellation()
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+
+        var thrown = await Assert.ThrowsAnyAsync<Exception>(() =>
+            MacDriveClassifier.RunAsync(SleepPath, ["30"], TimeSpan.FromSeconds(30), cancellation.Token));
+
+        Assert.IsAssignableFrom<OperationCanceledException>(thrown);
+    }
+
+    private const string SleepPath = "/bin/sleep";
 
     /// <summary>The DOCTYPE mirrors real diskutil output, which the parser must tolerate.</summary>
     private static string Plist(params string[] entries) =>

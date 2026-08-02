@@ -54,9 +54,3 @@ public static class DriveClassificationRegistry
         }
     }
 }
-
-/// <summary>
-/// Signals a transient classifier timeout. The registry degrades it to Unknown for callers while its
-/// normal fault eviction ensures the next explicit classification request can retry.
-/// </summary>
-internal sealed class DriveClassificationTimeoutException : Exception;

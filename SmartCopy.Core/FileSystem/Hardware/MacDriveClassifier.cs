@@ -80,15 +80,21 @@ internal sealed class MacDriveClassifier : IDriveClassifier
     private static Task<string?> RunDiskUtilAsync(string target, CancellationToken ct) =>
         RunAsync(DiskUtilPath, ["info", "-plist", target], ct);
 
+    private static Task<string?> RunAsync(string toolPath, string[] arguments, CancellationToken ct) =>
+        RunAsync(toolPath, arguments, ProcessTimeout, ct);
+
     /// <summary>
-    /// Runs a system tool and returns its stdout, or null if it fails, times out or writes nothing.
+    /// Runs a system tool and returns its stdout, or null if it fails or writes nothing. Exceeding
+    /// <paramref name="timeout"/> throws instead: null is cached as a verdict, and a drive that was
+    /// merely asleep has not given one.
     /// </summary>
     /// <param name="toolPath">
     /// Absolute, so a GUI-launched process's PATH does not matter. Deliberately not resolved through
     /// PATH as a fallback: a missing tool at a fixed macOS location means the classification cannot be
     /// trusted anyway, and Unknown is a better answer than whatever a PATH lookup finds.
     /// </param>
-    private static async Task<string?> RunAsync(string toolPath, string[] arguments, CancellationToken ct)
+    internal static async Task<string?> RunAsync(
+        string toolPath, string[] arguments, TimeSpan timeout, CancellationToken ct = default)
     {
         var psi = new ProcessStartInfo
         {
@@ -105,13 +111,13 @@ internal sealed class MacDriveClassifier : IDriveClassifier
             using var process = Process.Start(psi);
             if (process == null) return null;
 
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeout.CancelAfter(ProcessTimeout);
+            using var expiry = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            expiry.CancelAfter(timeout);
 
-            var readTask = process.StandardOutput.ReadToEndAsync(timeout.Token);
+            var readTask = process.StandardOutput.ReadToEndAsync(expiry.Token);
             try
             {
-                await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
+                await process.WaitForExitAsync(expiry.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -125,6 +131,11 @@ internal sealed class MacDriveClassifier : IDriveClassifier
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             throw;
+        }
+        catch (OperationCanceledException)
+        {
+            // The caller's token is live, so only the timeout can have fired.
+            throw new DriveClassificationTimeoutException();
         }
         catch
         {
