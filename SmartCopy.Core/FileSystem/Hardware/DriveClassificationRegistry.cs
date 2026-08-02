@@ -22,22 +22,23 @@ public static class DriveClassificationRegistry
     {
         string key = string.IsNullOrWhiteSpace(volumeId) ? rootPath : volumeId;
 
-        var task = _cache.GetOrAdd(key, k => 
+        var task = _cache.GetOrAdd(key, k =>
         {
             var innerTask = classifyAsync(rootPath, ct);
-            
+
             // Evict faulted/canceled tasks so subsequent calls can retry
-            _ = innerTask.ContinueWith(t => 
-            {
-                if (t.IsFaulted || t.IsCanceled)
-                {
-                    ((ICollection<KeyValuePair<string, Task<DriveClassification>>>)_cache)
-                        .Remove(new KeyValuePair<string, Task<DriveClassification>>(k, innerTask));
-                }
-            }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            _ = innerTask.ContinueWith(
+                _ => Evict(k, innerTask),
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
 
             return innerTask;
         });
+
+        // A task that failed before GetOrAdd published it was not in the dictionary when its
+        // continuation ran, so the eviction above missed it.
+        Evict(key, task);
 
         try
         {
@@ -46,11 +47,16 @@ public static class DriveClassificationRegistry
         catch (DriveClassificationTimeoutException)
         {
             ct.ThrowIfCancellationRequested();
-            // The continuation can run before GetOrAdd publishes a synchronously faulted task.
-            // Remove again here so a timed-out attempt is never retained by that race.
-            ((ICollection<KeyValuePair<string, Task<DriveClassification>>>)_cache)
-                .Remove(new KeyValuePair<string, Task<DriveClassification>>(key, task));
             return DriveClassification.Unknown;
         }
+    }
+
+    /// <summary>Discards <paramref name="task"/> if it failed, leaving the key free for a retry.</summary>
+    private static void Evict(string key, Task<DriveClassification> task)
+    {
+        if (!task.IsCompleted || task.IsCompletedSuccessfully) return;
+
+        ((ICollection<KeyValuePair<string, Task<DriveClassification>>>)_cache)
+            .Remove(new KeyValuePair<string, Task<DriveClassification>>(key, task));
     }
 }
