@@ -1,3 +1,6 @@
+using System.Runtime.InteropServices;
+using System.Text;
+
 namespace SmartCopy.Core.FileSystem;
 
 /// <summary>
@@ -42,7 +45,7 @@ internal static class MountPointResolver
             return null;
         }
 
-        var normalizedPath = NormalizePosixPath(path);
+        var normalizedPath = NormalizePosixPath(ResolveSymlinks(path));
         string? best = null;
 
         foreach (var mountPoint in mountPoints)
@@ -92,6 +95,45 @@ internal static class MountPointResolver
             && path.StartsWith(mountPoint, StringComparison.Ordinal)
             && path[mountPoint.Length] == '/';
     }
+
+    /// <summary>
+    /// Returns <paramref name="path"/> with symlinks resolved in every component, or unchanged when the
+    /// OS will not resolve it — typically because it does not exist yet.
+    /// <para>
+    /// <see cref="Path.GetFullPath(string)"/> resolves none, and <c>ResolveLinkTarget</c> only the final
+    /// component, so without this a root reached through a symlink is attributed to the volume holding
+    /// the link rather than the one holding the data. macOS firmlinks are unaffected — they are not
+    /// symlinks — so the caveat above still holds.
+    /// </para>
+    /// </summary>
+    public static string ResolveSymlinks(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || OperatingSystem.IsWindows())
+        {
+            return path;
+        }
+
+        try
+        {
+            var resolved = RealPath(Encoding.UTF8.GetBytes(path + '\0'), new byte[PathMax]);
+            return resolved == IntPtr.Zero ? path : Marshal.PtrToStringUTF8(resolved) ?? path;
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
+        {
+            return path;
+        }
+    }
+
+    /// <summary>Linux's PATH_MAX; macOS's is 1024, so one size is safe for both.</summary>
+    private const int PathMax = 4096;
+
+    /// <summary>
+    /// Both arguments are byte arrays rather than strings: a path is bytes to the kernel, and encoding
+    /// it here avoids depending on how the runtime would choose to marshal it.
+    /// </summary>
+    /// <param name="resolved">Caller-allocated, so there is no malloc'd result to free.</param>
+    [DllImport("libc", EntryPoint = "realpath")]
+    private static extern IntPtr RealPath(byte[] path, byte[] resolved);
 
     /// <summary>
     /// Collapses duplicate separators and strips trailing separators, preserving the "/" root.
