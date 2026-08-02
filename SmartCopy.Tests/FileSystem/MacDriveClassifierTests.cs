@@ -114,7 +114,7 @@ public class MacDriveClassifierTests
     }
 
     [Fact]
-    public void ParseClassification_ReadsSolidStateAndBusProtocol()
+    public void ParseInfo_ReadsSolidStateAndBusProtocol()
     {
         var classification = MacDriveClassifier.ParseInfo(Plist(
             "<key>SolidState</key><true/>",
@@ -126,7 +126,7 @@ public class MacDriveClassifierTests
 
     /// <summary>Apple Silicon internal storage reports the "Apple Fabric" bus, not PCI-Express.</summary>
     [Fact]
-    public void ParseClassification_MapsAppleFabricToNvme()
+    public void ParseInfo_MapsAppleFabricToNvme()
     {
         var classification = MacDriveClassifier.ParseInfo(Plist(
             "<key>SolidState</key><true/>",
@@ -137,7 +137,7 @@ public class MacDriveClassifierTests
     }
 
     [Fact]
-    public void ParseClassification_ReportsHddWhenSolidStateIsFalse()
+    public void ParseInfo_ReportsHddWhenSolidStateIsFalse()
     {
         var classification = MacDriveClassifier.ParseInfo(Plist(
             "<key>SolidState</key><false/>",
@@ -149,7 +149,7 @@ public class MacDriveClassifierTests
 
     /// <summary>USB bridges do not report rotation, so the media type must stay Unknown.</summary>
     [Fact]
-    public void ParseClassification_ReportsInterfaceOnlyWhenSolidStateIsAbsent()
+    public void ParseInfo_ReportsInterfaceOnlyWhenSolidStateIsAbsent()
     {
         var classification = MacDriveClassifier.ParseInfo(Plist(
             "<key>VolumeName</key><string>PortableSSD</string>",
@@ -161,7 +161,7 @@ public class MacDriveClassifierTests
     }
 
     [Fact]
-    public void ParseClassification_ReturnsUnknownForDiskUtilErrorDocument()
+    public void ParseInfo_ReturnsUnknownForDiskUtilErrorDocument()
     {
         var classification = MacDriveClassifier.ParseInfo(Plist(
             "<key>Error</key><true/>",
@@ -171,7 +171,7 @@ public class MacDriveClassifierTests
     }
 
     [Fact]
-    public void ParseClassification_ReturnsUnknownForMalformedXml()
+    public void ParseInfo_ReturnsUnknownForMalformedXml()
     {
         Assert.Equal(DriveClassification.Unknown, MacDriveClassifier.ParseInfo("not xml").Classification);
     }

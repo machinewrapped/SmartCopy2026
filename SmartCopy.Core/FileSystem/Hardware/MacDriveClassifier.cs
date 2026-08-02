@@ -83,12 +83,16 @@ internal sealed class MacDriveClassifier : IDriveClassifier
     /// <summary>
     /// Runs a system tool and returns its stdout, or null if it fails, times out or writes nothing.
     /// </summary>
-    /// <param name="toolPath">Absolute, so a GUI-launched process's PATH does not matter.</param>
+    /// <param name="toolPath">
+    /// Absolute, so a GUI-launched process's PATH does not matter. Deliberately not resolved through
+    /// PATH as a fallback: a missing tool at a fixed macOS location means the classification cannot be
+    /// trusted anyway, and Unknown is a better answer than whatever a PATH lookup finds.
+    /// </param>
     private static async Task<string?> RunAsync(string toolPath, string[] arguments, CancellationToken ct)
     {
         var psi = new ProcessStartInfo
         {
-            FileName = File.Exists(toolPath) ? toolPath : Path.GetFileName(toolPath),
+            FileName = toolPath,
             RedirectStandardOutput = true,
             RedirectStandardError = false,
             UseShellExecute = false,
@@ -149,7 +153,8 @@ internal sealed class MacDriveClassifier : IDriveClassifier
 
         DriveMediaType mediaType = DriveMediaType.Unknown;
         DriveInterfaceType interfaceType = DriveInterfaceType.Unknown;
-        string? deviceName = null;
+        string? ioRegistryEntryName = null;
+        string? mediaName = null;
         string? parentWholeDisk = null;
 
         string? currentKey = null;
@@ -180,13 +185,15 @@ internal sealed class MacDriveClassifier : IDriveClassifier
                     break;
 
                 // Both name the hardware, and both are empty on a volume record; the whole-disk record
-                // carries them. IORegistryEntryName includes the vendor, so it is preferred.
+                // carries them. IORegistryEntryName includes the vendor, so it is preferred — chosen
+                // after the loop rather than during it, so the preference does not depend on which key
+                // diskutil happens to emit first.
                 case "IORegistryEntryName":
-                    deviceName = NullIfBlank(element.Value);
+                    ioRegistryEntryName = NullIfBlank(element.Value);
                     break;
 
                 case "MediaName":
-                    deviceName ??= NullIfBlank(element.Value);
+                    mediaName = NullIfBlank(element.Value);
                     break;
 
                 case "ParentWholeDisk":
@@ -197,7 +204,10 @@ internal sealed class MacDriveClassifier : IDriveClassifier
             currentKey = null;
         }
 
-        return new DiskUtilInfo(new DriveClassification(mediaType, interfaceType), deviceName, parentWholeDisk);
+        return new DiskUtilInfo(
+            new DriveClassification(mediaType, interfaceType),
+            ioRegistryEntryName ?? mediaName,
+            parentWholeDisk);
     }
 
     private static readonly DiskUtilInfo Unreadable = new(DriveClassification.Unknown, null, null);

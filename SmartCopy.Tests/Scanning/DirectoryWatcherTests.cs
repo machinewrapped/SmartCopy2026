@@ -4,6 +4,12 @@ using SmartCopy.Tests.TestInfrastructure;
 
 namespace SmartCopy.Tests.Scanning;
 
+/// <summary>
+/// Exercises <see cref="DirectoryWatcher"/> against a real filesystem, so these tests depend on OS
+/// file-change notification timing and are flaky under load. They are skipped unless
+/// <see cref="RealFilesystemFactAttribute.EnvironmentVariable"/> is set — see that attribute.
+/// </summary>
+[Trait("Category", "RealFilesystem")]
 public sealed class DirectoryWatcherTests : IDisposable
 {
     private static readonly TimeSpan Debounce = TimeSpan.FromMilliseconds(50);
@@ -20,7 +26,7 @@ public sealed class DirectoryWatcherTests : IDisposable
 
     public void Dispose() => _temp.Dispose();
 
-    [Fact]
+    [RealFilesystemFact]
     public async Task FileCreated_EmitsBatchWithInsert()
     {
         using var watcher = new DirectoryWatcher(_provider, _temp.Path, Debounce);
@@ -37,7 +43,7 @@ public sealed class DirectoryWatcherTests : IDisposable
         Assert.Contains(batches[0].Inserts, i => i.CanonicalRelativePath == "new.txt");
     }
 
-    [Fact]
+    [RealFilesystemFact]
     public async Task FileDeleted_EmitsBatchWithDeletion()
     {
         var file = Path.Combine(_temp.Path, "delete-me.txt");
@@ -57,7 +63,7 @@ public sealed class DirectoryWatcherTests : IDisposable
         Assert.Contains(batches[0].Deletions, d => d.CanonicalRelativePath == "delete-me.txt");
     }
 
-    [Fact]
+    [RealFilesystemFact]
     public async Task MultipleFilesCreatedWithinDebounceWindow_ProduceSingleBatch()
     {
         using var watcher = new DirectoryWatcher(_provider, _temp.Path, Debounce);
@@ -82,7 +88,7 @@ public sealed class DirectoryWatcherTests : IDisposable
         Assert.Equal(5, batches[0].Inserts.Length);
     }
 
-    [Fact]
+    [RealFilesystemFact]
     public async Task DrainPendingBatches_AfterDrain_HasNoPendingBatches()
     {
         using var watcher = new DirectoryWatcher(_provider, _temp.Path, Debounce);

@@ -22,6 +22,7 @@ public sealed class MoveStep : IPipelineStep, IHasDestinationPath, IHasFreeSpace
 {
     public StepKind StepType => StepKind.Move;
     public bool IsExecutable => true;
+    public bool TransfersData => true;
 
     public MoveStep(string destinationPath, OverwriteMode overwriteMode = OverwriteMode.Skip)
     {
