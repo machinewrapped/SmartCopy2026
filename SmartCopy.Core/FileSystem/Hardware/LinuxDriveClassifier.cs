@@ -81,7 +81,9 @@ internal sealed class LinuxDriveClassifier : IDriveClassifier
         try
         {
             string mountInfo = File.ReadAllText("/proc/self/mountinfo");
-            var normalizedPath = NormalizeLinuxPath(path);
+            // Only the queried path: mountinfo's own mount points are already real paths, and this
+            // runs once per line.
+            var normalizedPath = NormalizeLinuxPath(MountPointResolver.ResolveSymlinks(path));
             
             string bestMountPoint = string.Empty;
             string bestSource = string.Empty;
