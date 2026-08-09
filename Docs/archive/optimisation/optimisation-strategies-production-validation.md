@@ -264,3 +264,9 @@ Run distribution: Legacy fast cluster 7 @ 4m24s-5m14s; routed fast cluster 8 @ 4
 - **Variants:** two production variants, no prototype runner: `Production_Routed` and `Legacy_Baseline` in the split config. The completed artifact used the temporary names `Production_Routed_USBFlash` and `Legacy_Baseline_USBFlash` while USB Flash still lived in the combined matrix.
 - **Convergence:** `ConvergenceSpreadPercent` 10%, `DesiredRunCount` 3. `Legacy_Baseline_USBFlash` converged 3/4 at 2.7%; `Production_Routed_USBFlash` converged 3/3 at 9.6%.
 - **Result:** `Production_Routed_USBFlash` median 7m10s vs `Legacy_Baseline_USBFlash` 8m21s, `PASS`, +14.1% (+1m10s), 27.4 s noise floor. Bucket evidence was positive for Tiny, Small, Medium, and XLarge; Large was `BELOW_THRESHOLD` rather than a regression.
+
+## Post-validation policy update — 2026-08-09
+
+The limited macOS validation pass was completed separately using `validation-matrix-macos.json`. Its post-cleanup runs found no correctness issue or copy failure and no run-level regression against the unrouted control. HDD→PortableSSD was noisy but effectively neutral to slightly favourable overall; HDD→internal NVMe was effectively neutral apart from an outlier.
+
+Based on that evidence, `AppSettings` now enables the same optimised copy policy by default for every platform identifier. Linux is enabled by cross-platform assumption pending native Linux validation. An explicit `OptimisedCopyEnabled = false` setting remains the opt-out.

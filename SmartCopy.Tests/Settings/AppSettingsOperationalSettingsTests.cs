@@ -9,9 +9,9 @@ public sealed class AppSettingsOperationalSettingsTests
     public static TheoryData<OSPlatform, bool> PlatformDefaultCases => new()
     {
         { OSPlatform.Windows, true },
-        { OSPlatform.OSX, false },
-        { OSPlatform.Linux, false },
-        { OSPlatform.Create("OTHER"), false },
+        { OSPlatform.OSX, true },
+        { OSPlatform.Linux, true },
+        { OSPlatform.Create("OTHER"), true },
     };
 
     [Theory]
@@ -36,22 +36,36 @@ public sealed class AppSettingsOperationalSettingsTests
 
         var windows = settings.CreateOperationalSettings(OSPlatform.Windows);
         var mac = settings.CreateOperationalSettings(OSPlatform.OSX);
+        var linux = settings.CreateOperationalSettings(OSPlatform.Linux);
+        var other = settings.CreateOperationalSettings(OSPlatform.Create("OTHER"));
 
         Assert.Equal(enabled, windows.DestinationRoutingEnabled);
         Assert.Equal(enabled, mac.DestinationRoutingEnabled);
+        Assert.Equal(enabled, linux.DestinationRoutingEnabled);
+        Assert.Equal(enabled, other.DestinationRoutingEnabled);
     }
 
     [Theory]
     [InlineData("Windows", true, null)]
     [InlineData("Windows", false, false)]
-    [InlineData("OSX", false, null)]
-    [InlineData("OSX", true, true)]
+    [InlineData("OSX", true, null)]
+    [InlineData("OSX", false, false)]
+    [InlineData("Linux", true, null)]
+    [InlineData("Linux", false, false)]
+    [InlineData("Other", true, null)]
+    [InlineData("Other", false, false)]
     public void SetOptimisedCopyEnabled_StoresOnlyNonDefaultChoices(
         string platformName,
         bool value,
         bool? expectedPersistedValue)
     {
-        var platform = platformName == "Windows" ? OSPlatform.Windows : OSPlatform.OSX;
+        var platform = platformName switch
+        {
+            "Windows" => OSPlatform.Windows,
+            "OSX" => OSPlatform.OSX,
+            "Linux" => OSPlatform.Linux,
+            _ => OSPlatform.Create("OTHER"),
+        };
         var settings = new AppSettings();
 
         settings.SetOptimisedCopyEnabled(platform, value);

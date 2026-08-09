@@ -2,7 +2,7 @@
 
 This project contains the standalone benchmark suite for measuring file copy performance and comparing optimisation strategies for SmartCopy2026.
 
-The benchmark executes realistic dataset fixtures against different variant implementations (buffer sizes, direct write, staging, etc.) and produces NDJSON historical records of throughput and copy latency for analysis.
+The benchmark executes pre-determined datasets against different variant implementations (buffer sizes, direct write, staging, etc.) and produces NDJSON historical records of throughput and copy latency for analysis.
 
 ## Running Benchmarks
 

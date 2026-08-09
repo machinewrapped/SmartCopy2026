@@ -152,10 +152,37 @@ internal static class BenchmarkHelpers
         foreach (var directory in Directory.EnumerateDirectories(fullDestinationPath))
         {
             progress?.Report(Path.GetFileName(directory));
-            Directory.Delete(directory, recursive: true);
+            DeleteDirectoryWithRetry(directory);
         }
 
-        Directory.Delete(fullDestinationPath, recursive: true);
+        DeleteDirectoryWithRetry(fullDestinationPath);
+    }
+
+    private static void DeleteDirectoryWithRetry(string directory)
+    {
+        // Some macOS volume/filesystem combinations can report a transient
+        // "Directory not empty" while recursive deletion is still catching up
+        // with metadata entries. Retry the cleanup outside the timed copy path.
+        const int maxAttempts = 8;
+        for (var attempt = 1; ; attempt++)
+        {
+            if (!Directory.Exists(directory))
+                return;
+
+            try
+            {
+                Directory.Delete(directory, recursive: true);
+                return;
+            }
+            catch (IOException) when (attempt < maxAttempts)
+            {
+                Thread.Sleep(250);
+            }
+            catch (UnauthorizedAccessException) when (attempt < maxAttempts)
+            {
+                Thread.Sleep(250);
+            }
+        }
     }
 
     public static async Task<List<T>> ReadExistingRunsAsync<T>(string resultsPath, CancellationToken ct)

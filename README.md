@@ -64,6 +64,11 @@ winget install machinewrapped.SmartCopy
 - Safe delete via trash/recycle bin (if supported on the file system)
 - Save pipelines as presets, or complete workflows
 
+**Optimised copy engine**
+- Destination-sensitive copy buffers, pooled transfer buffers, small-file direct-write handling, and batched small-file I/O
+- Enabled by default across platforms.
+- Turn it off from **Options → Optimised Copy** to use conservative default copy behavior instead.
+
 ## How it works
 
 The UI is organized as a left-to-right data flow:

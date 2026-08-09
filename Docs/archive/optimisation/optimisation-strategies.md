@@ -18,19 +18,19 @@ An important caveat: Every file write incurs unavoidable filesystem work — MFT
 
 ## 2. Current Policy & Open Questions
 
-*The one place to read for "what do we currently believe." The dated evidence and per-phase history live in the files indexed in §5; this is the signal extracted from them. Last updated 2026-07-10.*
+*The one place to read for "what do we currently believe." The dated evidence and per-phase history live in the files indexed in §5; this is the signal extracted from them. Last updated 2026-08-09.*
 
-**Shipping policy (validated for Windows promotion).** Encoded in code as a selected `CopyOptimisationPolicy` from `CopyOptimisationPlatformPolicy`. The final Windows production validation pass is complete: Gate 1 production/prototype parity passed, the mitigated full MixedDataset matrix passed, and the reduced USB Flash closure passed ([Production Validation Pass](optimisation-strategies-production-validation.md)). The final Windows verdict is **PASS**. Clean installs give the Windows policy the optimised routing/batch/direct-write values below, while macOS/Linux/Other policies are disabled legacy policies until Gate 3 platform validation exists. Same-volume HDD uses a 256 KiB copy buffer. Batch size ordering is disabled whenever the source drive is HDD; SSD-source copies keep size ordering, including SSD→HDD. Stream-only `LargeFileDataset` sweeps on two SameDriveHDD devices show the buffer response is drive-specific below 512 KiB: one drive weakly favoured `64 KiB`, while the second favoured `256 KiB` and made `64 KiB` the slowest. The shared conclusion is that `2/4 MiB` is not useful and `256 KiB` is the defensible SameDriveHDD baseline:
+**Shipping policy (cross-platform default, updated 2026-08-09).** Encoded in `AppSettings.CreateOperationalSettings`: the Windows production validation pass passed, and the limited macOS MixedDataset matrix found no correctness issue or run-level regression; Linux follows the same default by cross-platform assumption pending native Linux validation. Clean installs now enable the optimised routing/batch/direct-write values below on every platform. An explicit user opt-out remains available. Same-volume HDD uses a 256 KiB copy buffer. Batched traversal preserves natural source order universally; file-size ordering is no longer part of the production policy. Stream-only `LargeFileDataset` sweeps on two SameDriveHDD devices show the buffer response is drive-specific below 512 KiB: one drive weakly favoured `64 KiB`, while the second favoured `256 KiB` and made `64 KiB` the slowest. The shared conclusion is that `2/4 MiB` is not useful and `256 KiB` is the defensible SameDriveHDD baseline:
 
 | Knob | Value | Source of record |
 |---|---|---|
 | Copy buffer | SSD/USB 1 MiB · cross-volume HDD/Unknown 512 KiB · same-volume HDD 256 KiB | `AppSettings` → `OperationalSettings.CopyBufferRouting`, applied by `DefaultCopyStrategyPolicy` |
 | Batch buffer | 1 MiB (eligibility ceiling 512 KiB) | `AppSettings.BatchBufferKb`, `OperationalSettings` |
-| Batch traversal order | Order batched files by file size except HDD-source copies, which preserve natural order | `DefaultCopyStrategyPolicy`, `OperationalSettings.BatchOrderByFileSize` |
+| Batch traversal order | Natural source order for all drive classes | `BatchedCopyStrategy` |
 | Direct-write threshold | 256 KiB | `AppSettings.TinyFileFastPathKb` |
 | Manual-loop byte buffer | Always ArrayPool-rented | `StreamCopyEngine` |
 | Preallocation | OFF (universal) | `DefaultCopyStrategyPolicy` |
-| Platform policy | Per-platform policy objects: Windows enabled with the validated values; macOS/Linux/Other disabled until validated | `AppSettings.CopyOptimisationPlatformPolicy` |
+| Platform policy | Optimised policy enabled by default on every platform; explicit opt-out remains available | `AppSettings` platform default |
 
 **Confidence — what's earned vs assumed:**
 
@@ -52,7 +52,7 @@ An important caveat: Every file write incurs unavoidable filesystem work — MFT
 - **Alternative natural-order batching remains open.** The current natural-order path flushes before streaming a file above the eligibility ceiling. A possible next strategy is "flush when full": read files in natural order, accumulate eligible files until the batch buffer must be flushed, and write larger files as encountered instead of reordering small files by size. That may retain source-HDD locality while recovering some packing efficiency; it needs a dedicated benchmark before replacing the current traversal rule.
 - **USB is too noisy for a static profile.** The reduced USB Flash closure passed, but 1 MiB remains a *prior to be overridden by per-device learning*, not a settled universal finding (Phase 6). The high USB variance does **not** invalidate the SSD/HDD conclusions — it only makes USB defaults provisional.
 - **SameDrive SSD larger-buffer probe** (Phase 5, Step 3) remains open; it does not block promotion.
-- **Gate 3: non-Windows platform validation.** The production validation evidence is Windows-only. macOS/Linux therefore keep disabled legacy `CopyOptimisationPolicy` entries by default. A limited macOS validation pass can populate and enable the macOS entry later if it produces the same no-regression signal.
+- **Gate 3: non-Windows platform validation.** The limited macOS validation pass found no correctness issue or run-level regression, so the same optimized default is now used cross-platform. Linux remains an explicit cross-platform assumption pending native validation.
 - **Non-atomic move fallback bypasses batching.** Cross-volume / non-atomic moves copy each file individually via `TransferFileAsync`, not the batched `CopySelectionAsync`, so they miss the small-file phase-separation win. This is now worth scheduling after the default flip: use a deferred-source-delete refactor that deletes each source after its batch flushes, reconciled with `WalkAndMoveAsync`'s directory cleanup. The fix inherits correct per-file timing for free (Architecture §2.4.1).
 
 ## 3. Design Principles
