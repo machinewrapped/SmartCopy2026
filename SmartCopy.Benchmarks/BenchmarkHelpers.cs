@@ -71,6 +71,37 @@ internal static class BenchmarkHelpers
         return $"{(int)(totalSeconds / 3600.0)}h {((int)(totalSeconds % 3600.0) / 60)}m";
     }
 
+    /// <summary>
+    /// Resolves a config-authored path to a rooted absolute path, expanding a leading <c>~</c> to the
+    /// current user's home directory first so configs can name home-relative locations without pinning
+    /// an author's username. Only the bare <c>~</c> form is expanded; <c>~user</c> is left to
+    /// <see cref="Path.GetFullPath(string)"/> rather than guessed at.
+    /// </summary>
+    public static string ResolvePath(string path) => Path.GetFullPath(ExpandUserPath(path));
+
+    private static string ExpandUserPath(string path)
+    {
+        if (path.Length == 0 || path[0] != '~')
+        {
+            return path;
+        }
+
+        if (path.Length > 1 && path[1] != Path.DirectorySeparatorChar && path[1] != Path.AltDirectorySeparatorChar)
+        {
+            return path;
+        }
+
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (string.IsNullOrEmpty(home))
+        {
+            throw new InvalidOperationException($"Cannot expand '~' in '{path}': the user profile directory is unknown.");
+        }
+
+        // Path.Join, not Path.Combine: a remainder that looks rooted ("~//data") would make Combine
+        // discard the home directory and silently resolve somewhere else entirely.
+        return path.Length == 1 ? home : Path.Join(home, path[2..]);
+    }
+
     public static void ValidatePaths(string sourcePath, string destinationPath)
     {
         if (!Directory.Exists(sourcePath))

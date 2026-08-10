@@ -20,8 +20,8 @@ internal sealed class DatasetPreparationConfig
             throw new InvalidOperationException("datasetPreparation.destinationPath is required.");
         }
 
-        SourcePath = Path.GetFullPath(SourcePath);
-        DestinationPath = Path.GetFullPath(DestinationPath);
+        SourcePath = BenchmarkHelpers.ResolvePath(SourcePath);
+        DestinationPath = BenchmarkHelpers.ResolvePath(DestinationPath);
 
         if (Buckets.Count == 0)
         {

@@ -23,10 +23,10 @@ internal sealed class BenchmarkScenario
     public void Normalize()
     {
         Name = Name.Trim();
-        DestinationPath = Path.GetFullPath(DestinationPath);
+        DestinationPath = BenchmarkHelpers.ResolvePath(DestinationPath);
         if (!string.IsNullOrWhiteSpace(SourcePath))
         {
-            SourcePath = Path.GetFullPath(SourcePath);
+            SourcePath = BenchmarkHelpers.ResolvePath(SourcePath);
         }
     }
 

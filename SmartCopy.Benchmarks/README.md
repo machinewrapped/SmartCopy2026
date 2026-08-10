@@ -20,6 +20,10 @@ dotnet run --project .\SmartCopy.Benchmarks --config <path-to-scenario.json> --m
 All modes require an explicit `--config <path>` argument. Prepare a configuration
 for the machine, dataset fixtures, and workload being measured.
 
+Config paths may start with `~` to name a location under the current user's home
+directory, so a config can be shared or archived without pinning an author's
+username. Everything else resolves through `Path.GetFullPath`.
+
 ## OS File Cache Boundaries
 
 To accurately measure I/O performance, the benchmark requires a cold OS file

@@ -27,7 +27,7 @@
     },
     {
       "name": "PortableSSDToInternalNVMe",
-      "destinationPath": "/Users/simonbooth/SmartCopyValidation/Matrix_MacOS_PortableSSDToNVMe",
+      "destinationPath": "~/SmartCopyValidation/Matrix_MacOS_PortableSSDToNVMe",
       "sourcePath": null,
       "enabled": true,
       "overwriteMode": 1,
@@ -87,7 +87,7 @@
     },
     {
       "name": "HDDToInternalNVMe",
-      "destinationPath": "/Users/simonbooth/SmartCopyValidation/Matrix_MacOS_HDDToNVMe",
+      "destinationPath": "~/SmartCopyValidation/Matrix_MacOS_HDDToNVMe",
       "sourcePath": "/Volumes/4TB exFAT/SmartCopyValidation/MixedDataset",
       "enabled": true,
       "overwriteMode": 1,
@@ -112,17 +112,17 @@
   "variants": [
     {
       "name": "Unrouted_Defaults",
-      "notes": "Current macOS production defaults from AppSettings: 256 KiB copy buffer, direct-write disabled, batching disabled, and destination routing disabled. This is intentionally implicit rather than pinned so the run detects any change in the platform defaults.",
+      "notes": "Legacy unrouted baseline: 256 KiB copy buffer, direct-write disabled, batching disabled, destination routing disabled. These were the implicit macOS AppSettings defaults when the pass was run; they are pinned explicitly here because the pass promoted the optimised policy to a cross-platform default, so the unpinned form would now resolve to the routed candidate instead of the control.",
       "enabled": true,
       "desiredRunCount": 5,
       "writeJournal": true,
       "overwriteMode": null,
-      "providerCopyBufferSizeBytes": null,
+      "providerCopyBufferSizeBytes": 262144,
       "providerSmallFileProgressThresholdBytes": null,
-      "directWriteThresholdBytes": null,
-      "bufferBatchBytes": null,
-      "batchEligibilityThresholdBytes": null,
-      "destinationRoutingEnabled": null,
+      "directWriteThresholdBytes": 0,
+      "bufferBatchBytes": 0,
+      "batchEligibilityThresholdBytes": 524288,
+      "destinationRoutingEnabled": false,
       "providerWriteSequentialScan": null,
       "usePrototypeExecutor": null,
       "matchedControl": null,
@@ -135,7 +135,7 @@
     },
     {
       "name": "Production_Routed",
-      "notes": "Candidate macOS policy under test: the same Windows-validated 256 KiB direct-write threshold, 1 MiB batch buffer, 512 KiB eligibility ceiling, and destination-sensitive buffer routing. This explicitly enables the candidate for validation even though macOS remains disabled by default until Gate 3 passes.",
+      "notes": "Candidate macOS policy under test: the same Windows-validated 256 KiB direct-write threshold, 1 MiB batch buffer, 512 KiB eligibility ceiling, and destination-sensitive buffer routing. Pinned explicitly rather than inherited, so the pair stays a like-for-like comparison regardless of what the platform defaults become. This is the bundle the pass promoted to the cross-platform default.",
       "enabled": true,
       "desiredRunCount": 5,
       "writeJournal": true,
@@ -158,13 +158,5 @@
     }
   ],
   "datasetPreparation": null,
-  "cooldownSeconds": 120,
-  "sourcePools": {
-    "/Volumes/PortableSSD/TestData/MixedDataset": [
-      "/Volumes/PortableSSD/TestData/MixedDataset_1"
-    ],
-    "/Volumes/4TB exFAT/SmartCopyValidation/MixedDataset": [
-      "/Volumes/4TB exFAT/SmartCopyValidation/MixedDataset_1"
-    ]
-  }
+  "cooldownSeconds": 120
 }
