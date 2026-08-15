@@ -4,8 +4,24 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
 
   - package-ecosystem: nuget
     directory: /
     schedule:
       interval: weekly
+    groups:
+      avalonia:
+        patterns:
+          - "Avalonia*"
+      microsoft-extensions:
+        patterns:
+          - "Microsoft.Extensions*"
+      test-framework:
+        patterns:
+          - "xunit*"
+          - "Microsoft.NET.Test.Sdk"
+          - "coverlet*"
