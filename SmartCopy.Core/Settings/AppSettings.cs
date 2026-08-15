@@ -26,7 +26,7 @@ public sealed class AppSettings
     public int CopyChunkSizeKb { get; set; } = OperationalSettings.DefaultCopyBufferSizeBytes / 1024;
 
     /// <summary>
-    /// Explicit optimised-copy choice. Null keeps the platform default (Windows on, other platforms off).
+    /// Explicit optimised-copy choice. Null keeps the cross-platform optimised default.
     /// </summary>
     public bool? OptimisedCopyEnabled { get; set; }
 
@@ -129,8 +129,7 @@ public sealed class AppSettings
     internal bool GetOptimisedCopyEnabled(OSPlatform platform) =>
         OptimisedCopyEnabled ?? GetPlatformDefaultOptimisedCopyEnabled(platform);
 
-    private static bool GetPlatformDefaultOptimisedCopyEnabled(OSPlatform platform) =>
-        platform.Equals(OSPlatform.Windows);
+    private static bool GetPlatformDefaultOptimisedCopyEnabled(OSPlatform _) => true;
 
     private static OSPlatform GetCurrentPlatform()
     {

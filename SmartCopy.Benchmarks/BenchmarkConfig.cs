@@ -40,10 +40,10 @@ internal sealed class BenchmarkConfig
             throw new InvalidOperationException("sourcePath is required.");
         }
 
-        SourcePath = Path.GetFullPath(SourcePath);
+        SourcePath = BenchmarkHelpers.ResolvePath(SourcePath);
         ArtifactPath = string.IsNullOrWhiteSpace(ArtifactPath)
             ? null
-            : Path.GetFullPath(ArtifactPath);
+            : BenchmarkHelpers.ResolvePath(ArtifactPath);
 
         foreach (var scenario in Scenarios)
         {

@@ -87,3 +87,7 @@ Files to modify: `SmartCopy.Core/FileSystem/LocalFileSystemProvider.cs`, `Provid
 **Benchmark gate:** run the full scenario matrix (SSDtoSSD → SameDriveTest → SSDtoHDD → SSDtoUSBFlash) via the Production Validation Pass. Promote static defaults only after all scenarios pass. Per-device learning is a separate incremental feature that can ship after static routing is in place.
 
 ---
+
+## Post-validation policy update — 2026-08-09
+
+The Windows production validation pass and the separate macOS validation pass now support promoting the optimised copy policy as the cross-platform default. Linux is enabled by cross-platform assumption pending native validation; users can opt out through `AllowCopyOptimisations`.

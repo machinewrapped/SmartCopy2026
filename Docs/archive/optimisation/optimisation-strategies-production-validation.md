@@ -264,3 +264,13 @@ Run distribution: Legacy fast cluster 7 @ 4m24s-5m14s; routed fast cluster 8 @ 4
 - **Variants:** two production variants, no prototype runner: `Production_Routed` and `Legacy_Baseline` in the split config. The completed artifact used the temporary names `Production_Routed_USBFlash` and `Legacy_Baseline_USBFlash` while USB Flash still lived in the combined matrix.
 - **Convergence:** `ConvergenceSpreadPercent` 10%, `DesiredRunCount` 3. `Legacy_Baseline_USBFlash` converged 3/4 at 2.7%; `Production_Routed_USBFlash` converged 3/3 at 9.6%.
 - **Result:** `Production_Routed_USBFlash` median 7m10s vs `Legacy_Baseline_USBFlash` 8m21s, `PASS`, +14.1% (+1m10s), 27.4 s noise floor. Bucket evidence was positive for Tiny, Small, Medium, and XLarge; Large was `BELOW_THRESHOLD` rather than a regression.
+
+## Post-validation policy update — 2026-08-09
+
+The limited macOS validation pass was completed separately using `validation-matrix-macos.json`. Its post-cleanup runs found no correctness issue or copy failure and no run-level regression against the unrouted control. HDD→PortableSSD was noisy but effectively neutral to slightly favourable overall; HDD→internal NVMe was effectively neutral apart from an outlier.
+
+**Known limitation of the macOS pass — it is not equivalent in rigour to the Windows one.** The macOS config had no `datasetPreparation` block, so the pool clones the Windows pass relied on (`poolCloneCount` 8) were never generated: only `MixedDataset_1` existed on either volume, and every run of both variants re-read that same source. Path-pool rotation, the mechanism that keeps repeated runs cache-cold, therefore never happened, and the cold-cache boundary prompt never fired either because it triggers only when `UsePathPool` changes between scenarios.
+
+The practical measurement impact is small. A 20 GB dataset read in traversal order on an 8 GB Mac mini is close to self-evicting — a run finishes holding roughly the tail of the dataset, and the next run starts from the beginning, long since evicted — and the destination is cleared before and after each run. The residual risk is **metadata**, not data: directory entries and inodes are a tiny fraction of 20 GB and can stay resident across runs, and the Tiny/Small buckets are a small share of bytes but a large share of file count. Treat the run-level throughput numbers as sound and the Tiny/Small bucket evidence as softer than the Windows equivalent.
+
+Based on that evidence, `AppSettings` now enables the same optimised copy policy by default for every platform identifier. Linux is enabled by cross-platform assumption pending native Linux validation. An explicit `OptimisedCopyEnabled = false` setting remains the opt-out.

@@ -2,7 +2,7 @@
 
 This project contains the standalone benchmark suite for measuring file copy performance and comparing optimisation strategies for SmartCopy2026.
 
-The benchmark executes realistic dataset fixtures against different variant implementations (buffer sizes, direct write, staging, etc.) and produces NDJSON historical records of throughput and copy latency for analysis.
+The benchmark executes pre-determined datasets against different variant implementations (buffer sizes, direct write, staging, etc.) and produces NDJSON historical records of throughput and copy latency for analysis.
 
 ## Running Benchmarks
 
@@ -19,6 +19,10 @@ dotnet run --project .\SmartCopy.Benchmarks --config <path-to-scenario.json> --m
 
 All modes require an explicit `--config <path>` argument. Prepare a configuration
 for the machine, dataset fixtures, and workload being measured.
+
+Config paths may start with `~` to name a location under the current user's home
+directory, so a config can be shared or archived without pinning an author's
+username. Everything else resolves through `Path.GetFullPath`.
 
 ## OS File Cache Boundaries
 
