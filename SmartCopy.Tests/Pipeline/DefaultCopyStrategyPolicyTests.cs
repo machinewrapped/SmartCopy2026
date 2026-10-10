@@ -34,6 +34,8 @@ public sealed class DefaultCopyStrategyPolicyTests
             { DriveMediaType.HDD, DriveInterfaceType.SATA, DriveMediaType.SSD, DriveInterfaceType.NVMe, false, HddBuffer },
             { DriveMediaType.HDD, DriveInterfaceType.SATA, DriveMediaType.HDD, DriveInterfaceType.SATA, true, SameVolumeHddBuffer },
             { DriveMediaType.Unknown, DriveInterfaceType.Unknown, DriveMediaType.Unknown, DriveInterfaceType.Unknown, false, UnknownBuffer },
+            // A network share's media is unknown, so it must not be routed as fast storage.
+            { DriveMediaType.SSD, DriveInterfaceType.NVMe, DriveMediaType.Unknown, DriveInterfaceType.Network, false, UnknownBuffer },
         };
 
     [Theory]

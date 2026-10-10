@@ -4,8 +4,9 @@ namespace SmartCopy.Core.FileSystem;
 
 /// <summary>
 /// <see cref="IFileSystemProvider"/> backed by <see cref="System.IO"/> and the local (or UNC) filesystem.
-/// Network paths are detected at construction time; they lose atomic-move, trash, watch, and free-space
-/// capabilities because the underlying OS APIs either don't apply or are unreliable over the network.
+/// Network paths are detected at construction time; they lose atomic-move, trash and watch capabilities
+/// (and free-space queries outside Windows) because the underlying OS APIs either don't apply or are
+/// unreliable over the network.
 /// </summary>
 public sealed class LocalFileSystemProvider : IFileSystemProvider
 {
@@ -51,7 +52,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
             CanWatch: !_isNetworkPath,
             MaxPathLength: int.MaxValue,
             CanTrash: !_isNetworkPath,
-            CanQueryFreeSpace: !_isNetworkPath);
+            CanQueryFreeSpace: !_isNetworkPath || VolumeResolver.CanQueryNetworkFreeSpace);
 
         _readMountPoints = readMountPoints;
     }
@@ -59,44 +60,44 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     public string RootPath { get; }
 
     /// <summary>
-    /// Identity of the volume holding <see cref="RootPath"/>: the drive root on Windows, the deepest
-    /// containing mount point on Unix, and null for network paths (which have no local volume).
+    /// Identity of the volume holding <see cref="RootPath"/>, following junctions and mount points (see
+    /// <see cref="VolumeResolver.GetVolumeId"/>), and null for network paths (which have no local
+    /// volume) or when the volume cannot be determined.
     /// <para>
     /// Two providers rooted anywhere on one volume must return the same ID — the same-volume move
     /// fast path and the volume-keyed caches (<see cref="Hardware.DriveClassificationRegistry"/>,
     /// <c>FreeSpaceCache</c>) all depend on it.
     /// </para>
     /// <para>
-    /// Deliberately resolved on each access rather than cached. Providers live in a process-wide
+    /// Deliberately not cached for the provider's lifetime. Providers live in a process-wide
     /// registry, so a cached ID would outlive the mount topology it was derived from: a device
     /// mounted at a path that was inspected while unmounted would keep reporting the parent volume,
     /// which is the dangerous direction (a false same-volume claim skips the free-space warning).
-    /// This is read a handful of times per pipeline run, not per file, so re-reading the mount table
-    /// is not worth caching around.
+    /// It is read a handful of times per pipeline run, not per file; where resolving it is costly it
+    /// is reused only briefly (<see cref="VolumeResolver.VolumeIdReuseMs"/>).
     /// </para>
     /// </summary>
-    public string? VolumeId => _isNetworkPath ? null : GetVolumeIdSafe(RootPath, _readMountPoints);
+    public string? VolumeId => _isNetworkPath ? null : GetVolumeIdSafe();
 
-    private static string? GetVolumeIdSafe(string path, Func<IEnumerable<string>>? readMountPoints)
+    private volatile CachedVolumeId? _volumeId;
+
+    private sealed record CachedVolumeId(string? Id, long ExpiresAtMs);
+
+    private string? GetVolumeIdSafe()
     {
         try
         {
-            if (OperatingSystem.IsWindows())
-            {
-                return new DriveInfo(Path.GetPathRoot(path) ?? path).Name;
-            }
+            var now = Environment.TickCount64;
+            if (_volumeId is { } cached && now < cached.ExpiresAtMs)
+                return cached.Id;
 
-            // On Unix `new DriveInfo(path).Name` echoes the path back rather than resolving the
-            // containing mount point, so it must be matched against the mount table instead —
-            // otherwise every folder looks like its own volume and no two paths ever compare equal.
-            var mountPoints = readMountPoints?.Invoke();
-            return mountPoints is null
-                ? MountPointResolver.Resolve(path)
-                : MountPointResolver.Resolve(path, mountPoints);
+            var id = VolumeResolver.GetVolumeId(RootPath, _readMountPoints);
+            _volumeId = new CachedVolumeId(id, now + VolumeResolver.VolumeIdReuseMs);
+            return id;
         }
         catch
         {
-            return Path.GetPathRoot(path)?.ToUpperInvariant();
+            return Path.GetPathRoot(RootPath)?.ToUpperInvariant();
         }
     }
 
@@ -105,7 +106,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     public ValueTask<Hardware.DriveClassification> GetClassificationAsync(CancellationToken ct = default)
     {
         if (_isNetworkPath)
-            return ValueTask.FromResult(Hardware.DriveClassification.Unknown);
+            return ValueTask.FromResult(Hardware.DriveClassification.Network);
         return Hardware.DriveClassificationRegistry.GetOrClassifyAsync(RootPath, VolumeId, ct);
     }
 
@@ -566,15 +567,23 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 
     public Task<long?> GetAvailableFreeSpaceAsync(CancellationToken ct)
     {
-        if (_isNetworkPath) return Task.FromResult<long?>(null);
+        if (!_capabilities.CanQueryFreeSpace) return Task.FromResult<long?>(null);
+
+        // The lookup blocks — on a UNC path or mapped drive for as long as the server takes to answer —
+        // and the UI refreshes free space directly, so keep it off the caller's thread. The OS call
+        // itself cannot be interrupted; WaitAsync abandons it on cancellation instead.
+        return Task.Run(QueryAvailableFreeSpace, ct).WaitAsync(ct);
+    }
+
+    private long? QueryAvailableFreeSpace()
+    {
         try
         {
-            var drive = new DriveInfo(RootPath);
-            return Task.FromResult<long?>(drive.AvailableFreeSpace);
+            return VolumeResolver.GetAvailableFreeSpace(RootPath);
         }
         catch
         {
-            return Task.FromResult<long?>(null);
+            return null;
         }
     }
 

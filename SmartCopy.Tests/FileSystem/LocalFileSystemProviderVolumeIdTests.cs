@@ -130,17 +130,93 @@ public sealed class LocalFileSystemProviderVolumeIdTests
         Assert.Equal(leftProvider.VolumeId, rightProvider.VolumeId);
 
         // On Unix the pre-fix implementation returned the root path itself, so two temp folders
-        // disagreed. On Windows the volume is the drive root, which is also not the folder path.
+        // disagreed. On Windows the volume is the volume GUID path, which is also not the folder path.
         Assert.NotEqual(leftProvider.RootPath, leftProvider.VolumeId);
     }
 
+    /// <summary>
+    /// The drive root is not the volume: a junction or mount point under it can lead elsewhere. The
+    /// volume GUID path is the same however the volume is reached.
+    /// </summary>
     [Fact]
-    public void Windows_VolumeIdIsTheDriveRoot()
+    public void Windows_VolumeIdIsTheVolumeGuidPath()
     {
         if (!OperatingSystem.IsWindows()) return;
 
-        var provider = new LocalFileSystemProvider(@"C:\Users\alice\Pictures");
+        using var temp = new TempDirectory();
+        var provider = new LocalFileSystemProvider(temp.Path);
 
-        Assert.Equal(@"C:\", provider.VolumeId);
+        Assert.StartsWith(@"\\?\Volume{", provider.VolumeId);
+        Assert.EndsWith(@"}\", provider.VolumeId);
+    }
+
+    /// <summary>
+    /// A destination usually does not exist until the copy creates it, so both the volume and its free
+    /// space must come from the nearest existing ancestor rather than failing.
+    /// </summary>
+    [Fact]
+    public async Task MissingDestination_ResolvesThroughItsDeepestExistingAncestor()
+    {
+        using var temp = new TempDirectory();
+        var existing = new LocalFileSystemProvider(temp.Path);
+        var missing = new LocalFileSystemProvider(Path.Combine(temp.Path, "not", "created", "yet"));
+
+        Assert.NotNull(missing.VolumeId);
+        Assert.Equal(existing.VolumeId, missing.VolumeId);
+        Assert.True(await missing.GetAvailableFreeSpaceAsync(CancellationToken.None) > 0);
+    }
+
+    /// <summary>
+    /// The UI refreshes free space directly, and on a slow or unreachable share the OS lookup blocks until
+    /// the network times out — so the query must run off the caller's thread and honour cancellation.
+    /// </summary>
+    [Fact]
+    public async Task FreeSpaceQuery_HonoursCancellation()
+    {
+        using var temp = new TempDirectory();
+        var provider = new LocalFileSystemProvider(temp.Path);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => provider.GetAvailableFreeSpaceAsync(new CancellationToken(canceled: true)));
+    }
+
+    [Theory]
+    [InlineData(@"\\?\Volume{6bce7ae7-56ba-46da-b01b-4d08bd04e22d}\Users\alice", @"\\?\Volume{6bce7ae7-56ba-46da-b01b-4d08bd04e22d}\")]
+    [InlineData(@"\\?\Volume{6bce7ae7-56ba-46da-b01b-4d08bd04e22d}\", @"\\?\Volume{6bce7ae7-56ba-46da-b01b-4d08bd04e22d}\")]
+    [InlineData(@"\\?\UNC\server\share\folder", null)]
+    public void Windows_VolumeIdFromGuidPath(string finalPath, string? expected)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        Assert.Equal(expected, WindowsVolumeResolver.VolumeIdFromGuidPath(finalPath));
+    }
+
+    /// <summary>
+    /// The drive classifier opens a local volume by this path, and must classify a remote volume as
+    /// network rather than fall back to the local drive letter the path was written under.
+    /// </summary>
+    [Theory]
+    [InlineData(@"\\?\Volume{6bce7ae7-56ba-46da-b01b-4d08bd04e22d}\", @"\\?\Volume{6bce7ae7-56ba-46da-b01b-4d08bd04e22d}")]
+    [InlineData(@"\\MINIPC\Media|FE07D85A", null)]
+    public void Windows_LocalVolumeDevicePath(string volumeId, string? expected)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        Assert.Equal(expected, WindowsVolumeResolver.LocalVolumeDevicePath(volumeId));
+    }
+
+    /// <summary>
+    /// A mapped drive and its UNC path are the same share, so a remote ID is keyed on the share the
+    /// handle resolved to, never the drive letter it was reached through.
+    /// </summary>
+    [Theory]
+    [InlineData(@"\\?\UNC\MINIPC\Media\New Movies", @"\\MINIPC\Media")]
+    [InlineData(@"\\?\UNC\MINIPC\Media", @"\\MINIPC\Media")]
+    [InlineData(@"\\?\C:\Media\Disk2", @"C:\")]
+    public void Windows_RootFromFinalPath(string finalPath, string expected)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        Assert.Equal(expected, WindowsVolumeResolver.RootFromFinalPath(finalPath));
     }
 }

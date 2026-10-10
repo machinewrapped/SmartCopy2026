@@ -15,7 +15,8 @@ public enum DriveInterfaceType
     SATA,
     USB,
     NVMe,
-    Virtual
+    Virtual,
+    Network
 }
 
 public readonly record struct DriveClassification(
@@ -24,6 +25,13 @@ public readonly record struct DriveClassification(
 {
     public static DriveClassification Unknown { get; } = 
         new(DriveMediaType.Unknown, DriveInterfaceType.Unknown);
+
+    /// <summary>
+    /// Storage reached over the network. The media behind the share cannot be queried, so it stays
+    /// Unknown and copy routing treats it as unknown media.
+    /// </summary>
+    public static DriveClassification Network { get; } =
+        new(DriveMediaType.Unknown, DriveInterfaceType.Network);
 
     public override string ToString()
     {
