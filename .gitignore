@@ -71,3 +71,4 @@ dataset-prep-summary-*.json
 /Tools/RAMMap
 /.benchmarks
 /.antigravitycli
+/.vs
