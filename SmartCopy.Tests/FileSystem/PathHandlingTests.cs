@@ -151,6 +151,7 @@ public sealed class PathHandlingTests : IDisposable
         Assert.False(caps.CanWatch);
         Assert.False(caps.CanTrash);
         Assert.False(caps.CanAtomicMove);
+        Assert.True(caps.CanQueryFreeSpace);
         Assert.Null(provider.VolumeId);
     }
 

@@ -4,8 +4,9 @@ namespace SmartCopy.Core.FileSystem;
 
 /// <summary>
 /// <see cref="IFileSystemProvider"/> backed by <see cref="System.IO"/> and the local (or UNC) filesystem.
-/// Network paths are detected at construction time; they lose atomic-move, trash, watch, and free-space
-/// capabilities because the underlying OS APIs either don't apply or are unreliable over the network.
+/// Network paths are detected at construction time; they lose atomic-move, trash and watch capabilities
+/// (and free-space queries outside Windows) because the underlying OS APIs either don't apply or are
+/// unreliable over the network.
 /// </summary>
 public sealed class LocalFileSystemProvider : IFileSystemProvider
 {
@@ -51,7 +52,8 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
             CanWatch: !_isNetworkPath,
             MaxPathLength: int.MaxValue,
             CanTrash: !_isNetworkPath,
-            CanQueryFreeSpace: !_isNetworkPath);
+            // Windows answers free-space queries for UNC paths the same way it does for mapped drives.
+            CanQueryFreeSpace: !_isNetworkPath || OperatingSystem.IsWindows());
 
         _readMountPoints = readMountPoints;
     }
@@ -59,31 +61,48 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     public string RootPath { get; }
 
     /// <summary>
-    /// Identity of the volume holding <see cref="RootPath"/>: the drive root on Windows, the deepest
-    /// containing mount point on Unix, and null for network paths (which have no local volume).
+    /// Identity of the volume holding <see cref="RootPath"/>, following junctions and mount points:
+    /// on Windows the volume GUID path (or share + volume serial for a mapped network drive, see
+    /// <see cref="WindowsVolumeResolver"/>), the deepest containing mount point on Unix, and null for
+    /// network paths (which have no local volume) or when the volume cannot be determined.
     /// <para>
     /// Two providers rooted anywhere on one volume must return the same ID — the same-volume move
     /// fast path and the volume-keyed caches (<see cref="Hardware.DriveClassificationRegistry"/>,
     /// <c>FreeSpaceCache</c>) all depend on it.
     /// </para>
     /// <para>
-    /// Deliberately resolved on each access rather than cached. Providers live in a process-wide
+    /// Deliberately not cached for the provider's lifetime. Providers live in a process-wide
     /// registry, so a cached ID would outlive the mount topology it was derived from: a device
     /// mounted at a path that was inspected while unmounted would keep reporting the parent volume,
     /// which is the dangerous direction (a false same-volume claim skips the free-space warning).
     /// This is read a handful of times per pipeline run, not per file, so re-reading the mount table
-    /// is not worth caching around.
+    /// is not worth caching around. On Windows resolving it opens a handle — a network round trip on
+    /// a mapped drive — and validation reads it several times per pass on the UI thread, so it is
+    /// memoised for a couple of seconds there.
     /// </para>
     /// </summary>
     public string? VolumeId => _isNetworkPath ? null : GetVolumeIdSafe(RootPath, _readMountPoints);
 
-    private static string? GetVolumeIdSafe(string path, Func<IEnumerable<string>>? readMountPoints)
+    private const long WindowsVolumeIdLifetimeMs = 2000;
+    private volatile CachedVolumeId? _windowsVolumeId;
+
+    private sealed record CachedVolumeId(string? Id, long ExpiresAtMs);
+
+    private string? GetVolumeIdSafe(string path, Func<IEnumerable<string>>? readMountPoints)
     {
         try
         {
             if (OperatingSystem.IsWindows())
             {
-                return new DriveInfo(Path.GetPathRoot(path) ?? path).Name;
+                var now = Environment.TickCount64;
+                if (_windowsVolumeId is { } cached && now < cached.ExpiresAtMs)
+                    return cached.Id;
+
+                var id = FindDeepestExistingDirectory(path) is { } existing
+                    ? WindowsVolumeResolver.GetVolumeId(existing)
+                    : null;
+                _windowsVolumeId = new CachedVolumeId(id, now + WindowsVolumeIdLifetimeMs);
+                return id;
             }
 
             // On Unix `new DriveInfo(path).Name` echoes the path back rather than resolving the
@@ -566,16 +585,37 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
 
     public Task<long?> GetAvailableFreeSpaceAsync(CancellationToken ct)
     {
-        if (_isNetworkPath) return Task.FromResult<long?>(null);
+        if (!_capabilities.CanQueryFreeSpace) return Task.FromResult<long?>(null);
         try
         {
-            var drive = new DriveInfo(RootPath);
-            return Task.FromResult<long?>(drive.AvailableFreeSpace);
+            // Query the folder itself, not its drive root: a junction or mount point (locally or on an
+            // SMB server) can put it on a different volume. On Unix DriveInfo statfs's the path as given.
+            if (FindDeepestExistingDirectory(RootPath) is not { } existing)
+                return Task.FromResult<long?>(null);
+
+            long? freeSpace = OperatingSystem.IsWindows()
+                ? WindowsVolumeResolver.GetAvailableFreeSpace(existing)
+                : new DriveInfo(existing).AvailableFreeSpace;
+            return Task.FromResult(freeSpace);
         }
         catch
         {
             return Task.FromResult<long?>(null);
         }
+    }
+
+    /// <summary>
+    /// <paramref name="path"/> or its deepest existing ancestor — a destination often does not exist
+    /// yet, and the nearest ancestor that does is on the volume it will be created on.
+    /// </summary>
+    private static string? FindDeepestExistingDirectory(string path)
+    {
+        for (var current = path; !string.IsNullOrEmpty(current); current = Path.GetDirectoryName(current))
+        {
+            if (Directory.Exists(current)) return current;
+        }
+
+        return null;
     }
 
     // Path utilities — all paths passed to public methods may be absolute or root-relative;
