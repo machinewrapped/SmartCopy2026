@@ -98,7 +98,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
                 if (_windowsVolumeId is { } cached && now < cached.ExpiresAtMs)
                     return cached.Id;
 
-                var id = FindDeepestExistingDirectory(path) is { } existing
+                var id = PathHelper.FindDeepestExistingDirectory(path) is { } existing
                     ? WindowsVolumeResolver.GetVolumeId(existing)
                     : null;
                 _windowsVolumeId = new CachedVolumeId(id, now + WindowsVolumeIdLifetimeMs);
@@ -124,7 +124,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     public ValueTask<Hardware.DriveClassification> GetClassificationAsync(CancellationToken ct = default)
     {
         if (_isNetworkPath)
-            return ValueTask.FromResult(Hardware.DriveClassification.Unknown);
+            return ValueTask.FromResult(Hardware.DriveClassification.Network);
         return Hardware.DriveClassificationRegistry.GetOrClassifyAsync(RootPath, VolumeId, ct);
     }
 
@@ -590,7 +590,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         {
             // Query the folder itself, not its drive root: a junction or mount point (locally or on an
             // SMB server) can put it on a different volume. On Unix DriveInfo statfs's the path as given.
-            if (FindDeepestExistingDirectory(RootPath) is not { } existing)
+            if (PathHelper.FindDeepestExistingDirectory(RootPath) is not { } existing)
                 return Task.FromResult<long?>(null);
 
             long? freeSpace = OperatingSystem.IsWindows()
@@ -602,20 +602,6 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         {
             return Task.FromResult<long?>(null);
         }
-    }
-
-    /// <summary>
-    /// <paramref name="path"/> or its deepest existing ancestor — a destination often does not exist
-    /// yet, and the nearest ancestor that does is on the volume it will be created on.
-    /// </summary>
-    private static string? FindDeepestExistingDirectory(string path)
-    {
-        for (var current = path; !string.IsNullOrEmpty(current); current = Path.GetDirectoryName(current))
-        {
-            if (Directory.Exists(current)) return current;
-        }
-
-        return null;
     }
 
     // Path utilities — all paths passed to public methods may be absolute or root-relative;

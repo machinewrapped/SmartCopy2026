@@ -75,6 +75,16 @@ internal static class WindowsVolumeResolver
         return RemoteVolumeId(root ?? Path.GetPathRoot(directory) ?? directory, info.VolumeSerialNumber);
     }
 
+    /// <summary>
+    /// Device path of the local volume holding <paramref name="directory"/> (<c>\\?\Volume{guid}</c>, no
+    /// trailing separator, so <c>CreateFile</c> opens the volume rather than its root folder), or null for
+    /// remote volumes or when it cannot be opened.
+    /// </summary>
+    public static string? GetLocalVolumeDevicePath(string directory) =>
+        GetVolumeId(directory) is { } id && id.StartsWith(GuidVolumePrefix, StringComparison.OrdinalIgnoreCase)
+            ? id.TrimEnd('\\')
+            : null;
+
     /// <summary><c>\\?\Volume{guid}\Users</c> → <c>\\?\Volume{guid}\</c>.</summary>
     internal static string? VolumeIdFromGuidPath(string finalPath)
     {
