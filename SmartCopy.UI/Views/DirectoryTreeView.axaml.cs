@@ -75,12 +75,15 @@ public partial class DirectoryTreeView : UserControl
             return;
         }
 
-        var added = e.AddedItems.OfType<DirectoryTreeNode>().ToList();
-        if (added.Count > 0)
+        // Prefer the clicked node while it remains selected, even when it was already selected
+        // (e.g. a Shift+Click range that ends on it only adds the nodes in between).
+        if (pressedNode is not null && DirectoryTree.SelectedItems.Contains(pressedNode))
         {
-            _viewModel.SelectedNode = pressedNode is not null && added.Contains(pressedNode)
-                ? pressedNode
-                : added[^1];
+            _viewModel.SelectedNode = pressedNode;
+        }
+        else if (e.AddedItems.OfType<DirectoryTreeNode>().LastOrDefault() is { } lastAdded)
+        {
+            _viewModel.SelectedNode = lastAdded;
         }
         else if (_viewModel.SelectedNode is not { } current || !DirectoryTree.SelectedItems.Contains(current))
         {
