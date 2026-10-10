@@ -52,8 +52,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
             CanWatch: !_isNetworkPath,
             MaxPathLength: int.MaxValue,
             CanTrash: !_isNetworkPath,
-            // Windows answers free-space queries for UNC paths the same way it does for mapped drives.
-            CanQueryFreeSpace: !_isNetworkPath || OperatingSystem.IsWindows());
+            CanQueryFreeSpace: !_isNetworkPath || VolumeResolver.CanQueryNetworkFreeSpace);
 
         _readMountPoints = readMountPoints;
     }
@@ -61,10 +60,9 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     public string RootPath { get; }
 
     /// <summary>
-    /// Identity of the volume holding <see cref="RootPath"/>, following junctions and mount points:
-    /// on Windows the volume GUID path (or share + volume serial for a mapped network drive, see
-    /// <see cref="WindowsVolumeResolver"/>), the deepest containing mount point on Unix, and null for
-    /// network paths (which have no local volume) or when the volume cannot be determined.
+    /// Identity of the volume holding <see cref="RootPath"/>, following junctions and mount points (see
+    /// <see cref="VolumeResolver.GetVolumeId"/>), and null for network paths (which have no local
+    /// volume) or when the volume cannot be determined.
     /// <para>
     /// Two providers rooted anywhere on one volume must return the same ID — the same-volume move
     /// fast path and the volume-keyed caches (<see cref="Hardware.DriveClassificationRegistry"/>,
@@ -75,47 +73,31 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     /// registry, so a cached ID would outlive the mount topology it was derived from: a device
     /// mounted at a path that was inspected while unmounted would keep reporting the parent volume,
     /// which is the dangerous direction (a false same-volume claim skips the free-space warning).
-    /// This is read a handful of times per pipeline run, not per file, so re-reading the mount table
-    /// is not worth caching around. On Windows resolving it opens a handle — a network round trip on
-    /// a mapped drive — and validation reads it several times per pass on the UI thread, so it is
-    /// memoised for a couple of seconds there.
+    /// It is read a handful of times per pipeline run, not per file; where resolving it is costly it
+    /// is reused only briefly (<see cref="VolumeResolver.VolumeIdReuseMs"/>).
     /// </para>
     /// </summary>
-    public string? VolumeId => _isNetworkPath ? null : GetVolumeIdSafe(RootPath, _readMountPoints);
+    public string? VolumeId => _isNetworkPath ? null : GetVolumeIdSafe();
 
-    private const long WindowsVolumeIdLifetimeMs = 2000;
-    private volatile CachedVolumeId? _windowsVolumeId;
+    private volatile CachedVolumeId? _volumeId;
 
     private sealed record CachedVolumeId(string? Id, long ExpiresAtMs);
 
-    private string? GetVolumeIdSafe(string path, Func<IEnumerable<string>>? readMountPoints)
+    private string? GetVolumeIdSafe()
     {
         try
         {
-            if (OperatingSystem.IsWindows())
-            {
-                var now = Environment.TickCount64;
-                if (_windowsVolumeId is { } cached && now < cached.ExpiresAtMs)
-                    return cached.Id;
+            var now = Environment.TickCount64;
+            if (_volumeId is { } cached && now < cached.ExpiresAtMs)
+                return cached.Id;
 
-                var id = PathHelper.FindDeepestExistingDirectory(path) is { } existing
-                    ? WindowsVolumeResolver.GetVolumeId(existing)
-                    : null;
-                _windowsVolumeId = new CachedVolumeId(id, now + WindowsVolumeIdLifetimeMs);
-                return id;
-            }
-
-            // On Unix `new DriveInfo(path).Name` echoes the path back rather than resolving the
-            // containing mount point, so it must be matched against the mount table instead —
-            // otherwise every folder looks like its own volume and no two paths ever compare equal.
-            var mountPoints = readMountPoints?.Invoke();
-            return mountPoints is null
-                ? MountPointResolver.Resolve(path)
-                : MountPointResolver.Resolve(path, mountPoints);
+            var id = VolumeResolver.GetVolumeId(RootPath, _readMountPoints);
+            _volumeId = new CachedVolumeId(id, now + VolumeResolver.VolumeIdReuseMs);
+            return id;
         }
         catch
         {
-            return Path.GetPathRoot(path)?.ToUpperInvariant();
+            return Path.GetPathRoot(RootPath)?.ToUpperInvariant();
         }
     }
 
@@ -597,14 +579,7 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     {
         try
         {
-            // Query the folder itself, not its drive root: a junction or mount point (locally or on an
-            // SMB server) can put it on a different volume. On Unix DriveInfo statfs's the path as given.
-            if (PathHelper.FindDeepestExistingDirectory(RootPath) is not { } existing)
-                return null;
-
-            return OperatingSystem.IsWindows()
-                ? WindowsVolumeResolver.GetAvailableFreeSpace(existing)
-                : new DriveInfo(existing).AvailableFreeSpace;
+            return VolumeResolver.GetAvailableFreeSpace(RootPath);
         }
         catch
         {
