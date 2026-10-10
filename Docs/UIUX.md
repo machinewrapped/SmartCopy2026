@@ -342,7 +342,8 @@ All critical actions must be keyboard-accessible from the initial shell:
 - **Tab** cycles between the source field, tree, file list, filter chain, pipeline steps
   and action buttons
 - **Arrow keys** navigate the tree and file list
-- **Space** toggles checkbox on the focused tree node or file list row
+- **Ctrl+Click** / **Shift+Click** (and **Shift+Arrow**) multi-select folders in the tree; the file list follows the most recently selected folder
+- **Space** toggles checkbox on the focused tree node or file list row. With several tree folders selected, it checks them all, or unchecks them all if every one is already checked
 - **Enter** expands/collapses a tree node
 - **Ctrl+A** selects all visible nodes in the current panel
 - **Delete** or **Ctrl+D** removes a selected filter card or pipeline step
