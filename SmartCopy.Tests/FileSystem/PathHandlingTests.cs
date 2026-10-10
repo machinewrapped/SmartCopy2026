@@ -1,4 +1,5 @@
 using SmartCopy.Core.FileSystem;
+using SmartCopy.Core.FileSystem.Hardware;
 using SmartCopy.Tests.TestInfrastructure;
 
 namespace SmartCopy.Tests.FileSystem;
@@ -139,7 +140,7 @@ public sealed class PathHandlingTests : IDisposable
     }
 
     [Fact]
-    public void Local_UncRoot_HasDegradedCapabilities_OnWindows()
+    public async Task Local_UncRoot_HasDegradedCapabilities_OnWindows()
     {
         if (!OperatingSystem.IsWindows())
             return;
@@ -153,6 +154,7 @@ public sealed class PathHandlingTests : IDisposable
         Assert.False(caps.CanAtomicMove);
         Assert.True(caps.CanQueryFreeSpace);
         Assert.Null(provider.VolumeId);
+        Assert.Equal(DriveClassification.Network, await provider.GetClassificationAsync());
     }
 
     [Fact]
