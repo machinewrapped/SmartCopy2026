@@ -166,6 +166,20 @@ public sealed class LocalFileSystemProviderVolumeIdTests
         Assert.True(await missing.GetAvailableFreeSpaceAsync(CancellationToken.None) > 0);
     }
 
+    /// <summary>
+    /// The UI refreshes free space directly, and on a slow or unreachable share the OS lookup blocks until
+    /// the network times out — so the query must run off the caller's thread and honour cancellation.
+    /// </summary>
+    [Fact]
+    public async Task FreeSpaceQuery_HonoursCancellation()
+    {
+        using var temp = new TempDirectory();
+        var provider = new LocalFileSystemProvider(temp.Path);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => provider.GetAvailableFreeSpaceAsync(new CancellationToken(canceled: true)));
+    }
+
     [Theory]
     [InlineData(@"\\?\Volume{6bce7ae7-56ba-46da-b01b-4d08bd04e22d}\Users\alice", @"\\?\Volume{6bce7ae7-56ba-46da-b01b-4d08bd04e22d}\")]
     [InlineData(@"\\?\Volume{6bce7ae7-56ba-46da-b01b-4d08bd04e22d}\", @"\\?\Volume{6bce7ae7-56ba-46da-b01b-4d08bd04e22d}\")]
