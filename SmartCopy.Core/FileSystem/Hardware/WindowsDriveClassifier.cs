@@ -128,8 +128,28 @@ internal sealed class WindowsDriveClassifier : IDriveClassifier
         if (IsNetworkDrive(rootPath))
             return DriveClassification.Network;
 
-        if (GetDevicePath(rootPath) is not { } devicePath)
+        // Query the volume rootPath actually lives on, so a junction or mount point onto another disk is
+        // classified as that disk. This must agree with LocalFileSystemProvider.VolumeId, which keys the
+        // classification cache — otherwise the first path classified decides the result for its volume.
+        string devicePath;
+        if (PathHelper.FindDeepestExistingDirectory(rootPath) is { } existing
+            && WindowsVolumeResolver.GetVolumeId(existing) is { } volumeId)
+        {
+            // A folder on a local drive can still resolve to a share (a directory symlink to a UNC path).
+            if (WindowsVolumeResolver.LocalVolumeDevicePath(volumeId) is not { } volumeDevicePath)
+                return DriveClassification.Network;
+
+            devicePath = volumeDevicePath;
+        }
+        else if (Path.GetPathRoot(rootPath) is { Length: > 0 } root)
+        {
+            // The volume could not be resolved; fall back to the drive the path is written under.
+            devicePath = $@"\\.\{root.TrimEnd('\\')}";
+        }
+        else
+        {
             return DriveClassification.Unknown;
+        }
 
         using SafeFileHandle handle = CreateFileW(
             devicePath,
@@ -235,24 +255,5 @@ internal sealed class WindowsDriveClassifier : IDriveClassifier
         {
             return false;
         }
-    }
-
-    /// <summary>
-    /// The volume to query: the one <paramref name="rootPath"/> actually lives on, so a junction or mount
-    /// point onto another disk is classified as that disk. This must agree with
-    /// <see cref="LocalFileSystemProvider.VolumeId"/>, which keys the classification cache — otherwise the
-    /// first path classified would decide the result for its whole volume. Falls back to the drive
-    /// letter when the volume cannot be resolved, which for a remote volume still yields Unknown.
-    /// </summary>
-    private static string? GetDevicePath(string rootPath)
-    {
-        if (PathHelper.FindDeepestExistingDirectory(rootPath) is { } existing
-            && WindowsVolumeResolver.GetLocalVolumeDevicePath(existing) is { } volumeDevicePath)
-        {
-            return volumeDevicePath;
-        }
-
-        var root = Path.GetPathRoot(rootPath);
-        return string.IsNullOrWhiteSpace(root) ? null : $@"\\.\{root.TrimEnd('\\')}";
     }
 }

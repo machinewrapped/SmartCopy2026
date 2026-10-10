@@ -192,6 +192,20 @@ public sealed class LocalFileSystemProviderVolumeIdTests
     }
 
     /// <summary>
+    /// The drive classifier opens a local volume by this path, and must classify a remote volume as
+    /// network rather than fall back to the local drive letter the path was written under.
+    /// </summary>
+    [Theory]
+    [InlineData(@"\\?\Volume{6bce7ae7-56ba-46da-b01b-4d08bd04e22d}\", @"\\?\Volume{6bce7ae7-56ba-46da-b01b-4d08bd04e22d}")]
+    [InlineData(@"\\MINIPC\Media|FE07D85A", null)]
+    public void Windows_LocalVolumeDevicePath(string volumeId, string? expected)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        Assert.Equal(expected, WindowsVolumeResolver.LocalVolumeDevicePath(volumeId));
+    }
+
+    /// <summary>
     /// A mapped drive and its UNC path are the same share, so a remote ID is keyed on the share the
     /// handle resolved to, never the drive letter it was reached through.
     /// </summary>

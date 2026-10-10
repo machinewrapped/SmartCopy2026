@@ -76,13 +76,13 @@ internal static class WindowsVolumeResolver
     }
 
     /// <summary>
-    /// Device path of the local volume holding <paramref name="directory"/> (<c>\\?\Volume{guid}</c>, no
-    /// trailing separator, so <c>CreateFile</c> opens the volume rather than its root folder), or null for
-    /// remote volumes or when it cannot be opened.
+    /// Device path for a local volume ID from <see cref="GetVolumeId"/> (<c>\\?\Volume{guid}</c>, no
+    /// trailing separator, so <c>CreateFile</c> opens the volume rather than its root folder), or null when
+    /// the ID names a remote volume.
     /// </summary>
-    public static string? GetLocalVolumeDevicePath(string directory) =>
-        GetVolumeId(directory) is { } id && id.StartsWith(GuidVolumePrefix, StringComparison.OrdinalIgnoreCase)
-            ? id.TrimEnd('\\')
+    public static string? LocalVolumeDevicePath(string volumeId) =>
+        volumeId.StartsWith(GuidVolumePrefix, StringComparison.OrdinalIgnoreCase)
+            ? volumeId.TrimEnd('\\')
             : null;
 
     /// <summary><c>\\?\Volume{guid}\Users</c> → <c>\\?\Volume{guid}\</c>.</summary>
