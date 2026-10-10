@@ -111,6 +111,10 @@ public class DirectoryTreeViewModel : ViewModelBase
         _providerRegistry = providerRegistry;
     }
 
+    /// <summary>
+    /// The active node, whose files the file list shows. With several tree nodes selected,
+    /// this is the one most recently added to the selection.
+    /// </summary>
     public DirectoryTreeNode? SelectedNode
     {
         get => _selectedNode;
