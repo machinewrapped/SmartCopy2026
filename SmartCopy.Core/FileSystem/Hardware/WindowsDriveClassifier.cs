@@ -1,8 +1,10 @@
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using Microsoft.Win32.SafeHandles;
 
 namespace SmartCopy.Core.FileSystem.Hardware;
 
+[SupportedOSPlatform("windows")]
 internal sealed class WindowsDriveClassifier : IDriveClassifier
 {
     private const uint FILE_SHARE_READ = 0x00000001;
@@ -121,12 +123,33 @@ internal sealed class WindowsDriveClassifier : IDriveClassifier
 
     private DriveClassification ClassifyInternal(string rootPath)
     {
-        var root = Path.GetPathRoot(rootPath);
-        if (string.IsNullOrWhiteSpace(root))
-            return DriveClassification.Unknown;
+        // A mapped network drive is not a UNC path, so the provider treats it as local; the storage
+        // query cannot see through the redirector, so identify it here instead.
+        if (IsNetworkDrive(rootPath))
+            return DriveClassification.Network;
 
-        string driveLetter = root.TrimEnd('\\');
-        string devicePath = $@"\\.\{driveLetter}";
+        // Query the volume rootPath actually lives on, so a junction or mount point onto another disk is
+        // classified as that disk. This must agree with LocalFileSystemProvider.VolumeId, which keys the
+        // classification cache — otherwise the first path classified decides the result for its volume.
+        string devicePath;
+        if (PathHelper.FindDeepestExistingDirectory(rootPath) is { } existing
+            && WindowsVolumeResolver.GetVolumeId(existing) is { } volumeId)
+        {
+            // A folder on a local drive can still resolve to a share (a directory symlink to a UNC path).
+            if (WindowsVolumeResolver.LocalVolumeDevicePath(volumeId) is not { } volumeDevicePath)
+                return DriveClassification.Network;
+
+            devicePath = volumeDevicePath;
+        }
+        else if (Path.GetPathRoot(rootPath) is { Length: > 0 } root)
+        {
+            // The volume could not be resolved; fall back to the drive the path is written under.
+            devicePath = $@"\\.\{root.TrimEnd('\\')}";
+        }
+        else
+        {
+            return DriveClassification.Unknown;
+        }
 
         using SafeFileHandle handle = CreateFileW(
             devicePath,
@@ -219,5 +242,18 @@ internal sealed class WindowsDriveClassifier : IDriveClassifier
         }
 
         return new DriveClassification(mediaType, interfaceType);
+    }
+
+    private static bool IsNetworkDrive(string rootPath)
+    {
+        try
+        {
+            return Path.GetPathRoot(rootPath) is { Length: > 0 } root
+                && new DriveInfo(root).DriveType == DriveType.Network;
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 }

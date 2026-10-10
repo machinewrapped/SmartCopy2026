@@ -21,6 +21,20 @@ public static class PathHelper
         return path + Path.DirectorySeparatorChar;
     }
 
+    /// <summary>
+    /// <paramref name="path"/> or its deepest existing ancestor — a destination often does not exist
+    /// yet, and the nearest ancestor that does is on the volume it will be created on.
+    /// </summary>
+    internal static string? FindDeepestExistingDirectory(string path)
+    {
+        for (var current = path; !string.IsNullOrEmpty(current); current = Path.GetDirectoryName(current))
+        {
+            if (Directory.Exists(current)) return current;
+        }
+
+        return null;
+    }
+
     public static string RemoveTrailingSeparator(string path)
     {
         if (string.IsNullOrWhiteSpace(path))
