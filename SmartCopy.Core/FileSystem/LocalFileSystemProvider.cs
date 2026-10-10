@@ -586,21 +586,29 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
     public Task<long?> GetAvailableFreeSpaceAsync(CancellationToken ct)
     {
         if (!_capabilities.CanQueryFreeSpace) return Task.FromResult<long?>(null);
+
+        // The lookup blocks — on a UNC path or mapped drive for as long as the server takes to answer —
+        // and the UI refreshes free space directly, so keep it off the caller's thread. The OS call
+        // itself cannot be interrupted; WaitAsync abandons it on cancellation instead.
+        return Task.Run(QueryAvailableFreeSpace, ct).WaitAsync(ct);
+    }
+
+    private long? QueryAvailableFreeSpace()
+    {
         try
         {
             // Query the folder itself, not its drive root: a junction or mount point (locally or on an
             // SMB server) can put it on a different volume. On Unix DriveInfo statfs's the path as given.
             if (FindDeepestExistingDirectory(RootPath) is not { } existing)
-                return Task.FromResult<long?>(null);
+                return null;
 
-            long? freeSpace = OperatingSystem.IsWindows()
+            return OperatingSystem.IsWindows()
                 ? WindowsVolumeResolver.GetAvailableFreeSpace(existing)
                 : new DriveInfo(existing).AvailableFreeSpace;
-            return Task.FromResult(freeSpace);
         }
         catch
         {
-            return Task.FromResult<long?>(null);
+            return null;
         }
     }
 
