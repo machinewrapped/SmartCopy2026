@@ -145,11 +145,14 @@ jobs:
         if: steps.winget_token.outputs.enabled != 'true'
         run: echo "::notice::WINGET_TOKEN not set. Skipping Winget submission."
 
-      - uses: vedantmgoyal9/winget-releaser@a8fff44b123f115ce4c21543edf8b677376fc7e0 # main @ 2026-03-15; includes komac sync-fork (no tagged release has it yet)
+      - uses: vedantmgoyal9/winget-releaser@a8fff44b123f115ce4c21543edf8b677376fc7e0 # pinned to main: includes komac sync-fork (no tagged release has it yet)
         if: steps.winget_token.outputs.enabled == 'true'
         with:
           identifier: machinewrapped.SmartCopy
           installers-regex: 'SmartCopy-.*-win-x64\.zip$'
+          # Classic PAT with `public_repo` + `workflow` scopes. Without `workflow`, komac sync-fork
+          # fails with "does not have the correct permissions to execute `UpdateRef`" whenever
+          # upstream winget-pkgs has changed its workflow files.
           token: ${{ secrets.WINGET_TOKEN }}
 
   homebrew:
