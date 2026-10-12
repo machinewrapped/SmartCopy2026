@@ -174,26 +174,38 @@ public partial class PathPickerControl : UserControl
 
     private async void OnBrowseClick(object? sender, RoutedEventArgs e)
     {
-        if (TopLevel.GetTopLevel(this) is not TopLevel topLevel)
-            return;
-
-        var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        try
         {
-            Title = BrowseDialogTitle,
-            AllowMultiple = false,
-        });
+            if (TopLevel.GetTopLevel(this) is not TopLevel topLevel)
+                return;
 
-        if (folders is not { Count: > 0 })
-            return;
+            var startLocation = await PathPickerBrowseLocation.ResolveAsync(
+                topLevel.StorageProvider, (DataContext as PathPickerViewModel)?.Path);
 
-        var selectedUri = folders[0].Path;
-        if (!selectedUri.IsAbsoluteUri || !selectedUri.IsFile)
-            return;
+            var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            {
+                Title = BrowseDialogTitle,
+                SuggestedStartLocation = startLocation,
+                AllowMultiple = false,
+            });
 
-        if (DataContext is PathPickerViewModel vm)
+            if (folders is not { Count: > 0 })
+                return;
+
+            var selectedUri = folders[0].Path;
+            if (!selectedUri.IsAbsoluteUri || !selectedUri.IsFile)
+                return;
+
+            if (DataContext is PathPickerViewModel vm)
+            {
+                vm.Path = selectedUri.LocalPath;
+                vm.ApplyPathCommand.Execute(null);
+            }
+        }
+        catch (Exception ex)
         {
-            vm.Path = selectedUri.LocalPath;
-            vm.ApplyPathCommand.Execute(null);
+            if (DataContext is PathPickerViewModel vm)
+                vm.ValidationMessage = $"Unable to browse: {ex.Message}";
         }
     }
 }

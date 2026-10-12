@@ -134,38 +134,51 @@ public partial class FilePathPickerControl : UserControl
 
     private async void OnBrowseClick(object? sender, RoutedEventArgs e)
     {
-        if (TopLevel.GetTopLevel(this) is not TopLevel topLevel) return;
-
-        if (IsFileSave)
+        try
         {
-            var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
-            {
-                Title = BrowseDialogTitle,
-                SuggestedFileName = SuggestedFileName,
-                DefaultExtension = DefaultExtension,
-                FileTypeChoices = FileTypeChoices,
-            });
+            if (TopLevel.GetTopLevel(this) is not TopLevel topLevel) return;
 
-            if (file is not null && DataContext is PathPickerViewModel vm)
+            var startLocation = await PathPickerBrowseLocation.ResolveAsync(
+                topLevel.StorageProvider, (DataContext as PathPickerViewModel)?.Path, isFilePath: true);
+
+            if (IsFileSave)
             {
-                vm.Path = file.Path.LocalPath;
-                vm.ApplyPathCommand.Execute(null);
+                var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+                {
+                    Title = BrowseDialogTitle,
+                    SuggestedStartLocation = startLocation,
+                    SuggestedFileName = SuggestedFileName,
+                    DefaultExtension = DefaultExtension,
+                    FileTypeChoices = FileTypeChoices,
+                });
+
+                if (file is not null && DataContext is PathPickerViewModel vm)
+                {
+                    vm.Path = file.Path.LocalPath;
+                    vm.ApplyPathCommand.Execute(null);
+                }
+            }
+            else
+            {
+                var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+                {
+                    Title = BrowseDialogTitle,
+                    SuggestedStartLocation = startLocation,
+                    AllowMultiple = false,
+                    FileTypeFilter = FileTypeChoices,
+                });
+
+                if (files is { Count: > 0 } && DataContext is PathPickerViewModel vm)
+                {
+                    vm.Path = files[0].Path.LocalPath;
+                    vm.ApplyPathCommand.Execute(null);
+                }
             }
         }
-        else
+        catch (Exception ex)
         {
-            var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-            {
-                Title = BrowseDialogTitle,
-                AllowMultiple = false,
-                FileTypeFilter = FileTypeChoices,
-            });
-
-            if (files is { Count: > 0 } && DataContext is PathPickerViewModel vm)
-            {
-                vm.Path = files[0].Path.LocalPath;
-                vm.ApplyPathCommand.Execute(null);
-            }
+            if (DataContext is PathPickerViewModel vm)
+                vm.ValidationMessage = $"Unable to browse: {ex.Message}";
         }
     }
 }
