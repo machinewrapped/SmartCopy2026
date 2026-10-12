@@ -41,7 +41,7 @@ public sealed class DirectoryScanner
                 continue;
             }
 
-            var children = await _provider.GetChildrenAsync(currentDirectory.FullPath, ct);
+            var children = SortForDisplay(await _provider.GetChildrenAsync(currentDirectory.FullPath, ct));
             directoriesScanned++;
             progress?.Report(new ScanProgress(nodesDiscovered, directoriesScanned, currentDirectory.FullPath));
 
@@ -104,7 +104,7 @@ public sealed class DirectoryScanner
         if (!node.IsDirectory || !ShouldTraverse(options, node) || (options.MaxDepth.HasValue && depth >= options.MaxDepth.Value))
             return new ScannedNode(node, []);
 
-        var rawChildren = await _provider.GetChildrenAsync(node.FullPath, ct);
+        var rawChildren = SortForDisplay(await _provider.GetChildrenAsync(node.FullPath, ct));
         var children = new List<ScannedNode>();
         foreach (var child in rawChildren)
         {
@@ -115,6 +115,20 @@ public sealed class DirectoryScanner
                 children.Add(new ScannedNode(child, []));
         }
         return new ScannedNode(node, [.. children]);
+    }
+
+    /// <summary>
+    /// Providers return children in whatever order the underlying storage yields (unsorted on
+    /// FAT/exFAT, ext4, APFS and many network shares), so the tree imposes its own: directories
+    /// first, then <see cref="NaturalNameComparer"/> order.
+    /// </summary>
+    private static FileSystemNode[] SortForDisplay(IReadOnlyList<FileSystemNode> children)
+    {
+        var sorted = children.ToArray();
+        Array.Sort(sorted, static (a, b) => a.IsDirectory != b.IsDirectory
+            ? (a.IsDirectory ? -1 : 1)
+            : NaturalNameComparer.Instance.Compare(a.Name, b.Name));
+        return sorted;
     }
 
     private static bool ShouldIncludeNode(FileSystemNode node, ScanOptions options)
