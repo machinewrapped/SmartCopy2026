@@ -23,6 +23,15 @@ public sealed class OperationProgressViewModelTests
         Assert.Equal(expected, vm.TransferSpeed);
     }
 
+    [Theory]
+    [InlineData(65, "01:05")]
+    [InlineData(5 * 3600 + 18 * 60 + 20, "5:18:20")]
+    [InlineData(27 * 3600, "27:00:00")]
+    public void FormatRemaining_KeepsHours(int seconds, string expected)
+    {
+        Assert.Equal(expected, OperationProgressViewModel.FormatRemaining(TimeSpan.FromSeconds(seconds)));
+    }
+
     [Fact]
     public void Update_DropsSamplesOlderThanTenSeconds()
     {

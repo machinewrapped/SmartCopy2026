@@ -114,10 +114,16 @@ public partial class OperationProgressViewModel : ViewModelBase
         PercentComplete = progress.TotalBytes <= 0
             ? 0
             : Math.Round((double)progress.TotalBytesCompleted / progress.TotalBytes * 100, 2);
-        TimeRemaining = $"{progress.EstimatedRemaining:mm\\:ss} left";
+        TimeRemaining = $"{FormatRemaining(progress.EstimatedRemaining)} left";
         if (!IsPaused)
             UpdateTransferSpeed(progress);
     }
+
+    // "mm:ss" alone silently drops whole hours, so long copies would read as minutes.
+    internal static string FormatRemaining(TimeSpan remaining) =>
+        remaining.TotalHours >= 1
+            ? $"{(int)remaining.TotalHours}:{remaining:mm\\:ss}"
+            : $"{remaining:mm\\:ss}";
 
     /// <summary>
     /// Re-evaluates the rate against wall-clock time rather than against the elapsed time carried by
