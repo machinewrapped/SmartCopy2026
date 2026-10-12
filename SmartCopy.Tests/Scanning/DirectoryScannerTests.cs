@@ -50,6 +50,28 @@ public sealed class DirectoryScannerTests
     }
 
     [Fact]
+    public async Task ScanAsync_SortsSiblingsInNaturalOrder()
+    {
+        // The memory provider returns ordinal order ("disc10" before "disc2"); the scanner must re-sort.
+        var provider = MemoryFileSystemFixtures.Create(fixture => fixture
+            .WithDirectory("/root")
+            .WithDirectory("/root/disc10")
+            .WithDirectory("/root/disc2")
+            .WithFile("/root/track10.mp3", "x"u8)
+            .WithFile("/root/track9.mp3", "x"u8));
+
+        var scanner = new DirectoryScanner(provider);
+        DirectoryNode? root = null;
+        await foreach (var node in scanner.ScanAsync("/root", new ScanOptions { LazyExpand = false, IncludeHidden = true }))
+        {
+            root ??= (DirectoryNode)node;
+        }
+
+        Assert.Equal(["disc2", "disc10"], root!.Children.Select(c => c.Name));
+        Assert.Equal(["track9.mp3", "track10.mp3"], root.Files.Select(f => f.Name));
+    }
+
+    [Fact]
     public async Task ScanAsync_RespectsMaxDepth()
     {
         var provider = MemoryFileSystemFixtures.Create(fixture => fixture
