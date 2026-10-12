@@ -78,10 +78,16 @@ jobs:
 
       - name: Install AppImage dependencies
         if: matrix.rid == 'linux-x64'
-        run: sudo apt-get install -y squashfs-tools libfuse2
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y squashfs-tools
 
       - name: Build AppImage
         if: matrix.rid == 'linux-x64'
+        env:
+          # appimagetool is itself an AppImage; extracting it avoids a FUSE dependency on the runner
+          # (libfuse2 was renamed in Ubuntu 24.04 and is not guaranteed on later images).
+          APPIMAGE_EXTRACT_AND_RUN: 1
         run: |
           PUBLISH_DIR="artifacts/publish/SmartCopy.App/release_linux-x64"
           mkdir -p AppDir
