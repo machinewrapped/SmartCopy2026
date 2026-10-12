@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:SmartCopy.UI.ViewModels"
              xmlns:conv="clr-namespace:SmartCopy.UI.Converters"
+             xmlns:views="clr-namespace:SmartCopy.UI.Views"
              x:Class="SmartCopy.UI.Views.FileListView"
              x:DataType="vm:FileListViewModel">
 
@@ -40,7 +41,8 @@
                    </DataTemplate>
                </DataGridTemplateColumn.CellTemplate>
            </DataGridTemplateColumn>
-           <DataGridTemplateColumn Header="Name" Width="*" IsReadOnly="True" SortMemberPath="Name">
+           <DataGridTemplateColumn Header="Name" Width="*" IsReadOnly="True" SortMemberPath="Name"
+                                   CustomSortComparer="{x:Static views:NodeNameSortComparer.Instance}">
                <DataGridTemplateColumn.CellTemplate>
                    <DataTemplate>
                        <TextBlock Text="{Binding Name}"

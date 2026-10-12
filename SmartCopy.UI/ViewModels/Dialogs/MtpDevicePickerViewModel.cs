@@ -3,6 +3,7 @@ using System.Runtime.Versioning;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MediaDevices;
+using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 
 namespace SmartCopy.UI.ViewModels.Dialogs;
@@ -158,7 +159,7 @@ public partial class MtpDevicePickerViewModel : ObservableObject
 
             Items.Add(new MtpPickerItem { Kind = MtpPickerItem.ItemKind.Back, DisplayName = backLabel });
 
-            foreach (var node in children.Where(n => n.IsDirectory).OrderBy(n => n.Name))
+            foreach (var node in children.Where(n => n.IsDirectory).OrderBy(n => n.Name, NaturalNameComparer.Instance))
                 Items.Add(new MtpPickerItem { Kind = MtpPickerItem.ItemKind.Folder, DisplayName = node.Name, FolderPath = node.FullPath });
 
             LocationHeader = _browsingProvider.SplitPath(_currentPath).LastOrDefault() ?? "Device";

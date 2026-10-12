@@ -5,8 +5,8 @@ namespace SmartCopy.Core.Scanning;
 
 public static class DirectoryTreePatcher
 {
-    // Case sensitive sort for UI display only
-    private static readonly StringComparer SortComparer = StringComparer.OrdinalIgnoreCase;
+    // Must match the order DirectoryScanner gives siblings, or inserts land out of place
+    private static readonly IComparer<string> SortComparer = NaturalNameComparer.Instance;
 
     public static DirectoryTreePatchApplyResult Apply(
         DirectoryNode rootNode,

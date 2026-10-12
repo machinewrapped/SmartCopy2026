@@ -24,6 +24,10 @@
 8. **Device picker** — MTP devices appear in folder browser dialog, when supported
 9. **Keyboard-first** — every action reachable via keyboard; focus indicators on all controls
 
+### Path Picker Browsing
+
+Browse dialogs start at the path picker's current folder. File open/save dialogs start in the containing folder of the current file path (or the current folder if one is entered). Empty, invalid, unsupported, or unavailable locations fall back to the native dialog's default location.
+
 ## 2. Main Window Layout
 
 `MainWindow.axaml` is a 6 row grid:
@@ -154,6 +158,10 @@ A **modal `Window`** opened via "＋ Configure..." or the edit pencil on any car
 │            [Cancel]      [OK ✓]         │  ← OK disabled when !IsValid
 └─────────────────────────────────────────┘
 ```
+
+### Sort Order in Tree / File List
+
+- Siblings are always shown folders first, then in natural, case-insensitive order (`disc2` before `disc10`), with names differing only by case kept adjacent (`Photos` before `photos`), regardless of the order the filesystem returns them. `DirectoryScanner` sorts; `DirectoryTreePatcher` inserts watcher additions with the same `NaturalNameComparer`.
 
 ### Filter Results in Tree / File List
 
