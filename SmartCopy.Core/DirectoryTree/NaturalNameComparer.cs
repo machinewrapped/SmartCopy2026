@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace SmartCopy.Core.DirectoryTree;
 
 /// <summary>
@@ -52,12 +54,23 @@ public sealed class NaturalNameComparer : IComparer<string>
                 continue;
             }
 
-            var byChar = ignoreCase
-                ? char.ToUpperInvariant(x[i]).CompareTo(char.ToUpperInvariant(y[j]))
-                : x[i].CompareTo(y[j]);
-            if (byChar != 0) return byChar;
-            i++;
-            j++;
+            if (!ignoreCase)
+            {
+                var byChar = x[i].CompareTo(y[j]);
+                if (byChar != 0) return byChar;
+                i++;
+                j++;
+                continue;
+            }
+
+            // Fold whole scalars: upper-casing surrogate halves one at a time leaves cased characters
+            // outside the BMP (e.g. Deseret) unchanged, splitting their case variants apart.
+            Rune.DecodeFromUtf16(x.AsSpan(i), out var runeX, out var lengthX);
+            Rune.DecodeFromUtf16(y.AsSpan(j), out var runeY, out var lengthY);
+            var byRune = Rune.ToUpperInvariant(runeX).CompareTo(Rune.ToUpperInvariant(runeY));
+            if (byRune != 0) return byRune;
+            i += lengthX;
+            j += lengthY;
         }
 
         var byRemaining = (x.Length - i).CompareTo(y.Length - j);
