@@ -66,7 +66,15 @@ public class FileListViewModel : ViewModelBase
 
         SetCurrentDirectoryNode(directoryNode);
 
-        await ApplyChainToFilesAsync(filterChain, pathResolver, ct);
+        try
+        {
+            await ApplyChainToFilesAsync(filterChain, pathResolver, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Superseded by a newer load, which now owns the file list. Not the caller's
+            // cancellation, so it must not abort whatever operation the caller is part of.
+        }
     }
 
     public FileNode? FindFile(string fullPath)
