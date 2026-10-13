@@ -988,20 +988,26 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
             RecordRecentSource(normalizedPath);
 
-            // Apply filter chain
-            await ApplyFiltersAsync();
+            // Apply filter chain. Pass the scan token so a newer source change stops this setup
+            // rather than letting it continue against the new tree.
+            await ApplyFiltersAsync(ct);
 
             StartDirectoryWatcherIfSupported();
 
             if (DirectoryTree.SourceProvider is { } sp)
                 await Pipeline.SetSourceContext(sp);
 
+            ct.ThrowIfCancellationRequested();
             _settings.LastSourcePath = normalizedPath;
             await _settingsStore.SaveAsync(_settings);
         }
         catch (OperationCanceledException)
         {
-            // Scan was cancelled (new path committed or user pressed Cancel).+
+            // A newer source change superseded this one and now owns the UI state.
+            if (_scanCts?.Token != ct)
+                return;
+
+            // The user pressed Cancel.
             SourcePathValidationMessage = "Directory scan was cancelled before it was complete";
             LogPanel.AddEntry(SourcePathValidationMessage, LogLevel.Warning);
         }
