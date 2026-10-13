@@ -29,6 +29,28 @@ public sealed class FileListViewModelTests
         Assert.Empty(vm.VisibleFiles);
     }
 
+    // ── LoadFilesForNodeAsync ─────────────────────────────────────────────────
+
+    [Fact]
+    public async Task LoadFilesForNodeAsync_SupersededLoad_CompletesWithoutThrowing()
+    {
+        var provider = MemoryFileSystemFixtures.Create(f => f
+            .WithDirectory("/music")
+            .WithFile("/music/track.mp3", new byte[100]));
+        var root = await provider.BuildDirectoryTree();
+        var musicDir = root.Children.Single(n => n.Name == "music") as DirectoryNode;
+        Assert.NotNull(musicDir);
+
+        var vm = new FileListViewModel();
+        var context = new TestAppContext();
+        var firstLoad = vm.LoadFilesForNodeAsync(musicDir, new FilterChain([new BlockingFilter()]), context);
+
+        await vm.LoadFilesForNodeAsync(musicDir, FilterChain.Empty, context);
+
+        await firstLoad;
+        Assert.NotEmpty(vm.VisibleFiles);
+    }
+
     // ── ClearIfUnder ──────────────────────────────────────────────────────────
 
     [Fact]
@@ -120,5 +142,19 @@ public sealed class FileListViewModelTests
             musicDir));
 
         Assert.Contains(vm.VisibleFiles, file => file.Name == "bonus.mp3");
+    }
+
+    /// <summary>Never returns until cancelled, like a slow mirror check against the destination.</summary>
+    private sealed class BlockingFilter() : FilterBase("Blocking", FilterMode.Only)
+    {
+        public override string Summary => Name;
+        public override string Description => Name;
+
+        public override async ValueTask<bool> MatchesAsync(
+            DirectoryTreeNode node, IPathResolver context, CancellationToken ct = default)
+        {
+            await Task.Delay(Timeout.Infinite, ct);
+            return true;
+        }
     }
 }

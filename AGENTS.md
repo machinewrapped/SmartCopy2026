@@ -46,7 +46,7 @@ Four projects in `SmartCopy2026.slnx`:
 - **SmartCopy.Core** — Pure business logic, no UI references.
 - **SmartCopy.App** — Avalonia application host.
 - **SmartCopy.UI** — MVVM layer.
-- **SmartCopy.Tests** — xUnit + NSubstitute. Uses `MemoryFileSystemProvider` for fast, hermetic tests.
+- **SmartCopy.Tests** — xUnit, no mocking library; hand-written fakes live in `TestInfrastructure/`. Uses `MemoryFileSystemProvider` for fast, hermetic tests.
 
 ## Key abstractions
 
