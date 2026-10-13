@@ -147,6 +147,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 #endif
     private IDirectoryWatcher? _directoryWatcher;
     private CancellationTokenSource? _filterCts;
+    private CancellationTokenSource? _filterPassCts;
     private CancellationTokenSource? _scanCts;
     private string _lastCommittedSourcePath = string.Empty;
 
@@ -1152,20 +1153,41 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         catch (OperationCanceledException) { }
     }
 
+    /// <summary>
+    /// Applies the live filter chain to the file list and tree. Each pass supersedes any still in
+    /// flight, so a slow pass for an older chain cannot finish after a newer one and overwrite its
+    /// results. A superseded pass returns quietly; only <paramref name="ct"/> cancellation throws.
+    /// </summary>
     private async Task ApplyFiltersAsync(CancellationToken ct = default)
     {
+        _filterPassCts?.Cancel();
+        _filterPassCts?.Dispose();
+        _filterPassCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var passCt = _filterPassCts.Token;
+
         var chain = FilterChain.BuildLiveChain();
 
-        if (DirectoryTree.SelectedNode is DirectoryNode selectedDirectory)
+        try
         {
-            await FileList.LoadFilesForNodeAsync(selectedDirectory, chain, _appContext);
-        }
-        else
-        {
-            await FileList.ApplyChainToFilesAsync(chain, _appContext, ct);
-        }
+            if (DirectoryTree.SelectedNode is DirectoryNode selectedDirectory)
+            {
+                // Returns early if a node click supersedes the load; that load uses the same live
+                // chain, so this pass still carries on to the tree.
+                await FileList.LoadFilesForNodeAsync(selectedDirectory, chain, _appContext);
+            }
+            else
+            {
+                await FileList.ApplyChainToFilesAsync(chain, _appContext, passCt);
+            }
 
-        await DirectoryTree.ApplyFiltersAsync(chain, _appContext, ct);
+            passCt.ThrowIfCancellationRequested();
+            await DirectoryTree.ApplyFiltersAsync(chain, _appContext, passCt);
+        }
+        catch (OperationCanceledException) when (passCt.IsCancellationRequested && !ct.IsCancellationRequested)
+        {
+            // Superseded by a newer pass, which now owns the filter results.
+            return;
+        }
 
         RefreshIdleStats();
     }
@@ -1637,6 +1659,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         DisposeDirectoryWatcher();
         _scanCts?.Dispose();
         _filterCts?.Dispose();
+        _filterPassCts?.Dispose();
         _providerRegistry.Dispose();
         GC.SuppressFinalize(this);
     }
