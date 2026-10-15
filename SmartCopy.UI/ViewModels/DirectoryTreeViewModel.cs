@@ -140,6 +140,27 @@ public class DirectoryTreeViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Scans the current root again, keeping the checked nodes, expanded folders and active node
+    /// that still exist.
+    /// </summary>
+    public async Task RescanAsync(ScanOptions scanOptions, CancellationToken ct = default)
+    {
+        if (RootNode is not { } root)
+            return;
+
+        var state = DirectoryTreeState.Capture(root, SelectedNode);
+        SelectedNode = null;
+
+        await InitializeAsync(root.FullPath, scanOptions, ct);
+
+        if (RootNode is { } newRoot)
+        {
+            SelectedNode = state.Restore(newRoot) ?? newRoot;
+            newRoot.BuildStats();
+        }
+    }
+
+    /// <summary>
     /// Applies <paramref name="chain"/> to every node in the tree, setting <see cref="DirectoryTreeNode.FilterResult"/>/>.
     /// </summary>
     public async Task ApplyFiltersAsync(

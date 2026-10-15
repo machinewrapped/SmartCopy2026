@@ -982,7 +982,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
             FileList.Clear();
 
-            await DirectoryTree.ChangeRootAsync(normalizedPath, BuildScanOptions(), ct);
+            if (normalizedPath == previousSourcePath)
+                await DirectoryTree.RescanAsync(BuildScanOptions(), ct);
+            else
+                await DirectoryTree.ChangeRootAsync(normalizedPath, BuildScanOptions(), ct);
 
             _lastCommittedSourcePath = normalizedPath;
             SourcePathValidationMessage = string.Empty;
