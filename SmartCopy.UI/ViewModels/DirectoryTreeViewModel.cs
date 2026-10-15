@@ -148,7 +148,7 @@ public class DirectoryTreeViewModel : ViewModelBase
         if (RootNode is not { } root)
             return;
 
-        var state = DirectoryTreeState.Capture(root, SelectedNode);
+        var state = DirectoryTreeState.Capture(root, SelectedNode, SourceProvider?.PathComparer ?? StringComparer.Ordinal);
         SelectedNode = null;
 
         await InitializeAsync(root.FullPath, scanOptions, ct);

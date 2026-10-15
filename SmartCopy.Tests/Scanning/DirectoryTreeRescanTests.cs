@@ -38,7 +38,10 @@ public sealed class DirectoryTreeRescanTests
         vm.SelectedNode = stones;
 
         await File.WriteAllTextAsync(Path.Combine(beatlesPath, "yesterday.mp3"), "a");
+        // A checked file replaced by a folder of the same name must not pass its check on
         File.Delete(Path.Combine(stonesPath, "gone.mp3"));
+        Directory.CreateDirectory(Path.Combine(stonesPath, "gone.mp3"));
+        await File.WriteAllTextAsync(Path.Combine(stonesPath, "gone.mp3", "unrelated.mp3"), "a");
 
         await vm.RescanAsync(new ScanOptions());
 
@@ -52,6 +55,7 @@ public sealed class DirectoryTreeRescanTests
 
         Assert.Equal(CheckState.Checked, root.FindNodeByPathSegments("stones", "angie.mp3")!.CheckState);
         Assert.Equal(CheckState.Unchecked, root.FindNodeByPathSegments("stones", "wild horses.mp3")!.CheckState);
+        Assert.Equal(CheckState.Unchecked, root.FindNodeByPathSegments("stones", "gone.mp3", "unrelated.mp3")!.CheckState);
         Assert.Equal(CheckState.Indeterminate, newStones.CheckState);
         Assert.True(newStones.IsExpanded);
         Assert.Same(newStones, vm.SelectedNode);
