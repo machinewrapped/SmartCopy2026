@@ -582,7 +582,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         if (Pipeline.IsRunning) return;
         var path = SourcePath.Trim();
         if (string.IsNullOrWhiteSpace(path)) return;
-        await ApplySourcePathCoreAsync(path);
+        await ApplySourcePathCoreAsync(path, forceRescan: true);
     }
 
     [RelayCommand]
@@ -955,16 +955,16 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         await ApplySourcePathCoreAsync(oldDestination);
     }
 
-    private async Task ApplySourcePathCoreAsync(string path)
+    private async Task ApplySourcePathCoreAsync(string path, bool forceRescan = false)
     {
         var normalizedPath = PathHelper.NormalizeUserPath(path);
 
         if (string.IsNullOrWhiteSpace(normalizedPath))
             return;
 
-        // Check if the path has actually changed        
+        // Check if the path has actually changed; an explicit rescan reloads the same path
         var previousSourcePath = DirectoryTree.SourcePath;
-        if (normalizedPath == previousSourcePath)
+        if (!forceRescan && normalizedPath == previousSourcePath)
             return;
 
         // Cancel any in-progress scan and start a fresh token for this one.
