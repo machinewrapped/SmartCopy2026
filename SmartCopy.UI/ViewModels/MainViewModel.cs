@@ -994,7 +994,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         {
             DisposeDirectoryWatcher();
 
-            SourcePath = normalizedPath;
+            // A rescan leaves any uncommitted draft in the source box alone
+            if (!forceRescan)
+                SourcePath = normalizedPath;
             SourcePathValidationMessage = string.Empty;
 
             FileList.Clear();
