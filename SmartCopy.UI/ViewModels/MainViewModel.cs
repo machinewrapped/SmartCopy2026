@@ -1012,8 +1012,19 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             RecordRecentSource(normalizedPath);
 
             // Apply filter chain. Pass the scan token so a newer source change stops this setup
-            // rather than letting it continue against the new tree.
-            await ApplyFiltersAsync(ct);
+            // rather than letting it continue against the new tree. New nodes count as included
+            // until evaluated, so the pipeline stays blocked until the pass finishes.
+            Pipeline.IsScanning = true;
+            try
+            {
+                await ApplyFiltersAsync(ct);
+            }
+            finally
+            {
+                // A newer source change owns the pipeline state if it superseded this one
+                if (_scanCts?.Token == ct)
+                    Pipeline.IsScanning = DirectoryTree.IsLoading;
+            }
 
             StartDirectoryWatcherIfSupported();
 
