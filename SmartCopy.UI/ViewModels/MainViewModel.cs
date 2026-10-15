@@ -1092,17 +1092,21 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     private async Task RetireDirectoryWatcherAsync(IDirectoryWatcher watcher)
     {
-        // Its changes belong to this tree only: if a source change or another rescan replaces it
-        // meanwhile, they are discarded rather than applied by relative path to the wrong tree.
+        // Its changes belong to this tree only; see ApplyPendingWatcherBatchesAsync
         var tree = DirectoryTree.RootNode;
         DetachWatcher(watcher);
 
         try
         {
-            // Changes it saw before stopping may still be in its debounce window
-            await Task.Delay(TimeSpan.FromSeconds(1));
-            if (tree is not null && ReferenceEquals(DirectoryTree.RootNode, tree))
-                await ApplyPendingWatcherBatchesAsync(watcher);
+            // Collect everything it saw before stopping, including changes still in its debounce
+            // window or mid-build, and wait for any other reconciliation rather than skip.
+            await watcher.FlushAsync();
+            if (tree is not null)
+                await ApplyPendingWatcherBatchesAsync(watcher, onlyForTree: tree);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to collect changes from a retired watcher");
         }
         finally
         {
@@ -1814,7 +1818,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Applies <paramref name="source"/>'s pending batches, or the current watcher's.</summary>
-    private async Task ApplyPendingWatcherBatchesAsync(IDirectoryWatcher? source = null, CancellationToken ct = default)
+    /// <remarks>
+    /// With <paramref name="onlyForTree"/> (a retired watcher), the batches are applied only if that
+    /// tree is still loaded once it is this drain's turn; a source change or rescan since then
+    /// owns the tree, and batches matched by relative path would land in the wrong one.
+    /// </remarks>
+    private async Task ApplyPendingWatcherBatchesAsync(
+        IDirectoryWatcher? source = null, DirectoryNode? onlyForTree = null, CancellationToken ct = default)
     {
         // During a rescan the tree is being rebuilt; batches wait until it is ready
         if (Pipeline.IsRunning || DirectoryTree.IsLoading)
@@ -1822,13 +1832,25 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        if (!await _watcherApplyGate.WaitAsync(0, ct))
+        // A drain in progress loops until the current watcher is empty, so others can skip; a
+        // retired watcher's batches are only collected here, so its drain waits its turn.
+        if (onlyForTree is not null)
+        {
+            await _watcherApplyGate.WaitAsync(ct);
+        }
+        else if (!await _watcherApplyGate.WaitAsync(0, ct))
         {
             return;
         }
 
         try
         {
+            if (onlyForTree is not null
+                && (!ReferenceEquals(DirectoryTree.RootNode, onlyForTree) || Pipeline.IsRunning || DirectoryTree.IsLoading))
+            {
+                return;
+            }
+
             var appliedAny = false;
             var watcher = source ?? _directoryWatcher;
             if (watcher is null)

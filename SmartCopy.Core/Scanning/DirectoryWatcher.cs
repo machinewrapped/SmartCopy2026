@@ -68,6 +68,12 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
 
     public void Stop() => _watcher.EnableRaisingEvents = false;
 
+    public async Task FlushAsync()
+    {
+        _debounceTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        await BuildAndEmitPendingBatchesAsync(_disposeCts.Token, waitForBuildInProgress: true);
+    }
+
     public IReadOnlyList<DirectoryWatcherBatch> DrainPendingBatches()
     {
         lock (_sync)
@@ -186,9 +192,15 @@ public sealed class DirectoryWatcher : IDirectoryWatcher
         _ = BuildAndEmitPendingBatchesAsync(_disposeCts.Token);
     }
 
-    private async Task BuildAndEmitPendingBatchesAsync(CancellationToken ct)
+    private async Task BuildAndEmitPendingBatchesAsync(CancellationToken ct, bool waitForBuildInProgress = false)
     {
-        if (!await _buildGate.WaitAsync(0, ct))
+        // A build in progress picks up paths queued meanwhile, so the timer can skip; a flush
+        // must wait for it, then build whatever remains.
+        if (waitForBuildInProgress)
+        {
+            await _buildGate.WaitAsync(ct);
+        }
+        else if (!await _buildGate.WaitAsync(0, ct))
         {
             return;
         }
