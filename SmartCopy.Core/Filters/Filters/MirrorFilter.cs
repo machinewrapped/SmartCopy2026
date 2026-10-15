@@ -57,11 +57,8 @@ public sealed class MirrorFilter : FilterBase, IPipelineAwareFilter
             return UseAutomaticPath && Mode == FilterMode.Only;
         }
 
-        // TryGetNodeAsync answers existence and size together: one round trip per file on a share.
         var comparePath = comparisonProvider.JoinPath(effectivePath, node.RelativePathSegments);
-        var targetNode = await comparisonProvider.TryGetNodeAsync(comparePath, ct);
-
-        if (targetNode is null)
+        if (!await MatchesMirrorEntryAsync(comparisonProvider, comparePath, node, ct))
         {
             return false;
         }
@@ -74,18 +71,35 @@ public sealed class MirrorFilter : FilterBase, IPipelineAwareFilter
             foreach (var file in dirNode.Files)
             {
                 var fileMirrorPath = comparisonProvider.JoinPath(effectivePath, file.RelativePathSegments);
-                var mirrorFile = await comparisonProvider.TryGetNodeAsync(fileMirrorPath, ct);
-                if (mirrorFile is null
-                    || (CompareMode == MirrorCompareMode.NameAndSize && mirrorFile.Size != file.Size))
+                if (!await MatchesMirrorEntryAsync(comparisonProvider, fileMirrorPath, file, ct))
                 {
                     return false;
                 }
             }
-
-            return true;
         }
 
-        return CompareMode == MirrorCompareMode.NameOnly || targetNode.Size == node.Size;
+        return true;
+    }
+
+    /// <summary>
+    /// Whether the entry at <paramref name="mirrorPath"/> matches <paramref name="node"/>. Existence
+    /// alone needs only <see cref="IFileSystemProvider.ExistsAsync"/>, which some providers (MTP)
+    /// answer more cheaply than metadata; a size comparison uses
+    /// <see cref="IFileSystemProvider.TryGetNodeAsync"/> to get existence and size together.
+    /// </summary>
+    private async ValueTask<bool> MatchesMirrorEntryAsync(
+        IFileSystemProvider provider,
+        string mirrorPath,
+        DirectoryTreeNode node,
+        CancellationToken ct)
+    {
+        if (CompareMode == MirrorCompareMode.NameOnly || node is DirectoryNode)
+        {
+            return await provider.ExistsAsync(mirrorPath, ct);
+        }
+
+        var mirrorNode = await provider.TryGetNodeAsync(mirrorPath, ct);
+        return mirrorNode is not null && mirrorNode.Size == node.Size;
     }
 
     private static IFileSystemProvider? ResolveComparisonProvider(IPathResolver resolver, string path)
