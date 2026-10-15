@@ -589,7 +589,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// </summary>
     public bool CanRescan => !Pipeline.IsRunning && !DirectoryTree.IsLoading;
 
-    [RelayCommand]
+    // Concurrent: a rescan stays "executing" while filters apply after the scan, and that alone
+    // must not disable the button; CanRescan decides, as it does for F5 and the menu.
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task Rescan()
     {
         if (!CanRescan) return;
