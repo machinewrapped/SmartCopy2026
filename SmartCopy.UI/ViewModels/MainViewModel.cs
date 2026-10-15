@@ -247,7 +247,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             {
                 StatusBar.IsScanning = DirectoryTree.IsLoading;
                 StatusBar.ScanStatusText = DirectoryTree.IsLoading ? "Scanning..." : string.Empty;
-                Pipeline.IsScanning = DirectoryTree.IsLoading;
+                UpdatePipelineBusy();
                 OnPropertyChanged(nameof(CanRescan));
             }
             else if (e.PropertyName == nameof(DirectoryTreeViewModel.SelectedNode))
@@ -1012,19 +1012,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             RecordRecentSource(normalizedPath);
 
             // Apply filter chain. Pass the scan token so a newer source change stops this setup
-            // rather than letting it continue against the new tree. New nodes count as included
-            // until evaluated, so the pipeline stays blocked until the pass finishes.
-            Pipeline.IsScanning = true;
-            try
-            {
-                await ApplyFiltersAsync(ct);
-            }
-            finally
-            {
-                // A newer source change owns the pipeline state if it superseded this one
-                if (_scanCts?.Token == ct)
-                    Pipeline.IsScanning = DirectoryTree.IsLoading;
-            }
+            // rather than letting it continue against the new tree.
+            await ApplyFiltersAsync(ct);
 
             StartDirectoryWatcherIfSupported();
 
@@ -1216,6 +1205,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         var chain = FilterChain.BuildLiveChain();
 
+        // Nodes not yet evaluated count as included, so the pipeline stays blocked until every
+        // pass in flight has finished, including any that supersede this one.
+        _filterPassesInFlight++;
+        UpdatePipelineBusy();
         try
         {
             if (DirectoryTree.SelectedNode is DirectoryNode selectedDirectory)
@@ -1237,9 +1230,20 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             // Superseded by a newer pass, which now owns the filter results.
             return;
         }
+        finally
+        {
+            _filterPassesInFlight--;
+            UpdatePipelineBusy();
+        }
 
         RefreshIdleStats();
     }
+
+    private int _filterPassesInFlight;
+
+    /// <summary>The pipeline waits for scanning and for filters to finish applying.</summary>
+    private void UpdatePipelineBusy() =>
+        Pipeline.IsScanning = DirectoryTree.IsLoading || _filterPassesInFlight > 0;
 
     private void RefreshIdleStats()
     {
