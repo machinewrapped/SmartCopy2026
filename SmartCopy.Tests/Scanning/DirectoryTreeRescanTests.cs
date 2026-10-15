@@ -61,4 +61,36 @@ public sealed class DirectoryTreeRescanTests
         Assert.Same(newStones, vm.SelectedNode);
         Assert.Equal(3, root.NumSelectedFiles);
     }
+
+    [WindowsFact]
+    public async Task RescanAsync_KeepsStateAcrossACaseOnlyRename()
+    {
+        using var temp = new TempDirectory();
+        var rootPath = Path.Combine(temp.Path, "root");
+        var stonesPath = Path.Combine(rootPath, "stones");
+        Directory.CreateDirectory(stonesPath);
+        await File.WriteAllTextAsync(Path.Combine(stonesPath, "angie.mp3"), "a");
+        await File.WriteAllTextAsync(Path.Combine(stonesPath, "wild horses.mp3"), "a");
+
+        var registry = new FileSystemProviderRegistry();
+        registry.Register(new LocalFileSystemProvider(rootPath));
+        var vm = new DirectoryTreeViewModel(registry);
+        await vm.ChangeRootAsync(rootPath, new ScanOptions());
+
+        var angie = vm.RootNode!.FindNodeByPathSegments("stones", "angie.mp3")!;
+        angie.CheckState = CheckState.Checked;
+        ((DirectoryNode)vm.RootNode.FindNodeByPathSegments("stones")!).IsExpanded = true;
+        vm.SelectedNode = angie;
+
+        File.Move(Path.Combine(stonesPath, "angie.mp3"), Path.Combine(stonesPath, "Angie.mp3"));
+        Directory.Move(stonesPath, Path.Combine(rootPath, "Stones"));
+
+        await vm.RescanAsync(new ScanOptions());
+
+        var root = vm.RootNode!;
+        var renamed = root.FindNodeByPathSegments("Stones", "Angie.mp3")!;
+        Assert.Equal(CheckState.Checked, renamed.CheckState);
+        Assert.True(((DirectoryNode)root.FindNodeByPathSegments("Stones")!).IsExpanded);
+        Assert.Same(renamed, vm.SelectedNode);
+    }
 }
