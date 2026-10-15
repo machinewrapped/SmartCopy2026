@@ -1082,6 +1082,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Could not watch '{Path}' for changes", DirectoryTree.SourcePath);
+
+            // A replacement that failed to start is dropped, and the kept watcher stays in charge:
+            // it may still work, and a broken one is no worse than none until the next renewal.
+            DisposeDirectoryWatcher();
+            _directoryWatcher = retained;
+            retained = null;
         }
         finally
         {
