@@ -593,7 +593,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     private async Task Rescan()
     {
         if (!CanRescan) return;
-        var path = SourcePath.Trim();
+
+        // The loaded source, not the editor text, which may hold an uncommitted draft
+        var path = DirectoryTree.SourcePath ?? _lastCommittedSourcePath;
         if (string.IsNullOrWhiteSpace(path)) return;
         await ApplySourcePathCoreAsync(path, forceRescan: true);
     }
