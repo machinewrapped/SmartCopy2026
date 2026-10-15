@@ -67,6 +67,22 @@ public abstract class ProviderContractTests : IDisposable
     }
 
     [Fact]
+    public async Task TryGetNodeAsync_ReturnsFileOrDirectory_NullForMissing()
+    {
+        var file = await Provider.TryGetNodeAsync(DataFile, CancellationToken.None);
+        Assert.NotNull(file);
+        Assert.False(file.IsDirectory);
+        Assert.Equal(5, file.Size);
+
+        var dir = await Provider.TryGetNodeAsync(SubDir, CancellationToken.None);
+        Assert.NotNull(dir);
+        Assert.True(dir.IsDirectory);
+
+        var missing = Provider.JoinPath(Provider.RootPath, ["does-not-exist.txt"]);
+        Assert.Null(await Provider.TryGetNodeAsync(missing, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task WriteAsync_ThenOpenReadAsync_RoundTrips()
     {
         var dest = Provider.JoinPath(Provider.RootPath, ["roundtrip.txt"]);

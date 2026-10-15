@@ -262,4 +262,50 @@ public sealed class FilterChainTests
         Assert.Equal(FilterResult.Excluded, alt.FilterResult);
         Assert.Equal(FilterResult.Excluded, alt.Files.Single(f => f.Name == "song.flac").FilterResult);
     }
+
+    [Fact]
+    public async Task ApplyToTree_CancelledPartWay_KeepsFinishedResultsAndAggregatesDirectories()
+    {
+        // Selecting a folder re-applies the chain to it, and a newer selection cancels that apply.
+        // A directory must never be left in its provisional state (a mirror filter excludes a
+        // folder that exists in the mirror, whatever it holds), and files already evaluated keep
+        // their results so a slow apply updates the tree progressively.
+        DirectoryNode root = await MemoryFileSystemFixtures.BuildDirectoryTree(f => f
+            .WithSimulatedFile("/Show/S1/one.mkv", size: 100)
+            .WithSimulatedFile("/Show/S1/two.mkv", size: 100));
+        var show = (DirectoryNode)root.Children.Single(c => c.Name == "Show");
+        var season = (DirectoryNode)show.Children.Single(c => c.Name == "S1");
+
+        using var cts = new CancellationTokenSource();
+        var chain = new FilterChain([new CancelOnSecondFileFilter(cts)]);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => chain.ApplyToTreeAsync(show, new TestAppContext(), cts.Token));
+
+        Assert.Single(season.Files, f => f.FilterResult == FilterResult.Excluded);
+        Assert.Equal(FilterResult.Mixed, season.FilterResult);
+        Assert.Equal(FilterResult.Mixed, show.FilterResult);
+    }
+
+    /// <summary>Excludes every directory and the first file, then cancels the apply.</summary>
+    private sealed class CancelOnSecondFileFilter(CancellationTokenSource cts)
+        : FilterBase("CancelOnSecondFile", FilterMode.Exclude)
+    {
+        private int _filesSeen;
+
+        public override bool AppliesToDirectories => true;
+        public override string Summary => Name;
+        public override string Description => Name;
+
+        public override ValueTask<bool> MatchesAsync(DirectoryTreeNode node, IPathResolver context, CancellationToken ct = default)
+        {
+            if (node is not DirectoryNode && ++_filesSeen > 1)
+            {
+                cts.Cancel();
+                ct.ThrowIfCancellationRequested();
+            }
+
+            return ValueTask.FromResult(true);
+        }
+    }
 }

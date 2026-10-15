@@ -37,44 +37,70 @@ public sealed class FilterChain
         return result;
     }
 
+    /// <summary>
+    /// Evaluates <paramref name="root"/>'s subtree, committing each result once it is final: a file
+    /// as soon as it is evaluated, a directory once its whole subtree is. A slow apply (mirror
+    /// checks over a network) therefore updates the tree progressively, without ever showing a
+    /// directory in a provisional state. If the apply is cancelled part-way, each unfinished
+    /// directory is re-aggregated from whatever its contents now hold.
+    /// </summary>
     public async Task ApplyToTreeAsync(
         DirectoryNode root,
         IPathResolver? context = null,
         CancellationToken ct = default)
     {
         var resolvedContext = context ?? FileSystemProviderRegistry.Empty;
-        var stack = new Stack<DirectoryNode>([root]);
-        var postOrderList = new List<DirectoryNode>();
 
-        while (stack.Count > 0)
+        // Iterative post-order traversal: recursion could overflow the stack on a deep tree.
+        // `open` holds the directories entered but not finished — always the path from the root
+        // to the directory being evaluated — each with the children it has still to visit.
+        var open = new Stack<(DirectoryNode Node, Queue<DirectoryNode> Children)>();
+        DirectoryNode? next = root;
+
+        try
         {
-            ct.ThrowIfCancellationRequested();
-            var node = stack.Pop();
-            postOrderList.Add(node);
-
-            node.FilterResult = await EvaluateNodeAsync(node, resolvedContext, ct);
-
-            for (var i = node.Children.Count - 1; i >= 0; i--)
+            while (next is not null || open.Count > 0)
             {
-                stack.Push(node.Children[i]);
-            }
+                if (next is null)
+                {
+                    var (dir, children) = open.Peek();
+                    if (!children.TryDequeue(out next))
+                    {
+                        open.Pop();
+                        UpdateDirectoryExclusion(dir);
+                    }
+                    continue;
+                }
 
-            // Also evaluate all files in the current directory so that
-            // parent exclusion recalculation can see their correct state.
-            foreach (var file in node.Files)
-            {
-                file.FilterResult = await EvaluateNodeAsync(file, resolvedContext, ct);
+                ct.ThrowIfCancellationRequested();
+                var node = next;
+                next = null;
+
+                // A directory with content takes its result from that content (UpdateDirectoryExclusion),
+                // so its own evaluation only matters when it is empty.
+                if (node.Children.Count == 0 && node.Files.Count == 0)
+                {
+                    node.FilterResult = await EvaluateNodeAsync(node, resolvedContext, ct);
+                    continue;
+                }
+
+                // Snapshots: the watcher can patch these collections while evaluation is awaited.
+                open.Push((node, new Queue<DirectoryNode>(node.Children.ToArray())));
+                foreach (var file in node.Files.ToArray())
+                {
+                    file.FilterResult = await EvaluateNodeAsync(file, resolvedContext, ct);
+                }
             }
         }
-
-        for (var i = postOrderList.Count - 1; i >= 0; i--)
+        finally
         {
-            UpdateDirectoryExclusion(postOrderList[i]);
-        }
+            // Empty after a full pass; after a cancellation, re-aggregate deepest first.
+            while (open.Count > 0)
+            {
+                UpdateDirectoryExclusion(open.Pop().Node);
+            }
 
-        // Roots really shouldn't have a parent, but just in case...
-        if (root.Parent != null)
-        {
+            // Applying to a subtree (e.g. the selected folder) changes what its ancestors contain.
             RecalculateParentExclusion(root.Parent);
         }
     }
