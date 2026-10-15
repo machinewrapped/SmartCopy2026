@@ -1048,8 +1048,19 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// <summary>A failed rescan puts the previous tree back; watch it again.</summary>
     private void ResumeWatchingRestoredTree(string path)
     {
-        if (DirectoryTree.IsLoaded && DirectoryTree.SourcePath == path)
+        if (!DirectoryTree.IsLoaded || DirectoryTree.SourcePath != path)
+            return;
+
+        // Runs inside the failure handlers, and the failure may be the source disappearing,
+        // so a watcher that cannot start is logged rather than allowed to escape.
+        try
+        {
             StartDirectoryWatcherIfSupported();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not resume watching '{Path}' after the rescan failed", path);
+        }
     }
 
     [RelayCommand]
