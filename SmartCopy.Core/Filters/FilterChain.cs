@@ -43,39 +43,52 @@ public sealed class FilterChain
         CancellationToken ct = default)
     {
         var resolvedContext = context ?? FileSystemProviderRegistry.Empty;
-        var stack = new Stack<DirectoryNode>([root]);
-        var postOrderList = new List<DirectoryNode>();
-
-        while (stack.Count > 0)
+        try
         {
-            ct.ThrowIfCancellationRequested();
-            var node = stack.Pop();
-            postOrderList.Add(node);
-
-            node.FilterResult = await EvaluateNodeAsync(node, resolvedContext, ct);
-
-            for (var i = node.Children.Count - 1; i >= 0; i--)
-            {
-                stack.Push(node.Children[i]);
-            }
-
-            // Also evaluate all files in the current directory so that
-            // parent exclusion recalculation can see their correct state.
-            foreach (var file in node.Files)
-            {
-                file.FilterResult = await EvaluateNodeAsync(file, resolvedContext, ct);
-            }
+            await ApplyToSubtreeAsync(root, resolvedContext, ct);
         }
-
-        for (var i = postOrderList.Count - 1; i >= 0; i--)
+        finally
         {
-            UpdateDirectoryExclusion(postOrderList[i]);
-        }
-
-        // Roots really shouldn't have a parent, but just in case...
-        if (root.Parent != null)
-        {
+            // Applying to a subtree (e.g. the selected folder) changes what its ancestors contain.
             RecalculateParentExclusion(root.Parent);
+        }
+    }
+
+    /// <summary>
+    /// Evaluates <paramref name="node"/>'s subtree, committing each result once it is final: a file
+    /// as soon as it is evaluated, a directory once its whole subtree is. A slow apply (mirror
+    /// checks over a network) therefore updates the tree progressively, without ever showing a
+    /// directory in a provisional state. If the apply is cancelled part-way, each unfinished
+    /// directory is re-aggregated from whatever its contents now hold.
+    /// </summary>
+    private async Task ApplyToSubtreeAsync(DirectoryNode node, IPathResolver context, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        // A directory with content takes its result from that content (UpdateDirectoryExclusion),
+        // so its own evaluation only matters when it is empty.
+        if (node.Children.Count == 0 && node.Files.Count == 0)
+        {
+            node.FilterResult = await EvaluateNodeAsync(node, context, ct);
+            return;
+        }
+
+        try
+        {
+            // Snapshots: the watcher can patch these collections while evaluation is awaited.
+            foreach (var file in node.Files.ToArray())
+            {
+                file.FilterResult = await EvaluateNodeAsync(file, context, ct);
+            }
+
+            foreach (var child in node.Children.ToArray())
+            {
+                await ApplyToSubtreeAsync(child, context, ct);
+            }
+        }
+        finally
+        {
+            UpdateDirectoryExclusion(node);
         }
     }
 
