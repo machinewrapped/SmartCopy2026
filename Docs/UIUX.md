@@ -356,7 +356,7 @@ All critical actions must be keyboard-accessible from the initial shell:
 - **Ctrl+A** selects all visible nodes in the current panel
 - **Delete** or **Ctrl+D** removes a selected filter card or pipeline step
 - **Ctrl+Shift+P** opens the pipeline preset menu (via Add Step)
-- **F5** triggers a rescan (also the refresh-icon button at the end of the Source row and File → Rescan; all are disabled while a pipeline is running). Rescan keeps checked files, expanded folders and the active node for paths that still exist; content added to a checked folder is checked too
+- **F5** triggers a rescan (also the refresh-icon button at the end of the Source row and File → Rescan; all are disabled while a pipeline is running or a scan is in progress). Rescan keeps checked files, expanded folders and the active node for paths that still exist; content added to a checked folder is checked too
 - **Escape** cancels a running operation (with confirmation) or closes a modal
 
 Screen-reader labels and focus states are part of the UI shell, not a polish item. Avalonia supports `AutomationProperties.Name` — use it from the start.

@@ -21,7 +21,7 @@
         <Border Grid.Row="0" Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="0,0,0,1">
             <Menu>
                 <MenuItem Header="_File">
-                    <MenuItem Header="_Rescan" x:Name="RescanMenuItem" InputGesture="F5" IsEnabled="{Binding Pipeline.IsNotRunning}" />
+                    <MenuItem Header="_Rescan" x:Name="RescanMenuItem" InputGesture="F5" IsEnabled="{Binding CanRescan}" />
                     <Separator />
                     <MenuItem Header="_Export Settings..." x:Name="ExportSettingsMenuItem" />
                     <MenuItem Header="_Import Settings..." x:Name="ImportSettingsMenuItem" />
@@ -55,7 +55,7 @@
                                         BrowseButtonToolTip="Set the source path for the workflow" />
                 <Button Grid.Column="2"
                         Command="{Binding RescanCommand}"
-                        IsEnabled="{Binding Pipeline.IsNotRunning}"
+                        IsEnabled="{Binding CanRescan}"
                         VerticalAlignment="Top"
                         CornerRadius="4"
                         Margin="1,0,0,0"

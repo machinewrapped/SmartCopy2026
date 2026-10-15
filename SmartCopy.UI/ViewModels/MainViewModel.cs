@@ -235,6 +235,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         FilterChain.ChainChanged += OnChainChanged;
         DirectoryTree.SelectionChanged += (_, _) => RefreshIdleStats();
 
+        Pipeline.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(PipelineViewModel.IsRunning))
+                OnPropertyChanged(nameof(CanRescan));
+        };
+
         DirectoryTree.PropertyChanged += async (_, e) =>
         {
             if (e.PropertyName == nameof(DirectoryTreeViewModel.IsLoading))
@@ -242,6 +248,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 StatusBar.IsScanning = DirectoryTree.IsLoading;
                 StatusBar.ScanStatusText = DirectoryTree.IsLoading ? "Scanning..." : string.Empty;
                 Pipeline.IsScanning = DirectoryTree.IsLoading;
+                OnPropertyChanged(nameof(CanRescan));
             }
             else if (e.PropertyName == nameof(DirectoryTreeViewModel.SelectedNode))
             {
@@ -576,11 +583,16 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     // ── Keyboard shortcut commands ────────────────────────────────────────────
 
+    /// <summary>
+    /// Rescan waits for a running pipeline and for any scan in progress: rescanning during a scan
+    /// would capture the partial tree and lose the user's state.
+    /// </summary>
+    public bool CanRescan => !Pipeline.IsRunning && !DirectoryTree.IsLoading;
+
     [RelayCommand]
     private async Task Rescan()
     {
-        // A rescan during a scan would capture the partial tree and lose the user's state
-        if (Pipeline.IsRunning || DirectoryTree.IsLoading) return;
+        if (!CanRescan) return;
         var path = SourcePath.Trim();
         if (string.IsNullOrWhiteSpace(path)) return;
         await ApplySourcePathCoreAsync(path, forceRescan: true);
