@@ -1825,6 +1825,16 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 await ApplyFiltersAsync(ct);
             }
         }
+        catch (OperationCanceledException)
+        {
+            // Superseded; whatever cancelled this owns the tree now.
+        }
+        catch (Exception ex)
+        {
+            // Callers fire and forget, so failures are surfaced here rather than lost.
+            _logger.LogError(ex, "Failed to apply filesystem changes to the tree");
+            LogPanel.AddEntry("Failed to apply filesystem changes; use Rescan to refresh", LogLevel.Error);
+        }
         finally
         {
             _watcherApplyGate.Release();
