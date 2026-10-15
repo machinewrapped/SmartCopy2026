@@ -1103,9 +1103,6 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             await watcher.FlushAsync();
             if (tree is not null)
                 await ApplyPendingWatcherBatchesAsync(watcher, onlyForTree: tree);
-
-            // The new watcher's batches are skipped while this drain holds the gate; pick them up
-            await ApplyPendingWatcherBatchesAsync();
         }
         catch (Exception ex)
         {
@@ -1897,6 +1894,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         finally
         {
             _watcherApplyGate.Release();
+
+            // Drains that found the gate held skipped their batches, including any queued while
+            // this one awaited its filter pass; run another rather than wait for the next change.
+            if (_directoryWatcher?.HasPendingBatches == true)
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = ApplyPendingWatcherBatchesAsync());
         }
     }
 
