@@ -57,17 +57,13 @@ public sealed class MirrorFilter : FilterBase, IPipelineAwareFilter
             return UseAutomaticPath && Mode == FilterMode.Only;
         }
 
+        // TryGetNodeAsync answers existence and size together: one round trip per file on a share.
         var comparePath = comparisonProvider.JoinPath(effectivePath, node.RelativePathSegments);
-        var exists = await comparisonProvider.ExistsAsync(comparePath, ct);
+        var targetNode = await comparisonProvider.TryGetNodeAsync(comparePath, ct);
 
-        if (!exists)
+        if (targetNode is null)
         {
             return false;
-        }
-
-        if (CompareMode == MirrorCompareMode.NameOnly && node is not DirectoryNode)
-        {
-            return true;
         }
 
         if (node is DirectoryNode dirNode)
@@ -78,26 +74,18 @@ public sealed class MirrorFilter : FilterBase, IPipelineAwareFilter
             foreach (var file in dirNode.Files)
             {
                 var fileMirrorPath = comparisonProvider.JoinPath(effectivePath, file.RelativePathSegments);
-                if (!await comparisonProvider.ExistsAsync(fileMirrorPath, ct))
+                var mirrorFile = await comparisonProvider.TryGetNodeAsync(fileMirrorPath, ct);
+                if (mirrorFile is null
+                    || (CompareMode == MirrorCompareMode.NameAndSize && mirrorFile.Size != file.Size))
                 {
                     return false;
-                }
-
-                if (CompareMode == MirrorCompareMode.NameAndSize)
-                {
-                    var mirrorFile = await comparisonProvider.GetNodeAsync(fileMirrorPath, ct);
-                    if (mirrorFile.Size != file.Size)
-                    {
-                        return false;
-                    }
                 }
             }
 
             return true;
         }
 
-        var targetNode = await comparisonProvider.GetNodeAsync(comparePath, ct);
-        return targetNode.Size == node.Size;
+        return CompareMode == MirrorCompareMode.NameOnly || targetNode.Size == node.Size;
     }
 
     private static IFileSystemProvider? ResolveComparisonProvider(IPathResolver resolver, string path)
