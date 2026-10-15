@@ -46,6 +46,14 @@ public interface IFileSystemProvider
     Task<FileSystemNode> GetNodeAsync(string path, CancellationToken ct);
 
     /// <summary>
+    /// Gets metadata for a single file or directory path, or null when nothing exists there.
+    /// Providers should override this when they can answer in fewer round trips than
+    /// <see cref="ExistsAsync"/> followed by <see cref="GetNodeAsync"/>.
+    /// </summary>
+    async Task<FileSystemNode?> TryGetNodeAsync(string path, CancellationToken ct) =>
+        await ExistsAsync(path, ct) ? await GetNodeAsync(path, ct) : null;
+
+    /// <summary>
     /// Opens a readable stream for the file at <paramref name="path"/>.
     /// </summary>
     Task<Stream> OpenReadAsync(string path, int? bufferSize = null, CancellationToken ct = default);

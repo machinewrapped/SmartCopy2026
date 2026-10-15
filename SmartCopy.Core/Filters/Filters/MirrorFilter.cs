@@ -58,16 +58,9 @@ public sealed class MirrorFilter : FilterBase, IPipelineAwareFilter
         }
 
         var comparePath = comparisonProvider.JoinPath(effectivePath, node.RelativePathSegments);
-        var exists = await comparisonProvider.ExistsAsync(comparePath, ct);
-
-        if (!exists)
+        if (!await MatchesMirrorEntryAsync(comparisonProvider, comparePath, node, ct))
         {
             return false;
-        }
-
-        if (CompareMode == MirrorCompareMode.NameOnly && node is not DirectoryNode)
-        {
-            return true;
         }
 
         if (node is DirectoryNode dirNode)
@@ -78,26 +71,35 @@ public sealed class MirrorFilter : FilterBase, IPipelineAwareFilter
             foreach (var file in dirNode.Files)
             {
                 var fileMirrorPath = comparisonProvider.JoinPath(effectivePath, file.RelativePathSegments);
-                if (!await comparisonProvider.ExistsAsync(fileMirrorPath, ct))
+                if (!await MatchesMirrorEntryAsync(comparisonProvider, fileMirrorPath, file, ct))
                 {
                     return false;
                 }
-
-                if (CompareMode == MirrorCompareMode.NameAndSize)
-                {
-                    var mirrorFile = await comparisonProvider.GetNodeAsync(fileMirrorPath, ct);
-                    if (mirrorFile.Size != file.Size)
-                    {
-                        return false;
-                    }
-                }
             }
-
-            return true;
         }
 
-        var targetNode = await comparisonProvider.GetNodeAsync(comparePath, ct);
-        return targetNode.Size == node.Size;
+        return true;
+    }
+
+    /// <summary>
+    /// Whether the entry at <paramref name="mirrorPath"/> matches <paramref name="node"/>. Existence
+    /// alone needs only <see cref="IFileSystemProvider.ExistsAsync"/>, which some providers (MTP)
+    /// answer more cheaply than metadata; a size comparison uses
+    /// <see cref="IFileSystemProvider.TryGetNodeAsync"/> to get existence and size together.
+    /// </summary>
+    private async ValueTask<bool> MatchesMirrorEntryAsync(
+        IFileSystemProvider provider,
+        string mirrorPath,
+        DirectoryTreeNode node,
+        CancellationToken ct)
+    {
+        if (CompareMode == MirrorCompareMode.NameOnly || node is DirectoryNode)
+        {
+            return await provider.ExistsAsync(mirrorPath, ct);
+        }
+
+        var mirrorNode = await provider.TryGetNodeAsync(mirrorPath, ct);
+        return mirrorNode is not null && mirrorNode.Size == node.Size;
     }
 
     private static IFileSystemProvider? ResolveComparisonProvider(IPathResolver resolver, string path)

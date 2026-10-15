@@ -161,24 +161,27 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         }, ct);
     }
 
-    public Task<FileSystemNode> GetNodeAsync(string path, CancellationToken ct)
+    public async Task<FileSystemNode> GetNodeAsync(string path, CancellationToken ct) =>
+        await TryGetNodeAsync(path, ct)
+        ?? throw new FileNotFoundException($"Path does not exist: {Resolve(path)}", Resolve(path));
+
+    public Task<FileSystemNode?> TryGetNodeAsync(string path, CancellationToken ct)
     {
         return Task.Run(() =>
         {
             ct.ThrowIfCancellationRequested();
             var fullPath = Resolve(path);
 
-            if (Directory.Exists(fullPath))
+            // One metadata query answers both existence and the file's details, which matters
+            // when each query is a network round trip (e.g. a mirror filter on a share).
+            var fileInfo = new FileInfo(fullPath);
+            if (fileInfo.Exists)
             {
-                return CreateDirectoryNode(fullPath);
+                return CreateFileNode(fileInfo);
             }
 
-            if (File.Exists(fullPath))
-            {
-                return CreateFileNode(fullPath);
-            }
-
-            throw new FileNotFoundException($"Path does not exist: {fullPath}", fullPath);
+            var directoryInfo = new DirectoryInfo(fullPath);
+            return directoryInfo.Exists ? CreateDirectoryNode(directoryInfo) : null;
         }, ct);
     }
 
@@ -657,9 +660,8 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         return NormalizePath(Path.Combine(basePath, relativePath));
     }
 
-    private static FileSystemNode CreateDirectoryNode(string directoryPath)
+    private static FileSystemNode CreateDirectoryNode(DirectoryInfo info)
     {
-        var info = new DirectoryInfo(directoryPath);
         return new FileSystemNode
         {
             Name = info.Name,
@@ -672,9 +674,8 @@ public sealed class LocalFileSystemProvider : IFileSystemProvider
         };
     }
 
-    private static FileSystemNode CreateFileNode(string filePath)
+    private static FileSystemNode CreateFileNode(FileInfo info)
     {
-        var info = new FileInfo(filePath);
         return new FileSystemNode
         {
             Name = info.Name,
