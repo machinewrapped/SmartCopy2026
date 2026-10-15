@@ -148,10 +148,23 @@ public class DirectoryTreeViewModel : ViewModelBase
         if (RootNode is not { } root)
             return;
 
-        var state = DirectoryTreeState.Capture(root, SelectedNode, SourceProvider?.PathComparer ?? StringComparer.Ordinal);
+        var provider = SourceProvider;
+        var selected = SelectedNode;
+        var state = DirectoryTreeState.Capture(root, selected, provider?.PathComparer ?? StringComparer.Ordinal);
         SelectedNode = null;
 
-        await InitializeAsync(root.FullPath, scanOptions, ct);
+        var generation = _initializeCount + 1;
+        try
+        {
+            await InitializeAsync(root.FullPath, scanOptions, ct);
+        }
+        catch when (_initializeCount == generation)
+        {
+            // Failed or cancelled, and no newer scan has replaced it: put the old tree back
+            // rather than leave a partial one without the user's checks.
+            RestoreRoot(root, provider, selected);
+            throw;
+        }
 
         if (RootNode is { } newRoot)
         {
@@ -194,8 +207,28 @@ public class DirectoryTreeViewModel : ViewModelBase
         IsLoading = false;
     }
 
+    private void RestoreRoot(DirectoryNode root, IFileSystemProvider? provider, DirectoryTreeNode? selected)
+    {
+        if (RootNode is { } partial)
+            partial.PropertyChanged -= OnRootNodePropertyChanged;
+
+        ItemsSource.Clear();
+        ItemsSource.Add(root);
+        root.PropertyChanged += OnRootNodePropertyChanged;
+
+        SourceProvider = provider;
+        IsLoaded = true;
+        SelectedNode = selected ?? root;
+        _ = LoadClassificationAsync(provider);
+    }
+
+    /// <summary>Counts scans started, so a failed rescan can tell whether a newer scan replaced it.</summary>
+    private int _initializeCount;
+
     private async Task InitializeAsync(string rootPath, ScanOptions scanOptions, CancellationToken ct = default)
     {
+        _initializeCount++;
+
         // Unsubscribe from old roots before clearing
         if (RootNode != null)
         {

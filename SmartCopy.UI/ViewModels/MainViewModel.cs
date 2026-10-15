@@ -579,7 +579,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private async Task Rescan()
     {
-        if (Pipeline.IsRunning) return;
+        // A rescan during a scan would capture the partial tree and lose the user's state
+        if (Pipeline.IsRunning || DirectoryTree.IsLoading) return;
         var path = SourcePath.Trim();
         if (string.IsNullOrWhiteSpace(path)) return;
         await ApplySourcePathCoreAsync(path, forceRescan: true);
@@ -1014,6 +1015,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             // The user pressed Cancel.
             SourcePathValidationMessage = "Directory scan was cancelled before it was complete";
             LogPanel.AddEntry(SourcePathValidationMessage, LogLevel.Warning);
+            if (forceRescan) ResumeWatchingRestoredTree(normalizedPath);
         }
         catch (Exception ex)
         {
@@ -1021,7 +1023,15 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
             SourcePathValidationMessage = BuildSourcePathValidationMessage(normalizedPath, ex);
             LogPanel.AddEntry(SourcePathValidationMessage, LogLevel.Error);
+            if (forceRescan) ResumeWatchingRestoredTree(normalizedPath);
         }
+    }
+
+    /// <summary>A failed rescan puts the previous tree back; watch it again.</summary>
+    private void ResumeWatchingRestoredTree(string path)
+    {
+        if (DirectoryTree.IsLoaded && DirectoryTree.SourcePath == path)
+            StartDirectoryWatcherIfSupported();
     }
 
     [RelayCommand]

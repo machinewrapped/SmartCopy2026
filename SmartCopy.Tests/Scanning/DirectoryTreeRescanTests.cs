@@ -62,6 +62,33 @@ public sealed class DirectoryTreeRescanTests
         Assert.Equal(3, root.NumSelectedFiles);
     }
 
+    [Fact]
+    public async Task RescanAsync_KeepsTheOldTreeWhenTheRescanDoesNotComplete()
+    {
+        using var temp = new TempDirectory();
+        var rootPath = Path.Combine(temp.Path, "root");
+        Directory.CreateDirectory(rootPath);
+        await File.WriteAllTextAsync(Path.Combine(rootPath, "angie.mp3"), "a");
+
+        var registry = new FileSystemProviderRegistry();
+        registry.Register(new LocalFileSystemProvider(rootPath));
+        var vm = new DirectoryTreeViewModel(registry);
+        await vm.ChangeRootAsync(rootPath, new ScanOptions());
+
+        var root = vm.RootNode!;
+        var angie = root.FindNodeByPathSegments("angie.mp3")!;
+        angie.CheckState = CheckState.Checked;
+        vm.SelectedNode = angie;
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => vm.RescanAsync(new ScanOptions(), new CancellationToken(canceled: true)));
+
+        Assert.Same(root, vm.RootNode);
+        Assert.Equal(CheckState.Checked, angie.CheckState);
+        Assert.Same(angie, vm.SelectedNode);
+        Assert.True(vm.IsLoaded);
+    }
+
     [WindowsFact]
     public async Task RescanAsync_KeepsStateAcrossACaseOnlyRename()
     {
