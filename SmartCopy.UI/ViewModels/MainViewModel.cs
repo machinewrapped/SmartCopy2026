@@ -1092,17 +1092,21 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     private async Task RetireDirectoryWatcherAsync(IDirectoryWatcher watcher)
     {
+        // Its changes belong to this tree only: if a source change or another rescan replaces it
+        // meanwhile, they are discarded rather than applied by relative path to the wrong tree.
+        var tree = DirectoryTree.RootNode;
+        DetachWatcher(watcher);
+
         try
         {
-            watcher.Stop();
-
             // Changes it saw before stopping may still be in its debounce window
             await Task.Delay(TimeSpan.FromSeconds(1));
-            await ApplyPendingWatcherBatchesAsync(watcher);
+            if (tree is not null && ReferenceEquals(DirectoryTree.RootNode, tree))
+                await ApplyPendingWatcherBatchesAsync(watcher);
         }
         finally
         {
-            DetachAndDispose(watcher);
+            watcher.Dispose();
         }
     }
 
@@ -1778,17 +1782,18 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        DetachAndDispose(_directoryWatcher);
+        DetachWatcher(_directoryWatcher);
+        _directoryWatcher.Dispose();
         _directoryWatcher = null;
     }
 
-    private void DetachAndDispose(IDirectoryWatcher watcher)
+    /// <summary>Unhooks and stops a watcher; the caller disposes it.</summary>
+    private void DetachWatcher(IDirectoryWatcher watcher)
     {
         watcher.PendingBatchesAvailable -= OnDirectoryWatcherPendingBatchesAvailable;
         watcher.WatcherError -= OnDirectoryWatcherError;
         watcher.NotifyNodeWillBeRemoved -= OnDirectoryWatcherNodeWillBeRemoved;
         watcher.Stop();
-        watcher.Dispose();
     }
 
     private void OnDirectoryWatcherPendingBatchesAvailable(object? sender, EventArgs e)
