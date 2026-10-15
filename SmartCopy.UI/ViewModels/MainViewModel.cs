@@ -579,6 +579,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private async Task Rescan()
     {
+        if (Pipeline.IsRunning) return;
         var path = SourcePath.Trim();
         if (string.IsNullOrWhiteSpace(path)) return;
         await ApplySourcePathCoreAsync(path);
