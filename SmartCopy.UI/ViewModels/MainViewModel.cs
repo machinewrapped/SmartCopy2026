@@ -1103,6 +1103,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             await watcher.FlushAsync();
             if (tree is not null)
                 await ApplyPendingWatcherBatchesAsync(watcher, onlyForTree: tree);
+
+            // The new watcher's batches are skipped while this drain holds the gate; pick them up
+            await ApplyPendingWatcherBatchesAsync();
         }
         catch (Exception ex)
         {
