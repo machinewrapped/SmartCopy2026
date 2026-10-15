@@ -990,24 +990,34 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _scanCts = new CancellationTokenSource();
         var ct = _scanCts.Token;
 
+        // A rescan keeps the watcher running, so changes made while it scans are held and then
+        // applied to the rebuilt tree rather than lost.
+        var isRescan = normalizedPath == previousSourcePath;
+
+        // A rescan leaves an uncommitted draft in the source box, and any message about it, alone
+        var editorShowsSource = !forceRescan || PathHelper.NormalizeUserPath(SourcePath) == normalizedPath;
+
         try
         {
-            DisposeDirectoryWatcher();
+            if (!isRescan)
+                DisposeDirectoryWatcher();
 
-            // A rescan leaves any uncommitted draft in the source box alone
-            if (!forceRescan)
+            if (editorShowsSource)
+            {
                 SourcePath = normalizedPath;
-            SourcePathValidationMessage = string.Empty;
+                SourcePathValidationMessage = string.Empty;
+            }
 
             FileList.Clear();
 
-            if (normalizedPath == previousSourcePath)
+            if (isRescan)
                 await DirectoryTree.RescanAsync(BuildScanOptions(), ct);
             else
                 await DirectoryTree.ChangeRootAsync(normalizedPath, BuildScanOptions(), ct);
 
             _lastCommittedSourcePath = normalizedPath;
-            SourcePathValidationMessage = string.Empty;
+            if (editorShowsSource)
+                SourcePathValidationMessage = string.Empty;
 
             RecordRecentSource(normalizedPath);
 
@@ -1015,7 +1025,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             // rather than letting it continue against the new tree.
             await ApplyFiltersAsync(ct);
 
-            StartDirectoryWatcherIfSupported();
+            if (isRescan && _directoryWatcher is not null)
+                _ = ApplyPendingWatcherBatchesAsync();
+            else
+                StartDirectoryWatcherIfSupported();
 
             if (DirectoryTree.SourceProvider is { } sp)
                 await Pipeline.SetSourceContext(sp);
@@ -1050,6 +1063,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     {
         if (!DirectoryTree.IsLoaded || DirectoryTree.SourcePath != path)
             return;
+
+        // A rescan kept its watcher running; apply what it saw to the restored tree
+        if (_directoryWatcher is not null)
+        {
+            _ = ApplyPendingWatcherBatchesAsync();
+            return;
+        }
 
         // Runs inside the failure handlers, and the failure may be the source disappearing,
         // so a watcher that cannot start is logged rather than allowed to escape.
@@ -1762,7 +1782,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     private async Task ApplyPendingWatcherBatchesAsync(CancellationToken ct = default)
     {
-        if (Pipeline.IsRunning)
+        // During a rescan the tree is being rebuilt; batches wait until it is ready
+        if (Pipeline.IsRunning || DirectoryTree.IsLoading)
         {
             return;
         }
