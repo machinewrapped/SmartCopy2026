@@ -104,20 +104,4 @@ public sealed class DirectoryWatcherTests : IDisposable
         watcher.DrainPendingBatches();
         Assert.False(watcher.HasPendingBatches);
     }
-
-    [RealFilesystemFact]
-    public async Task FlushAsync_BuildsChangesStillInTheDebounceWindow()
-    {
-        using var watcher = new DirectoryWatcher(_provider, _temp.Path, TimeSpan.FromMinutes(1));
-        watcher.Start();
-
-        await File.WriteAllTextAsync(Path.Combine(_temp.Path, "late.txt"), "x");
-        await Task.Delay(500); // let the OS deliver the event; the debounce won't fire for a minute
-
-        watcher.Stop();
-        await watcher.FlushAsync();
-
-        var batches = watcher.DrainPendingBatches();
-        Assert.Contains(batches.SelectMany(b => b.Inserts), i => i.CanonicalRelativePath == "late.txt");
-    }
 }

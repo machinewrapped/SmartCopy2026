@@ -990,8 +990,6 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _scanCts = new CancellationTokenSource();
         var ct = _scanCts.Token;
 
-        // A rescan keeps the watcher running, so changes made while it scans are held and then
-        // applied to the rebuilt tree rather than lost.
         var isRescan = normalizedPath == previousSourcePath;
 
         // A rescan leaves an uncommitted draft in the source box, and any message about it, alone
@@ -999,8 +997,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         try
         {
-            if (!isRescan)
-                DisposeDirectoryWatcher();
+            // Changes made while scanning are not tracked, as for a source change; the scan
+            // itself picks up most of them, and the fresh watcher everything after.
+            DisposeDirectoryWatcher();
 
             if (editorShowsSource)
             {
@@ -1025,8 +1024,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             // rather than letting it continue against the new tree.
             await ApplyFiltersAsync(ct);
 
-            // Awaited so the pipeline stays blocked until changes seen during the scan are applied
-            await RenewDirectoryWatcherAsync();
+            StartDirectoryWatcherIfSupported();
 
             if (DirectoryTree.SourceProvider is { } sp)
                 await Pipeline.SetSourceContext(sp);
@@ -1066,74 +1064,18 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// <summary>A failed rescan puts the previous tree back; watch it again.</summary>
     private void ResumeWatchingRestoredTree(string path)
     {
-        // Not awaited from the failure handlers; the retirement still holds the pipeline itself
-        if (DirectoryTree.IsLoaded && DirectoryTree.SourcePath == path)
-            _ = RenewDirectoryWatcherAsync();
-    }
+        if (!DirectoryTree.IsLoaded || DirectoryTree.SourcePath != path)
+            return;
 
-    /// <summary>
-    /// Starts a fresh watcher on the current tree, then retires any watcher a rescan kept running.
-    /// The kept one may have stopped working (its root deleted and recreated, say), so it never
-    /// stays in charge, but the changes it saw during the scan are still applied. Starting the new
-    /// one first means no change falls between them; overlapping batches are harmless.
-    /// </summary>
-    private Task RenewDirectoryWatcherAsync()
-    {
-        var retained = _directoryWatcher;
-        _directoryWatcher = null;
-
-        // May run in failure handlers, where the failure may be the source disappearing, so a
-        // watcher that cannot start is logged rather than allowed to escape.
+        // Runs inside the failure handlers, and the failure may be the source disappearing,
+        // so a watcher that cannot start is logged rather than allowed to escape.
         try
         {
             StartDirectoryWatcherIfSupported();
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Could not watch '{Path}' for changes", DirectoryTree.SourcePath);
-
-            // A replacement that failed to start is dropped, and the kept watcher stays in charge:
-            // it may still work, and a broken one is no worse than none until the next renewal.
-            DisposeDirectoryWatcher();
-            _directoryWatcher = retained;
-            retained = null;
-        }
-
-        return retained is not null ? RetireDirectoryWatcherAsync(retained) : Task.CompletedTask;
-    }
-
-    private async Task RetireDirectoryWatcherAsync(IDirectoryWatcher watcher)
-    {
-        // Its changes belong to this tree only; see ApplyPendingWatcherBatchesAsync
-        var tree = DirectoryTree.RootNode;
-
-        // Unhooked from the tree now, but its errors are still reported until the flush is done:
-        // a batch that fails to build is otherwise only reported through WatcherError.
-        DetachWatcher(watcher);
-        watcher.WatcherError += OnDirectoryWatcherError;
-
-        // The tree may be missing changes only this watcher saw, so no pipeline runs until
-        // they are applied (and a run starting meanwhile would make the drain discard them).
-        _pipelineHolds++;
-        UpdatePipelineBusy();
-        try
-        {
-            // Collect everything it saw before stopping, including changes still in its debounce
-            // window or mid-build, and wait for any other reconciliation rather than skip.
-            await watcher.FlushAsync();
-            if (tree is not null)
-                await ApplyPendingWatcherBatchesAsync(watcher, onlyForTree: tree);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to collect changes from a retired watcher");
-        }
-        finally
-        {
-            watcher.WatcherError -= OnDirectoryWatcherError;
-            watcher.Dispose();
-            _pipelineHolds--;
-            UpdatePipelineBusy();
+            _logger.LogWarning(ex, "Could not resume watching '{Path}' after the rescan failed", path);
         }
     }
 
@@ -1324,10 +1266,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         RefreshIdleStats();
     }
 
-    /// <summary>Work the pipeline must wait for: filter passes and retiring watchers.</summary>
+    /// <summary>Filter passes in flight, which the pipeline must wait for.</summary>
     private int _pipelineHolds;
 
-    /// <summary>The pipeline waits for scanning and for every hold to finish.</summary>
+    /// <summary>The pipeline waits for scanning and for filters to finish applying.</summary>
     private void UpdatePipelineBusy() =>
         Pipeline.IsScanning = DirectoryTree.IsLoading || _pipelineHolds > 0;
 
@@ -1810,18 +1752,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        DetachWatcher(_directoryWatcher);
+        _directoryWatcher.PendingBatchesAvailable -= OnDirectoryWatcherPendingBatchesAvailable;
+        _directoryWatcher.WatcherError -= OnDirectoryWatcherError;
+        _directoryWatcher.NotifyNodeWillBeRemoved -= OnDirectoryWatcherNodeWillBeRemoved;
+        _directoryWatcher.Stop();
         _directoryWatcher.Dispose();
         _directoryWatcher = null;
-    }
-
-    /// <summary>Unhooks and stops a watcher; the caller disposes it.</summary>
-    private void DetachWatcher(IDirectoryWatcher watcher)
-    {
-        watcher.PendingBatchesAvailable -= OnDirectoryWatcherPendingBatchesAvailable;
-        watcher.WatcherError -= OnDirectoryWatcherError;
-        watcher.NotifyNodeWillBeRemoved -= OnDirectoryWatcherNodeWillBeRemoved;
-        watcher.Stop();
     }
 
     private void OnDirectoryWatcherPendingBatchesAvailable(object? sender, EventArgs e)
@@ -1841,42 +1777,22 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             DirectoryTree.RootNode?.FindNodeByPathSegments(relativeSegments)?.MarkForRemoval());
     }
 
-    /// <summary>Applies <paramref name="source"/>'s pending batches, or the current watcher's.</summary>
-    /// <remarks>
-    /// With <paramref name="onlyForTree"/> (a retired watcher), the batches are applied only if that
-    /// tree is still loaded once it is this drain's turn; a source change or rescan since then
-    /// owns the tree, and batches matched by relative path would land in the wrong one.
-    /// </remarks>
-    private async Task ApplyPendingWatcherBatchesAsync(
-        IDirectoryWatcher? source = null, DirectoryNode? onlyForTree = null, CancellationToken ct = default)
+    private async Task ApplyPendingWatcherBatchesAsync(CancellationToken ct = default)
     {
-        // During a rescan the tree is being rebuilt; batches wait until it is ready
-        if (Pipeline.IsRunning || DirectoryTree.IsLoading)
+        if (Pipeline.IsRunning)
         {
             return;
         }
 
-        // A drain in progress loops until the current watcher is empty, so others can skip; a
-        // retired watcher's batches are only collected here, so its drain waits its turn.
-        if (onlyForTree is not null)
-        {
-            await _watcherApplyGate.WaitAsync(ct);
-        }
-        else if (!await _watcherApplyGate.WaitAsync(0, ct))
+        if (!await _watcherApplyGate.WaitAsync(0, ct))
         {
             return;
         }
 
         try
         {
-            if (onlyForTree is not null
-                && (!ReferenceEquals(DirectoryTree.RootNode, onlyForTree) || Pipeline.IsRunning || DirectoryTree.IsLoading))
-            {
-                return;
-            }
-
             var appliedAny = false;
-            var watcher = source ?? _directoryWatcher;
+            var watcher = _directoryWatcher;
             if (watcher is null)
             {
                 return;
