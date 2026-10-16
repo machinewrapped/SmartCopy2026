@@ -36,14 +36,21 @@ public static class DirectoryTreePatcher
         foreach (var insert in batch.Inserts.OrderBy(u => u.RelativePathSegments.Count))
         {
             var existingNode = FindExactNode(rootNode, insert.RelativePathSegments);
+
+            // Deleted and recreated within the batch: the insert replaces the removed node rather
+            // than being skipped, which would leave the path missing from the tree. A replacement
+            // of the same kind keeps the node's check, expansion and selection; a file replaced by
+            // a folder (or the reverse) starts afresh.
+            DirectoryTreeNode? replaced = null;
             if (existingNode is { IsMarkedForRemoval: true, Parent: { } existingParent })
             {
-                // Deleted and recreated within the batch: the insert replaces the removed node
-                // rather than being skipped, which would leave the path missing from the tree.
                 if (existingNode is DirectoryNode existingDir)
                     existingParent.Children.Remove(existingDir);
                 else if (existingNode is FileNode existingFile)
                     existingParent.Files.Remove(existingFile);
+
+                if (existingNode.IsDirectory == insert.Node.FileSystemNode.IsDirectory)
+                    replaced = existingNode;
             }
             else if (existingNode is not null)
             {
@@ -58,7 +65,10 @@ public static class DirectoryTreePatcher
 
             if (insert.Node.FileSystemNode.IsDirectory)
             {
-                var insertedDirNode = MakeDirectoryNode(insert.Node, parentNode);
+                var insertedDirNode = MakeDirectoryNode(insert.Node, parentNode,
+                    replaced?.CheckState == CheckState.Checked ? CheckState.Checked : null);
+                if (replaced is DirectoryNode { IsExpanded: true })
+                    insertedDirNode.IsExpanded = true;
                 InsertDirAlphabetically(parentNode.Children, insertedDirNode);
             }
             else
@@ -67,12 +77,17 @@ public static class DirectoryTreePatcher
                     !f.IsMarkedForRemoval && string.Equals(f.Name, insert.Node.FileSystemNode.Name, StringComparison.Ordinal));
                 if (existingFile is null)
                 {
-                    var initialCheckState = parentNode.CheckState == CheckState.Checked
-                        ? CheckState.Checked
-                        : CheckState.Unchecked;
+                    var initialCheckState = replaced?.CheckState
+                        ?? (parentNode.CheckState == CheckState.Checked ? CheckState.Checked : CheckState.Unchecked);
                     var fileNode = new FileNode(insert.Node.FileSystemNode, parentNode, initialCheckState);
                     InsertFileAlphabetically(parentNode.Files, fileNode);
                 }
+            }
+
+            // The deletion moved the selection off the replaced node; move it to its replacement
+            if (replaced is not null && selectedNode is not null && IsDescendantOrSelf(selectedNode, replaced))
+            {
+                nextSelectedNode = FindExactNode(rootNode, selectedNode.RelativePathSegments) ?? nextSelectedNode;
             }
         }
 
@@ -183,11 +198,11 @@ public static class DirectoryTreePatcher
         return false;
     }
 
-    private static DirectoryNode MakeDirectoryNode(ScannedNode snapshotNode, DirectoryNode parentNode)
+    private static DirectoryNode MakeDirectoryNode(
+        ScannedNode snapshotNode, DirectoryNode parentNode, CheckState? checkState = null)
     {
-        var initialCheckState = parentNode.CheckState == CheckState.Checked
-            ? CheckState.Checked
-            : CheckState.Unchecked;
+        var initialCheckState = checkState
+            ?? (parentNode.CheckState == CheckState.Checked ? CheckState.Checked : CheckState.Unchecked);
 
         var clone = new DirectoryNode(snapshotNode.FileSystemNode, parentNode, initialCheckState);
 
