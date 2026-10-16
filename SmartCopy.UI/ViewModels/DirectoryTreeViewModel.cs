@@ -140,6 +140,40 @@ public class DirectoryTreeViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Scans the current root again, keeping the checked nodes, expanded folders and active node
+    /// that still exist.
+    /// </summary>
+    public async Task RescanAsync(ScanOptions scanOptions, CancellationToken ct = default)
+    {
+        if (RootNode is not { } root)
+            return;
+
+        var provider = SourceProvider;
+        var selected = SelectedNode;
+        var state = DirectoryTreeState.Capture(root, selected, provider?.PathComparer ?? StringComparer.Ordinal);
+        SelectedNode = null;
+
+        var generation = _initializeCount + 1;
+        try
+        {
+            await InitializeAsync(root.FullPath, scanOptions, ct);
+        }
+        catch when (_initializeCount == generation)
+        {
+            // Failed or cancelled, and no newer scan has replaced it: put the old tree back
+            // rather than leave a partial one without the user's checks.
+            RestoreRoot(root, provider, selected);
+            throw;
+        }
+
+        if (RootNode is { } newRoot)
+        {
+            SelectedNode = state.Restore(newRoot) ?? newRoot;
+            newRoot.BuildStats();
+        }
+    }
+
+    /// <summary>
     /// Applies <paramref name="chain"/> to every node in the tree, setting <see cref="DirectoryTreeNode.FilterResult"/>/>.
     /// </summary>
     public async Task ApplyFiltersAsync(
@@ -173,8 +207,28 @@ public class DirectoryTreeViewModel : ViewModelBase
         IsLoading = false;
     }
 
+    private void RestoreRoot(DirectoryNode root, IFileSystemProvider? provider, DirectoryTreeNode? selected)
+    {
+        if (RootNode is { } partial)
+            partial.PropertyChanged -= OnRootNodePropertyChanged;
+
+        ItemsSource.Clear();
+        ItemsSource.Add(root);
+        root.PropertyChanged += OnRootNodePropertyChanged;
+
+        SourceProvider = provider;
+        IsLoaded = true;
+        SelectedNode = selected ?? root;
+        _ = LoadClassificationAsync(provider);
+    }
+
+    /// <summary>Counts scans started, so a scan can tell whether a newer one has replaced it.</summary>
+    private int _initializeCount;
+
     private async Task InitializeAsync(string rootPath, ScanOptions scanOptions, CancellationToken ct = default)
     {
+        var generation = ++_initializeCount;
+
         // Unsubscribe from old roots before clearing
         if (RootNode != null)
         {
@@ -211,8 +265,13 @@ public class DirectoryTreeViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
-            IsLoaded = RootNode != null;
+            // A scan replaced by a newer one ends after that one has started; the loading state
+            // is the newer scan's, and clearing it here would enable Rescan and Run mid-scan.
+            if (generation == _initializeCount)
+            {
+                IsLoading = false;
+                IsLoaded = RootNode != null;
+            }
         }
 
         if (RootNode is not null)

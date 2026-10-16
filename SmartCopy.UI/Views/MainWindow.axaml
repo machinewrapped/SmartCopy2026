@@ -21,6 +21,8 @@
         <Border Grid.Row="0" Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="0,0,0,1">
             <Menu>
                 <MenuItem Header="_File">
+                    <MenuItem Header="_Rescan" x:Name="RescanMenuItem" InputGesture="F5" IsEnabled="{Binding CanRescan}" />
+                    <Separator />
                     <MenuItem Header="_Export Settings..." x:Name="ExportSettingsMenuItem" />
                     <MenuItem Header="_Import Settings..." x:Name="ImportSettingsMenuItem" />
                     <Separator />
@@ -37,7 +39,7 @@
 
         <!-- Source Field -->
         <Border Grid.Row="1" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="6" Margin="10,10,10,5" Padding="10">
-            <Grid ColumnDefinitions="Auto, *" ColumnSpacing="4">
+            <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="4">
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0" Spacing="8">
                     <TextBlock Text="Source" VerticalAlignment="Center" FontWeight="SemiBold"/>
                     <TextBlock Text="{Binding DirectoryTree.Classification, FallbackValue=''}" 
@@ -51,6 +53,16 @@
                                         DataContext="{Binding SourcePathPicker}"
                                         BrowseDialogTitle="Select Source Path"
                                         BrowseButtonToolTip="Set the source path for the workflow" />
+                <Button Grid.Column="2"
+                        Command="{Binding RescanCommand}"
+                        IsEnabled="{Binding CanRescan}"
+                        VerticalAlignment="Top"
+                        CornerRadius="4"
+                        Margin="1,0,0,0"
+                        ToolTip.Tip="Rescan the source path (F5)"
+                        AutomationProperties.Name="Rescan the source path">
+                    <PathIcon Data="{DynamicResource RefreshIcon}" Width="16" Height="16" />
+                </Button>
             </Grid>
         </Border>
 

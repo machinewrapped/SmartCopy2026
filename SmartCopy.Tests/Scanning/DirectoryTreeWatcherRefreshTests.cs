@@ -98,6 +98,94 @@ public sealed class DirectoryTreeWatcherRefreshTests
     }
 
     [Fact]
+    public async Task ApplyWatcherBatch_KeepsAPathDeletedAndRecreatedInTheSameBatch()
+    {
+        using var temp = new TempDirectory();
+        var rootPath = Path.Combine(temp.Path, "root");
+        var beatlesPath = Path.Combine(rootPath, "albums", "beatles");
+        Directory.CreateDirectory(beatlesPath);
+        await File.WriteAllTextAsync(Path.Combine(beatlesPath, "song1.mp3"), "a");
+
+        var registry = new FileSystemProviderRegistry();
+        var provider = new LocalFileSystemProvider(rootPath);
+        registry.Register(provider);
+
+        var vm = new DirectoryTreeViewModel(registry);
+        await vm.ChangeRootAsync(rootPath, new ScanOptions {});
+
+        var oldBeatles = (DirectoryNode)vm.RootNode!.FindNodeByPathSegments(["albums", "beatles"])!;
+        oldBeatles.CheckState = CheckState.Checked;
+        oldBeatles.IsExpanded = true;
+        vm.SelectedNode = oldBeatles;
+
+        // The folder was replaced: the batch both deletes and inserts it
+        var scanner = new DirectoryScanner(provider);
+        vm.ApplyWatcherBatch(
+            new DirectoryWatcherBatch(
+                requiresFullRescan: false,
+                deletions: [new DirectoryWatcherDeletion(["albums", "beatles"])],
+                inserts:
+                [
+                    new DirectoryWatcherInsert(
+                        ["albums", "beatles"],
+                        await scanner.BuildScannedSubtreeAsync(
+                            beatlesPath, new ScanOptions { LazyExpand = false, IncludeHidden = true }))
+                ],
+                refreshes: []));
+
+        var beatles = vm.RootNode!.FindNodeByPathSegments(["albums", "beatles"]) as DirectoryNode;
+        Assert.NotNull(beatles);
+        Assert.NotSame(oldBeatles, beatles);
+        Assert.False(beatles.IsMarkedForRemoval);
+        Assert.Equal(CheckState.Checked, beatles.CheckState);
+        Assert.True(beatles.IsExpanded);
+        Assert.Same(beatles, vm.SelectedNode);
+        Assert.Equal(CheckState.Checked, vm.RootNode.FindNodeByPathSegments(["albums", "beatles", "song1.mp3"])!.CheckState);
+    }
+
+    [Fact]
+    public async Task ApplyWatcherBatch_KeepsTheCheckAndSelectionOfAReplacedFile()
+    {
+        using var temp = new TempDirectory();
+        var rootPath = Path.Combine(temp.Path, "root");
+        Directory.CreateDirectory(rootPath);
+        await File.WriteAllTextAsync(Path.Combine(rootPath, "song1.mp3"), "a");
+        await File.WriteAllTextAsync(Path.Combine(rootPath, "song2.mp3"), "a");
+
+        var registry = new FileSystemProviderRegistry();
+        var provider = new LocalFileSystemProvider(rootPath);
+        registry.Register(provider);
+
+        var vm = new DirectoryTreeViewModel(registry);
+        await vm.ChangeRootAsync(rootPath, new ScanOptions {});
+
+        // Only song1 is checked, so the parent is partly checked and can't supply the state
+        var oldSong1 = vm.RootNode!.FindNodeByPathSegments(["song1.mp3"])!;
+        oldSong1.CheckState = CheckState.Checked;
+        vm.SelectedNode = oldSong1;
+
+        var scanner = new DirectoryScanner(provider);
+        vm.ApplyWatcherBatch(
+            new DirectoryWatcherBatch(
+                requiresFullRescan: false,
+                deletions: [new DirectoryWatcherDeletion(["song1.mp3"])],
+                inserts:
+                [
+                    new DirectoryWatcherInsert(
+                        ["song1.mp3"],
+                        await scanner.BuildScannedSubtreeAsync(
+                            Path.Combine(rootPath, "song1.mp3"), new ScanOptions { LazyExpand = false, IncludeHidden = true }))
+                ],
+                refreshes: []));
+
+        var song1 = vm.RootNode.FindNodeByPathSegments(["song1.mp3"])!;
+        Assert.NotSame(oldSong1, song1);
+        Assert.Equal(CheckState.Checked, song1.CheckState);
+        Assert.Same(song1, vm.SelectedNode);
+        Assert.Equal(CheckState.Indeterminate, vm.RootNode.CheckState);
+    }
+
+    [Fact]
     public async Task ApplyWatcherBatch_RemovesDeletedSubtreeAndSelectsParent()
     {
         using var temp = new TempDirectory();

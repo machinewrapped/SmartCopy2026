@@ -58,13 +58,14 @@
 
         <Button Grid.Row="0"
                 Grid.Column="3"
-                Content="📱"
                 Click="OnMtpPickerClick"
                 CornerRadius="4"
                 Margin="5,0,0,0"
                 IsVisible="{OnPlatform Windows=True, Default=False}"
                 ToolTip.Tip="Pick MTP device (Android, camera)"
-                AutomationProperties.Name="Pick MTP device"/>
+                AutomationProperties.Name="Pick MTP device">
+            <PathIcon Data="{DynamicResource PhoneIcon}" Width="16" Height="16" />
+        </Button>
 
         <!-- Validation Row -->
         <TextBlock Grid.Row="1"

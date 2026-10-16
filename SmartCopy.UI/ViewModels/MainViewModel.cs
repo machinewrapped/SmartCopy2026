@@ -235,13 +235,20 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         FilterChain.ChainChanged += OnChainChanged;
         DirectoryTree.SelectionChanged += (_, _) => RefreshIdleStats();
 
+        Pipeline.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(PipelineViewModel.IsRunning))
+                OnPropertyChanged(nameof(CanRescan));
+        };
+
         DirectoryTree.PropertyChanged += async (_, e) =>
         {
             if (e.PropertyName == nameof(DirectoryTreeViewModel.IsLoading))
             {
                 StatusBar.IsScanning = DirectoryTree.IsLoading;
                 StatusBar.ScanStatusText = DirectoryTree.IsLoading ? "Scanning..." : string.Empty;
-                Pipeline.IsScanning = DirectoryTree.IsLoading;
+                UpdatePipelineBusy();
+                OnPropertyChanged(nameof(CanRescan));
             }
             else if (e.PropertyName == nameof(DirectoryTreeViewModel.SelectedNode))
             {
@@ -576,12 +583,23 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     // ── Keyboard shortcut commands ────────────────────────────────────────────
 
-    [RelayCommand]
+    /// <summary>
+    /// Rescan waits for a running pipeline and for any scan in progress: rescanning during a scan
+    /// would capture the partial tree and lose the user's state.
+    /// </summary>
+    public bool CanRescan => !Pipeline.IsRunning && !DirectoryTree.IsLoading;
+
+    // Concurrent: a rescan stays "executing" while filters apply after the scan, and that alone
+    // must not disable the button; CanRescan decides, as it does for F5 and the menu.
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task Rescan()
     {
-        var path = SourcePath.Trim();
+        if (!CanRescan) return;
+
+        // The loaded source, not the editor text, which may hold an uncommitted draft
+        var path = DirectoryTree.SourcePath ?? _lastCommittedSourcePath;
         if (string.IsNullOrWhiteSpace(path)) return;
-        await ApplySourcePathCoreAsync(path);
+        await ApplySourcePathCoreAsync(path, forceRescan: true);
     }
 
     [RelayCommand]
@@ -954,16 +972,16 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         await ApplySourcePathCoreAsync(oldDestination);
     }
 
-    private async Task ApplySourcePathCoreAsync(string path)
+    private async Task ApplySourcePathCoreAsync(string path, bool forceRescan = false)
     {
         var normalizedPath = PathHelper.NormalizeUserPath(path);
 
         if (string.IsNullOrWhiteSpace(normalizedPath))
             return;
 
-        // Check if the path has actually changed        
+        // Check if the path has actually changed; an explicit rescan reloads the same path
         var previousSourcePath = DirectoryTree.SourcePath;
-        if (normalizedPath == previousSourcePath)
+        if (!forceRescan && normalizedPath == previousSourcePath)
             return;
 
         // Cancel any in-progress scan and start a fresh token for this one.
@@ -972,19 +990,33 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _scanCts = new CancellationTokenSource();
         var ct = _scanCts.Token;
 
+        var isRescan = normalizedPath == previousSourcePath;
+
+        // A rescan leaves an uncommitted draft in the source box, and any message about it, alone
+        var editorShowsSource = !forceRescan || PathHelper.NormalizeUserPath(SourcePath) == normalizedPath;
+
         try
         {
+            // Changes made while scanning are not tracked, as for a source change; the scan
+            // itself picks up most of them, and the fresh watcher everything after.
             DisposeDirectoryWatcher();
 
-            SourcePath = normalizedPath;
-            SourcePathValidationMessage = string.Empty;
+            if (editorShowsSource)
+            {
+                SourcePath = normalizedPath;
+                SourcePathValidationMessage = string.Empty;
+            }
 
             FileList.Clear();
 
-            await DirectoryTree.ChangeRootAsync(normalizedPath, BuildScanOptions(), ct);
+            if (isRescan)
+                await DirectoryTree.RescanAsync(BuildScanOptions(), ct);
+            else
+                await DirectoryTree.ChangeRootAsync(normalizedPath, BuildScanOptions(), ct);
 
             _lastCommittedSourcePath = normalizedPath;
-            SourcePathValidationMessage = string.Empty;
+            if (editorShowsSource)
+                SourcePathValidationMessage = string.Empty;
 
             RecordRecentSource(normalizedPath);
 
@@ -1008,15 +1040,42 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 return;
 
             // The user pressed Cancel.
-            SourcePathValidationMessage = "Directory scan was cancelled before it was complete";
-            LogPanel.AddEntry(SourcePathValidationMessage, LogLevel.Warning);
+            ReportSourceFailure("Directory scan was cancelled before it was complete", LogLevel.Warning);
+            if (forceRescan) ResumeWatchingRestoredTree(normalizedPath);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to change source path to '{Path}'", normalizedPath);
 
-            SourcePathValidationMessage = BuildSourcePathValidationMessage(normalizedPath, ex);
-            LogPanel.AddEntry(SourcePathValidationMessage, LogLevel.Error);
+            ReportSourceFailure(BuildSourcePathValidationMessage(normalizedPath, ex), LogLevel.Error);
+            if (forceRescan) ResumeWatchingRestoredTree(normalizedPath);
+        }
+
+        // A message about the loaded source would be misleading under a draft that names another
+        // path, and would replace the draft's own message; then the log alone reports it.
+        void ReportSourceFailure(string message, LogLevel level)
+        {
+            if (editorShowsSource)
+                SourcePathValidationMessage = message;
+            LogPanel.AddEntry(message, level);
+        }
+    }
+
+    /// <summary>A failed rescan puts the previous tree back; watch it again.</summary>
+    private void ResumeWatchingRestoredTree(string path)
+    {
+        if (!DirectoryTree.IsLoaded || DirectoryTree.SourcePath != path)
+            return;
+
+        // Runs inside the failure handlers, and the failure may be the source disappearing,
+        // so a watcher that cannot start is logged rather than allowed to escape.
+        try
+        {
+            StartDirectoryWatcherIfSupported();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not resume watching '{Path}' after the rescan failed", path);
         }
     }
 
@@ -1173,6 +1232,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         var chain = FilterChain.BuildLiveChain();
 
+        // Nodes not yet evaluated count as included, so the pipeline stays blocked until every
+        // pass in flight has finished, including any that supersede this one.
+        _pipelineHolds++;
+        UpdatePipelineBusy();
         try
         {
             if (DirectoryTree.SelectedNode is DirectoryNode selectedDirectory)
@@ -1194,9 +1257,21 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             // Superseded by a newer pass, which now owns the filter results.
             return;
         }
+        finally
+        {
+            _pipelineHolds--;
+            UpdatePipelineBusy();
+        }
 
         RefreshIdleStats();
     }
+
+    /// <summary>Filter passes in flight, which the pipeline must wait for.</summary>
+    private int _pipelineHolds;
+
+    /// <summary>The pipeline waits for scanning and for filters to finish applying.</summary>
+    private void UpdatePipelineBusy() =>
+        Pipeline.IsScanning = DirectoryTree.IsLoading || _pipelineHolds > 0;
 
     private void RefreshIdleStats()
     {
@@ -1746,9 +1821,24 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 await ApplyFiltersAsync(ct);
             }
         }
+        catch (OperationCanceledException)
+        {
+            // Superseded; whatever cancelled this owns the tree now.
+        }
+        catch (Exception ex)
+        {
+            // Callers fire and forget, so failures are surfaced here rather than lost.
+            _logger.LogError(ex, "Failed to apply filesystem changes to the tree");
+            LogPanel.AddEntry("Failed to apply filesystem changes; use Rescan to refresh", LogLevel.Error);
+        }
         finally
         {
             _watcherApplyGate.Release();
+
+            // Drains that found the gate held skipped their batches, including any queued while
+            // this one awaited its filter pass; run another rather than wait for the next change.
+            if (_directoryWatcher?.HasPendingBatches == true)
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = ApplyPendingWatcherBatchesAsync());
         }
     }
 
