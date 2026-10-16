@@ -222,12 +222,12 @@ public class DirectoryTreeViewModel : ViewModelBase
         _ = LoadClassificationAsync(provider);
     }
 
-    /// <summary>Counts scans started, so a failed rescan can tell whether a newer scan replaced it.</summary>
+    /// <summary>Counts scans started, so a scan can tell whether a newer one has replaced it.</summary>
     private int _initializeCount;
 
     private async Task InitializeAsync(string rootPath, ScanOptions scanOptions, CancellationToken ct = default)
     {
-        _initializeCount++;
+        var generation = ++_initializeCount;
 
         // Unsubscribe from old roots before clearing
         if (RootNode != null)
@@ -265,8 +265,13 @@ public class DirectoryTreeViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
-            IsLoaded = RootNode != null;
+            // A scan replaced by a newer one ends after that one has started; the loading state
+            // is the newer scan's, and clearing it here would enable Rescan and Run mid-scan.
+            if (generation == _initializeCount)
+            {
+                IsLoading = false;
+                IsLoaded = RootNode != null;
+            }
         }
 
         if (RootNode is not null)
