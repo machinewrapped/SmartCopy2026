@@ -63,6 +63,27 @@ public sealed class DirectoryTreeRescanTests
     }
 
     [Fact]
+    public async Task ChangeRootAsync_SelectsTheNewRootRatherThanANodeFromTheOldTree()
+    {
+        using var temp = new TempDirectory();
+        var moviesPath = Path.Combine(temp.Path, "movies");
+        var musicPath = Path.Combine(temp.Path, "music");
+        Directory.CreateDirectory(moviesPath);
+        Directory.CreateDirectory(musicPath);
+
+        var registry = new FileSystemProviderRegistry();
+        registry.Register(new LocalFileSystemProvider(temp.Path));
+        var vm = new DirectoryTreeViewModel(registry);
+        await vm.ChangeRootAsync(moviesPath, new ScanOptions());
+        Assert.Same(vm.RootNode, vm.SelectedNode);
+
+        await vm.ChangeRootAsync(musicPath, new ScanOptions());
+
+        Assert.Equal(musicPath, vm.RootNode!.FullPath);
+        Assert.Same(vm.RootNode, vm.SelectedNode);
+    }
+
+    [Fact]
     public async Task RescanAsync_KeepsTheOldTreeWhenTheRescanDoesNotComplete()
     {
         using var temp = new TempDirectory();
