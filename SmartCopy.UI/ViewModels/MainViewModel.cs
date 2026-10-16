@@ -1106,7 +1106,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     {
         // Its changes belong to this tree only; see ApplyPendingWatcherBatchesAsync
         var tree = DirectoryTree.RootNode;
+
+        // Unhooked from the tree now, but its errors are still reported until the flush is done:
+        // a batch that fails to build is otherwise only reported through WatcherError.
         DetachWatcher(watcher);
+        watcher.WatcherError += OnDirectoryWatcherError;
 
         // The tree may be missing changes only this watcher saw, so no pipeline runs until
         // they are applied (and a run starting meanwhile would make the drain discard them).
@@ -1126,6 +1130,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         }
         finally
         {
+            watcher.WatcherError -= OnDirectoryWatcherError;
             watcher.Dispose();
             _pipelineHolds--;
             UpdatePipelineBusy();
