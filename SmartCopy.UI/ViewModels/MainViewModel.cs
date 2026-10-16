@@ -1025,7 +1025,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             // rather than letting it continue against the new tree.
             await ApplyFiltersAsync(ct);
 
-            RenewDirectoryWatcher();
+            // Awaited so the pipeline stays blocked until changes seen during the scan are applied
+            await RenewDirectoryWatcherAsync();
 
             if (DirectoryTree.SourceProvider is { } sp)
                 await Pipeline.SetSourceContext(sp);
@@ -1041,25 +1042,33 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 return;
 
             // The user pressed Cancel.
-            SourcePathValidationMessage = "Directory scan was cancelled before it was complete";
-            LogPanel.AddEntry(SourcePathValidationMessage, LogLevel.Warning);
+            ReportSourceFailure("Directory scan was cancelled before it was complete", LogLevel.Warning);
             if (forceRescan) ResumeWatchingRestoredTree(normalizedPath);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to change source path to '{Path}'", normalizedPath);
 
-            SourcePathValidationMessage = BuildSourcePathValidationMessage(normalizedPath, ex);
-            LogPanel.AddEntry(SourcePathValidationMessage, LogLevel.Error);
+            ReportSourceFailure(BuildSourcePathValidationMessage(normalizedPath, ex), LogLevel.Error);
             if (forceRescan) ResumeWatchingRestoredTree(normalizedPath);
+        }
+
+        // A message about the loaded source would be misleading under a draft that names another
+        // path, and would replace the draft's own message; then the log alone reports it.
+        void ReportSourceFailure(string message, LogLevel level)
+        {
+            if (editorShowsSource)
+                SourcePathValidationMessage = message;
+            LogPanel.AddEntry(message, level);
         }
     }
 
     /// <summary>A failed rescan puts the previous tree back; watch it again.</summary>
     private void ResumeWatchingRestoredTree(string path)
     {
+        // Not awaited from the failure handlers; the retirement still holds the pipeline itself
         if (DirectoryTree.IsLoaded && DirectoryTree.SourcePath == path)
-            RenewDirectoryWatcher();
+            _ = RenewDirectoryWatcherAsync();
     }
 
     /// <summary>
@@ -1068,7 +1077,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// stays in charge, but the changes it saw during the scan are still applied. Starting the new
     /// one first means no change falls between them; overlapping batches are harmless.
     /// </summary>
-    private void RenewDirectoryWatcher()
+    private Task RenewDirectoryWatcherAsync()
     {
         var retained = _directoryWatcher;
         _directoryWatcher = null;
@@ -1089,11 +1098,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             _directoryWatcher = retained;
             retained = null;
         }
-        finally
-        {
-            if (retained is not null)
-                _ = RetireDirectoryWatcherAsync(retained);
-        }
+
+        return retained is not null ? RetireDirectoryWatcherAsync(retained) : Task.CompletedTask;
     }
 
     private async Task RetireDirectoryWatcherAsync(IDirectoryWatcher watcher)
@@ -1102,6 +1108,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         var tree = DirectoryTree.RootNode;
         DetachWatcher(watcher);
 
+        // The tree may be missing changes only this watcher saw, so no pipeline runs until
+        // they are applied (and a run starting meanwhile would make the drain discard them).
+        _pipelineHolds++;
+        UpdatePipelineBusy();
         try
         {
             // Collect everything it saw before stopping, including changes still in its debounce
@@ -1117,6 +1127,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         finally
         {
             watcher.Dispose();
+            _pipelineHolds--;
+            UpdatePipelineBusy();
         }
     }
 
@@ -1275,7 +1287,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         // Nodes not yet evaluated count as included, so the pipeline stays blocked until every
         // pass in flight has finished, including any that supersede this one.
-        _filterPassesInFlight++;
+        _pipelineHolds++;
         UpdatePipelineBusy();
         try
         {
@@ -1300,18 +1312,19 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         }
         finally
         {
-            _filterPassesInFlight--;
+            _pipelineHolds--;
             UpdatePipelineBusy();
         }
 
         RefreshIdleStats();
     }
 
-    private int _filterPassesInFlight;
+    /// <summary>Work the pipeline must wait for: filter passes and retiring watchers.</summary>
+    private int _pipelineHolds;
 
-    /// <summary>The pipeline waits for scanning and for filters to finish applying.</summary>
+    /// <summary>The pipeline waits for scanning and for every hold to finish.</summary>
     private void UpdatePipelineBusy() =>
-        Pipeline.IsScanning = DirectoryTree.IsLoading || _filterPassesInFlight > 0;
+        Pipeline.IsScanning = DirectoryTree.IsLoading || _pipelineHolds > 0;
 
     private void RefreshIdleStats()
     {
