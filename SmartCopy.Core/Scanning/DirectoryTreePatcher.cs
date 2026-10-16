@@ -36,7 +36,16 @@ public static class DirectoryTreePatcher
         foreach (var insert in batch.Inserts.OrderBy(u => u.RelativePathSegments.Count))
         {
             var existingNode = FindExactNode(rootNode, insert.RelativePathSegments);
-            if (existingNode is not null)
+            if (existingNode is { IsMarkedForRemoval: true, Parent: { } existingParent })
+            {
+                // Deleted and recreated within the batch: the insert replaces the removed node
+                // rather than being skipped, which would leave the path missing from the tree.
+                if (existingNode is DirectoryNode existingDir)
+                    existingParent.Children.Remove(existingDir);
+                else if (existingNode is FileNode existingFile)
+                    existingParent.Files.Remove(existingFile);
+            }
+            else if (existingNode is not null)
             {
                 continue;
             }

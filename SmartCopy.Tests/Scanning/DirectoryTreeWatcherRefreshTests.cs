@@ -98,6 +98,43 @@ public sealed class DirectoryTreeWatcherRefreshTests
     }
 
     [Fact]
+    public async Task ApplyWatcherBatch_KeepsAPathDeletedAndRecreatedInTheSameBatch()
+    {
+        using var temp = new TempDirectory();
+        var rootPath = Path.Combine(temp.Path, "root");
+        var beatlesPath = Path.Combine(rootPath, "albums", "beatles");
+        Directory.CreateDirectory(beatlesPath);
+        await File.WriteAllTextAsync(Path.Combine(beatlesPath, "song1.mp3"), "a");
+
+        var registry = new FileSystemProviderRegistry();
+        var provider = new LocalFileSystemProvider(rootPath);
+        registry.Register(provider);
+
+        var vm = new DirectoryTreeViewModel(registry);
+        await vm.ChangeRootAsync(rootPath, new ScanOptions {});
+
+        // The folder was replaced: the batch both deletes and inserts it
+        var scanner = new DirectoryScanner(provider);
+        vm.ApplyWatcherBatch(
+            new DirectoryWatcherBatch(
+                requiresFullRescan: false,
+                deletions: [new DirectoryWatcherDeletion(["albums", "beatles"])],
+                inserts:
+                [
+                    new DirectoryWatcherInsert(
+                        ["albums", "beatles"],
+                        await scanner.BuildScannedSubtreeAsync(
+                            beatlesPath, new ScanOptions { LazyExpand = false, IncludeHidden = true }))
+                ],
+                refreshes: []));
+
+        var beatles = vm.RootNode!.FindNodeByPathSegments(["albums", "beatles"]);
+        Assert.NotNull(beatles);
+        Assert.False(beatles.IsMarkedForRemoval);
+        Assert.NotNull(vm.RootNode.FindNodeByPathSegments(["albums", "beatles", "song1.mp3"]));
+    }
+
+    [Fact]
     public async Task ApplyWatcherBatch_RemovesDeletedSubtreeAndSelectsParent()
     {
         using var temp = new TempDirectory();
