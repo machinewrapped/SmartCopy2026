@@ -201,6 +201,9 @@ public class DirectoryTreeViewModel : ViewModelBase
 
     internal void Reset()
     {
+        // Clear the selection too: the view only does so when the TreeView raises SelectionChanged
+        // on clear, and a node left over from the old tree would survive into the new one.
+        SelectedNode = null;
         ItemsSource.Clear();
         SourceProvider = null;
         IsLoaded = false;
