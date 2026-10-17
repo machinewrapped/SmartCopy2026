@@ -31,8 +31,9 @@ dotnet test | Out-String
 # Run a single test
 dotnet test --filter "FullyQualifiedName~TestClassName" | Out-String
 
-# Publish self-contained single file
-dotnet publish -c Release --self-contained true -p:PublishSingleFile=true | Out-String
+# Publish self-contained single file (profiles: win-x64, linux-x64, osx-arm64)
+# Output: artifacts/publish/SmartCopy.App/release_<rid>/
+dotnet publish SmartCopy.App/SmartCopy.App.csproj -p:PublishProfile=win-x64 | Out-String
 ```
 
 ## Error Handling
