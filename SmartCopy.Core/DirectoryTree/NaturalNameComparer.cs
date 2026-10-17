@@ -6,7 +6,8 @@ namespace SmartCopy.Core.DirectoryTree;
 /// Display order for sibling names in the directory tree: case-insensitive ordinal, except that runs
 /// of ASCII digits compare by numeric value, so "file2" sorts before "file10". Names that differ only
 /// by case stay adjacent, ordered case-sensitively ("Photos" before "photos"). Numerically equal runs
-/// fall back to the shorter run first ("a1" before "a01"), keeping the order total.
+/// fall back to the shorter run first ("a1" before "a01"), keeping the order total. Punctuation and
+/// symbols sort before digits, and digits before letters ("[Draft]" before "1st" before "alpha").
 /// </summary>
 public sealed class NaturalNameComparer : IComparer<string>
 {
@@ -67,7 +68,9 @@ public sealed class NaturalNameComparer : IComparer<string>
             // outside the BMP (e.g. Deseret) unchanged, splitting their case variants apart.
             Rune.DecodeFromUtf16(x.AsSpan(i), out var runeX, out var lengthX);
             Rune.DecodeFromUtf16(y.AsSpan(j), out var runeY, out var lengthY);
-            var byRune = Rune.ToUpperInvariant(runeX).CompareTo(Rune.ToUpperInvariant(runeY));
+            var byRune = Rank(runeX).CompareTo(Rank(runeY));
+            if (byRune == 0)
+                byRune = Rune.ToUpperInvariant(runeX).CompareTo(Rune.ToUpperInvariant(runeY));
             if (byRune != 0) return byRune;
             i += lengthX;
             j += lengthY;
@@ -76,6 +79,13 @@ public sealed class NaturalNameComparer : IComparer<string>
         var byRemaining = (x.Length - i).CompareTo(y.Length - j);
         return byRemaining != 0 ? byRemaining : leadingZeroTieBreak;
     }
+
+    // Punctuation and symbols sort before digits, digits before letters, as in Windows Explorer.
+    // Without this, '[' and '_' (between 'Z' and 'a' in ASCII) would sort after every letter once upper-cased.
+    private static int Rank(Rune r) =>
+        Rune.IsPunctuation(r) || Rune.IsSymbol(r) || Rune.IsWhiteSpace(r) ? 0
+        : Rune.IsDigit(r) ? 1
+        : 2;
 
     private static int EndOfDigitRun(string s, int start)
     {

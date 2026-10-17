@@ -161,7 +161,7 @@ A **modal `Window`** opened via "＋ Configure..." or the edit pencil on any car
 
 ### Sort Order in Tree / File List
 
-- Siblings are always shown folders first, then in natural, case-insensitive order (`disc2` before `disc10`), with names differing only by case kept adjacent (`Photos` before `photos`), regardless of the order the filesystem returns them. `DirectoryScanner` sorts; `DirectoryTreePatcher` inserts watcher additions with the same `NaturalNameComparer`.
+- Siblings are always shown folders first, then in natural, case-insensitive order (`disc2` before `disc10`), with names differing only by case kept adjacent (`Photos` before `photos`) and punctuation/symbols before digits before letters (`[Draft]` before `1st` before `alpha`, as in Windows Explorer), regardless of the order the filesystem returns them. `DirectoryScanner` sorts; `DirectoryTreePatcher` inserts watcher additions with the same `NaturalNameComparer`.
 
 ### Filter Results in Tree / File List
 
