@@ -17,6 +17,16 @@ public sealed class NaturalNameComparerTests
     }
 
     [Fact]
+    public void Sort_PutsPunctuationBeforeDigitsBeforeLetters()
+    {
+        string[] names = ["Zeta", "alpha", "~temp", "1st", "_private", "[Draft]"];
+
+        var sorted = names.Order(NaturalNameComparer.Instance);
+
+        Assert.Equal(["[Draft]", "_private", "~temp", "1st", "alpha", "Zeta"], sorted);
+    }
+
+    [Fact]
     public void Sort_KeepsCaseVariantsOutsideTheBmpAdjacent()
     {
         // Deseret 𐐀 (U+10400) and 𐐨 (U+10428) are case variants; 𐐁 (U+10401) falls between them by code unit.
