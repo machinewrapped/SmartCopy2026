@@ -283,7 +283,7 @@ public sealed class PipelineIntegrationTests
         Assert.Equal("copy", columns[2]);
         Assert.Equal("src/song.mp3", columns[3]);
         Assert.Equal("mem://dest/src/song.mp3", columns[4]);
-        Assert.Equal("256.0KB", columns[5]);
+        Assert.Equal("256.0KiB", columns[5]);
         Assert.Equal((256 * 1024).ToString(), columns[6]);
         Assert.Equal((256 * 1024).ToString(), columns[7]);
         Assert.Equal("1", columns[8]);
