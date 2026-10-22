@@ -500,6 +500,157 @@ internal static class BenchmarkCopyRunner
         }
     }
 
+    /// <summary>
+    /// Phase 7 stream-only prototype: copies every selected file individually, mirroring the production
+    /// streaming path's per-file mechanics (natural selection order, unbuffered sequential-scan source,
+    /// staged temp file + rename) while swapping the byte pump for <paramref name="pumpMode"/>. No
+    /// batching and no direct writes, so the pump is the only variable versus the serial control.
+    /// </summary>
+    public static async Task<IReadOnlyList<TransformResult>> RunStreamPumpAsync(
+        PipelineJob job,
+        string destinationPath,
+        OverwriteMode overwriteMode,
+        int copyBufferSizeBytes,
+        StreamPumpMode pumpMode,
+        CancellationToken ct)
+    {
+        job.RootNode.BuildStats();
+
+        var results = new List<TransformResult>();
+        var stopwatch = Stopwatch.StartNew();
+        long totalBytes = job.RootNode.TotalSelectedBytes;
+        int totalFiles = job.RootNode.NumSelectedFiles;
+        long completedBytes = 0;
+        int filesCompleted = 0;
+        string? lastCreatedDir = null;
+
+        foreach (var node in job.RootNode.GetSelectedDescendants())
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (node.IsDirectory)
+            {
+                results.Add(new TransformResult(IsSuccess: true, SourceNode: node, SourceNodeResult: SourceResult.None));
+                continue;
+            }
+
+            if (job.PauseToken is not null)
+            {
+                await job.PauseToken.WaitIfPausedAsync(ct);
+            }
+
+            var segments = node.RelativePathSegments.Length > 0
+                ? node.RelativePathSegments
+                : [node.Name];
+            var destination = Path.GetFullPath(Path.Combine(destinationPath, Path.Combine(segments)));
+
+            var exists = File.Exists(destination);
+            if (exists && overwriteMode == OverwriteMode.Skip)
+            {
+                results.Add(new TransformResult(
+                    IsSuccess: true,
+                    SourceNode: node,
+                    SourceNodeResult: SourceResult.Skipped,
+                    DestinationPath: destination,
+                    NumberOfFilesSkipped: 1,
+                    InputBytes: node.Size));
+                continue;
+            }
+
+            var startTick = Stopwatch.GetTimestamp();
+            string? stagedPath = null;
+            string? copyError = null;
+
+            try
+            {
+                var directory = Path.GetDirectoryName(destination);
+                if (!string.IsNullOrEmpty(directory) && directory != lastCreatedDir)
+                {
+                    Directory.CreateDirectory(directory);
+                    lastCreatedDir = directory;
+                }
+
+                var fileName = Path.GetFileName(destination);
+                var safeFileName = string.IsNullOrWhiteSpace(fileName) ? "smartcopy" : fileName;
+                stagedPath = Path.Combine(directory ?? Path.GetTempPath(), $".{safeFileName}.smartcopy.tmp.{Guid.NewGuid():N}");
+
+                long copied;
+                using (var source = File.OpenHandle(
+                    node.FullPath, FileMode.Open, FileAccess.Read, FileShare.Read,
+                    FileOptions.Asynchronous | FileOptions.SequentialScan))
+                using (var target = File.OpenHandle(
+                    stagedPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                    FileOptions.Asynchronous))
+                {
+                    copied = await StreamPumpPrototype.CopyAsync(source, target, copyBufferSizeBytes, pumpMode, ct);
+                }
+
+                // Byte accounting uses node.Size; see the batch path's matching guard.
+                if (copied != node.Size)
+                    throw new IOException($"Copied {copied} of {node.Size} scanned bytes; source changed during the run.");
+
+                File.Move(stagedPath, destination, overwrite: true);
+                stagedPath = null;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                copyError = ex.Message;
+            }
+            finally
+            {
+                if (stagedPath is not null)
+                {
+                    try { File.Delete(stagedPath); } catch { /* Ignore cleanup failures */ }
+                }
+            }
+
+            var elapsedDuration = Stopwatch.GetElapsedTime(startTick);
+
+            if (copyError is not null)
+            {
+                results.Add(new TransformResult(
+                    IsSuccess: false,
+                    SourceNode: node,
+                    SourceNodeResult: SourceResult.None,
+                    DestinationPath: destination,
+                    ErrorMessage: copyError,
+                    ExecutionDuration: elapsedDuration));
+                continue;
+            }
+
+            filesCompleted++;
+            completedBytes += node.Size;
+
+            var result = new TransformResult(
+                IsSuccess: true,
+                SourceNode: node,
+                SourceNodeResult: SourceResult.Copied,
+                DestinationPath: destination,
+                DestinationResult: exists ? DestinationResult.Overwritten : DestinationResult.Created,
+                NumberOfFilesAffected: 1,
+                InputBytes: node.Size,
+                OutputBytes: node.Size,
+                ExecutionDuration: elapsedDuration);
+
+            results.Add(result);
+            job.NodeProgress?.Report(result);
+
+            var currentElapsed = stopwatch.Elapsed;
+            job.Progress?.Report(new OperationProgress(
+                CurrentFile: node.CanonicalRelativePath,
+                CurrentFileBytes: node.Size,
+                CurrentFileTotalBytes: node.Size,
+                FilesCompleted: filesCompleted,
+                FilesTotal: totalFiles,
+                TotalBytesCompleted: completedBytes,
+                TotalBytes: totalBytes,
+                Elapsed: currentElapsed,
+                EstimatedRemaining: EstimateRemaining(currentElapsed, completedBytes, totalBytes)));
+        }
+
+        return results;
+    }
+
     private static TimeSpan EstimateRemaining(TimeSpan elapsed, long completed, long total)
     {
         if (completed <= 0 || elapsed.TotalSeconds <= 0 || completed >= total)
