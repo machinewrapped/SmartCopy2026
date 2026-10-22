@@ -7,9 +7,9 @@ public static class FileSizeFormatter
     public static string FormatBytes(long bytes) => bytes switch
     {
         < 1024 => $"{bytes}B",
-        < 1024 * 1024 => $"{(bytes / 1024.0).ToString("F1", CultureInfo.InvariantCulture)}KB",
-        < 1024L * 1024 * 1024 => $"{(bytes / (1024.0 * 1024)).ToString("F1", CultureInfo.InvariantCulture)}MB",
-        _ => $"{(bytes / (1024.0 * 1024 * 1024)).ToString("F2", CultureInfo.InvariantCulture)}GB",
+        < 1024 * 1024 => $"{(bytes / 1024.0).ToString("F1", CultureInfo.InvariantCulture)}KiB",
+        < 1024L * 1024 * 1024 => $"{(bytes / (1024.0 * 1024)).ToString("F1", CultureInfo.InvariantCulture)}MiB",
+        _ => $"{(bytes / (1024.0 * 1024 * 1024)).ToString("F2", CultureInfo.InvariantCulture)}GiB",
     };
 
     public static string FormatRate(double bytesPerSecond)
@@ -20,9 +20,9 @@ public static class FileSizeFormatter
         return bytesPerSecond switch
         {
             < 1024 => $"{bytesPerSecond.ToString("F0", CultureInfo.InvariantCulture)}B/s",
-            < 1024 * 1024 => $"{(bytesPerSecond / 1024).ToString("F1", CultureInfo.InvariantCulture)}KB/s",
-            < 1024L * 1024 * 1024 => $"{(bytesPerSecond / (1024.0 * 1024)).ToString("F1", CultureInfo.InvariantCulture)}MB/s",
-            _ => $"{(bytesPerSecond / (1024.0 * 1024 * 1024)).ToString("F2", CultureInfo.InvariantCulture)}GB/s",
+            < 1024 * 1024 => $"{(bytesPerSecond / 1024).ToString("F1", CultureInfo.InvariantCulture)}KiB/s",
+            < 1024L * 1024 * 1024 => $"{(bytesPerSecond / (1024.0 * 1024)).ToString("F1", CultureInfo.InvariantCulture)}MiB/s",
+            _ => $"{(bytesPerSecond / (1024.0 * 1024 * 1024)).ToString("F2", CultureInfo.InvariantCulture)}GiB/s",
         };
     }
 }

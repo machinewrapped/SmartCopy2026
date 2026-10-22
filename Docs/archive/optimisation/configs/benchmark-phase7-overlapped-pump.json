@@ -1,0 +1,120 @@
+{
+  "sourcePath": "G:\\TestData\\Phase7DVDs",
+  "artifactPath": "C:\\benchmark-artifacts",
+  "includeHidden": false,
+  "convergenceSpreadPercent": 4.5,
+  "gatePercent": 3,
+  "maxConvergenceRuns": 5,
+  "converge": true,
+  "failFast": false,
+  "clearDestinationBeforeRun": true,
+  "clearDestinationAfterRun": true,
+  "cooldownSeconds": 30,
+  "purgeSourceCacheBeforeRun": true,
+  "scenarios": [
+    {
+      "name": "USBHDDtoHDD-G-M",
+      "destinationPath": "M:\\TestData\\Phase7_Out",
+      "sourcePath": "G:\\TestData\\Phase7DVDs",
+      "enabled": true,
+      "overwriteMode": 1,
+      "usePathPool": false,
+      "variants": null
+    },
+    {
+      "name": "SSDtoHDD-D-M",
+      "destinationPath": "M:\\TestData\\Phase7_Out",
+      "sourcePath": "D:\\TestData\\Phase7DVDs",
+      "enabled": false,
+      "overwriteMode": 1,
+      "usePathPool": false,
+      "variants": null
+    },
+    {
+      "name": "SameDriveHDD-M",
+      "destinationPath": "M:\\TestData\\Phase7_Out",
+      "sourcePath": "M:\\TestData\\Phase7DVDs",
+      "enabled": false,
+      "overwriteMode": 1,
+      "usePathPool": false,
+      "variants": null
+    },
+    {
+      "name": "USBHDDtoSSD-G-D",
+      "destinationPath": "D:\\TestData\\Phase7_Out",
+      "sourcePath": "G:\\TestData\\Phase7DVDs",
+      "enabled": false,
+      "overwriteMode": 1,
+      "usePathPool": false,
+      "variants": null
+    }
+  ],
+  "scenarioExecutionOrder": [
+    "USBHDDtoHDD-G-M",
+    "SSDtoHDD-D-M",
+    "SameDriveHDD-M",
+    "USBHDDtoSSD-G-D"
+  ],
+  "variants": [
+    {
+      "name": "P7_Serial_512K",
+      "notes": "Phase 7 control. Prototype stream-only runner, serial pump (await read, await write) at 512 KiB: the production StreamCopyEngine loop over RandomAccess. No batching, no direct write.",
+      "enabled": true,
+      "desiredRunCount": 3,
+      "writeJournal": true,
+      "providerCopyBufferSizeBytes": 524288,
+      "directWriteThresholdBytes": 0,
+      "bufferBatchBytes": 0,
+      "usePrototypeExecutor": true,
+      "prototypeStreamPump": "Serial",
+      "matchedControl": null
+    },
+    {
+      "name": "P7_Overlapped_512K",
+      "notes": "Double-buffered pump at 512 KiB: the read of chunk N+1 is in flight while chunk N is written. Two buffers, at most one read and one write outstanding.",
+      "enabled": true,
+      "desiredRunCount": 3,
+      "writeJournal": true,
+      "providerCopyBufferSizeBytes": 524288,
+      "directWriteThresholdBytes": 0,
+      "bufferBatchBytes": 0,
+      "usePrototypeExecutor": true,
+      "prototypeStreamPump": "Overlapped",
+      "matchedControl": "P7_Serial_512K",
+      "validationRole": "Value"
+    },
+    {
+      "name": "P7_Overlapped2Reads_512K",
+      "notes": "As P7_Overlapped_512K with up to two 512 KiB reads in flight (three buffers) and one write.",
+      "enabled": true,
+      "desiredRunCount": 3,
+      "writeJournal": true,
+      "providerCopyBufferSizeBytes": 524288,
+      "directWriteThresholdBytes": 0,
+      "bufferBatchBytes": 0,
+      "usePrototypeExecutor": true,
+      "prototypeStreamPump": "Overlapped2Reads",
+      "matchedControl": "P7_Serial_512K",
+      "validationRole": "Value"
+    },
+    {
+      "name": "Prod_Stream_512K_NoBatch",
+      "notes": "Parity anchor: production runner (StreamingCopyStrategy + StreamCopyEngine), 512 KiB, routing/batching/direct write disabled. Should match P7_Serial_512K; a gap means the prototype harness, not the pump, differs from production.",
+      "enabled": true,
+      "desiredRunCount": 3,
+      "writeJournal": true,
+      "providerCopyBufferSizeBytes": 524288,
+      "directWriteThresholdBytes": 0,
+      "bufferBatchBytes": 0,
+      "destinationRoutingEnabled": false,
+      "usePrototypeExecutor": false,
+      "matchedControl": "P7_Serial_512K",
+      "expectedEffectiveCopyBufferSizeBytes": 524288,
+      "expectedEffectiveBatchBufferBytes": 0,
+      "expectedEffectiveTinyFileFastPathThresholdBytes": 0,
+      "expectedEffectiveDestinationRoutingEnabled": false,
+      "validationRole": "Equivalence"
+    }
+  ],
+  "sourcePools": {}
+}

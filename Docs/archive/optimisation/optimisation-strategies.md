@@ -113,6 +113,8 @@ To automate cache clearing without rebooting, download Sysinternals [RAMMap](htt
   "ramMapPath": "D:\\Tools\\RAMMap\\RAMMap64.exe"
 ```
 
+**Note (2026-10-22):** the current harness does not read `clearCacheBetweenRuns`/`ramMapPath`. Set `"purgeSourceCacheBeforeRun": true` instead: it opens each source file unbuffered before every run, which evicts it from the cache without admin rights (see [Phase 7](optimisation-strategies-phase-7.md#inter-phase-overlap-prototype-usb-hdd--sata-hdd-2026-10-22)).
+
 **Important:** RAMMap requires Administrator privileges to empty the working sets and standby list. You *must* run the benchmark suite from an **Administrator command prompt or PowerShell instance**. If you run it from a standard console, Windows UAC will intercept the RAMMap execution and prompt you for permission on every single cache clear.
 
 Per-iteration protocol:
@@ -229,4 +231,4 @@ This document should contain summaries with enough context to know when and wher
 | Phase 4 | DONE | [Progress Throttling](optimisation-strategies-phase-4.md) | Documents the progress reporter extraction and dual-gate throttling defaults. | Changing progress event cadence, progress UX, or execution progress settings. |
 | Phase 5 | DONE | [Buffer Size Scaling](optimisation-strategies-phase-5.md) | Cross-drive large-file buffer sweep; retracts preallocation and supports 1 MiB SSD / 512 KiB HDD defaults. | Changing large-file copy buffers, preallocation, or the open SameDriveSSD larger-buffer probe. |
 | Phase 6 | DONE | [Destination-Sensitive Policies](optimisation-strategies-phase-6.md) | Static destination routing, USB validation, and per-device learned profile design notes. | Changing destination profiles, provider capabilities, USB policy, or adaptive per-device learning. |
-| Phase 7 | RESERVED | [Parallelism](optimisation-strategies-phase-7.md) | Reserved last-resort concurrency design and benchmark gates. | Considering any parallel copy path or concurrency default. |
+| Phase 7 | RESERVED | [Parallelism](optimisation-strategies-phase-7.md) | Reserved last-resort concurrency design and benchmark gates. A read/write-overlap prototype gave no gain on USB HDD → SATA HDD: SmartCopy already matches `CopyFile2` at the source's sequential ceiling. | Considering any parallel copy path or concurrency default, or investigating a SmartCopy-vs-Explorer speed gap. |

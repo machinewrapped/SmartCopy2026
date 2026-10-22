@@ -13,7 +13,7 @@ public class FileSizeConverter : IValueConverter
         {
             if (bytes == 0) return string.Empty;
             
-            string[] suf = { "B", "KB", "MB", "GB", "TB", "PB", "EB" }; 
+            string[] suf = { "B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB" }; 
             if (bytes == 0)
                 return "0 " + suf[0];
             long bytesTemp = Math.Abs(bytes);

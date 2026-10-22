@@ -34,6 +34,7 @@ internal sealed class PrototypeCopyExecutor : ICopyExecutor
     private readonly long _bufferBatchBytes;
     private readonly long _batchEligibilityThresholdBytes;
     private readonly bool _writeSequentialScan;
+    private readonly StreamPumpMode? _streamPump;
 
     public PrototypeCopyExecutor(
         string destinationPath,
@@ -41,7 +42,8 @@ internal sealed class PrototypeCopyExecutor : ICopyExecutor
         long directWriteThresholdBytes,
         long bufferBatchBytes,
         long batchEligibilityThresholdBytes,
-        bool writeSequentialScan)
+        bool writeSequentialScan,
+        StreamPumpMode? streamPump = null)
     {
         _destinationPath = destinationPath;
         _overwriteMode = overwriteMode;
@@ -49,10 +51,28 @@ internal sealed class PrototypeCopyExecutor : ICopyExecutor
         _bufferBatchBytes = bufferBatchBytes;
         _batchEligibilityThresholdBytes = batchEligibilityThresholdBytes;
         _writeSequentialScan = writeSequentialScan;
+        _streamPump = streamPump;
     }
 
     public Task<IReadOnlyList<TransformResult>> ExecuteAsync(PipelineJob job, CancellationToken ct)
     {
+        if (_streamPump is { } pump)
+        {
+            if (_directWriteThresholdBytes > 0 || _bufferBatchBytes > 0)
+            {
+                throw new InvalidOperationException(
+                    "prototypeStreamPump is stream-only; set directWriteThresholdBytes and bufferBatchBytes to 0.");
+            }
+
+            return BenchmarkCopyRunner.RunStreamPumpAsync(
+                job,
+                _destinationPath,
+                _overwriteMode,
+                job.OperationalSettings.CopyBufferSizeBytes,
+                pump,
+                ct);
+        }
+
         if (_directWriteThresholdBytes > 0 || _bufferBatchBytes > 0)
         {
             return BenchmarkCopyRunner.RunAsync(

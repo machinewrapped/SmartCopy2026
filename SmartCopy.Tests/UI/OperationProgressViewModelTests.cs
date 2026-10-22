@@ -8,11 +8,11 @@ public sealed class OperationProgressViewModelTests
 {
     [Theory]
     [InlineData(1023, 1, "1023B/s")]
-    [InlineData(1024, 1, "1.0KB/s")]
-    [InlineData(3 * 1024, 2, "1.5KB/s")]
-    [InlineData(1024 * 1024, 1, "1.0MB/s")]
-    [InlineData(3 * 1024 * 1024, 2, "1.5MB/s")]
-    [InlineData(1024L * 1024 * 1024, 1, "1.00GB/s")]
+    [InlineData(1024, 1, "1.0KiB/s")]
+    [InlineData(3 * 1024, 2, "1.5KiB/s")]
+    [InlineData(1024 * 1024, 1, "1.0MiB/s")]
+    [InlineData(3 * 1024 * 1024, 2, "1.5MiB/s")]
+    [InlineData(1024L * 1024 * 1024, 1, "1.00GiB/s")]
     public void Update_SetsRollingTransferSpeed(long completedBytes, int elapsedSeconds, string expected)
     {
         var vm = new OperationProgressViewModel();
@@ -39,11 +39,11 @@ public sealed class OperationProgressViewModelTests
 
         Report(vm, completedBytes: 0, elapsedSeconds: 1);
         Report(vm, completedBytes: 10 * 1024 * 1024, elapsedSeconds: 2);
-        Assert.Equal("10.0MB/s", vm.TransferSpeed);
+        Assert.Equal("10.0MiB/s", vm.TransferSpeed);
 
         Report(vm, completedBytes: 11 * 1024 * 1024, elapsedSeconds: 12);
 
-        Assert.Equal("102.4KB/s", vm.TransferSpeed);
+        Assert.Equal("102.4KiB/s", vm.TransferSpeed);
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public sealed class OperationProgressViewModelTests
 
         Report(vm, completedBytes: 0, elapsedSeconds: 1);
         Report(vm, completedBytes: 1024 * 1024, elapsedSeconds: 2);
-        Assert.Equal("1.0MB/s", vm.TransferSpeed);
+        Assert.Equal("1.0MiB/s", vm.TransferSpeed);
 
         Report(vm, completedBytes: 1024 * 1024, elapsedSeconds: 12);
 
@@ -68,12 +68,12 @@ public sealed class OperationProgressViewModelTests
 
         Report(vm, completedBytes: 0, elapsedSeconds: 0);
         Report(vm, completedBytes: 10 * 1024 * 1024, elapsedSeconds: 1);
-        Assert.Equal("10.0MB/s", vm.TransferSpeed);
+        Assert.Equal("10.0MiB/s", vm.TransferSpeed);
 
         // The 10MB measured over 1s of reports now spans 4s of wall clock.
         clock.Advance(TimeSpan.FromSeconds(3));
         vm.TickStaleness();
-        Assert.Equal("2.5MB/s", vm.TransferSpeed);
+        Assert.Equal("2.5MiB/s", vm.TransferSpeed);
 
         // Every sample has now aged out of the 10s window.
         clock.Advance(TimeSpan.FromSeconds(30));
@@ -102,7 +102,7 @@ public sealed class OperationProgressViewModelTests
 
         Report(vm, completedBytes: 0, elapsedSeconds: 0);
         Report(vm, completedBytes: 10 * 1024 * 1024, elapsedSeconds: 1);
-        Assert.Equal("10.0MB/s", vm.TransferSpeed);
+        Assert.Equal("10.0MiB/s", vm.TransferSpeed);
 
         // A following delete step reports no transfer.
         Report(vm, completedBytes: 1024, elapsedSeconds: 0, transfersData: false);
@@ -117,14 +117,14 @@ public sealed class OperationProgressViewModelTests
 
         Report(vm, completedBytes: 0, elapsedSeconds: 0);
         Report(vm, completedBytes: 10 * 1024 * 1024, elapsedSeconds: 5);
-        Assert.Equal("2.0MB/s", vm.TransferSpeed);
+        Assert.Equal("2.0MiB/s", vm.TransferSpeed);
 
         // A second executable step restarts the reporter's stopwatch and zeroes its byte count.
         // Without a reset the window would span the discontinuity and report nonsense.
         Report(vm, completedBytes: 0, elapsedSeconds: 0);
         Report(vm, completedBytes: 4 * 1024 * 1024, elapsedSeconds: 1);
 
-        Assert.Equal("4.0MB/s", vm.TransferSpeed);
+        Assert.Equal("4.0MiB/s", vm.TransferSpeed);
     }
 
     private static OperationProgressViewModel ActiveViewModel(FakeClock clock)
