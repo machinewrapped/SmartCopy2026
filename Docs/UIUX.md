@@ -183,6 +183,8 @@ For free-text inputs that require validation (such as the Extension filter's add
 
 ## 4. Pipeline UX Flow
 
+After a job ends, the tree and file list reapply the active filters against the current filesystem state. This lets a mirror filter exclude files copied to its comparison destination by that job.
+
 ### Pipeline Step Card Anatomy
 
 Each step in the pipeline strip is a card. Cards follow the same summary/subtitle pattern as filter cards, with an additional (optional) warning when the step is invalid or destructive.
