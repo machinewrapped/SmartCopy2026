@@ -41,7 +41,7 @@ internal static class BenchmarkHelpers
 
     public static string FormatSize(long bytes)
     {
-        string[] units = { "B", "KB", "MB", "GB", "TB" };
+        string[] units = { "B", "KiB", "MiB", "GiB", "TiB" };
         double len = bytes;
         int order = 0;
         while (len >= 1024 && order < units.Length - 1)

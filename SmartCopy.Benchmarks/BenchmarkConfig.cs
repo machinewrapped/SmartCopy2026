@@ -21,6 +21,13 @@ internal sealed class BenchmarkConfig
     public int CooldownSeconds { get; set; } = 60;
 
     /// <summary>
+    /// Before each copy, opens every selected source file once with <c>FILE_FLAG_NO_BUFFERING</c>.
+    /// Windows flushes and purges a file's cached pages when it is opened non-cached, so each run
+    /// reads from disk without a reboot, RAMMap, or administrator rights. Verified on exFAT and NTFS.
+    /// </summary>
+    public bool PurgeSourceCacheBeforeRun { get; set; }
+
+    /// <summary>
     /// Keyed by normalized base source path. Each value is the (shuffled) list of pool
     /// paths for that source root, shared across all scenarios that use that source.
     /// Populated on first benchmark run; persisted to the config file.

@@ -62,7 +62,7 @@ The main content area uses a **3-column layout** — Filters | Folders | Files �
 ├─────────────────┴─┴──────────────────┴─┴─────────────────────────────────────┤
 │ LOG PANEL                                                   [Clear] [Save]   │
 ├──────────────────────────────────────────────────────────────────────────────┤
-│ 142 files selected · 2.3 GB · 17 filtered out          12/142 ████░ 34% 0:34 │
+│ 142 files selected · 2.3 GiB · 17 filtered out         12/142 ████░ 34% 0:34 │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -71,7 +71,7 @@ The main content area uses a **3-column layout** — Filters | Folders | Files �
 ```text
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │ [SelectionView: always visible]          [OperationProgressView: when active] │
-│ 142 files selected · 2.3 GB · 17 filt…  12/142 ████░░ 34% 18.4MB/s  0:34 [‖][✕] │
+│ 142 files selected · 2.3 GiB · 17 filt… 12/142 ████░░ 34% 18.4MiB/s 0:34 [‖][✕] │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -182,6 +182,8 @@ For free-text inputs that require validation (such as the Extension filter's add
 ---
 
 ## 4. Pipeline UX Flow
+
+After a job ends, the tree and file list reapply the active filters against the current filesystem state. This lets a mirror filter exclude files copied to its comparison destination by that job.
 
 ### Pipeline Step Card Anatomy
 
@@ -333,10 +335,10 @@ When the pipeline contains a `DeleteStep`, the `[▶ Run]` button is replaced by
 ┌──────────────────────────────────────────────────────────┐
 │  ⚠ Permanent delete — files CANNOT be recovered.        │
 ├──────────────────────────────────────────────────────────┤
-│  Will delete 47 files · 1.2 GB                           │
+│  Will delete 47 files · 1.2 GiB                          │
 │ ┌──────────────────────────────────────────────────────┐ │
-│ │ Abbey Road/01 Come Together.flac               45 MB │ │
-│ │ Abbey Road/02 Something.flac                   38 MB │ │
+│ │ Abbey Road/01 Come Together.flac              45 MiB │ │
+│ │ Abbey Road/02 Something.flac                  38 MiB │ │
 │ │ ...                                                  │ │
 │ └──────────────────────────────────────────────────────┘ │
 ├──────────────────────────────────────────────────────────┤

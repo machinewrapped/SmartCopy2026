@@ -5,7 +5,7 @@ using SmartCopy.Core.Filters.Filters;
 
 namespace SmartCopy.UI.ViewModels.Filters;
 
-public enum SizeUnit { Bytes, KB, MB, GB, TB }
+public enum SizeUnit { Bytes, KiB, MiB, GiB, TiB }
 
 public partial class SizeRangeFilterEditorViewModel : FilterEditorViewModelBase
 {
@@ -18,10 +18,10 @@ public partial class SizeRangeFilterEditorViewModel : FilterEditorViewModelBase
     private double? _maxValue;
 
     [ObservableProperty]
-    private SizeUnit _minUnit = SizeUnit.MB;
+    private SizeUnit _minUnit = SizeUnit.MiB;
 
     [ObservableProperty]
-    private SizeUnit _maxUnit = SizeUnit.MB;
+    private SizeUnit _maxUnit = SizeUnit.MiB;
 
     partial void OnMinValueChanged(double? value) => AutoUpdateName();
     partial void OnMaxValueChanged(double? value) => AutoUpdateName();
@@ -35,10 +35,10 @@ public partial class SizeRangeFilterEditorViewModel : FilterEditorViewModelBase
 
     private static long UnitMultiplier(SizeUnit u) => u switch
     {
-        SizeUnit.KB => 1024L,
-        SizeUnit.MB => 1024L * 1024,
-        SizeUnit.GB => 1024L * 1024 * 1024,
-        SizeUnit.TB => 1024L * 1024 * 1024 * 1024,
+        SizeUnit.KiB => 1024L,
+        SizeUnit.MiB => 1024L * 1024,
+        SizeUnit.GiB => 1024L * 1024 * 1024,
+        SizeUnit.TiB => 1024L * 1024 * 1024 * 1024,
         _ => 1L
     };
 
@@ -70,7 +70,7 @@ public partial class SizeRangeFilterEditorViewModel : FilterEditorViewModelBase
     private static (double? value, SizeUnit unit) BackCalculate(long? bytes)
     {
         if (!bytes.HasValue)
-            return (null, SizeUnit.MB);
+            return (null, SizeUnit.MiB);
         var unit = BestUnitForBytes(bytes.Value);
         var multiplier = (double)UnitMultiplier(unit);
         return (Math.Round(bytes.Value / multiplier, 2), unit);
@@ -81,10 +81,10 @@ public partial class SizeRangeFilterEditorViewModel : FilterEditorViewModelBase
     /// </summary>
     private static SizeUnit BestUnitForBytes(long bytes)
     {
-        if (bytes >= UnitMultiplier(SizeUnit.TB)) return SizeUnit.TB;
-        if (bytes >= UnitMultiplier(SizeUnit.GB)) return SizeUnit.GB;
-        if (bytes >= UnitMultiplier(SizeUnit.MB)) return SizeUnit.MB;
-        if (bytes >= UnitMultiplier(SizeUnit.KB)) return SizeUnit.KB;
+        if (bytes >= UnitMultiplier(SizeUnit.TiB)) return SizeUnit.TiB;
+        if (bytes >= UnitMultiplier(SizeUnit.GiB)) return SizeUnit.GiB;
+        if (bytes >= UnitMultiplier(SizeUnit.MiB)) return SizeUnit.MiB;
+        if (bytes >= UnitMultiplier(SizeUnit.KiB)) return SizeUnit.KiB;
         return SizeUnit.Bytes;
     }
 }

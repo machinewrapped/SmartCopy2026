@@ -68,6 +68,8 @@ internal sealed class BenchmarkTask
             SetupProviders();
             await ResolveAndValidateRunSettingsAsync();
             await ScanAsync();
+            if (_config.PurgeSourceCacheBeforeRun)
+                PurgeSourceCache();
             await RunCopyAsync();
             if (ShouldWriteJournal())
                 await WriteJournalAsync(runStartedUtc);
@@ -318,6 +320,21 @@ internal sealed class BenchmarkTask
         _state.Root.BuildStats();
     }
 
+    private void PurgeSourceCache()
+    {
+        const FileOptions NoBuffering = (FileOptions)0x20000000;
+        BenchmarkHelpers.UpdateProgress("Purging source files from the OS file cache...");
+        foreach (var node in _state.Root!.GetSelectedDescendants())
+        {
+            _ct.ThrowIfCancellationRequested();
+            if (node.IsDirectory)
+                continue;
+
+            using var handle = File.OpenHandle(node.FullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, NoBuffering);
+        }
+        BenchmarkHelpers.UpdateProgress("");
+    }
+
     private async Task RunCopyAsync()
     {
         var resolvedDestinationProvider = _registry!.ResolveProvider(_destinationPath)
@@ -339,7 +356,7 @@ internal sealed class BenchmarkTask
             : new PrototypeCopyExecutor(
                 _destinationPath, overwriteMode,
                 directWriteThresholdBytes, bufferBatchBytes, batchEligibilityThresholdBytes,
-                writeSequentialScan);
+                writeSequentialScan, _variant.PrototypeStreamPump);
 
         BenchmarkHelpers.UpdateProgress("Preparing copy...");
         using (var executeProgress = new ThrottledConsoleProgress<OperationProgress>(p =>
@@ -497,6 +514,7 @@ internal sealed class BenchmarkTask
             ["runIndex"] = _nextRunIndex.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["providerCopyBufferSizeBytes"] = providerOptions.CopyBufferSizeBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["providerSmallFileProgressThresholdBytes"] = providerOptions.SmallFileProgressThresholdBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["prototypeStreamPump"] = _variant.PrototypeStreamPump?.ToString(),
             ["providerWriteSequentialScan"] = (_variant.ProviderWriteSequentialScan ?? _scenario.ProviderWriteSequentialScan ?? false).ToString(),
             ["bufferBatchBytes"] = (_variant.BufferBatchBytes ?? _scenario.BufferBatchBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["batchEligibilityThresholdBytes"] = (_variant.BatchEligibilityThresholdBytes ?? _scenario.BatchEligibilityThresholdBytes ?? 0L).ToString(System.Globalization.CultureInfo.InvariantCulture),
