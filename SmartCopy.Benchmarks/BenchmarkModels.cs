@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using SmartCopy.Core.DirectoryTree;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
@@ -93,6 +94,8 @@ internal sealed class BenchmarkRunRecord
     public int? ProviderCopyBufferSizeBytes { get; init; }
     public long? ProviderSmallFileProgressThresholdBytes { get; init; }
     public bool? ProviderWriteSequentialScan { get; init; }
+    [JsonConverter(typeof(JsonStringEnumConverter<StreamPumpMode>))]
+    public StreamPumpMode? PrototypeStreamPump { get; init; }
     public long? DirectWriteThresholdBytes { get; init; }
     public long? BufferBatchBytes { get; init; }
     public long? BatchEligibilityThresholdBytes { get; init; }
@@ -152,6 +155,7 @@ internal sealed class BenchmarkRunRecord
             ProviderCopyBufferSizeBytes = providerOptions.CopyBufferSizeBytes,
             ProviderSmallFileProgressThresholdBytes = providerOptions.SmallFileProgressThresholdBytes,
             ProviderWriteSequentialScan = variant.ProviderWriteSequentialScan ?? scenario.ProviderWriteSequentialScan,
+            PrototypeStreamPump = variant.PrototypeStreamPump,
             DirectWriteThresholdBytes = variant.DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes,
             BufferBatchBytes = variant.BufferBatchBytes ?? scenario.BufferBatchBytes,
             BatchEligibilityThresholdBytes = variant.BatchEligibilityThresholdBytes ?? scenario.BatchEligibilityThresholdBytes,
@@ -241,6 +245,7 @@ internal sealed class BenchmarkRunRecord
             ProviderCopyBufferSizeBytes = providerOptions.CopyBufferSizeBytes,
             ProviderSmallFileProgressThresholdBytes = providerOptions.SmallFileProgressThresholdBytes,
             ProviderWriteSequentialScan = variant.ProviderWriteSequentialScan ?? scenario.ProviderWriteSequentialScan,
+            PrototypeStreamPump = variant.PrototypeStreamPump,
             DirectWriteThresholdBytes = variant.DirectWriteThresholdBytes ?? scenario.DirectWriteThresholdBytes,
             BufferBatchBytes = variant.BufferBatchBytes ?? scenario.BufferBatchBytes,
             BatchEligibilityThresholdBytes = variant.BatchEligibilityThresholdBytes ?? scenario.BatchEligibilityThresholdBytes,

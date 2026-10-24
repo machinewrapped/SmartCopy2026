@@ -16,10 +16,10 @@
             <ComboBox Grid.Column="2" SelectedItem="{Binding MinUnit}">
                 <ComboBox.Items>
                     <vm:SizeUnit>Bytes</vm:SizeUnit>
-                    <vm:SizeUnit>KB</vm:SizeUnit>
-                    <vm:SizeUnit>MB</vm:SizeUnit>
-                    <vm:SizeUnit>GB</vm:SizeUnit>
-                    <vm:SizeUnit>TB</vm:SizeUnit>
+                    <vm:SizeUnit>KiB</vm:SizeUnit>
+                    <vm:SizeUnit>MiB</vm:SizeUnit>
+                    <vm:SizeUnit>GiB</vm:SizeUnit>
+                    <vm:SizeUnit>TiB</vm:SizeUnit>
                 </ComboBox.Items>
             </ComboBox>
         </Grid>
@@ -35,10 +35,10 @@
             <ComboBox Grid.Column="2" SelectedItem="{Binding MaxUnit}">
                 <ComboBox.Items>
                     <vm:SizeUnit>Bytes</vm:SizeUnit>
-                    <vm:SizeUnit>KB</vm:SizeUnit>
-                    <vm:SizeUnit>MB</vm:SizeUnit>
-                    <vm:SizeUnit>GB</vm:SizeUnit>
-                    <vm:SizeUnit>TB</vm:SizeUnit>
+                    <vm:SizeUnit>KiB</vm:SizeUnit>
+                    <vm:SizeUnit>MiB</vm:SizeUnit>
+                    <vm:SizeUnit>GiB</vm:SizeUnit>
+                    <vm:SizeUnit>TiB</vm:SizeUnit>
                 </ComboBox.Items>
             </ComboBox>
         </Grid>

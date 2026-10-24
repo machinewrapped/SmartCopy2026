@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using SmartCopy.Core.FileSystem;
 using SmartCopy.Core.Pipeline;
 using SmartCopy.Core.Settings;
@@ -24,6 +25,13 @@ internal sealed class BenchmarkVariant
     /// validation=production); true forces the prototype executor; false forces the production runner.
     /// </summary>
     public bool? UsePrototypeExecutor { get; set; }
+    /// <summary>
+    /// Phase 7: routes the prototype executor through the stream-only
+    /// <see cref="BenchmarkCopyRunner.RunStreamPumpAsync"/> with this byte pump. Null keeps the
+    /// legacy prototype routing. Ignored by the production executor.
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<StreamPumpMode>))]
+    public StreamPumpMode? PrototypeStreamPump { get; set; }
     public string? MatchedControl { get; set; }
     public int? ExpectedEffectiveCopyBufferSizeBytes { get; set; }
     public long? ExpectedEffectiveBatchBufferBytes { get; set; }
