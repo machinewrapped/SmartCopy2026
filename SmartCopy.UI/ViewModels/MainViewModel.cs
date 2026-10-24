@@ -1526,6 +1526,19 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             FileList.RemoveAllMarkedForRemoval();
             DirectoryTree.RemoveNodesMarkedForRemoval();
             await ApplyPendingWatcherBatchesAsync();
+
+            // A copy can change a filter's comparison destination without changing the source
+            // tree watched above. Re-evaluate against the completed destination state.
+            try
+            {
+                if (DirectoryTree.IsLoaded)
+                    await ApplyFiltersAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to refresh filters after pipeline execution");
+                LogPanel.AddEntry("Failed to refresh filters after the job; use Rescan to refresh", LogLevel.Error);
+            }
         }
 
         if (_settings.WriteOperationJournal && results is { Count: > 0 })
