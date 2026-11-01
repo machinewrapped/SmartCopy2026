@@ -364,3 +364,5 @@ All critical actions must be keyboard-accessible from the initial shell:
 Screen-reader labels and focus states are part of the UI shell, not a polish item. Avalonia supports `AutomationProperties.Name` — use it from the start.
 
 ---
+
+The **Mirror File** and **Mirror Folder** filters compare against a manually selected path or the pipeline destination. Mirror File matches existing files; Mirror Folder matches files whose containing folder exists at the comparison path, and checks empty folders by their own path. Choose Exclude in Mirror Folder to keep files in folders absent from the comparison path.

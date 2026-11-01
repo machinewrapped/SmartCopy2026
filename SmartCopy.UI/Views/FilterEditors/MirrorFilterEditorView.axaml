@@ -19,7 +19,7 @@
         </StackPanel>
 
         <!-- Compare mode -->
-        <StackPanel Spacing="4">
+        <StackPanel Spacing="4" IsVisible="{Binding ShowCompareMode}">
             <TextBlock Text="Compare by" FontSize="12" Opacity="0.7" />
             <StackPanel Orientation="Horizontal" Spacing="16">
                 <RadioButton Content="Name only"

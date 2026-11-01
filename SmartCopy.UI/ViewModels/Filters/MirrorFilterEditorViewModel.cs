@@ -7,6 +7,9 @@ namespace SmartCopy.UI.ViewModels.Filters;
 
 public partial class MirrorFilterEditorViewModel : FilterEditorViewModelBase
 {
+    public bool UnmirroredFolder { get; }
+    public bool MirrorFolder { get; }
+    public bool ShowCompareMode => !UnmirroredFolder && !MirrorFolder;
     public PathPickerViewModel ComparisonPathPicker { get; }
 
     public string ComparisonPath
@@ -40,8 +43,10 @@ public partial class MirrorFilterEditorViewModel : FilterEditorViewModelBase
         set { if (value) CompareMode = MirrorCompareMode.NameAndSize; }
     }
 
-    public MirrorFilterEditorViewModel(AppSettings settings)
+    public MirrorFilterEditorViewModel(AppSettings settings, bool unmirroredFolder = false, bool mirrorFolder = false)
     {
+        UnmirroredFolder = unmirroredFolder;
+        MirrorFolder = mirrorFolder;
         ComparisonPathPicker = new PathPickerViewModel(settings, PathPickerMode.Target);
         ComparisonPathPicker.PropertyChanged += (s, e) =>
         {
@@ -73,7 +78,7 @@ public partial class MirrorFilterEditorViewModel : FilterEditorViewModelBase
     }
 
     public override IFilter BuildFilter()
-        => new MirrorFilter(ComparisonPath, CompareMode, Mode, IsEnabled, UseAutomaticPath);
+        => new MirrorFilter(ComparisonPath, CompareMode, Mode, IsEnabled, UseAutomaticPath, UnmirroredFolder, MirrorFolder);
 
     public override void LoadFrom(IFilter filter)
     {
@@ -93,6 +98,8 @@ public partial class MirrorFilterEditorViewModel : FilterEditorViewModelBase
     public override string GenerateName()
     {
         var prefix = Mode.ToString();
+        if (UnmirroredFolder || MirrorFolder)
+            return $"{prefix} {(UnmirroredFolder ? "unmirrored" : "mirrored")} folders";
         if (UseAutomaticPath)
             return $"{prefix} mirrored (auto)";
         return string.IsNullOrEmpty(ComparisonPath)

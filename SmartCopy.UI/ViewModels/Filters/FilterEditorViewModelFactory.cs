@@ -16,6 +16,8 @@ public static class FilterEditorViewModelFactory
         "DateRange" => new DateRangeFilterEditorViewModel(),
         "SizeRange" => new SizeRangeFilterEditorViewModel(),
         "Mirror"    => new MirrorFilterEditorViewModel(settings),
+        "UnmirroredFolder" => new MirrorFilterEditorViewModel(settings, unmirroredFolder: true),
+        "MirrorFolder" => new MirrorFilterEditorViewModel(settings, mirrorFolder: true),
         "Attribute" => new AttributeFilterEditorViewModel(),
         _ => throw new InvalidOperationException($"Unknown filter type: {filterType}")
     };

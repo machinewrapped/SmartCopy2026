@@ -17,14 +17,18 @@ public sealed class MirrorFilter : FilterBase, IPipelineAwareFilter
         MirrorCompareMode compareMode,
         FilterMode mode,
         bool isEnabled = true,
-        bool useAutomaticPath = false)
-        : base("Mirror", mode, isEnabled)
+        bool useAutomaticPath = false, bool unmirroredFolder = false, bool mirrorFolder = false)
+        : base(unmirroredFolder ? "UnmirroredFolder" : mirrorFolder ? "MirrorFolder" : "Mirror", mode, isEnabled)
     {
+        UnmirroredFolder = unmirroredFolder;
+        MirrorFolder = mirrorFolder;
         ComparisonPath = comparisonPath;
         CompareMode = compareMode;
         UseAutomaticPath = useAutomaticPath;
     }
 
+    public bool UnmirroredFolder { get; }
+    public bool MirrorFolder { get; }
     public string ComparisonPath { get; }
     public MirrorCompareMode CompareMode { get; }
     public bool UseAutomaticPath { get; }
@@ -35,10 +39,11 @@ public sealed class MirrorFilter : FilterBase, IPipelineAwareFilter
     private string EffectiveComparisonPath =>
         UseAutomaticPath ? (PipelineDestinationPath ?? string.Empty) : ComparisonPath;
 
+    public override string TypeDisplayName => UnmirroredFolder ? "Unmirrored Folder" : MirrorFolder ? "Mirror Folder" : "Mirror File";
     public override bool AppliesToDirectories => true;
 
-    public override string Summary => "Skip files already in target";
-    public override string Description => UseAutomaticPath
+    public override string Summary => UnmirroredFolder ? "Match files whose folder is absent from the target" : MirrorFolder ? "Match files whose folder exists at the target" : "Match files that exist at the target";
+    public override string Description => UnmirroredFolder || MirrorFolder ? $"{(MirrorFolder ? "Mirror folder" : "Unmirrored folder")}: {(UseAutomaticPath ? "(automatic)" : ComparisonPath)}" : UseAutomaticPath
         ? $"Mirror: (automatic) ({CompareMode})"
         : $"Mirror: {ComparisonPath} ({CompareMode})";
 
@@ -55,6 +60,17 @@ public sealed class MirrorFilter : FilterBase, IPipelineAwareFilter
             // Return the neutral value for this mode: true for Only (don't exclude anything),
             // false for Exclude/Add (don't exclude or force-include anything).
             return UseAutomaticPath && Mode == FilterMode.Only;
+        }
+
+        if (UnmirroredFolder || MirrorFolder)
+        {
+            // Files use their containing folder; directories use their own path.
+            var segments = node is DirectoryNode
+                ? node.RelativePathSegments
+                : node.Parent?.RelativePathSegments ?? Array.Empty<string>();
+            var folderPath = comparisonProvider.JoinPath(effectivePath, segments);
+            var folder = await comparisonProvider.TryGetNodeAsync(folderPath, ct);
+            return UnmirroredFolder ? folder is not { IsDirectory: true } : folder is { IsDirectory: true };
         }
 
         var comparePath = comparisonProvider.JoinPath(effectivePath, node.RelativePathSegments);
