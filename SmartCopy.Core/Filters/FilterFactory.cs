@@ -21,6 +21,8 @@ public static class FilterFactory
             "DateRange"  => BuildDateRange(config, mode),
             "SizeRange"  => BuildSizeRange(config, mode),
             "Mirror"     => BuildMirror(config, mode),
+            "UnmirroredFolder" => BuildMirror(config, mode, unmirroredFolder: true),
+            "MirrorFolder" => BuildMirror(config, mode, mirrorFolder: true),
             "Attribute"  => BuildAttribute(config, mode),
             _ => throw new InvalidOperationException($"Unknown filter type: {config.FilterType}")
         };
@@ -81,7 +83,7 @@ public static class FilterFactory
         return new SizeRangeFilter(minBytes, maxBytes, mode, c.IsEnabled);
     }
 
-    private static IFilter BuildMirror(FilterConfig c, FilterMode mode)
+    private static IFilter BuildMirror(FilterConfig c, FilterMode mode, bool unmirroredFolder = false, bool mirrorFolder = false)
     {
         var comparisonPath = c.Parameters["comparisonPath"]?.GetValue<string>() ?? string.Empty;
         var compareModeStr = c.Parameters["compareMode"]?.GetValue<string>() ?? "NameAndSize";
@@ -89,7 +91,7 @@ public static class FilterFactory
         var useAutomaticPath = c.Parameters.TryGetPropertyValue("useAutomaticPath", out var autoNode)
             && autoNode is not null
             && autoNode.GetValue<bool>();
-        return new MirrorFilter(comparisonPath, compareMode, mode, c.IsEnabled, useAutomaticPath);
+        return new MirrorFilter(comparisonPath, compareMode, mode, c.IsEnabled, useAutomaticPath, unmirroredFolder, mirrorFolder);
     }
 
     private static IFilter BuildAttribute(FilterConfig c, FilterMode mode)

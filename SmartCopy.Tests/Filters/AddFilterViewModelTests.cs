@@ -30,11 +30,11 @@ public sealed class AddFilterViewModelTests
     // -------------------------------------------------------------------------
 
     [Fact]
-    public void FilterTypes_HasSixEntries()
+    public void FilterTypes_IncludesMirrorFolder()
     {
         var (vm, _) = CreateVm();
 
-        Assert.Equal(6, vm.FilterTypes.Count);
+        Assert.Contains(vm.FilterTypes, item => item.TypeKey == "MirrorFolder");
     }
 
     [Fact]
